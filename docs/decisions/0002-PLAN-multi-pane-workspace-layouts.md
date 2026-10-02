@@ -314,3 +314,40 @@ change. It was re-anchored and then killed.
 * `make lint` passed, as did `go test -race`, `LC_ALL=C go test` and
   `go mod tidy -diff`.
 * The Windows test host passed `go vet` and `go test -race`.
+
+### Step 3: `glyph` (2026-10-01)
+
+**What changed.**
+
+* **`glyph`** (standard library only).
+  * `Border` holds lipgloss's thirteen fields, in its order.
+  * `Set` holds four border styles (Light, Rounded, Heavy, Double), pane
+    separators, the focus marker, ellipsis, scroll indicators and bar,
+    bullet, and badge brackets: 64 glyphs.
+  * `Unicode()`, `ASCII()` and `For(utf8)`. The ASCII set draws every
+    border as `+-|`, except Double, whose rules are `=`. The ASCII ellipsis
+    is `~`, one cell, where `...` would be three.
+
+**Tests.**
+
+* A reflection walk checks every field of both sets: non-empty, one cell
+  (`x/ansi`, in the test only) and one rune. It asserts that it walked 64,
+  so a skipped field fails.
+* The ASCII set is printable ASCII.
+* `For` chooses by `utf8`, and the Unicode border styles are distinct.
+
+**Mutation proofs**; none survived:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| a two-cell Unicode glyph | `Unicode.Focus = "▸▸" is 2 cells, want 1` |
+| a non-ASCII rune in the ASCII set | `ASCII.Ellipsis = "…" holds U+2026, which is not printable ASCII` |
+| the reflection walk skips the last field | `ASCII: walked 59 glyphs, want 64` |
+| an empty glyph | `Unicode.BadgeClose is empty` |
+
+**Checks.**
+
+* `make pre-add-check` reported 2 files clean.
+* `make lint` passed, as did `go test -race`, `LC_ALL=C go test` and
+  `go mod tidy -diff`.
+* The Windows test host passed `go vet` and `go test -race`.
