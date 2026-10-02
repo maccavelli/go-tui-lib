@@ -351,3 +351,73 @@ change. It was re-anchored and then killed.
 * `make lint` passed, as did `go test -race`, `LC_ALL=C go test` and
   `go mod tidy -diff`.
 * The Windows test host passed `go vet` and `go test -race`.
+
+### Step 4: `theme` (2026-10-01)
+
+**What changed.**
+
+* **`theme`.**
+  * `Background` is Unknown, Dark or Light. `Palette` holds ten roles; a nil
+    colour means the terminal's own foreground. `DarkPalette`,
+    `LightPalette`, `UnknownPalette` and `PaletteFor` provide the built-in
+    palettes.
+  * `Styles` holds the ten roles plus `FocusTitle`. `BorderStyle` names
+    Light, Rounded, Heavy and Double, and `Theme.Border(style)` converts the
+    glyph set's border to a `lipgloss.Border`.
+  * `New(profile, background, glyphs, WithPalette(…))` builds a theme:
+    * with NoTTY, styles emit nothing;
+    * with ASCII, bold only;
+    * with ANSI and above, colours `Profile.Convert`ed when the theme is
+      built.
+* **The unknown palette.** A scan of the 240 xterm-256 colours found six
+  that clear 4.5:1 on both black and white: `#767676`, `#af5f5f`,
+  `#00875f`, `#5f5fff`, `#875fd7` and `#d700af`. The unknown palette uses
+  only these. No yellow or orange qualifies, so Warning is `#d700af` there.
+  The package comment states it, and rule 4 already requires a glyph or
+  text beside every colour.
+* **`go.mod`** requires `charm.land/lipgloss/v2` v2.0.6 and
+  `github.com/charmbracelet/colorprofile` v0.4.3, their first imports.
+  lipgloss brings `ultraviolet` and the `x` terminal packages as indirect
+  requirements. Nothing here imports them directly (MADR §1).
+
+**Tests.**
+
+* **Contrast.** The unknown palette's eight coloured roles clear 4.5:1 on
+  black and white, as written and after ANSI256 conversion. The dark and
+  light palettes clear 4.5:1 for text roles and 3:1 for the border, on
+  their own background.
+* **Profiles.**
+  * NoTTY renders every style plain.
+  * ASCII carries no colour sequence and keeps a bold `FocusTitle`.
+  * TrueColor, ANSI256 and ANSI emit `38;2;`, `38;5;` and `\x1b[9…`.
+* **Borders and options.** Borders come from the glyph set: rounded corners
+  in Unicode, `+` and `|` for every ASCII style. `WithPalette` replaces the
+  palette.
+* **Goldens.** Swatches across the matrix at 30 and 50 columns (8 files),
+  read before they were trusted: bold and colour in the colour cases, bold
+  only without colour, box width equal to the case width.
+
+**Mutation proofs**; none survived:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| the ASCII profile keeps colour, unconverted | `ASCII Muted renders "\x1b[38;2;138;138;138mx\x1b[m", which carries colour` |
+| an unknown-palette role below the contrast floor (`#808080`) | `Unknown.Muted as written: 3.95:1 on white, want 4.5` |
+| NoTTY keeps attributes | `NoTTY Title renders "\x1b[1mx\x1b[m", want plain "x"` |
+| colours are not converted to the profile | `profile ANSI256: Accent renders "\x1b[38;2;135;175;255mx\x1b[m", want "38;5;"` |
+| the border ignores the requested style | `Unicode rounded border = {… TopLeft:┌ …}` |
+
+The first mutation as written, "colour from ASCII upward", **survived as an
+equivalent mutation**: `colorprofile`'s `ASCII.Convert` already drops
+colour, so the change could not produce the defect. It was replaced by
+"colour from ASCII upward, unconverted". That replacement first failed to
+compile, because a variable became unused, and was fixed and killed. The
+survivor shows that ASCII safety rests on two layers, `build`'s gate and
+`colorprofile`. The test guards the gate.
+
+**Checks.**
+
+* `make pre-add-check` reported 2 files clean.
+* `make lint` passed, as did `go test -race`, `LC_ALL=C go test` and
+  `go mod tidy -diff`.
+* The Windows test host passed `go vet` and `go test -race`.
