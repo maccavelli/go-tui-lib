@@ -548,3 +548,148 @@ three were re-anchored, a fourth added for `Text`, and all re-run with Step
 * `go-fuzz_test.sh` passed 12 of 12, and `make fuzz` ran clean.
 * shellcheck and actionlint are clean.
 * The Windows test host passed `go vet` and `go test -race`.
+
+### Step 6: `workspace` (2026-10-01)
+
+**What changed.**
+
+* **`workspace`** (`workspace.go`, `render.go`, `overlay.go`, `keys.go`).
+  * **Interfaces.** `Pane`, plus the optional `Titled`, `Badged`, `Focuser`,
+    `Focusable`, `Sizer`, `Cursorer`, `KeyMapper`, `Changer` and
+    `EscConsumer`.
+  * **Construction.** `New`, `Init` and the options `WithTheme`,
+    `WithKeyMap`, `WithChrome`, `WithPaneChrome`, `WithBorder`,
+    `WithFocusRing`, `WithState`, `WithMouse` and `WithFocus`.
+  * **Hosting.** `Update`, `Render`, `Cursor`, `State`, `Plan` and `Err`.
+  * **Control.** `Focus`, `FocusNext`, `FocusPrev`, `Zoom`, `Toggle`,
+    `Resize`, `SetLayout`, `SetPane`, `SetState`, `Send`, `Broadcast` and
+    `To`.
+  * **Overlays.** `Overlay`, `Anchor` (`Center`, `BelowCursor`, `OnPane`),
+    `Push`, `Pop` and `Overlays`.
+  * **Keys.** `KeyMap` and `DefaultKeyMap`: `alt+]`, `alt+[`, `alt+1`–`alt+9`,
+    `alt+z`, `alt+shift+arrows`, and `esc` for overlays. None is `ctrl+c`.
+  * **Chrome.** `Chrome` is `Borders`, `Separators` or `None`, and
+    `SizeMsg` tells a pane its content size.
+* **Composition.**
+  * Each pane is clipped to exactly its content size, then placed as a Lip
+    Gloss layer with the pane's ID. Separators are layers at Z 1, and
+    overlays at Z 10 and up.
+  * One `Compositor` both renders the canvas and answers mouse hit tests.
+    Nothing imports `ultraviolet` directly.
+* **Routing.**
+  * Keys go to the workspace's bindings, then to the focused pane. A modal
+    overlay takes every key; a non-modal one takes only `esc`. `esc` pops
+    the top overlay unless it is an `EscConsumer`.
+  * Paste goes to the focused pane or the modal overlay. Every other message
+    is broadcast, and `To` targets one pane.
+  * Mouse events go by hit test: a click focuses, the wheel reaches the pane
+    under the pointer, a separator can be dragged, and coordinates are
+    pane-local. A modal overlay blocks what is beneath it, and `WithMouse(false)`
+    ignores the mouse.
+* **Before the first `tea.WindowSizeMsg`** the workspace lays out at 80×24,
+  so the first frame is not empty. `Init` returns the first `SizeMsg`s and
+  the focus command.
+
+**Deviation D2 (2026-10-01): per-pane chrome.**
+
+* **Found.** A golden frame showed a one-row footer in `Borders` chrome
+  raised to two rows, a border with no room for its content. A status line
+  should carry no chrome.
+* **Resolution.** `WithPaneChrome(id, chrome)` overrides the chrome for one
+  pane. It is an addition to MADR §3's option list in the same shape as the
+  others, and decides nothing else.
+* **Also fixed.** A box with no content rows drew a stray `||` row. It now
+  draws its top and bottom edges only.
+
+**`internal/conformance`** (test-only).
+
+* It parses every non-test Go file and fails on `os.Stdout`, `os.Stderr`,
+  `signal.Notify`, or `AltScreen` used as a field or key (0001 §6, rules 1
+  and 2).
+* It asserts that it read all five packages, and its own test proves each
+  rule on a planted file.
+
+**Tests**, through real `tea` messages and a recording fake pane:
+
+* every pane is told its size, and an unchanged size is not sent again;
+* focus cycles in ring order, skipping the non-focusable footer; `alt+2`
+  focuses the second pane; and a hidden pane loses focus;
+* keys reach only the focused pane, and `ctrl+c` is bound by nothing,
+  changes nothing, and reaches the pane;
+* a modal overlay traps keys and gets its content size; `esc` closes it,
+  unless the overlay consumes `esc`; a non-modal pop-up leaves keys to the
+  pane;
+* mouse:
+  * a click focuses and arrives pane-local;
+  * the wheel reaches the pane under the pointer;
+  * a border click focuses without forwarding;
+  * a modal overlay blocks clicks beneath it, and `WithMouse(false)`
+    ignores them;
+* a five-cell separator drag resizes by five, and motion after the release
+  does nothing; `alt+shift+left` resizes by one;
+* zoom and restore; hide and show;
+* the cursor is offset by the pane, and hidden when nil or outside it;
+* a `Changer` that reports no change is not viewed again, until it changes
+  or its size does;
+* a pane is clipped, and so is an overlay drawn over its neighbours;
+* under the ASCII profile the focused title has the marker and bold, and no
+  colour;
+* `Sizer` raises a layout minimum; `Send`, `Broadcast` and `To` deliver;
+* commands run concurrently, then are fed back, under `-race`.
+
+**Golden frames.** Five Borders scenes (focus on each of three panes, a
+modal permission dialog, a zoom) and one Separators scene, across the matrix
+at 80 and 160 columns: 48 files, read before they were trusted.
+
+* At 80 columns the sidebar folds under main, and the footer has no chrome.
+* At 160 the sidebar is on the right, with its badge and focus marker.
+* The modal dialog is centred and takes the focus marker.
+* The zoom fills the screen with the zoomed pane focused.
+* Separators draws the title rows and both separator lines.
+
+**Benchmarks.** `Render` at 200×60 with four panes took 1.60 ms, and 1.53
+ms with `Changer` panes. Composing the canvas dominates, not the panes'
+views, so `Changer` saves little with cheap views. Its saving grows with the
+cost of a view, such as Markdown rendering. Caching whole frames is a
+possible later optimisation, not in this PLAN.
+
+**Mutation proofs**; none survived:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| keys go to every pane | `keys: main [x], side [x], logs [x]` |
+| the wheel goes to the focused pane | `the wheel did not reach the pane under the pointer` |
+| the cursor is not offset | `cursor &{Position:{X:2 Y:1} …}, want (3,2)` |
+| `Changer` is ignored | `an unchanged Changer was viewed 2 times` |
+| the overlay does not trap keys | `dialog keys [], main keys [y], focus side` |
+| `ctrl+c` is consumed | `ctrl+c did not reach the focused pane: []` |
+| a modal overlay lets the mouse through | `a click reached a pane under a modal overlay` |
+| panes are not clipped | `row 18: the overlay painted past its box: "…\|OOOO…"` |
+| a non-focusable pane takes focus | `focus order [main side logs footer] (the footer is not focusable)` |
+| the conformance scan skips one package | `the scan did not read workspace (…)` |
+| the scan misses `os.Stdout` | `"writes to os.Stdout" found 0 times, want 1` |
+
+"Panes are not clipped" first **survived**. Panes are drawn left to right,
+so a pane's overflow lies under its neighbour, and the test could not see
+it. The test now pushes an overlay wider than its content, which is drawn
+above everything. The mutation was then killed. Pane clipping stays as
+defence in depth.
+
+**Lint, fixed at the source:**
+
+* an unneeded conversion and an unused test helper;
+* an embedded-field selector;
+* the confusing `send` / `Send` pair, now one exported method;
+* a 576-byte range copy;
+* `inset`, whose margin was always 1, now `insetBorder`.
+
+**`go.mod`** requires `charm.land/bubbletea/v2` v2.0.10 and
+`charm.land/bubbles/v2` v2.2.1, their first imports. The five direct
+requirements are exactly MADR §1's.
+
+**Checks.**
+
+* `make pre-add-check` reported 7 files clean.
+* `make lint` passed, as did `go test -race ./...`, `LC_ALL=C go test ./...`
+  and `go mod tidy -diff`.
+* The Windows test host passed `go vet` and `go test -race`.
