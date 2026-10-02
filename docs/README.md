@@ -9,6 +9,8 @@ Decisions and their implementation plans, in one numbered sequence.
 | 0001 | MADR | [Scaffold go-tui-lib as a Go 1.27.1 Charm v2 library to the go-core-lib standard, with honest gates until the first package lands](decisions/0001-MADR-scaffold-charm-tui-library.md) | accepted |
 | 0001 | PLAN | [Implement the go-tui-lib Go 1.27.1 Charm v2 library scaffold](decisions/0001-PLAN-scaffold-charm-tui-library.md) | complete |
 | 0001 | REPORT | [TUI working example, fleet consumers and the planned packages](reports/0001-REPORT-tui-working-example-and-consumers.md) | — |
+| 0002 | MADR | [Build multi-pane terminal workspaces from a pure layout solver and a Bubble Tea pane host, with pi-go's agent session as the first consumer](decisions/0002-MADR-multi-pane-workspace-layouts.md) | accepted |
+| 0002 | PLAN | [Implement multi-pane workspaces (`v0.1.0`)](decisions/0002-PLAN-multi-pane-workspace-layouts.md) | in-progress |
 
 ## I want to…
 
@@ -26,4 +28,5 @@ Decisions and their implementation plans, in one numbered sequence.
 | see what ocp-login's TUI design offers for extraction | [0001-REPORT, §1](reports/0001-REPORT-tui-working-example-and-consumers.md#1-the-working-example-ocp-login-by-pattern) |
 | know who will use this library | [0001-REPORT, §2 and §3](reports/0001-REPORT-tui-working-example-and-consumers.md#2-the-fleets-tui-programs) |
 | see the planned `updatetea` API | [0001-REPORT, §4](reports/0001-REPORT-tui-working-example-and-consumers.md#4-updatetea-as-go-core-lib-plans-it) |
+| know how the multi-pane workspace is designed | [0002-MADR](decisions/0002-MADR-multi-pane-workspace-layouts.md) |
 | know how this scaffold differs from go-core-lib's | [0001-MADR, §5](decisions/0001-MADR-scaffold-charm-tui-library.md#5-deliberate-differences-from-go-core-lib) |
