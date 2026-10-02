@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-10-01
 associated-madr: "0002-MADR-multi-pane-workspace-layouts.md"
 ---
@@ -867,3 +867,17 @@ before `v1`.
 * follow `docs/guides/building-workspaces.md`.
 
 pi-go must amend its import rule 5 to name `github.com/maccavelli/go-tui-lib`.
+
+### Close-out (2026-10-01)
+
+* **Pushed.** The owner pushed the scaffold and Steps 1–8, and then
+  force-pushed the history rewrite recorded in
+  [0001-PLAN-scaffold-charm-tui-library.md](0001-PLAN-scaffold-charm-tui-library.md)
+  Phase 4. `b54b217` is that rewrite's head.
+* **CI.** Run `36959770289` on `b54b21766c29` concluded `success` on
+  `ubuntu-24.04`, `windows-2025` and `macos-15`. That covers tests, race,
+  shuffle, `LC_ALL=C`, fuzz, cross vet, lint, govulncheck v1.8.0,
+  shellcheck, markdownlint and actionlint.
+* **Complete.** Every acceptance criterion in Verification is met, so this
+  PLAN is `complete`.
+* **Next.** The owner decides the `v0.1.0` tag.

@@ -489,3 +489,43 @@ Phase 4 brings them here. It decides nothing new.
   report. **A2** is the re-wording above.
 * **Index and architecture.** `docs/README.md` indexes the report and gains
   three rows. `docs/architecture.md` lists `docs/reports/`.
+
+**History rewrite (2026-10-01).**
+
+* **Found.** After the owner's push of `85ab9c1`, the first four commits
+  still held the file-level wording that amendment A2 had removed from the
+  tree. The owner chose to rewrite history ("option 1, clean it up").
+* **How.**
+  * `git filter-branch` rewrote the 13 commits after `ff5c504`.
+  * In the four early commits, 0001-MADR became the pattern-level text,
+    without A2's marker, which those commits predate.
+  * Every commit hash cited in the records was mapped to its new hash.
+  * Author, committer, dates and messages were kept.
+* **Checked before the push.**
+  * Only the planned files differed, and the final tree differed from the
+    old one by the four cited hashes alone.
+  * No rewritten commit contains the old wording.
+  * Every cited hash names its intended commit, and the tests passed.
+  * The disclosure guard passed.
+* **Published.** The owner force-pushed with a lease on `85ab9c1`. CI run
+  `36959770289` on `b54b217` concluded `success` on all three operating
+  systems.
+* **Not cleaned.** GitHub may serve the old commits by hash until it
+  collects them. CI run `36955512636` refers to the old `85ab9c1`.
+* **The mapping**, for anything that cites an old hash:
+
+| Before | After |
+| :--- | :--- |
+| `65fb134` | `bcfab0b` |
+| `0d1b327` | `a65b2c8` |
+| `f0cb79c` | `5530ac9` |
+| `e194ec9` | `8d57bd7` |
+| `93b1c7b` | `9c770c4` |
+| `da72598` | `a076c64` |
+| `df76276` | `1967072` |
+| `ed4b3ba` | `9f29976` |
+| `aa70059` | `6b0cf61` |
+| `1b5b392` | `a23a14f` |
+| `447f508` | `ff1ff54` |
+| `0152171` | `1f6497a` |
+| `85ab9c1` | `b54b217` |
