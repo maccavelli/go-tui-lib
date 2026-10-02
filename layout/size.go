@@ -93,8 +93,12 @@ func (s Size) weight() int {
 	return s.N
 }
 
-// Arrange divides area among the children that have a visible pane.
+// Arrange divides area among the children that have a visible pane. It
+// first claims the split's name for this solve (see Split).
 func (s Split) Arrange(area Rect, ctx *Context) error {
+	if err := ctx.claimSplit(s.Name); err != nil {
+		return err
+	}
 	var kids []int
 	for i, c := range s.Children {
 		if err := c.Size.valid(); err != nil {

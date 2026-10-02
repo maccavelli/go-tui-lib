@@ -158,8 +158,8 @@ func TestAppliedResizeReproducesThePlan(t *testing.T) {
 	for i := range 2000 {
 		next := 0
 		// random names splits after the pane count, so two splits can share
-		// a name, and with it their separators' keys. A program's names are
-		// unique, so the tree is renamed before the property is checked.
+		// a name, which Solve rejects (ErrBadSplitName). The tree is renamed
+		// first, as in TestSolverProperties.
 		splits := 0
 		root := uniqueNames(random(r, 4, &next, 8, false), &splits)
 		area := Rect{W: 1 + r.IntN(300), H: 1 + r.IntN(100)}
@@ -207,6 +207,83 @@ func TestSeparatorResizable(t *testing.T) {
 				t.Errorf("%s split: separator %s Resizable = %v, want %v", c.name, s.ID, s.Resizable, c.want)
 			}
 		}
+	}
+}
+
+// twice is a custom Node that arranges two splits with one name, each in
+// half of its area.
+type twice struct{ name string }
+
+func (twice) Leaves() []PaneID { return []PaneID{"a", "b", "c", "d"} }
+func (n twice) Arrange(area Rect, ctx *Context) error {
+	top, bottom := area, area
+	top.H = area.H / 2
+	bottom.Y, bottom.H = area.Y+top.H, area.H-top.H
+	if err := ctx.Arrange(row(1, leaf("a", Fill(1)), leaf("b", Fill(1))).named(n.name), top); err != nil {
+		return err
+	}
+	return ctx.Arrange(row(1, leaf("c", Fill(1)), leaf("d", Fill(1))).named(n.name), bottom)
+}
+
+func (s Split) named(name string) Split { s.Name = name; return s }
+
+func TestSplitNameUsedOncePerSolve(t *testing.T) {
+	nested := Split{Name: "x", Axis: Vertical, Gap: 1, Children: []Child{
+		{Node: row(1, leaf("a", Fill(1)), leaf("b", Fill(1))).named("x"), Size: Fill(1)},
+		leaf("c", Fill(1)),
+	}}
+	for _, c := range []struct {
+		name string
+		root Node
+		want string
+	}{
+		{"nested splits share a name", nested, `"x"`},
+		{"a custom node arranges one name twice", twice{name: "y"}, `"y"`},
+		{"a name starts with /", row(1, leaf("a", Fill(1)), leaf("b", Fill(1))).named("/"), `"/"`},
+		{"a name starts with /0", row(1, leaf("a", Fill(1)), leaf("b", Fill(1))).named("/0"), `"/0"`},
+	} {
+		_, err := Solve(c.root, Rect{W: 80, H: 20}, State{})
+		if !errors.Is(err, ErrBadSplitName) || !strings.Contains(fmt.Sprint(err), c.want) {
+			t.Errorf("%s: Solve error = %v, want ErrBadSplitName naming %s", c.name, err, c.want)
+		}
+	}
+	// The same tree solved twice: names are claimed per solve.
+	ok := row(1, leaf("a", Fill(1)), leaf("b", Fill(1)))
+	for range 2 {
+		if _, err := Solve(ok, Rect{W: 80, H: 20}, State{}); err != nil {
+			t.Fatalf("a second solve of one tree: %v", err)
+		}
+	}
+}
+
+func TestSplitNameReusedAcrossResponsiveRules(t *testing.T) {
+	r := Responsive{
+		Rules: []Rule{{When: MinWidth(100), Use: row(1, leaf("a", Fill(1)), leaf("b", Fill(1))).named("r")}},
+		Else:  Split{Name: "r", Axis: Vertical, Gap: 1, Children: []Child{leaf("a", Fill(1)), leaf("b", Fill(1))}},
+	}
+	st := State{}.WithResize("r:0", 3)
+	for _, w := range []int{120, 80} {
+		p, err := Solve(r, Rect{W: w, H: 20}, st)
+		if err != nil {
+			t.Fatalf("at width %d: %v", w, err)
+		}
+		if p.Resize["r:0"] != 3 {
+			t.Errorf("at width %d: Plan.Resize = %v, want r:0 applied as 3", w, p.Resize)
+		}
+	}
+}
+
+func TestSplitNameInHiddenSubtree(t *testing.T) {
+	root := Split{Name: "x", Axis: Horizontal, Gap: 1, Children: []Child{
+		leaf("a", Fill(1)),
+		{Node: Split{Name: "x", Axis: Vertical, Gap: 1, Children: []Child{leaf("b", Fill(1)), leaf("c", Fill(1))}}, Size: Fill(1)},
+	}}
+	hidden := State{}.WithHidden("b", true).WithHidden("c", true)
+	if _, err := Solve(root, Rect{W: 80, H: 20}, hidden); err != nil {
+		t.Fatalf("a duplicate in a subtree that is not arranged: %v", err)
+	}
+	if _, err := Solve(root, Rect{W: 80, H: 20}, hidden.WithHidden("b", false)); !errors.Is(err, ErrBadSplitName) {
+		t.Fatalf("once the subtree is shown: %v, want ErrBadSplitName", err)
 	}
 }
 
@@ -458,7 +535,8 @@ func TestSolverProperties(t *testing.T) {
 	for i := range 3000 {
 		withMax := i%2 == 0
 		next := 0
-		root := random(r, 4, &next, 8, withMax)
+		splits := 0
+		root := uniqueNames(random(r, 4, &next, 8, withMax), &splits)
 		area := Rect{W: 1 + r.IntN(300), H: 1 + r.IntN(100)}
 		label := fmt.Sprintf("tree %d at %dx%d", i, area.W, area.H)
 		p, err := Solve(root, area, State{})
@@ -522,7 +600,7 @@ func FuzzSolve(f *testing.F) {
 		area := Rect{W: w, H: h}
 		p, err := Solve(decode(data), area, State{})
 		if err != nil {
-			if errors.Is(err, ErrBadSize) || errors.Is(err, ErrDuplicatePane) {
+			if errors.Is(err, ErrBadSize) || errors.Is(err, ErrDuplicatePane) || errors.Is(err, ErrBadSplitName) {
 				return
 			}
 			t.Fatal(err)

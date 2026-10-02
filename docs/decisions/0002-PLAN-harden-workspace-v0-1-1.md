@@ -577,3 +577,80 @@ owner, not fixed in this step. Deviation D2 below adds the fix as Step 3a.
 * **Order.** Step 3a runs after Step 3 and before Step 4, so Step 6's
   resize, which finds a separator by ID, starts from unique IDs. It hands
   off alone, by rule 6.
+
+### Step 3a: a split name is used once per solve (2026-10-02)
+
+The owner approved Step 3a ("proceed") after committing Step 3 and the A2
+records (`572ea7f`).
+
+**What changed.**
+
+* **`Context.claimSplit`** and the `Context.splits` set, allocated on first
+  use. `Split.Arrange` claims its name before anything else. A name already
+  claimed in the solve fails with
+  `layout: a split name is used twice, or is reserved: "x" names two splits arranged in one layout`.
+  A name starting with `/` fails with
+  `…: "/0" starts with "/", which positional separator IDs use`.
+* **`ErrBadSplitName`** joins `ErrDuplicatePane`, `ErrBadArea` and
+  `ErrBadSize`.
+* **Docs:** `Split`'s comment states the rule, the legal reuse across
+  `Responsive` rules and the reserved `/`, and gives the positional form
+  `"/<path>:<i>"`. The presets' constant block says `SplitBottom` is
+  reused on purpose.
+* **Test helpers:** `TestSolverProperties` builds through `uniqueNames`;
+  `FuzzSolve` accepts `ErrBadSplitName`.
+
+**Regression first.** The new tests use Step 3's API (`Plan.Resize`), so
+they cannot compile on `v0.1.0`. They were run instead on a scratch copy of
+`572ea7f` (`v0.1.0` plus Step 3), whose name handling is `v0.1.0`'s, with
+one scratch-only file declaring the sentinel so the tests compile:
+
+```text
+--- FAIL: TestSplitNameUsedOncePerSolve (0.00s)
+    layout_test.go:247: nested splits share a name: Solve error = <nil>, want ErrBadSplitName naming "x"
+    layout_test.go:247: a custom node arranges one name twice: Solve error = <nil>, want ErrBadSplitName naming "y"
+    layout_test.go:247: a name starts with /: Solve error = <nil>, want ErrBadSplitName naming "/"
+    layout_test.go:247: a name starts with /0: Solve error = <nil>, want ErrBadSplitName naming "/0"
+--- FAIL: TestSplitNameInHiddenSubtree (0.00s)
+    layout_test.go:286: once the subtree is shown: <nil>, want ErrBadSplitName
+```
+
+`TestSplitNameReusedAcrossResponsiveRules` passed there, as it must: it
+guards the reuse that option B would have broken.
+
+**Tests:** `TestSplitNameUsedOncePerSolve` (nested splits, a custom `Node`
+arranging one name twice, `/` and `/0`, and one tree solved twice);
+`TestSplitNameReusedAcrossResponsiveRules` (one name in a rule and in
+`Else`, solved at 120 and 80 columns, with `r:0` applied as 3 in each);
+`TestSplitNameInHiddenSubtree` (no error while the duplicate's panes are
+hidden; `ErrBadSplitName` once one is shown). Every preset golden diagram
+matched its `v0.1.0` file byte for byte, and no golden file changed.
+
+**Mutation proofs**, each on a scratch copy; none survived:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| the claim is skipped | `TestSplitNameUsedOncePerSolve` (all four cases: `Solve error = <nil>`) and `TestSplitNameInHiddenSubtree` |
+| names are claimed from every rule of a `Responsive` node | `TestSplitNameReusedAcrossResponsiveRules`, `TestPresetDiagrams` and `TestPresetsKeepTheMainPane` |
+| the `/` check is skipped | `TestSplitNameUsedOncePerSolve`: the `/` and `/0` cases |
+| claims outlive the solve, in a package-level set | `TestSplitNameUsedOncePerSolve` (the second solve), the preset tests and `TestSolverProperties` |
+
+The fourth mutation's first form did not compile, because it used the
+package-level set without declaring it. By rule 2 it was replaced: the
+mutation runner now applies more than one edit, and the declaration was
+added. That form compiled and was killed as above. The runner had counted
+the build failure as a kill. Every kill in the table was checked to be a
+test failure, not a build failure.
+
+**Checks.**
+
+* `make pre-add-check FILES=…` on the four files: `4 file(s) clean`.
+* `make lint`: `0 issues` for linux, darwin and windows.
+* `go test -race -count=1 ./...` and `LC_ALL=C go test -count=1 ./...`:
+  every package `ok`.
+* `go mod tidy -diff` and `go fix -diff ./layout/...`: no output, exit 0.
+* `FuzzSolve` for 15 s: `PASS`, about 3.1 million executions, with
+  duplicate names now an expected error; no corpus file was written to the
+  tree.
+* **The Windows test host:** `go vet`, `go test -race -count=1 ./...` and
+  `LC_ALL=C go test -count=1 ./...` exited 0, every package `ok`.

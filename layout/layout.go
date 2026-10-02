@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 )
 
 // Rect is a rectangle of terminal cells. X and Y are its top-left cell.
@@ -93,7 +94,13 @@ type Child struct {
 // between neighbours for a separator or a border. Name, when set, names
 // the split's separators "<name>:<i>" (between child i and i+1), so a
 // resize in State survives a change of tree; otherwise they are named by
-// position.
+// position, as "/<path>:<i>".
+//
+// A name is used by at most one split in each Solve, or Solve fails with
+// ErrBadSplitName. Splits in different Responsive rules, or in trees a
+// program swaps, may share a name, and then share the resize: the presets
+// do this so a resize survives a change of breakpoint. A name must not
+// start with "/", which positional IDs use.
 type Split struct {
 	Name     string
 	Axis     Axis
@@ -240,9 +247,10 @@ type Plan struct {
 // arranged. A custom Node uses Place for its leaves and Arrange for its
 // children.
 type Context struct {
-	state State
-	plan  *Plan
-	path  []int
+	state  State
+	plan   *Plan
+	path   []int
+	splits map[string]bool // split names claimed in this solve
 }
 
 // Errors returned by Solve.
@@ -250,7 +258,27 @@ var (
 	ErrDuplicatePane = errors.New("layout: a pane is placed twice")
 	ErrBadArea       = errors.New("layout: the area has a negative size")
 	ErrBadSize       = errors.New("layout: a size is invalid")
+	ErrBadSplitName  = errors.New("layout: a split name is used twice, or is reserved")
 )
+
+// claimSplit records that a split named name is arranged in this solve. An
+// empty name claims nothing. A name already claimed, or one that starts
+// with "/", is an error, as a pane placed twice is.
+func (c *Context) claimSplit(name string) error {
+	switch {
+	case name == "":
+		return nil
+	case strings.HasPrefix(name, "/"):
+		return fmt.Errorf("%w: %q starts with \"/\", which positional separator IDs use", ErrBadSplitName, name)
+	case c.splits[name]:
+		return fmt.Errorf("%w: %q names two splits arranged in one layout", ErrBadSplitName, name)
+	}
+	if c.splits == nil {
+		c.splits = map[string]bool{}
+	}
+	c.splits[name] = true
+	return nil
+}
 
 // Place records pane id at r. A pane hidden by State, or given no cells, is
 // not placed.

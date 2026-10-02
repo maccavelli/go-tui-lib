@@ -14,7 +14,9 @@ const (
 // The names of the presets' splits, and so of their separators in
 // State.Resize: "sidebar:0" is the boundary between the main pane and the
 // sidebar (whichever side it is on), and "bottom:0" the boundary above the
-// bottom pane.
+// bottom pane. SplitBottom names a split in more than one responsive rule
+// on purpose, so the bottom pane's resize survives a change of breakpoint;
+// only one of those rules is arranged in a solve.
 const (
 	SplitSidebar = "sidebar"
 	SplitBottom  = "bottom"
