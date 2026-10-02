@@ -89,7 +89,20 @@ func (m Matrix) Cases() []Case {
 // With -update it writes the files instead, for these cases only.
 func Golden(t T, name string, m Matrix, render func(Case) string) {
 	t.Helper()
-	compare(t, filepath.Join("testdata", "golden"), name, m, render, updating())
+	compare(t, filepath.Join("testdata", "golden"), name, m, render, updating(), false)
+}
+
+// Text compares got with testdata/golden/<name>.golden, for a rendering
+// that does not vary across the matrix, such as a geometry diagram.
+// With -update it writes the file instead.
+func Text(t T, name, got string) {
+	t.Helper()
+	textAt(t, filepath.Join("testdata", "golden"), name, got, updating())
+}
+
+func textAt(t T, dir, name, got string, update bool) {
+	t.Helper()
+	compare(t, dir, name, Matrix{Widths: []int{0}}, func(Case) string { return got }, update, true)
 }
 
 func updating() bool {
@@ -108,7 +121,7 @@ func updating() bool {
 // compare is Golden with the directory and the update switch explicit.
 // Files are read and written through an os.Root on dir, so a name holding
 // ".." cannot reach outside it.
-func compare(t T, dir, name string, m Matrix, render func(Case) string, update bool) {
+func compare(t T, dir, name string, m Matrix, render func(Case) string, update, single bool) {
 	t.Helper()
 	if len(m.Widths) == 0 {
 		t.Fatalf("tuitest: %s: the matrix has no widths", name)
@@ -134,8 +147,15 @@ func compare(t T, dir, name string, m Matrix, render func(Case) string, update b
 			t.Errorf("tuitest: %v", err)
 		}
 	}()
-	for _, c := range m.Cases() {
+	cases := m.Cases()
+	if single {
+		cases = cases[:1]
+	}
+	for _, c := range cases {
 		file := name + "." + c.Name() + ".golden"
+		if single {
+			file = name + ".golden"
+		}
 		path := filepath.Join(dir, file)
 		got := Annotate(render(c))
 		if update {

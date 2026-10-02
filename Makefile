@@ -9,7 +9,7 @@ GOVULNCHECK   ?= $(or $(wildcard $(GOBIN)/govulncheck),$(GOPATH_BIN)/govulncheck
 GOTESTSUM     ?= $(or $(wildcard $(GOBIN)/gotestsum),$(GOPATH_BIN)/gotestsum,$(shell command -v gotestsum 2>/dev/null))
 FLEET_LINT_CFG := .golangci.yml
 
-.PHONY: all help test test-sum fmt vet lint tidy vuln pre-add-check
+.PHONY: all help test test-sum fmt vet lint tidy vuln fuzz pre-add-check
 
 all: help
 
@@ -54,6 +54,12 @@ vuln: ## Runs govulncheck (opt-in; requires govulncheck on PATH/GOBIN)
 		exit 1; \
 	fi
 	$(GOVULNCHECK) ./...
+
+# Fuzz each layout fuzz target for FUZZTIME; go test -fuzz takes one target
+# per run (docs/decisions/0002-PLAN-multi-pane-workspace-layouts.md Step 5).
+FUZZTIME ?= 20s
+fuzz: ## Fuzzes every layout fuzz target for FUZZTIME each (default 20s)
+	@./scripts/go-fuzz.sh -t $(FUZZTIME) -m 1 ./layout
 
 # The pre-add rule (AGENTS.md). scripts/go-precheck.sh is the one
 # implementation; the agent gate at `git commit` runs the same file.

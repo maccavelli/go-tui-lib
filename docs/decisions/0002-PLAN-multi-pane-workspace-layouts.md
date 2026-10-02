@@ -421,3 +421,130 @@ survivor shows that ASCII safety rests on two layers, `build`'s gate and
 * `make lint` passed, as did `go test -race`, `LC_ALL=C go test` and
   `go mod tidy -diff`.
 * The Windows test host passed `go vet` and `go test -race`.
+
+### Step 5: `layout` (2026-10-01)
+
+**What changed.**
+
+* **`layout`** (standard library only), in four files:
+  * `layout.go`:
+    * `Rect` (with `Empty`, `Contains`, `Within` and `Overlaps`), `Axis`,
+      `PaneID`;
+    * `Node` and the optional `Leaver`;
+    * `Pane`, `Child`, `Split` (with `Name` for stable separator IDs),
+      `Responsive`, `Rule` and the conditions (`MinWidth`, `MinHeight`,
+      `And`, `Or`, `Not`);
+    * `Separator`, `Plan` (`Panes`, `Order`, `Separators`, `Hidden`),
+      `Context` (`Place`, `Arrange`, `State`) and `Solve`;
+    * the errors `ErrDuplicatePane`, `ErrBadArea` and `ErrBadSize`.
+  * `size.go`: `Size` and its constructors and bounds, and the solver.
+    * It meets fixed claims first, then percentages and ratios floored. Fill
+      weights share the rest, largest remainders first. Leftover remainders
+      go to percentages and ratios, then to the last child with room, so a
+      split tiles unless every child is at its Max.
+    * When a split is too short, children shrink to their Min in `Shrink`
+      order (lowest first, later first among equals). When the minimums do
+      not fit, children are hidden in the same order.
+    * Resizes apply only to named splits, clamped by both neighbours' bounds
+      at every size.
+  * `state.go`: `State`, with JSON at version 1, refusal of an unknown
+    version, and `IsHidden`, `WithHidden`, `WithResize` and `WithZoom`.
+  * `presets.go`: the four presets and their options.
+    * The options are `SidebarWidth`, `BottomHeight`, `MainSize`,
+      `BottomSpan(FullWidth | UnderMain)`, `Footer`, `Gap`, `Breakpoints`
+      and `NoResponsive`.
+    * The defaults: sidebar 30%, between 24 and 56; bottom 30%, between 5
+      and 20, shrinking first; main a fill, at least 30. Below 100 columns
+      the sidebar folds under the main pane, below 70 it hides, and below
+      16 rows the bottom pane hides.
+    * The split names are `sidebar`, `bottom`, `footer` and `folded`.
+* **Fuzzing in CI.**
+  * `scripts/go-fuzz.sh` and `scripts/go-fuzz_test.sh` come from go-core-lib,
+    with their citations naming go-core-lib.
+  * `make fuzz` runs it on `./layout` with `-m 1`. CI's Linux leg runs the
+    script's test, then `make fuzz`, and uploads `layout/testdata/fuzz/` if
+    either fails, as go-core-lib does.
+
+**Deviation D1 (2026-10-01): `tuitest.Text`.**
+
+* **Found.** The preset diagrams do not vary by colour or charset. Through
+  `tuitest.Golden` they would be four identical files per width.
+* **Resolution.** `tuitest` gained `Text(t, name, got)`, a single annotated
+  golden file with the same `-update` and diff, and its test `TestText`.
+  `tuitest` is outside Step 5's paths. The addition is within the MADR's
+  purpose for the package and decides nothing.
+
+**Defects found while writing, fixed before the commit.**
+
+* `allocate` called the drop-victim chooser inside `slices.DeleteFunc`,
+  which compacts the slice in place while the chooser read it. The victim
+  is now chosen first.
+* `IsHidden` used a binary search on a list a user could write unsorted in
+  JSON. It is now a plain lookup, and `WithHidden` keeps the list sorted.
+* `WithResize` left an empty map after a delta returned to zero, so a JSON
+  round trip compared unequal. It now leaves `nil`.
+
+**Tests.**
+
+* **Claims**, in ten cases: fixed, percent, ratio, weights, remainders,
+  gaps, Max, Min, and leftover.
+* **Shrinking and hiding:** shrink order, and hiding when minimums do not
+  fit, with no separator left behind.
+* **Responsive:** the first rule wins, and `Not` and `Or` hold.
+* **State:**
+  * resizes are clamped at 200 and at 60 columns, and unnamed splits ignore
+    them;
+  * JSON is exact, and versions 2 and 9 are refused;
+  * hidden and zoomed panes behave, and an unknown zoom is ignored.
+* **Errors:** a duplicate pane, five bad sizes, and a negative area.
+* **Extension:** a custom `grid` node.
+* **Golden diagrams.** Seven preset variants at 60, 80, 120 and 200 columns
+  and 20 and 40 rows: the four presets, both bottom spans, and a footer.
+  They were read before they were trusted:
+  * 120×40 gives main 84 columns, a sidebar of 35 (30% of 119) and a bottom
+    of 11 rows (30% of 39);
+  * at 80 columns the sidebar folds under main;
+  * at 60 columns the sidebar is hidden;
+  * under the main pane, the bottom pane leaves the sidebar its full height;
+  * with a footer at 200×20, the rows are 13, 1, 5 and 1.
+* **Every preset keeps its main pane** at 20 sizes, down to 20×3.
+* **Properties:** 3,000 random trees (depth up to 4, up to 8 panes, areas up
+  to 300×100) are checked for:
+  * no escaping rectangle and no overlap;
+  * exact tiling for every tree without a Max;
+  * determinism;
+  * every pane either placed or listed hidden.
+* **Fuzz.** `FuzzSolve` ran 20 s (about 4 million inputs) with no failure.
+* **Benchmarks** at 200×60: 0.7–3.1 µs per preset.
+
+**Mutation proofs**; none survived:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| remainders are dropped, not distributed | `remainders largest first: widths [3 3 3], want [4 3 3]` |
+| Max is ignored for a fill | `max caps a fill: widths [15 15], want [5 25]` |
+| the shrink order is reversed | `widths [10 20 10], want [15 15 10]` |
+| a responsive condition is inverted | `at 120: map[a:{… W:120 H:10}]` |
+| State deltas are not clamped | `side after a -40 drag from 50 = 90, want its Max 50` |
+| a squeezed child overlaps instead of hiding | `plan {Panes:map[] … Hidden:[main side]}, want side hidden and main the whole width` |
+| zoom is ignored | `zoom c: {Panes:map[a:… b:… c:…] …}` |
+
+The refactors for lint moved code that Step 2's mutations anchor to. Those
+three were re-anchored, a fourth added for `Text`, and all re-run with Step
+5's: 11 of 11 killed.
+
+**Lint, fixed at the source:**
+
+* two confusing-naming pairs: the test helper `solve` became `mustSolve`,
+  and `text` became `textAt`;
+* two redundant `var … Node =` declarations;
+* two `append` chains combined.
+
+**Checks.**
+
+* `make pre-add-check` reported 7 files clean.
+* `make lint` passed, as did `go test -race`, `LC_ALL=C go test` and
+  `go mod tidy -diff`.
+* `go-fuzz_test.sh` passed 12 of 12, and `make fuzz` ran clean.
+* shellcheck and actionlint are clean.
+* The Windows test host passed `go vet` and `go test -race`.
