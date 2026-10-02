@@ -1,6 +1,8 @@
 package workspace
 
 import (
+	"slices"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/maccavelli/go-tui-lib/layout"
@@ -29,7 +31,10 @@ type Anchor struct {
 
 // Overlay is a pane drawn above the layout: a dialog, a picker, a pop-up.
 type Overlay struct {
-	// ID names the overlay; Send and To reach it by this ID.
+	// ID names the overlay. Overlay IDs are a namespace of their own, so an
+	// overlay may share an ID with a pane. SendOverlay reaches it by this ID,
+	// and Send and To do when no pane has the ID. Pushing an ID already open
+	// replaces that overlay.
 	ID string
 	// Pane is the overlay's content.
 	Pane Pane
@@ -44,10 +49,17 @@ type Overlay struct {
 	Modal bool
 }
 
-// Push opens an overlay above any already open, and focuses its pane.
+// Push opens an overlay above any already open, tells it its size, and
+// focuses its pane. An overlay already open with the same ID is closed
+// first, so the new one replaces it, on top.
 func (w *Workspace) Push(o Overlay) tea.Cmd {
+	if i := w.overlayIndex(o.ID); i >= 0 {
+		w.closeOverlay(i)
+	}
 	w.overlays = append(w.overlays, o)
-	cmds := []tea.Cmd{w.updateOverlay(len(w.overlays)-1, w.overlayContent(o))}
+	sz := w.overlayContent(o)
+	w.osizes[o.ID] = sz
+	cmds := []tea.Cmd{w.updateOverlay(len(w.overlays)-1, sz)}
 	if f, ok := o.Pane.(Focuser); ok {
 		cmds = append(cmds, f.Focus())
 	}
@@ -56,14 +68,35 @@ func (w *Workspace) Push(o Overlay) tea.Cmd {
 
 // Pop closes the top overlay.
 func (w *Workspace) Pop() tea.Cmd {
-	n := len(w.overlays)
-	if n == 0 {
-		return nil
+	if n := len(w.overlays); n > 0 {
+		w.closeOverlay(n - 1)
 	}
-	if f, ok := w.overlays[n-1].Pane.(Focuser); ok {
+	return nil
+}
+
+// closeOverlay blurs overlay i, removes it, and forgets its size and its
+// cached view.
+func (w *Workspace) closeOverlay(i int) {
+	o := w.overlays[i]
+	if f, ok := o.Pane.(Focuser); ok {
 		f.Blur()
 	}
-	w.overlays = w.overlays[:n-1]
+	w.overlays = slices.Delete(w.overlays, i, i+1)
+	delete(w.osizes, o.ID)
+	delete(w.cache, viewKey{overlayView, o.ID})
+}
+
+// overlayIndex is the position of the open overlay with id, or -1.
+func (w *Workspace) overlayIndex(id string) int {
+	return slices.IndexFunc(w.overlays, func(o Overlay) bool { return o.ID == id })
+}
+
+// SendOverlay delivers msg to the open overlay id now, and returns its
+// command. Unlike Send, it never reaches a pane.
+func (w *Workspace) SendOverlay(id string, msg tea.Msg) tea.Cmd {
+	if i := w.overlayIndex(id); i >= 0 {
+		return w.updateOverlay(i, msg)
+	}
 	return nil
 }
 
@@ -97,7 +130,9 @@ func (w *Workspace) overlayRect(o Overlay) layout.Rect {
 	r := layout.Rect{X: (w.width - ow) / 2, Y: (w.height - oh) / 2, W: ow, H: oh}
 	switch o.Anchor.Kind {
 	case BelowCursor:
-		if c := w.Cursor(); c != nil {
+		// The focused pane's cursor, never Cursor(): with a modal overlay
+		// open, Cursor() asks for this rectangle, and the two would recurse.
+		if c := w.paneCursor(); c != nil {
 			r.X, r.Y = c.X, c.Y+1
 		}
 	case OnPane:

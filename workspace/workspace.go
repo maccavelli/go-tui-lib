@@ -116,15 +116,33 @@ type Workspace struct {
 	focus    layout.PaneID
 	overlays []Overlay
 	sizes    map[layout.PaneID]SizeMsg
-	cache    map[string]cached
+	osizes   map[string]SizeMsg // each open overlay's last content size
+	cache    map[viewKey]cached
 	hits     *lipgloss.Compositor
 	inner    map[string]layout.Rect // content area by layer ID, from the last Render
 	drag     *drag
 }
 
+// viewKind tells a pane's cached view from an overlay's: their IDs are
+// separate namespaces, so one ID may name both.
+type viewKind uint8
+
+const (
+	paneView viewKind = iota
+	overlayView
+)
+
+// viewKey names a cached view.
+type viewKey struct {
+	kind viewKind
+	id   string
+}
+
+// cached is a view, with the size and focus it was drawn at.
 type cached struct {
-	key  string
-	view string
+	width, height int
+	focused       bool
+	view          string
 }
 
 type drag struct {
@@ -188,7 +206,8 @@ func New(root layout.Node, panes map[layout.PaneID]Pane, opts ...Option) *Worksp
 		width:  fallbackWidth,
 		height: fallbackHeight,
 		sizes:  map[layout.PaneID]SizeMsg{},
-		cache:  map[string]cached{},
+		osizes: map[string]SizeMsg{},
+		cache:  map[viewKey]cached{},
 	}
 	for id, p := range panes {
 		w.panes[id] = p
@@ -241,10 +260,12 @@ func (w *Workspace) SetLayout(root layout.Node) tea.Cmd {
 	return w.resolve()
 }
 
-// SetPane adds or replaces a pane.
+// SetPane adds or replaces a pane. A replaced pane's cached view is dropped,
+// and the new pane is told its size.
 func (w *Workspace) SetPane(id layout.PaneID, p Pane) tea.Cmd {
 	w.panes[id] = p
 	delete(w.sizes, id)
+	delete(w.cache, viewKey{paneView, string(id)})
 	return w.resolve()
 }
 
@@ -287,16 +308,12 @@ type targeted struct {
 // To wraps msg so that Update delivers it to pane id only.
 func To(id layout.PaneID, msg tea.Msg) tea.Msg { return targeted{id: id, msg: msg} }
 
-// Send delivers msg to pane, or overlay, id now, and returns its command.
+// Send delivers msg to pane id now, and returns its command. When no pane
+// has that ID, it tries an open overlay with it, as SendOverlay does.
 func (w *Workspace) Send(id layout.PaneID, msg tea.Msg) tea.Cmd {
 	p, ok := w.panes[id]
 	if !ok {
-		for i, o := range w.overlays {
-			if layout.PaneID(o.ID) == id {
-				return w.updateOverlay(i, msg)
-			}
-		}
-		return nil
+		return w.SendOverlay(string(id), msg)
 	}
 	next, cmd := p.Update(msg)
 	if next != nil {
@@ -495,8 +512,8 @@ func (w *Workspace) solve() {
 	}
 }
 
-// resolve re-solves the layout, tells each pane whose content size changed,
-// and moves focus off a pane that is no longer shown.
+// resolve re-solves the layout, tells each pane and each open overlay whose
+// content size changed, and moves focus off a pane that is no longer shown.
 func (w *Workspace) resolve() tea.Cmd {
 	w.solve()
 	var cmds []tea.Cmd
@@ -508,6 +525,14 @@ func (w *Workspace) resolve() tea.Cmd {
 		}
 		w.sizes[id] = sz
 		cmds = append(cmds, w.Send(id, sz))
+	}
+	for i, o := range w.overlays {
+		sz := w.overlayContent(o)
+		if old, ok := w.osizes[o.ID]; ok && old == sz {
+			continue
+		}
+		w.osizes[o.ID] = sz
+		cmds = append(cmds, w.updateOverlay(i, sz))
 	}
 	if !w.focusable(w.focus) {
 		if r := w.focusRing(); len(r) > 0 {

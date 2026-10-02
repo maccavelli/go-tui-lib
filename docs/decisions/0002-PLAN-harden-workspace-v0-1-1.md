@@ -654,3 +654,93 @@ test failure, not a build failure.
   tree.
 * **The Windows test host:** `go vet`, `go test -race -count=1 ./...` and
   `LC_ALL=C go test -count=1 ./...` exited 0, every package `ok`.
+
+### Step 4: overlays and the view cache (2026-10-02)
+
+The owner committed Step 3a under an explicit, one-time authorization
+(`d379c4d`) and approved Step 4 ("proceed").
+
+**What changed.**
+
+* **The crash.** `overlayRect` places a `BelowCursor` overlay with the new
+  `paneCursor()`, the focused pane's cursor in screen cells, which never
+  looks at overlays. `Cursor()` keeps its contract, and the shared logic is
+  `placeCursor(p, in)`.
+* **The cache.** Its key is `viewKey{kind, id}`, with `kind` `paneView` or
+  `overlayView`, and its value `cached{width, height, focused, view}`. The
+  `fmt.Sprintf` key is gone, with render.go's `fmt` import. `renderBox`
+  takes the `viewKey`, and uses its `id` as the fallback title.
+  * `SetPane` deletes the pane's entry.
+  * Closing an overlay, by `Pop` or by a replacing `Push`, deletes its entry
+    and its size, through the new `closeOverlay(i)`.
+* **Overlay IDs.** `Push` with an ID already open closes that overlay, then
+  pushes the new one on top. `SendOverlay(id string, msg tea.Msg) tea.Cmd`
+  reaches an overlay only. `Send` still tries panes first, and now falls
+  back to `SendOverlay`. `Overlay.ID`'s comment states the separate
+  namespace and the replacement.
+* **Overlay sizes.** `Workspace.osizes` holds each open overlay's last
+  content size. `Push` records it as it sends the first `SizeMsg`, and
+  `resolve` sends a new `SizeMsg` to each overlay whose size changed.
+* **Focus, unchanged in kind.** A replacing `Push` blurs the old overlay's
+  `Focuser`, as `Pop` always did. Step 5 replaces overlay focus with
+  messages.
+
+**Regression first.** On a scratch copy of `d379c4d`, whose `workspace` is
+`v0.1.0`'s, with the new `overlay_test.go` and one scratch-only file giving
+`SendOverlay` the old behaviour (it calls `Send`). Each test ran alone,
+because the first kills the test binary:
+
+```text
+## TestModalOverlayBelowCursor
+runtime: goroutine stack exceeds 1000000000-byte limit
+fatal error: stack overflow
+## TestSetPaneDropsTheCachedView
+overlay_test.go:38: after SetPane, an unchanged replacement shows the old view:
+## TestPaneAndOverlayWithOneID
+overlay_test.go:52: pane viewed 1 times, overlay 0 times; frame:
+## TestOverlayIsToldItsNewSize
+overlay_test.go:72: overlay sizes [{98 28}], want 98x28 then 58x18
+## TestPushReplacesAnOpenID
+overlay_test.go:87: overlays [x y x], want [y x]: the open x replaced and moved to the top
+## TestPopEvictsTheOverlay
+overlay_test.go:105: after Pop the cache still holds box:qqpopped
+```
+
+**Tests** (`workspace/overlay_test.go`): a modal `BelowCursor` overlay sits
+one row under the pane's cursor, and `Cursor()` is then the overlay's; an
+unchanged `Changer` that replaces a pane is drawn; a pane and an overlay with
+one ID each draw their own view, `SendOverlay` reaches the overlay only, and
+`Send` the pane; an overlay is told 98×28, then 58×18 after a resize from
+120×40 to 60×20, and not told twice; pushing `x`, `y`, `x` leaves `[y x]`,
+draws the second `x`, and sizes it once; after `Pop` the cache holds nothing
+for the overlay. Every existing workspace test passed unchanged, and no
+golden file changed.
+
+**Mutation proofs**, each on a scratch copy; none survived. The first two
+rows are the PLAN's; the last two were added for `Push` and `Pop`:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| `overlayRect` calls `Cursor()` again | `TestModalOverlayBelowCursor`: `fatal error: stack overflow` |
+| `SetPane` keeps the entry | `TestSetPaneDropsTheCachedView` |
+| the cache key drops `kind` (overlays keyed as panes) | `TestPaneAndOverlayWithOneID` |
+| `resolve` skips overlays | `overlay sizes [{98 28}], want 98x28 then 58x18` |
+| `Push` does not replace an open ID | `overlays [x y x], want [y x]` |
+| closing an overlay keeps its cached view | `TestPopEvictsTheOverlay` |
+
+Each kill was a test failure on code that compiled; the first was checked to
+be the runtime's stack overflow.
+
+**Checks.**
+
+* `make pre-add-check FILES=…` on the four files: `4 file(s) clean`.
+* `make lint`: `0 issues` for linux, darwin and windows.
+* `go test -race -count=1 ./...` and `LC_ALL=C go test -count=1 ./...`:
+  every package `ok`.
+* `go mod tidy -diff`: no output, exit 0.
+* `go fix -diff ./workspace/...` exits 1 with `strings.SplitSeq`,
+  `maps.Copy` and two `wg.Go` suggestions. They are the same, line for line,
+  on the tree before this step: 0003-REPORT §1.13's, which Step 6 owns
+  ("`go fix -diff ./workspace` reports nothing"). This step adds none.
+* **The Windows test host:** `go vet`, `go test -race -count=1 ./...` and
+  `LC_ALL=C go test -count=1 ./...` exited 0, every package `ok`.

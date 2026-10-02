@@ -1,7 +1,6 @@
 package workspace
 
 import (
-	"fmt"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -36,7 +35,7 @@ func (w *Workspace) Render() string {
 		r := w.overlayRect(o)
 		lid := layerID("overlay", o.ID)
 		w.inner[lid] = insetBorder(r)
-		layers = append(layers, lipgloss.NewLayer(w.renderBox(r, o.Pane, o.ID, true)).X(r.X).Y(r.Y).Z(10+i).ID(lid))
+		layers = append(layers, lipgloss.NewLayer(w.renderBox(r, o.Pane, viewKey{overlayView, o.ID}, true)).X(r.X).Y(r.Y).Z(10+i).ID(lid))
 	}
 	w.hits = lipgloss.NewCompositor(layers...)
 	canvas := lipgloss.NewCanvas(w.width, w.height)
@@ -48,17 +47,25 @@ func (w *Workspace) Render() string {
 // modal overlay, in screen cells; nil when that pane has none, or it falls
 // outside the pane.
 func (w *Workspace) Cursor() *tea.Cursor {
-	var p Pane
-	var in layout.Rect
 	if o := w.modal(); o != nil {
-		p, in = o.Pane, insetBorder(w.overlayRect(*o))
-	} else {
-		r, ok := w.plan.Panes[w.focus]
-		if !ok {
-			return nil
-		}
-		p, in = w.panes[w.focus], w.content(w.focus, r)
+		return placeCursor(o.Pane, insetBorder(w.overlayRect(*o)))
 	}
+	return w.paneCursor()
+}
+
+// paneCursor is the focused pane's cursor in screen cells, whatever
+// overlays are open. A BelowCursor overlay is placed by it.
+func (w *Workspace) paneCursor() *tea.Cursor {
+	r, ok := w.plan.Panes[w.focus]
+	if !ok {
+		return nil
+	}
+	return placeCursor(w.panes[w.focus], w.content(w.focus, r))
+}
+
+// placeCursor moves p's cursor from its own cells into the screen cells of
+// its content area in, or returns nil when it has none or it falls outside.
+func placeCursor(p Pane, in layout.Rect) *tea.Cursor {
 	c, ok := p.(Cursorer)
 	if !ok {
 		return nil
@@ -74,16 +81,15 @@ func (w *Workspace) Cursor() *tea.Cursor {
 }
 
 // view asks a pane for its view, unless it is a Changer reporting no change
-// at the same size and focus.
-func (w *Workspace) view(cacheID string, p Pane, width, height int, focused bool) string {
-	k := fmt.Sprintf("%dx%d/%t", width, height, focused)
+// at the same size and focus as its cached view under k.
+func (w *Workspace) view(k viewKey, p Pane, width, height int, focused bool) string {
 	if c, ok := p.(Changer); ok && !c.Changed() {
-		if hit, ok := w.cache[cacheID]; ok && hit.key == k {
+		if hit, ok := w.cache[k]; ok && hit.width == width && hit.height == height && hit.focused == focused {
 			return hit.view
 		}
 	}
 	v := clip(p.View(width, height), width, height)
-	w.cache[cacheID] = cached{key: k, view: v}
+	w.cache[k] = cached{width: width, height: height, focused: focused, view: v}
 	return v
 }
 
@@ -109,19 +115,20 @@ func clip(s string, width, height int) string {
 
 func (w *Workspace) renderPane(id layout.PaneID, r layout.Rect) string {
 	p := w.panes[id]
+	k := viewKey{paneView, string(id)}
 	focused := id == w.focus && w.modal() == nil
 	switch w.chromeOf(id) {
 	case Borders:
-		return w.renderBox(r, p, string(id), focused)
+		return w.renderBox(r, p, k, focused)
 	case Separators:
 		in := w.content(id, r)
 		head := w.title(p, string(id), focused, r.W)
 		if in.H == 0 {
 			return head
 		}
-		return head + "\n" + w.view("pane:"+string(id), p, in.W, in.H, focused)
+		return head + "\n" + w.view(k, p, in.W, in.H, focused)
 	}
-	return w.view("pane:"+string(id), p, r.W, r.H, focused)
+	return w.view(k, p, r.W, r.H, focused)
 }
 
 // title renders a pane's title line: the focus marker, the title and the
@@ -148,8 +155,9 @@ func (w *Workspace) title(p Pane, id string, focused bool, width int) string {
 	return style.Render(label)
 }
 
-// renderBox draws p in r with a border, its title in the top edge.
-func (w *Workspace) renderBox(r layout.Rect, p Pane, id string, focused bool) string {
+// renderBox draws p in r with a border, its title in the top edge. k names
+// its cached view, and k.id is the title when p has none of its own.
+func (w *Workspace) renderBox(r layout.Rect, p Pane, k viewKey, focused bool) string {
 	t := w.theme
 	b := t.Border(w.border)
 	edge := t.Styles.Border
@@ -160,7 +168,7 @@ func (w *Workspace) renderBox(r layout.Rect, p Pane, id string, focused bool) st
 	if in.W == 0 {
 		return clip("", r.W, r.H)
 	}
-	name := id
+	name := k.id
 	if tp, ok := p.(Titled); ok {
 		name = tp.Title()
 	}
@@ -179,7 +187,7 @@ func (w *Workspace) renderBox(r layout.Rect, p Pane, id string, focused bool) st
 	var out strings.Builder
 	out.WriteString(edge.Render(b.TopLeft+b.Top) + tstyle.Render(label) + edge.Render(strings.Repeat(b.Top, max(fill, 0))+b.TopRight))
 	if in.H > 0 {
-		body := w.view(layerID("box", id), p, in.W, in.H, focused)
+		body := w.view(k, p, in.W, in.H, focused)
 		for _, line := range strings.Split(body, "\n") {
 			out.WriteString("\n" + edge.Render(b.Left) + line + edge.Render(b.Right))
 		}
