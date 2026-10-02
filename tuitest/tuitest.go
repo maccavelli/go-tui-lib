@@ -1,0 +1,198 @@
+// Package tuitest renders a view across the test matrix every go-tui-lib
+// package uses, {colour, no colour} × {UTF-8, ASCII} × widths, and compares
+// each rendering with a golden file
+// (docs/decisions/0001-MADR-scaffold-charm-tui-library.md §6, rule 6).
+//
+// Golden files live under the calling package's testdata/golden/. Each line is
+// stored with its width in terminal cells in front of it, so a change of width
+// shows in the diff even when the text looks the same. Run the tests with
+// -update to rewrite the files for the cases a test names.
+package tuitest
+
+import (
+	"errors"
+	"flag"
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+
+	"github.com/charmbracelet/x/ansi"
+)
+
+// updateFlag is the -update flag. A test binary may already define one, so it
+// is registered only when no flag of that name exists.
+const updateFlag = "update"
+
+func init() {
+	if flag.Lookup(updateFlag) == nil {
+		flag.Bool(updateFlag, false, "rewrite tuitest golden files")
+	}
+}
+
+// T is the part of *testing.T and *testing.B that Golden uses.
+type T interface {
+	Helper()
+	Errorf(format string, args ...any)
+	Fatalf(format string, args ...any)
+}
+
+// Case is one cell of the matrix.
+type Case struct {
+	// Color is false for a rendering with no colour: the NO_COLOR or ASCII
+	// colour profile.
+	Color bool
+	// UTF8 is false for a rendering restricted to ASCII glyphs.
+	UTF8 bool
+	// Width is the width, in cells, the view is given.
+	Width int
+}
+
+// Name is the case's part of a golden file name, such as "color.utf8.80" or
+// "nocolor.ascii.60".
+func (c Case) Name() string {
+	color, charset := "nocolor", "ascii"
+	if c.Color {
+		color = "color"
+	}
+	if c.UTF8 {
+		charset = "utf8"
+	}
+	return color + "." + charset + "." + strconv.Itoa(c.Width)
+}
+
+// Matrix is the set of cases a test renders.
+type Matrix struct {
+	// Widths are the widths, in cells, each colour and charset combination
+	// is rendered at. Rule 6 asks for at least two.
+	Widths []int
+}
+
+// Cases returns every case: colour before no colour, UTF-8 before ASCII,
+// then each width in order.
+func (m Matrix) Cases() []Case {
+	cases := make([]Case, 0, 4*len(m.Widths))
+	for _, color := range []bool{true, false} {
+		for _, utf8 := range []bool{true, false} {
+			for _, w := range m.Widths {
+				cases = append(cases, Case{Color: color, UTF8: utf8, Width: w})
+			}
+		}
+	}
+	return cases
+}
+
+// Golden renders every case of m and compares each with
+// testdata/golden/<name>.<case>.golden, reporting every case that differs.
+// With -update it writes the files instead, for these cases only.
+func Golden(t T, name string, m Matrix, render func(Case) string) {
+	t.Helper()
+	compare(t, filepath.Join("testdata", "golden"), name, m, render, updating())
+}
+
+func updating() bool {
+	f := flag.Lookup(updateFlag)
+	if f == nil {
+		return false
+	}
+	g, ok := f.Value.(flag.Getter)
+	if !ok {
+		return false
+	}
+	on, ok := g.Get().(bool)
+	return ok && on
+}
+
+// compare is Golden with the directory and the update switch explicit.
+// Files are read and written through an os.Root on dir, so a name holding
+// ".." cannot reach outside it.
+func compare(t T, dir, name string, m Matrix, render func(Case) string, update bool) {
+	t.Helper()
+	if len(m.Widths) == 0 {
+		t.Fatalf("tuitest: %s: the matrix has no widths", name)
+		return
+	}
+	if update {
+		if err := os.MkdirAll(dir, 0o750); err != nil {
+			t.Fatalf("tuitest: %v", err)
+			return
+		}
+	}
+	root, err := os.OpenRoot(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("tuitest: %s: no golden directory %s; run the test with -update", name, dir)
+		return
+	}
+	if err != nil {
+		t.Fatalf("tuitest: %v", err)
+		return
+	}
+	defer func() {
+		if err := root.Close(); err != nil {
+			t.Errorf("tuitest: %v", err)
+		}
+	}()
+	for _, c := range m.Cases() {
+		file := name + "." + c.Name() + ".golden"
+		path := filepath.Join(dir, file)
+		got := Annotate(render(c))
+		if update {
+			if err := root.WriteFile(file, []byte(got), 0o600); err != nil {
+				t.Fatalf("tuitest: %v", err)
+				return
+			}
+			continue
+		}
+		want, err := root.ReadFile(file)
+		if errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("tuitest: %s: no golden file %s; run the test with -update", c.Name(), path)
+			continue
+		}
+		if err != nil {
+			t.Fatalf("tuitest: %v", err)
+			return
+		}
+		if msg := diff(string(want), got); msg != "" {
+			t.Errorf("tuitest: %s %s: %s", name, c.Name(), msg)
+		}
+	}
+}
+
+// Annotate puts each line's width in cells in front of it, as golden files
+// store it. A trailing newline is kept.
+func Annotate(s string) string {
+	lines := strings.Split(s, "\n")
+	var b strings.Builder
+	for i, l := range lines {
+		if i == len(lines)-1 && l == "" && i > 0 {
+			break
+		}
+		fmt.Fprintf(&b, "%3d|%s\n", ansi.StringWidth(l), l)
+	}
+	return b.String()
+}
+
+// diff describes the first difference between two annotated renderings, with
+// escape sequences made visible, or returns "" when they are equal.
+func diff(want, got string) string {
+	if want == got {
+		return ""
+	}
+	w, g := strings.Split(want, "\n"), strings.Split(got, "\n")
+	n := max(len(w), len(g))
+	for i := range n {
+		var wl, gl string
+		if i < len(w) {
+			wl = w[i]
+		}
+		if i < len(g) {
+			gl = g[i]
+		}
+		if wl != gl {
+			return fmt.Sprintf("line %d differs\n  want %s\n  got  %s", i+1, strconv.Quote(wl), strconv.Quote(gl))
+		}
+	}
+	return "the renderings differ"
+}

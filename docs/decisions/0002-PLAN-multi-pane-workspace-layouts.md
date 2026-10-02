@@ -263,3 +263,54 @@ here too, as an amendment, before any push.
   working-example bullet.
 * **State.** The MADR is `accepted`, and this PLAN is `in-progress`.
   `docs/README.md` indexes both.
+
+### Step 2: `tuitest` (2026-10-01)
+
+**What changed.**
+
+* **`tuitest`.**
+  * The types are `Case` (`Color`, `UTF8`, `Width`) with `Name()`, and
+    `Matrix{Widths}` with `Cases()`, in a fixed order.
+  * `Golden(t, name, m, render)` compares each case with
+    `testdata/golden/<name>.<case>.golden`, reporting every differing case
+    with its first differing line, escapes quoted. `Annotate` puts each
+    line's cell width in front.
+  * `-update` rewrites only the named cases. The flag is registered only if
+    the test binary has none.
+  * `Golden` takes a small `T` interface, so `*testing.T` and
+    `*testing.B` both work and the package's own tests can record failures.
+* **`go.mod`** requires `github.com/charmbracelet/x/ansi` v0.11.8, its
+  first import.
+
+**Lint, fixed at the source.** golangci-lint found five problems:
+
+* `revive` confusing-naming on `golden` / `Golden`: renamed to `compare`;
+* gosec G301 and G306 on the permissions: the directory is `0o750` and the
+  files `0o600`;
+* gosec G304 on a variable path: files are now read and written through an
+  `os.Root` on the golden directory, so a name holding `..` cannot escape it;
+* errcheck `check-blank` on `_ = root.Close()`: the close error is reported
+  through `t.Errorf`.
+
+**Tests:** case order and names, a round trip, one changed cell reported
+with case and line, an added last line, cell-width annotation of a wide
+rune and an escape, a missing golden file, an update that leaves other cases
+alone, and an empty matrix.
+
+**Mutation proofs**; none survived:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| the comparison ignores the last line | `an added last line: errors = [… the renderings differ …]` |
+| the width prefix counts bytes | `Annotate = "  4\|a界\n 12\|…", want "  3\|a界\n  4\|…"` |
+| update rewrites every case of the name | `a case outside the matrix was rewritten: ""` |
+
+The third mutation's first anchor stopped matching after the `os.Root`
+change. It was re-anchored and then killed.
+
+**Checks.**
+
+* `make pre-add-check` reported 2 files clean.
+* `make lint` passed, as did `go test -race`, `LC_ALL=C go test` and
+  `go mod tidy -diff`.
+* The Windows test host passed `go vet` and `go test -race`.
