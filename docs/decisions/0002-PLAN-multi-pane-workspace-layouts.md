@@ -693,3 +693,61 @@ requirements are exactly MADR §1's.
 * `make lint` passed, as did `go test -race ./...`, `LC_ALL=C go test ./...`
   and `go mod tidy -diff`.
 * The Windows test host passed `go vet` and `go test -race`.
+
+### Step 7: the agent-session example (2026-10-01)
+
+**What changed.**
+
+* **`workspace/agent_test.go`** (package `workspace_test`, the public API
+  only) holds the panes a program like pi-go would write:
+  * a transcript that streams lines and places the real cursor after its
+    prompt, using the height it is told through `SizeMsg`;
+  * a key/value metrics sidebar;
+  * a log tail that counts unread lines as a badge until it is focused;
+  * a footer that takes no focus and has no chrome (`WithPaneChrome`).
+
+  `session` builds them on a preset and streams activity in through `To`,
+  and through keys to the focused pane.
+* **`ExampleWorkspace_agentSession`** renders the session at 104×20 with a
+  right sidebar, a full-width bottom pane and a footer, and prints the
+  cursor and focus. Its output was checked line by line before it became
+  the `Output` block:
+  * session 73 columns, metrics 31 (30% of 104, within 24..56);
+  * rows: 14 top, 5 bottom (30% of 19, at its Min of 5), 1 footer;
+  * cursor at 7,12, after `> why?` on the session's last row;
+  * the `Logs [3]` badge.
+* **`TestAgentSessionGolden`** renders the four arrangements the owner
+  named, sidebar right or left, each with the bottom pane full width or
+  under the session, across the matrix at 80, 120 and 200 columns: 48
+  files. Read before they were trusted:
+  * left sidebar with the bottom under the session: metrics full height on
+    the left, session and logs stacked on the right, the footer across;
+  * at 80 columns the sidebar folds under the session, and logs run the
+    full width.
+
+**Deviation D3 (2026-10-01): breakpoints and the footer.**
+
+* **Found.** The first example run, at 16 rows, had no bottom pane. A
+  `Footer` takes its rows first, so the responsive rules saw 15 rows, under
+  the 16-row breakpoint.
+* **Resolution.** The behaviour is consistent: a footer is outside the
+  responsive arrangement. `Breakpoints`' doc comment now says they measure
+  the area above a footer, and the example uses 20 rows. `layout/presets.go`
+  is outside Step 7's paths; the change is that one comment.
+
+**The example's first draft had a wrong cursor:** it placed the cursor at
+the row after the last message, not on the prompt row. The example pane,
+not the workspace, was at fault. It now takes its height from `SizeMsg`.
+
+**Mutation proofs**; none survived:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| `BottomSpan(UnderMain)` is ignored | `tuitest: agent-right-bottom-main color.utf8.120: line 17 differs` |
+| the cursor is not offset | `ExampleWorkspace_agentSession` output differs |
+
+**Checks.**
+
+* `make pre-add-check` and `make lint` passed, as did `go test -race ./...`,
+  `LC_ALL=C go test ./...` and `go mod tidy -diff`.
+* The Windows test host passed `go vet` and `go test -race`.

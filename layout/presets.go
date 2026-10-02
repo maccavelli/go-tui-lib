@@ -76,6 +76,7 @@ func Gap(n int) PresetOption { return func(p *preset) { p.gap = n } }
 // Breakpoints sets the responsive folds: below foldWidth columns the
 // sidebar moves under the main pane; below hideWidth it is hidden; below
 // hideBottomHeight rows the bottom pane is hidden. Defaults: 100, 70, 16.
+// They measure the area above a Footer, which takes its rows first.
 func Breakpoints(foldWidth, hideWidth, hideBottomHeight int) PresetOption {
 	return func(p *preset) { p.foldBelow, p.hideBelow, p.bottomBelow = foldWidth, hideWidth, hideBottomHeight }
 }
