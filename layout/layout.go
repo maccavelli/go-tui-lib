@@ -211,6 +211,10 @@ type Separator struct {
 	Axis Axis
 	// Rect is the gap's cells. With a Gap of 0 it is empty, at the boundary.
 	Rect Rect
+	// Resizable is true for a named split's separators, the only ones
+	// State.Resize moves. An unnamed split's separator has a positional ID,
+	// which changes when the tree does, so a host must not resize it.
+	Resizable bool
 }
 
 // Plan is the result of Solve.
@@ -224,6 +228,12 @@ type Plan struct {
 	// Hidden lists, in tree order, the panes the tree knows of but did not
 	// place: hidden by State, dropped by a responsive rule, or squeezed out.
 	Hidden []PaneID
+	// Resize holds, for each separator that State.Resize moved, the delta
+	// Solve applied after clamping it to the children's bounds. A host
+	// stores this, not the delta it asked for, so a drag or a held key past
+	// a limit leaves no dead zone to work back through. A separator with
+	// nothing applied is absent, and Resize is nil when none is present.
+	Resize map[string]int
 }
 
 // Context carries the state and collects the plan while a tree is

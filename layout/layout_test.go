@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math/rand/v2"
 	"reflect"
 	"slices"
@@ -114,6 +115,98 @@ func TestResizeIsClampedAtEverySize(t *testing.T) {
 	anon.Name = ""
 	if p := mustSolve(t, anon, 200, 10, State{}.WithResize("row:0", -40)); p.Panes["side"] != base.Panes["side"] {
 		t.Fatal("an unnamed split was resized")
+	}
+}
+
+func TestPlanReportsAppliedResize(t *testing.T) {
+	s := row(1, leaf("main", Fill(1).AtLeast(30)), leaf("side", Percent(30).AtLeast(20).AtMost(50)))
+	base := mustSolve(t, s, 200, 10, State{})
+	if base.Resize != nil {
+		t.Fatalf("no resize asked for, Plan.Resize = %v", base.Resize)
+	}
+	// +1000 asks to move the separator far past side's Min of 20.
+	far := mustSolve(t, s, 200, 10, State{}.WithResize("row:0", 1000))
+	want := base.Panes["side"].W - 20
+	if got, ok := far.Resize["row:0"]; !ok || got != want {
+		t.Fatalf("Plan.Resize[row:0] = %d, %v; want the applied %d, not the asked 1000", got, ok, want)
+	}
+	if far.Panes["side"].W != 20 {
+		t.Fatalf("side = %d, want its Min 20", far.Panes["side"].W)
+	}
+	// Storing the applied delta, then moving back by 5, moves the separator
+	// 5 cells: there is no dead zone of 1000 - want cells.
+	back := mustSolve(t, s, 200, 10, State{}.WithResize("row:0", far.Resize["row:0"]-5))
+	if back.Panes["side"].W != 25 {
+		t.Fatalf("after -5 from the applied delta, side = %d, want 25", back.Panes["side"].W)
+	}
+	// side starts at its Max, so growing it is clamped to nothing, and a
+	// delta clamped to 0 is absent.
+	if base.Panes["side"].W != 50 {
+		t.Fatalf("side = %d, want it at its Max 50 for the next case", base.Panes["side"].W)
+	}
+	none := mustSolve(t, s, 200, 10, State{}.WithResize("row:0", -7))
+	if _, ok := none.Resize["row:0"]; ok || none.Panes["side"].W != 50 {
+		t.Fatalf("a delta clamped to 0: Plan.Resize = %v, side = %d", none.Resize, none.Panes["side"].W)
+	}
+}
+
+// TestAppliedResizeReproducesThePlan checks the property a host relies on
+// when it stores Plan.Resize: solving again with the applied deltas gives
+// the same plan, and any deltas leave the split tiled.
+func TestAppliedResizeReproducesThePlan(t *testing.T) {
+	r := rand.New(rand.NewPCG(3, 4))
+	for i := range 2000 {
+		next := 0
+		// random names splits after the pane count, so two splits can share
+		// a name, and with it their separators' keys. A program's names are
+		// unique, so the tree is renamed before the property is checked.
+		splits := 0
+		root := uniqueNames(random(r, 4, &next, 8, false), &splits)
+		area := Rect{W: 1 + r.IntN(300), H: 1 + r.IntN(100)}
+		label := fmt.Sprintf("tree %d at %dx%d", i, area.W, area.H)
+		plain, err := Solve(root, area, State{})
+		if err != nil {
+			t.Fatalf("%s: %v", label, err)
+		}
+		st := State{}
+		for _, s := range plain.Separators {
+			if s.Resizable {
+				st = st.WithResize(s.ID, r.IntN(401)-200)
+			}
+		}
+		asked, err := Solve(root, area, st)
+		if err != nil {
+			t.Fatalf("%s: %v", label, err)
+		}
+		check(t, label+" resized", asked, area, true)
+		applied, err := Solve(root, area, State{Resize: asked.Resize})
+		if err != nil {
+			t.Fatalf("%s: %v", label, err)
+		}
+		if !reflect.DeepEqual(applied.Panes, asked.Panes) || !reflect.DeepEqual(applied.Resize, asked.Resize) {
+			t.Fatalf("%s: solving with the applied deltas %v gives a different plan than asking for %v", label, asked.Resize, st.Resize)
+		}
+	}
+}
+
+func TestSeparatorResizable(t *testing.T) {
+	named := row(1, leaf("a", Fill(1)), leaf("b", Fill(1)), leaf("c", Fill(1)))
+	anon := named
+	anon.Name = ""
+	for _, c := range []struct {
+		name string
+		root Split
+		want bool
+	}{{"named", named, true}, {"unnamed", anon, false}} {
+		p := mustSolve(t, c.root, 60, 5, State{})
+		if len(p.Separators) != 2 {
+			t.Fatalf("%s: %d separators, want 2", c.name, len(p.Separators))
+		}
+		for _, s := range p.Separators {
+			if s.Resizable != c.want {
+				t.Errorf("%s split: separator %s Resizable = %v, want %v", c.name, s.ID, s.Resizable, c.want)
+			}
+		}
 	}
 }
 
@@ -243,8 +336,14 @@ func presets() map[string]Node {
 	}
 }
 
+// presetNames lists presets() in sorted order, so tests that walk it do so
+// the same way every run.
+func presetNames() []string { return slices.Sorted(maps.Keys(presets())) }
+
 func TestPresetDiagrams(t *testing.T) {
-	for name, root := range presets() {
+	all := presets()
+	for _, name := range presetNames() {
+		root := all[name]
 		var b strings.Builder
 		for _, h := range []int{20, 40} {
 			for _, w := range []int{60, 80, 120, 200} {
@@ -258,7 +357,9 @@ func TestPresetDiagrams(t *testing.T) {
 }
 
 func TestPresetsKeepTheMainPane(t *testing.T) {
-	for name, root := range presets() {
+	all := presets()
+	for _, name := range presetNames() {
+		root := all[name]
 		for _, w := range []int{20, 60, 99, 100, 200} {
 			for _, h := range []int{3, 15, 16, 60} {
 				if p := mustSolve(t, root, w, h, State{}); p.Panes["main"].Empty() {
@@ -305,6 +406,22 @@ func random(r *rand.Rand, d int, next *int, budget int, withMax bool) Node {
 		return Pane{ID: PaneID(fmt.Sprintf("p%d", *next))}
 	}
 	return s
+}
+
+// uniqueNames returns n with every split renamed "u<k>", in tree order.
+func uniqueNames(n Node, k *int) Node {
+	s, ok := n.(Split)
+	if !ok {
+		return n
+	}
+	out := s
+	out.Name = fmt.Sprintf("u%d", *k)
+	*k++
+	out.Children = make([]Child, len(s.Children))
+	for i, c := range s.Children {
+		out.Children[i] = Child{Node: uniqueNames(c.Node, k), Size: c.Size}
+	}
+	return out
 }
 
 // check verifies the invariants every plan must hold.
@@ -422,7 +539,9 @@ func abs(x int) int {
 }
 
 func BenchmarkSolvePresets(b *testing.B) {
-	for name, root := range presets() {
+	all := presets()
+	for _, name := range presetNames() {
+		root := all[name]
 		b.Run(name, func(b *testing.B) {
 			for b.Loop() {
 				if _, err := Solve(root, Rect{W: 200, H: 60}, State{}); err != nil {

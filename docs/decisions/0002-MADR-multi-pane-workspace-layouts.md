@@ -562,6 +562,81 @@ these defaults into the keymap engine and removes `workspace.KeyMap`.
   fixes possible. The alternative is `v0.2.0`, which 0004 would then take
   as `v0.3.0`.
 
+### A2 (2026-10-02): a split name is used once per solve
+
+*Status: accepted (2026-10-02).* The owner asked for the solution to be
+specified, more than one option weighed, the most idiomatic, standards-
+adherent and project-native one chosen, and the result added to the plan
+as its own phase. Its plan is Step 3a of
+[0002-PLAN-harden-workspace-v0-1-1.md](0002-PLAN-harden-workspace-v0-1-1.md).
+
+**Found.** While A1's Step 3 was executed, a property test found that two
+splits with one `Name` share their separators' IDs. One `State.Resize`
+entry then moves both, `Plan.Resize` keeps only the last, and
+`Plan.Separators` holds two entries with one ID. The workspace finds a
+separator by ID for a drag or a keyboard resize, so it can move the wrong
+one. `Split.Name`'s documentation implies that names are unique, but
+nothing states or enforces it. A name starting with `/` can also collide
+with an unnamed split's positional ID, such as `/:0`. This defect predates
+A1.
+
+**What is legal today, and stays legal.** The presets give one name to
+splits in different `Responsive` rules on purpose. `arrange` and `stack`
+both name a split `SplitBottom`, so a resize of the bottom pane survives
+the fold between breakpoints. Only one rule is arranged in a solve, so the
+two never meet.
+
+**Options.**
+
+* **A. Document the rule only.** Good, because nothing changes. Bad,
+  because the fault stays silent, and the workspace moves the wrong
+  separator.
+* **B. Check every name in the tree before arranging.** Bad, because it
+  rejects the presets' reuse across `Responsive` rules, and a custom
+  `Node` builds its splits only when it arranges, so a static walk cannot
+  see them.
+* **C. Check while arranging.** `Context` records each named split it
+  arranges. A second split with that name in one solve is an error.
+  Good, because it mirrors `ErrDuplicatePane`, which `Context.Place`
+  enforces as panes are placed. Good, because it allows reuse across
+  `Responsive` rules, and because it sees a custom `Node`'s splits, which
+  go through `Context.Arrange`. Neutral, because a duplicate inside a
+  subtree that is not arranged, such as one whose panes are all hidden, is
+  reported only once that subtree is shown.
+* **D. Qualify separator IDs by path.** Bad, because every persisted
+  `State.Resize` key and the documented `sidebar:0` change, and a resize no
+  longer survives a change of breakpoint.
+* **E. Check separator IDs in the plan only.** Bad, because a split
+  showing fewer than two children has no separator, so the error would
+  depend on the terminal's size.
+* **F. An opt-in `Validate(root)`.** Bad, because a program that does not
+  call it is unprotected, and it has B's blind spots.
+
+**Decision: C.**
+
+* `Split.Arrange` claims its `Name` in the solve's `Context` before it
+  arranges anything. A name already claimed in this solve, or one that
+  starts with `/`, fails `Solve` with the new sentinel `ErrBadSplitName`,
+  wrapped with the name:
+
+  ```go
+  ErrBadSplitName = errors.New("layout: a split name is used twice, or is reserved")
+  ```
+
+  The name follows the existing `ErrBad…` family, and callers test it with
+  `errors.Is`, as they test `ErrDuplicatePane`.
+* `Split.Name`'s documentation states the rule: a name is used by at most
+  one split in each solve. The same name in different `Responsive` rules,
+  or in trees a program swaps, is legal, and keeps the resize. A name must
+  not start with `/`, which positional IDs use.
+* The workspace needs no change. On a `Solve` error it keeps its last plan
+  and reports the error through `Err()`, as it does for every `Solve`
+  error.
+
+**Versioning.** `v0.1.1`. `ErrBadSplitName` is a small API addition the fix
+needs. A tree that arranged two splits with one name used to solve, with a
+wrong result, and now fails. The release notes say so.
+
 ## More Information
 
 * [0001-MADR-scaffold-charm-tui-library.md](0001-MADR-scaffold-charm-tui-library.md):

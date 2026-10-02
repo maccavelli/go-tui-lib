@@ -6,7 +6,7 @@ associated-madr: "0002-MADR-multi-pane-workspace-layouts.md"
 # Harden multi-pane workspaces (`v0.1.1`)
 
 Associated MADR: [0002-MADR-multi-pane-workspace-layouts.md](0002-MADR-multi-pane-workspace-layouts.md),
-amendment A1. The first plan for that MADR,
+amendments A1 and A2. The first plan for that MADR,
 [0002-PLAN-multi-pane-workspace-layouts.md](0002-PLAN-multi-pane-workspace-layouts.md),
 shipped `v0.1.0` and is complete. This plan fixes what an audit then found in
 it ([0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md)
@@ -35,6 +35,7 @@ tree, and the owner can tag `v0.1.1`.
 | 1 | `docs/decisions/0002-*`, `docs/README.md` | accept amendment A1 |
 | 2 | `tuitest/` | 4: the `-update` panic; 12 and 13 in this package |
 | 3 | `layout/` | 8: applied resize deltas, `Separator.Resizable`; 12 and 13 in this package |
+| 3a | `layout/` | MADR A2: a split name is used once per solve (found in Step 3; deviation D2) |
 | 4 | `workspace/overlay.go`, `workspace/render.go`, `workspace/workspace.go` | 1, 2, 3: the crash, the cache, overlay sizes |
 | 5 | `workspace/focus.go` (new), `workspace/model.go` (new), `workspace/workspace.go`, `workspace/overlay.go` | 7: focus as messages, `Wrap` and `Model` |
 | 6 | `workspace/keys.go`, `workspace/workspace.go`, `workspace/*_test.go` | 8 in the workspace, 9, 12 and 13 |
@@ -137,6 +138,51 @@ rest of this step, setting it `in-progress`, waits for that approval.
 * **Mutations:**
   * `Plan.Resize` reports the requested delta;
   * `Resizable` is always true.
+
+### Step 3a: a split name is used once per solve
+
+Added 2026-10-02 by deviation D2, for MADR amendment A2.
+
+* **The claim.** `Context` gains a set of the split names claimed in this
+  solve, allocated on first use. `Split.Arrange` claims its `Name` first,
+  before it validates sizes or arranges a child. An unnamed split claims
+  nothing.
+* **The error.** A name already claimed, or one that starts with `/`,
+  returns `fmt.Errorf("%w: %q …", ErrBadSplitName, name)`, with the reason
+  in the message. `ErrBadSplitName` joins the `var` block of `Solve`'s
+  errors.
+* **Docs.** `Split.Name`'s comment states the rule, the legal reuse across
+  `Responsive` rules, and the reserved `/`. The comment on the presets'
+  split-name constants says `SplitBottom` names a split in more than one
+  rule on purpose.
+* **Test helpers.** `TestSolverProperties` builds its trees through
+  `uniqueNames`, as `TestAppliedResizeReproducesThePlan` does, so its random
+  trees stay valid. `FuzzSolve` treats `ErrBadSplitName` as an expected
+  error, beside `ErrBadSize` and `ErrDuplicatePane`, so the fuzzer still
+  explores duplicate names.
+* **Tests (the first three fail on `v0.1.0`, where `Solve` returns nil):**
+  * a vertical split named `x` holding a horizontal split also named `x`:
+    `Solve` fails, `errors.Is(err, ErrBadSplitName)`, and the message names
+    `"x"`;
+  * a custom `Node` that arranges one named split twice fails the same
+    way;
+  * a split named `/` fails;
+  * a `Responsive` node with one name in two rules solves at both
+    breakpoints, and a `State.Resize` for that name applies in each;
+  * every preset solves at every size of `TestPresetsKeepTheMainPane`, and
+    `TestPresetDiagrams` matches its `v0.1.0` golden files byte for byte;
+  * a duplicate inside a subtree whose panes are all hidden does not fail,
+    and fails once one of its panes is shown. This pins the "Neutral"
+    consequence A2 records.
+* **Mutations:**
+  * the claim is skipped;
+  * names are claimed from every rule of a `Responsive` node, so the
+    presets fail;
+  * the `/` check is skipped;
+  * the set lives on the `Split` value instead of the `Context`, so a
+    second solve is affected by the first.
+* **Checks:** as for every step. `go mod tidy -diff` is clean; no module is
+  added.
 
 ### Step 4: overlays and the view cache
 
@@ -310,13 +356,16 @@ rest of this step, setting it `in-progress`, waits for that approval.
 * **`docs/guides/building-workspaces.md`:**
   * focus messages, `Wrap` and a bubbles example;
   * overlay IDs and `SendOverlay`;
-  * resize behaviour, and the new default keys.
+  * resize behaviour, and the new default keys;
+  * split names: unique in a solve, legal to reuse across `Responsive`
+    rules, and never starting with `/` (MADR A2).
 * **`AGENTS.md`:** the pre-add section says `-tuitest.update` or
   `TUITEST_UPDATE=1`, and names `make modernize`.
 * **`docs/architecture.md`:** the conformance scan and the gate.
 * **Release notes for `v0.1.1`** in the execution record. They name the
-  behaviour changes: the flag, the default keys, focus messages, and
-  `Push` replacing an open ID.
+  behaviour changes: the flag, the default keys, focus messages,
+  `Push` replacing an open ID, and `Solve` failing with `ErrBadSplitName`
+  for a split name used twice in one solve or starting with `/`.
 * **Verification** as below. Mark `complete` after CI is green on the
   pushed tree. The owner tags.
 
@@ -437,3 +486,94 @@ was run.
 
 **Not done in this step.** The guides and `AGENTS.md` still say `-update`.
 Step 8 changes them, as planned.
+
+### Step 3: `layout` (2026-10-02)
+
+**What changed.**
+
+* **`Plan.Resize map[string]int`.** For each separator that `State.Resize`
+  moved, the delta `Solve` applied after clamping. A delta clamped to 0 is
+  absent, and the map is nil when nothing was applied. `Split.resize` now
+  takes the `Context` so it can record what it applied.
+* **`Separator.Resizable`** is true for a named split's separators only.
+* **Idioms:** `dropFirst` walks `slices.Backward(kept)`; `State.clone` uses
+  `maps.Copy`; `TestPresetDiagrams`, `TestPresetsKeepTheMainPane` and
+  `BenchmarkSolvePresets` walk the presets in sorted order
+  (`presetNames`).
+* **Docs:** `State.Resize` says a host stores the applied delta.
+
+**Regression first.** On a scratch copy of `v0.1.0`:
+
+* the new tests do not build there, because the API is new:
+  `base.Resize undefined (type Plan has no field or method Resize)` and
+  `s.Resizable undefined (type Separator has no field or method Resizable)`;
+* the dead zone itself, with `v0.1.0`'s own API:
+
+  ```text
+  --- FAIL: TestDeadZoneV010 (0.00s)
+      deadzone_test.go:17: after +1000 then -5, side stayed 20 cells (stored delta 995): the separator did not move
+  ```
+
+The workspace's use of `Plan.Resize`, which removes that dead zone for a
+user, is Step 6.
+
+**Tests:**
+
+* `TestPlanReportsAppliedResize`: +1000 against side's Min reports the
+  applied 30; storing it and moving back 5 leaves side at 25; a delta
+  clamped to 0 is absent.
+* `TestSeparatorResizable`: a named split's separators are `Resizable`, an
+  unnamed one's are not.
+* `TestAppliedResizeReproducesThePlan` (added beyond the PLAN's list): over
+  2,000 random trees with random deltas on every resizable separator, the
+  split stays tiled, and solving with `Plan.Resize` gives the same panes and
+  the same `Plan.Resize`. That is the property Step 6 relies on.
+* The existing property and fuzz tests pass unchanged, and every `v0.1.0`
+  golden diagram matches byte for byte.
+
+**Found, and not changed.** The first run of the new property test failed on
+tree 0. The test's random generator names splits after the pane count, so
+two splits can share a name. Two splits with one `Name` share their
+separators' keys, so one `State.Resize` entry moves both, and `Plan.Resize`
+keeps the last. The test now renames the tree's splits uniquely
+(`uniqueNames`), and the property holds. The behaviour itself predates this
+PLAN and is outside its scope: `Split.Name`'s documentation implies, but
+does not state or enforce, that names are unique. It was reported to the
+owner, not fixed in this step. Deviation D2 below adds the fix as Step 3a.
+
+**Mutation proofs**, each on a scratch copy; none survived:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| `Plan.Resize` reports the requested delta | `Plan.Resize[row:0] = 1000, true; want the applied 30, not the asked 1000` |
+| `Resizable` is always true | `unnamed split: separator /:0 Resizable = true, want false` |
+| a delta clamped to 0 is still reported | `TestPlanReportsAppliedResize` (the clamped-to-0 case) |
+
+**Checks.**
+
+* `make pre-add-check FILES=…` on the four files: `4 file(s) clean`, and
+  again on `state.go` after its doc comment: `1 file(s) clean`.
+* `make lint`: `0 issues` for linux, darwin and windows.
+* `go test -race -count=1 ./...` and `LC_ALL=C go test -count=1 ./...`:
+  every package `ok`.
+* `go mod tidy -diff` and `go fix -diff ./layout/...`: no output, exit 0.
+* `FuzzSolve` for 15 s: `PASS`, about 2.9 million executions; no corpus file
+  was written to the tree.
+* **The Windows test host:** `go vet`, `go test -race -count=1 ./...` and
+  `LC_ALL=C go test -count=1 ./...` exited 0, every package `ok`.
+
+### Deviation D2 (2026-10-02): Step 3a, unique split names
+
+* **Found.** Step 3's property test showed that two splits with one `Name`
+  share their separators' IDs (Step 3, "Found, and not changed").
+* **Decision.** The owner asked for the solution to be specified, more than
+  one option weighed, the most idiomatic and project-native one chosen, and
+  the result added to this PLAN as its own phase. MADR amendment A2 records
+  the six options and the choice. The choice is option C: `Context` claims
+  each split name as it is arranged, and a second claim, or a name starting
+  with `/`, fails `Solve` with `ErrBadSplitName`.
+* **Scope added.** Step 3a, in `layout/` only. Step 8 gains a guide bullet
+  and a release-notes item. No module, no other package.
+* **Order.** Step 3a runs after Step 3 and before Step 4, so Step 6's
+  resize, which finds a separator by ID, starts from unique IDs. It hands
+  off alone, by rule 6.

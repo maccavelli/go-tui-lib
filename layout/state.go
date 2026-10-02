@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 )
 
@@ -21,7 +22,9 @@ type State struct {
 	// Version is StateVersion, or 0 for a State that was never written.
 	Version int `json:"version"`
 	// Resize moves a named split's separator: a positive delta gives cells
-	// from the child after the separator to the child before it.
+	// from the child after the separator to the child before it. A host
+	// stores the delta Plan.Resize reports as applied, not the one it asked
+	// for.
 	Resize map[string]int `json:"resize,omitempty"`
 	// Hidden lists the panes the user has hidden. WithHidden keeps it
 	// sorted, so its JSON is stable.
@@ -98,9 +101,7 @@ func (s State) clone() State {
 	out.Hidden = slices.Clone(s.Hidden)
 	if s.Resize != nil {
 		out.Resize = make(map[string]int, len(s.Resize))
-		for k, v := range s.Resize {
-			out.Resize[k] = v
-		}
+		maps.Copy(out.Resize, s.Resize)
 	}
 	return out
 }

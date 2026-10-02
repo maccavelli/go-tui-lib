@@ -112,7 +112,7 @@ func (s Split) Arrange(area Rect, ctx *Context) error {
 		length = area.H
 	}
 	sizes, kept := allocate(s.Children, kids, length, s.Gap)
-	s.resize(ctx.state, kept, sizes)
+	s.resize(ctx, kept, sizes)
 	pos := area.X
 	if s.Axis == Vertical {
 		pos = area.Y
@@ -138,7 +138,7 @@ func (s Split) Arrange(area Rect, ctx *Context) error {
 			} else {
 				sep.Y, sep.H = pos, s.Gap
 			}
-			ctx.plan.Separators = append(ctx.plan.Separators, Separator{ID: s.sepID(ctx, i), Axis: s.Axis, Rect: sep})
+			ctx.plan.Separators = append(ctx.plan.Separators, Separator{ID: s.sepID(ctx, i), Axis: s.Axis, Rect: sep, Resizable: s.Name != ""})
 			pos += s.Gap
 		}
 	}
@@ -168,10 +168,11 @@ func (s Split) sepID(ctx *Context, i int) string {
 
 // resize applies State.Resize to the boundaries between kept children: a
 // positive delta moves cells from the later child to the earlier one, as
-// far as both children's bounds allow.
-func (s Split) resize(st State, kept []int, sizes []int) {
+// far as both children's bounds allow. What it applied goes in Plan.Resize.
+func (s Split) resize(ctx *Context, kept []int, sizes []int) {
 	for k := 0; k+1 < len(kept); k++ {
-		d, ok := st.Resize[s.resizeKey(kept[k])]
+		key := s.resizeKey(kept[k])
+		d, ok := ctx.state.Resize[key]
 		if !ok || d == 0 {
 			continue
 		}
@@ -187,8 +188,15 @@ func (s Split) resize(st State, kept []int, sizes []int) {
 				d = max(d, sizes[k+1]-b.Max)
 			}
 		}
+		if d == 0 {
+			continue
+		}
 		sizes[k] += d
 		sizes[k+1] -= d
+		if ctx.plan.Resize == nil {
+			ctx.plan.Resize = map[string]int{}
+		}
+		ctx.plan.Resize[key] = d
 	}
 }
 
@@ -227,9 +235,9 @@ func allocate(children []Child, kids []int, total, gap int) (sizes []int, kept [
 // equals the latest.
 func dropFirst(children []Child, kept []int) int {
 	best := kept[len(kept)-1]
-	for k := len(kept) - 1; k >= 0; k-- {
-		if children[kept[k]].Size.Shrink < children[best].Size.Shrink {
-			best = kept[k]
+	for _, i := range slices.Backward(kept) {
+		if children[i].Size.Shrink < children[best].Size.Shrink {
+			best = i
 		}
 	}
 	return best
