@@ -8,11 +8,35 @@ of terminal-UI packages on the Charm v2 stack. It has no binary.
 - **A library only.** Each capability is a top-level directory, with the
   package named after it. There is no root package. Helpers shared between
   packages go under `internal/`.
-- **No package yet.** The module has no Go file, no requirement and no
-  `go.sum`. `make test`, `make vet`, `make lint` and `make vuln` fail with
-  "no packages" until the first package lands. `make pre-add-check` reports
-  `no Go files to check.` and exits 0.
 - **Go 1.27.1**, with no `toolchain` line.
+- **Five packages,** for multi-pane terminal workspaces and the foundations
+  every package uses.
+
+## Packages
+
+```text
+ workspace     Bubble Tea pane host       → layout, theme, glyph; bubbletea, lipgloss, bubbles/key
+ theme         palettes, roles, styles    → glyph; lipgloss, colorprofile
+ glyph         Unicode and ASCII glyphs   → standard library
+ layout        geometry and state         → standard library
+ tuitest       golden rendering           → x/ansi (tests and examples only)
+```
+
+| Package | What it holds |
+| :--- | :--- |
+| `glyph` | `Set` (4 border styles, separators, focus marker, ellipsis, scroll, bullet, badge brackets), `Unicode()`, `ASCII()`, `For(utf8)`; every glyph one cell |
+| `theme` | `Palette` for dark, light and unknown backgrounds; `Styles`; `New(profile, background, glyphs)`; `Border(style)` |
+| `layout` | `Rect`, `Size` (fixed, percent, ratio, fill; min, max, shrink order), `Node` (`Pane`, `Split`, `Responsive`, or a custom node), `Solve` → `Plan`; `State` (JSON); the sidebar presets |
+| `workspace` | `Pane` and its optional interfaces; `Workspace` (routing, focus, chrome, resize, zoom, hide, overlays, cursor); `KeyMap` |
+| `tuitest` | `Golden` across {colour, no colour} × {UTF-8, ASCII} × widths; `Text` for a single file; `Annotate` |
+
+- **`layout` has no Charm import,** so its solver can serve any front end.
+- **`workspace` composes the frame on a Lip Gloss canvas.** Each pane is a
+  layer clipped to its rectangle; separators sit at Z 1 and overlays at Z 10
+  and up. The same compositor answers mouse hit tests.
+- **Nothing writes to the terminal.** No package writes to `os.Stdout` or
+  `os.Stderr`, calls `signal.Notify` or sets `AltScreen`;
+  `internal/conformance` checks this.
 
 ## Tree
 
@@ -21,7 +45,7 @@ README.md                   repository entry; links here
 LICENSE                     Apache License 2.0
 AGENTS.md                   rules for agents: dependencies, TUI conventions,
                             records, checks, identifiers, commits
-go.mod                      the module, with no requirements
+go.mod, go.sum              the module and its five requirements
 Makefile                    development targets (below)
 .golangci.yml               golangci-lint configuration, with depguard
 .markdownlint-cli2.jsonc    Markdown lint configuration
@@ -31,6 +55,11 @@ Makefile                    development targets (below)
   ci.yml                    CI
 scripts/
   go-precheck.sh            the pre-add check
+  go-fuzz.sh                fuzzes each fuzz target of a package in turn
+  go-fuzz_test.sh           its offline test
+glyph/ theme/ layout/ workspace/ tuitest/
+                            the packages; goldens under each testdata/golden/
+internal/conformance/       the terminal-ownership scan (tests only)
 .claude/ .grok/ .opencode/  per-agent pointers to AGENTS.md
 opencode.json
 docs/
@@ -38,14 +67,17 @@ docs/
   architecture.md           this file
   decisions/                MADR and PLAN records
   reports/                  REPORT records
+  guides/                   how-to guides
 ```
 
 ## Dependencies
 
-- **Named stack:** `charm.land/bubbletea/v2`, `charm.land/lipgloss/v2`,
-  `charm.land/bubbles/v2`, `github.com/charmbracelet/colorprofile`,
-  `github.com/charmbracelet/x/ansi` and `github.com/maccavelli/go-core-lib`.
-  None is required yet. Each is added in the commit with its first import.
+- **Required:** `charm.land/bubbletea/v2` v2.0.10, `charm.land/lipgloss/v2`
+  v2.0.6, `charm.land/bubbles/v2` v2.2.1,
+  `github.com/charmbracelet/colorprofile` v0.4.3 and
+  `github.com/charmbracelet/x/ansi` v0.11.8.
+- **Named but not yet required:** `github.com/maccavelli/go-core-lib`, for
+  `updatetea`.
 - **Refused by `depguard`,** in source and tests:
   - the Charm v1 paths `github.com/charmbracelet/bubbletea`, `…/lipgloss`
     and `…/bubbles`;
@@ -56,9 +88,11 @@ docs/
 ## Tooling
 
 - **`make` targets:** `test`, `test-sum`, `fmt`, `vet`, `lint`, `tidy`,
-  `vuln`, `pre-add-check`, `help`.
+  `vuln`, `fuzz`, `pre-add-check`, `help`.
 - **`make lint`** runs `golangci-lint run -c .golangci.yml ./...` three
   times: `GOOS=linux`, `darwin` and `windows`, each with `CGO_ENABLED=0`.
+- **`make fuzz`** fuzzes `layout`'s fuzz target for `FUZZTIME` (default
+  20s).
 - **`scripts/go-precheck.sh`** runs `gofmt` on the given Go files, the same
   three golangci-lint runs, `go vet` and `go test` on their packages, and
   `govulncheck ./...`. `make pre-add-check` runs it, and so does the
@@ -71,12 +105,16 @@ docs/
   - gofmt and goimports as formatters;
   - test files exempt from `errcheck`, `gosec`, `unparam`, `revive`,
     `gocritic` and `goconst`, but not from `depguard`.
+- **Golden files** are written with `go test ./<pkg>/ -run <Test> -update`,
+  and read before they are committed.
 - **CI** (`.github/workflows/ci.yml`) runs on `ubuntu-24.04`, `macos-15` and
   `windows-2025`, with the Go version read from `go.mod`.
   - **Every OS:** `go test`.
   - **Linux and macOS:** `go test -race`.
   - **Linux also:**
     - `go test -shuffle=on -count=2` and `LC_ALL=C go test`;
+    - the fuzz script's test, then `make fuzz`, uploading the corpus as an
+      artifact on failure;
     - `go vet` for `freebsd/amd64`, `openbsd/amd64` and `linux/386`;
     - `go vet`, `gofmt`, `go mod tidy -diff`, and `make lint` with
       golangci-lint v2.14.0;
@@ -88,9 +126,9 @@ docs/
 
 ## What is not here
 
-- **Any package.** The first, `updatetea` or an extraction from ocp-login,
-  is its own record.
-- **`make apicheck`.** It needs a release tag to compare against. It comes
-  with the first release.
-- **`docs/guides/`.** It is created by its first document.
-- **A release workflow, Dependabot, and any tag.**
+- **Standard panes** (log tail, metrics view, scrolling text and
+  Markdown), **overlay widgets** (dialog, picker, palette, toast), a **help
+  footer** and **`updatetea`.** Each is its own record.
+- **`make apicheck`.** It needs a `v1` tag to compare against, and comes
+  with the `v1` record.
+- **A release workflow, Dependabot, and any tag** other than the owner's.

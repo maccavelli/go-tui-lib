@@ -751,3 +751,119 @@ not the workspace, was at fault. It now takes its height from `SizeMsg`.
 * `make pre-add-check` and `make lint` passed, as did `go test -race ./...`,
   `LC_ALL=C go test ./...` and `go mod tidy -diff`.
 * The Windows test host passed `go vet` and `go test -race`.
+
+### Step 8: documentation (2026-10-01)
+
+**What changed.**
+
+* **`docs/guides/building-workspaces.md`** (new) covers:
+  * the program around a workspace, and what it owns;
+  * choosing and changing a preset, and building a tree;
+  * size claims, shrinking, responsive rules and custom nodes;
+  * writing a pane and its optional interfaces, and how messages are routed;
+  * keys and the mouse, overlays, persisting the layout, and chrome and
+    theme.
+* **`ExampleWorkspace_program`** (`workspace/example_program_test.go`) is
+  the guide's program skeleton, compiled, so the guide cannot drift from the
+  API. It sets `AltScreen` and `MouseMode`, as a program does. The
+  conformance scan reads only non-test files, so it allows this.
+* **`docs/architecture.md`** is rewritten for the five packages: their
+  imports, a table, the compositor, the dependencies, the tooling with the
+  fuzz step, and "What is not here".
+* **`README.md`** Status describes `v0.1.0` and its first consumer, and the
+  "no packages" line is gone. The owner's three paragraphs are unchanged.
+* **`docs/README.md`** gains seven rows. **`AGENTS.md`'s** pre-add section
+  replaces the "no packages" paragraph with the conformance and golden
+  rules.
+* **Package documentation** lives in each package's main file
+  (`glyph/glyph.go`, `theme/theme.go`, `layout/layout.go`,
+  `workspace/workspace.go`, `tuitest/tuitest.go`), not in a separate
+  `doc.go` as the PLAN said. A second file would split one comment for no
+  reader's benefit.
+
+**Checks.** The link resolver, proven in 0001-PLAN Phase 4, found 0 broken
+links across the 13 documents. markdownlint-cli2 linted 7 files with 0
+issues.
+
+### Verification (2026-10-01)
+
+**On the macOS development host:**
+
+| Check | Result |
+| :--- | :--- |
+| `make pre-add-check`, `make lint`, `make vuln` | rc 0 each |
+| `go test -race -count=1 ./...`, `go test -shuffle=on -count=2 ./...`, `LC_ALL=C go test ./...` | rc 0 each |
+| `make fuzz`, `scripts/go-fuzz_test.sh` | rc 0 each |
+| `go mod tidy -diff` | rc 0 |
+| shellcheck, actionlint v1.7.12, markdownlint-cli2 0.23.2 | rc 0 each |
+| direct requirements in `go.mod` | 5, exactly MADR §1's |
+
+**On the Windows test host:** `go vet`, `go test -race`,
+`go test -shuffle=on -count=2`, govulncheck, the fuzz script's test, 10 s of
+`FuzzSolve`, and golangci-lint v2.14.0 all exited 0.
+
+**depguard in every package.** A scratch copy planted a Charm v1 import in
+each of the five packages, and golangci-lint reported exactly five findings,
+one per package:
+
+```text
+import 'github.com/charmbracelet/lipgloss' is not allowed from list 'forbidden': Charm v1: use charm.land/lipgloss/v2 (…§3) (depguard)
+```
+
+The first attempt required the real `github.com/charmbracelet/lipgloss`
+v1.1.0, and **it does not compile in this module**. Version selection
+chooses this module's `x/ansi` v0.11.8, and v1's `x/cellbuf` fails against
+it: `not enough arguments in call to b.Italic`, and similar. The type error
+hid depguard. The check was re-run with the v1 path replaced by a small
+local module. The failure also shows directly that Charm v1 and v2 cannot
+share one module, which is MADR §3's premise.
+
+**Conformance.** `internal/conformance` found no `os.Stdout`, `os.Stderr`,
+`signal.Notify` or `AltScreen` in non-test code, after reading all five
+packages.
+
+**Identifiers.** Each commit's added lines, and the tree, carry none of:
+the local account name, a real-machine home path, either development
+hostname or its domain, the owner's email, or ocp-login's org-internal
+module host.
+
+**Not yet met:** CI on the pushed tree, which waits for the owner's push.
+This PLAN stays `in-progress` until then.
+
+### Release notes for `v0.1.0`
+
+The first release. Everything is new, and `v0` means the API may change
+before `v1`.
+
+* **`layout`**: pure geometry.
+  * A tree of `Pane`, `Split` and `Responsive` nodes, or a custom `Node`.
+  * Fixed, percent, ratio and fill sizes, with min, max and shrink order.
+  * A deterministic integer solver that tiles, never overlaps, and hides
+    rather than overflows.
+  * `State` holds resizes, hidden panes and zoom, as versioned JSON.
+  * Four presets: `SidebarRight`, `SidebarLeft`, `SidebarRightBottom` and
+    `SidebarLeftBottom`. They take bottom span, footer, gap, sizes and
+    responsive breakpoints.
+* **`workspace`**: a Bubble Tea v2 pane host.
+  * Borders, separator or no chrome, per workspace or per pane.
+  * Focus by ring, number and mouse.
+  * Keyboard and mouse resize, zoom, and hide.
+  * Modal and non-modal overlays.
+  * The focused pane's real cursor, and targeted or broadcast messages.
+  * `Changer`-aware rendering.
+  * No `ctrl+c` binding, no alternate screen and no signal handler.
+* **`theme`**: dark, light and unknown palettes, with the unknown palette
+  legible on both backgrounds. Styles degrade under ASCII and NoTTY
+  profiles.
+* **`glyph`**: Unicode and ASCII glyph sets, every glyph one cell.
+* **`tuitest`**: golden rendering across colour × charset × width, and
+  single-file goldens.
+
+**Migration notes.** A first release has none. To adopt it:
+
+* require Go 1.27.1;
+* use `charm.land/…/v2`, because `depguard` and the module graph both
+  refuse Charm v1;
+* follow `docs/guides/building-workspaces.md`.
+
+pi-go must amend its import rule 5 to name `github.com/maccavelli/go-tui-lib`.

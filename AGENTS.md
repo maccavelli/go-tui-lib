@@ -146,10 +146,9 @@ CI; `go vet` and `go test` on the packages the files belong to; and
 not used: its checks are `revive`'s `exported`, `package-comments` and
 `var-naming` rules in `.golangci.yml`. A file that fails is not committed.
 
-Until the first package lands, `make test`, `make vet`, `make lint` and
-`make vuln` fail with "no packages"
-(`docs/decisions/0001-MADR-scaffold-charm-tui-library.md` §8). That is the
-expected state, not a defect to work around.
+`internal/conformance` checks rules 1 and 2 of the TUI conventions on
+every package. Golden files are rewritten with `-update` and read before
+they are committed.
 
 The machine-wide agent gate runs the same script before every agent
 `git commit` that stages Go files, and denies the commit when it fails. There

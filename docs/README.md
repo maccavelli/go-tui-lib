@@ -17,6 +17,13 @@ Decisions and their implementation plans, in one numbered sequence.
 | I want to… | Start here |
 | :--- | :--- |
 | see what is in this repository today | [architecture.md](architecture.md) |
+| build a main pane with a sidebar, a bottom pane and a footer | [guides/building-workspaces.md](guides/building-workspaces.md) |
+| write a pane, and choose its optional interfaces | [guides/building-workspaces.md](guides/building-workspaces.md#write-a-pane) |
+| make my own layout, or change a preset | [guides/building-workspaces.md](guides/building-workspaces.md#choose-a-layout) |
+| save and restore what the user changed in the layout | [guides/building-workspaces.md](guides/building-workspaces.md#persist-the-layout) |
+| open a dialog, picker or completion pop-up | [guides/building-workspaces.md](guides/building-workspaces.md#overlays) |
+| know what my program, not the workspace, owns | [guides/building-workspaces.md](guides/building-workspaces.md#the-program-owns-the-program) |
+| see a whole agent session | `ExampleWorkspace_agentSession` in `workspace/agent_test.go` |
 | know which Charm version to use | [0001-MADR, §3](decisions/0001-MADR-scaffold-charm-tui-library.md#3-toolchain-and-dependencies) |
 | know what this module may import, and what it never may | [AGENTS.md, Dependencies](../AGENTS.md#dependencies) |
 | know who owns the screen, the output and ctrl+c | [AGENTS.md, TUI conventions](../AGENTS.md#tui-conventions) |

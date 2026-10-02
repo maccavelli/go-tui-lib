@@ -16,17 +16,18 @@ stable API.
 
 ## Status
 
-- **No package yet, and no release.** The first package, such as
-  `updatetea` (the Bubble Tea adapter for go-core-lib's `selfupdate`) or an
-  extraction from ocp-login, is its own record.
+- **Multi-pane workspaces, `v0.1.0`.** `layout` arranges panes: a main
+  pane with a sidebar on either side, a bottom pane, a footer, responsive
+  folds and saved state. `workspace` hosts them in a Bubble Tea program,
+  with focus, resize, zoom, overlays, mouse and cursor. `glyph`, `theme`
+  and `tuitest` are the foundations every package uses. pi-go's agent
+  session is the first consumer. `v0` means the API may still change.
 - **The stack is Charm v2:** `charm.land/bubbletea/v2`,
   `charm.land/lipgloss/v2` and `charm.land/bubbles/v2`, with
   `github.com/charmbracelet/colorprofile` and
   `github.com/charmbracelet/x/ansi`. The v1 `github.com/charmbracelet/…`
   paths are refused by lint.
 - **Go 1.27.1** is required.
-- **Until the first package lands,** `make test`, `make vet`, `make lint` and
-  `make vuln` fail with "no packages". That is expected.
 
 ## Documentation
 
@@ -39,6 +40,7 @@ repository as it is now.
 | I want to… | Start here |
 | :--- | :--- |
 | see what is in this repository today | [architecture.md](docs/architecture.md) |
+| build a main pane with a sidebar, a bottom pane and a footer | [the workspace guide](docs/guides/building-workspaces.md) |
 | know which Charm version to use, and what may be imported | [AGENTS.md, Dependencies](AGENTS.md#dependencies) |
 | know the rules every TUI package follows | [AGENTS.md, TUI conventions](AGENTS.md#tui-conventions) |
 | contribute: checks, records and commit rules | [AGENTS.md](AGENTS.md) |
