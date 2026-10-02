@@ -47,7 +47,12 @@ type Titled interface{ Title() string }
 // empty badge is not drawn.
 type Badged interface{ Badge() string }
 
-// Focuser is told when a pane gains and loses focus.
+// Focuser is told when a pane gains and loses the keyboard, before the
+// pane's Update gets PaneFocusMsg or PaneBlurMsg. Its methods change the
+// value the workspace holds, so only a pointer pane keeps the change. A
+// pane implements Focuser or handles the messages, not both; a pane with
+// value semantics, such as a bubbles model, handles the messages, or is
+// hosted with Wrap.
 type Focuser interface {
 	Focus() tea.Cmd
 	Blur()
@@ -226,13 +231,10 @@ func New(root layout.Node, panes map[layout.PaneID]Pane, opts ...Option) *Worksp
 }
 
 // Init returns the commands a program runs first, from its own Init: each
-// placed pane's first SizeMsg, and the focused pane's Focus.
+// placed pane's first SizeMsg, and PaneFocusMsg to the pane with the
+// keyboard.
 func (w *Workspace) Init() tea.Cmd {
-	cmds := []tea.Cmd{w.resolve()}
-	if f, ok := w.panes[w.focus].(Focuser); ok {
-		cmds = append(cmds, f.Focus())
-	}
-	return tea.Batch(cmds...)
+	return tea.Batch(w.resolve(), w.gain(w.focusTarget()))
 }
 
 // Err returns the error of the last layout, if any. The workspace keeps the
@@ -380,19 +382,17 @@ func (w *Workspace) key(m tea.KeyPressMsg) tea.Cmd {
 	return w.Send(w.focus, m)
 }
 
-// Focus moves focus to pane id, if it is visible and focusable.
+// Focus moves focus to pane id, if it is visible and focusable. The pane
+// that had the keyboard is sent PaneBlurMsg, and id PaneFocusMsg. While a
+// modal overlay is open it keeps the keyboard, and id is told when the
+// overlay closes.
 func (w *Workspace) Focus(id layout.PaneID) tea.Cmd {
 	if id == w.focus || !w.focusable(id) {
 		return nil
 	}
-	if f, ok := w.panes[w.focus].(Focuser); ok {
-		f.Blur()
-	}
+	was := w.focusTarget()
 	w.focus = id
-	if f, ok := w.panes[id].(Focuser); ok {
-		return f.Focus()
-	}
-	return nil
+	return w.moveFocus(was)
 }
 
 // FocusNext moves focus to the next pane of the ring.
@@ -536,12 +536,9 @@ func (w *Workspace) resolve() tea.Cmd {
 	}
 	if !w.focusable(w.focus) {
 		if r := w.focusRing(); len(r) > 0 {
-			old := w.focus
-			w.focus = ""
-			if f, ok := w.panes[old].(Focuser); ok {
-				f.Blur()
-			}
-			cmds = append(cmds, w.Focus(r[0]))
+			was := w.focusTarget()
+			w.focus = r[0]
+			cmds = append(cmds, w.moveFocus(was))
 		}
 	}
 	return tea.Batch(cmds...)

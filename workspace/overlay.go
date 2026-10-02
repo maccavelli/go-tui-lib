@@ -49,41 +49,59 @@ type Overlay struct {
 	Modal bool
 }
 
-// Push opens an overlay above any already open, tells it its size, and
-// focuses its pane. An overlay already open with the same ID is closed
-// first, so the new one replaces it, on top.
+// Push opens an overlay above any already open and tells it its size. A
+// modal overlay takes the keyboard: the pane that had it is sent
+// PaneBlurMsg, and the overlay's pane PaneFocusMsg. A non-modal overlay
+// changes no focus, because the focused pane drives it. An overlay already
+// open with the same ID is closed first, so the new one replaces it, on top.
 func (w *Workspace) Push(o Overlay) tea.Cmd {
+	was := w.focusTarget()
+	var cmds []tea.Cmd
 	if i := w.overlayIndex(o.ID); i >= 0 {
-		w.closeOverlay(i)
+		if was == (focusTarget{overlay: true, id: o.ID}) {
+			// The replaced overlay had the keyboard: it loses it now, and
+			// nothing beneath gains it in between.
+			cmds = append(cmds, w.lose(was))
+			was = focusTarget{}
+		}
+		w.removeOverlay(i)
 	}
 	w.overlays = append(w.overlays, o)
 	sz := w.overlayContent(o)
 	w.osizes[o.ID] = sz
-	cmds := []tea.Cmd{w.updateOverlay(len(w.overlays)-1, sz)}
-	if f, ok := o.Pane.(Focuser); ok {
-		cmds = append(cmds, f.Focus())
-	}
+	cmds = append(cmds, w.updateOverlay(len(w.overlays)-1, sz), w.moveFocus(was))
 	return tea.Batch(cmds...)
 }
 
-// Pop closes the top overlay.
+// Pop closes the top overlay. If it had the keyboard, its pane is sent
+// PaneBlurMsg, and whoever has the keyboard now, the next modal overlay or
+// the focused pane, PaneFocusMsg.
 func (w *Workspace) Pop() tea.Cmd {
 	if n := len(w.overlays); n > 0 {
-		w.closeOverlay(n - 1)
+		return w.closeOverlay(n - 1)
 	}
 	return nil
 }
 
-// closeOverlay blurs overlay i, removes it, and forgets its size and its
-// cached view.
-func (w *Workspace) closeOverlay(i int) {
-	o := w.overlays[i]
-	if f, ok := o.Pane.(Focuser); ok {
-		f.Blur()
+// closeOverlay closes overlay i, moving the keyboard on if it had it.
+func (w *Workspace) closeOverlay(i int) tea.Cmd {
+	was := w.focusTarget()
+	var cmd tea.Cmd
+	if was == (focusTarget{overlay: true, id: w.overlays[i].ID}) {
+		cmd = w.lose(was)
+		was = focusTarget{}
 	}
+	w.removeOverlay(i)
+	return tea.Batch(cmd, w.moveFocus(was))
+}
+
+// removeOverlay removes overlay i and forgets its size and its cached view.
+// It sends no message.
+func (w *Workspace) removeOverlay(i int) {
+	id := w.overlays[i].ID
 	w.overlays = slices.Delete(w.overlays, i, i+1)
-	delete(w.osizes, o.ID)
-	delete(w.cache, viewKey{overlayView, o.ID})
+	delete(w.osizes, id)
+	delete(w.cache, viewKey{overlayView, id})
 }
 
 // overlayIndex is the position of the open overlay with id, or -1.

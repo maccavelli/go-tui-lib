@@ -553,6 +553,14 @@ view cache. Both tags stay, because a published tag is never moved or
 deleted. Steps 5–8 ship as `v0.1.3`, still a patch for the reasons
 above (the owner's choice).
 
+*Amended 2026-10-02*
+([0002-PLAN-harden-workspace-v0-1-1.md](0002-PLAN-harden-workspace-v0-1-1.md)
+deviation D4): testing `Wrap` against a real bubbles `textinput` makes
+`go.mod` require `github.com/atotto/clipboard v0.1.4 // indirect`, which
+`charm.land/bubbles/v2/textinput` imports. Only tests import it. This
+record names it, as AGENTS.md requires of every required module; it is a
+dependency of bubbles, which 0001-MADR §3 already names.
+
 **Owner questions for A1.**
 
 *Answered 2026-10-02* (picked from options): Q5 "alt+. and alt+,"; Q6

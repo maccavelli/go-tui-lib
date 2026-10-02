@@ -44,7 +44,9 @@ both tag Steps 1–4.*
 | 7 | `internal/conformance/`, `Makefile`, `.github/workflows/ci.yml` | 11, and a `go fix` gate |
 | 8 | `README.md`, `AGENTS.md`, `docs/` | documentation, release notes, close-out |
 
-No module is added or removed. `go.mod` does not change.
+No module is added or removed. `go.mod` does not change. *Amended by
+deviation D4: Step 5 adds `github.com/atotto/clipboard v0.1.4 // indirect`,
+a dependency of bubbles' `textinput` that only its tests import.*
 
 ### Out of scope
 
@@ -784,3 +786,131 @@ be the runtime's stack overflow.
   and its PLAN, [0007-MADR-keymap-engine.md](0007-MADR-keymap-engine.md),
   and [0010-PLAN-nested-adapter-modules.md](0010-PLAN-nested-adapter-modules.md).
 * **Unchanged.** Steps 5–8, and this PLAN's file name.
+
+### Deviation D4 (2026-10-02): Step 5's `textinput` test adds an indirect requirement
+
+* **Found.** Step 5's test of a wrapped bubbles `textinput` imports
+  `charm.land/bubbles/v2/textinput`, which imports
+  `github.com/atotto/clipboard`. That module is not in this module's
+  `go.sum`, so the test does not build, and the Scope says `go.mod` does not
+  change.
+* **Evidence.** `go mod tidy` on scratch copies, one bubbles package
+  imported at a time by a test file: `textinput` and `textarea` each add
+  `github.com/atotto/clipboard v0.1.4 // indirect`; `viewport` adds
+  nothing; `list` adds that line and `github.com/sahilm/fuzzy`. The cause
+  is bubbles v2.2.1's own imports, not this PLAN's code.
+* **Resolutions offered:**
+  * accept the indirect line, and test the real `textinput` as planned
+    (recommended);
+  * test `Wrap` against `viewport` and a test model with `textinput`'s
+    method set, and prove the real `textinput` in a nested test-only module
+    once 0010-PLAN's tooling exists;
+  * stop Step 5.
+* **Decision** (the owner, picked from options, 2026-10-02): accept the
+  indirect line.
+* **Consequence.** `go.mod` gains `github.com/atotto/clipboard v0.1.4 //
+  indirect`. Only tests import it, so no program compiles it. It still
+  reaches every consumer's `go.sum` and module graph, as
+  [0010-REPORT-nested-modules-and-adapter-sources.md](../reports/0010-REPORT-nested-modules-and-adapter-sources.md)
+  §2 measured for any root requirement. MADR A1 names it, as AGENTS.md
+  requires of every required module.
+* **Scope added.** `go.mod` and `go.sum`, in Step 5.
+
+### Step 5: focus as messages (2026-10-02)
+
+The owner approved Step 5 ("proceed") after committing D3's records
+(`831a2dc`). Deviation D4 was raised, answered and recorded before any
+code was written.
+
+**What changed.**
+
+* **`focus.go` (new).** `PaneFocusMsg` and `PaneBlurMsg`. One rule decides
+  who has the keyboard: the top modal overlay's pane, or else the focused
+  pane (`focusTarget`). Every change goes through `moveFocus`, which sends
+  the old target `PaneBlurMsg` and the new one `PaneFocusMsg`. Each is sent
+  with `Send` (or `updateOverlay`), so the value `Update` returns is kept.
+  A `Focuser` is called first, so a `v0.1.0` pointer pane works unchanged.
+* **Where focus moves:** `Init` (the target gains focus); `Focus` (old
+  blurs, new gains; under a modal overlay the change waits for the overlay
+  to close); `resolve`, when it moves focus off a pane no longer shown;
+  `Push` of a modal overlay; and `Pop` or a replacing `Push` of the overlay
+  that had the keyboard. Replacing the top modal overlay blurs the old one
+  and focuses the new one, with nothing beneath focused in between.
+* **`model.go` (new).** `Bubble[M]`, `Model[M]`, `Wrap`, `WrapOption` and
+  the options `OnSize`, `OnFocus`, `OnBlur`, `WithCursor` and `WithKeys`,
+  as the PLAN gives them. `SizeMsg` calls `SetSize`, or `SetWidth` and
+  `SetHeight`, on `*M`; the focus messages call `Focus` and `Blur` on `*M`;
+  `Cursor` and `Keys` look on `M`, then `*M`. Every other message reaches
+  the model's `Update`. `View` clips to the size.
+* **Docs.** `Focuser`'s comment says to implement it or handle the
+  messages, not both. `Wrap`'s comment notes that bubbles `textinput` and
+  `textarea` draw a virtual cursor by default (`textinput.go:164`) and give
+  no `Cursor`, unless `SetVirtualCursor(false)`.
+* **`go.mod`** gains `github.com/atotto/clipboard v0.1.4 // indirect`, and
+  `go.sum` its two lines: deviation D4, and nothing else.
+
+**Behaviour changes,** for the `v0.1.3` release notes:
+
+* panes receive `PaneFocusMsg` and `PaneBlurMsg`;
+* a non-modal overlay no longer has its `Focuser` called on `Push` or on
+  closing: it never has the keyboard;
+* `Focus` while a modal overlay is open changes the focused pane, which is
+  told only when the overlay closes.
+
+**Regression first.** On a scratch copy of `831a2dc`, with `go mod tidy`
+allowed to add D4's line there:
+
+```text
+--- FAIL: TestValueFocuserV010 (0.00s)
+    focus_v010_test.go:34: a value-type Focuser was focused on a copy: the stored pane has focused=false
+--- FAIL: TestTextinputV010 (0.00s)
+    focus_v010_test.go:44: textinput focused false, value "": it is never focused, so it drops typed keys
+```
+
+**Tests** (`workspace/focus_test.go`):
+
+* a value-type pane records `a focus, a blur, b focus, b blur, c focus,
+  c blur, a focus` across `Init`, `FocusNext`, a click and hiding `c`, and
+  the stored copies hold the matching state;
+* a non-modal `Push` and its close send nothing; two stacked modal
+  overlays and two `Pop`s send `a blur, dlg focus, dlg blur, dlg2 focus,
+  dlg2 blur, dlg focus, dlg blur, a focus`; `Focus` under a modal overlay
+  sends nothing until `Pop`;
+* a pointer `Focuser` is called and also gets the message;
+* a wrapped `textinput` with the terminal cursor is focused, takes typed
+  keys, is given the content width, places its cursor at the pane's
+  offset, and is blurred by a modal overlay;
+* a wrapped `viewport` gets its content size;
+* each option replaces the method `Wrap` would find.
+
+The first run of the `textinput` test failed with
+`cursor <nil>, want the textinput's <nil>`: bubbles v2's textinput uses a
+virtual cursor by default. The test now calls `SetVirtualCursor(false)`, as
+a program wanting the terminal cursor does; no assertion was loosened.
+
+**Mutation proofs**, each on a scratch copy; none survived:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| focus messages go through `Update`, but the returned value is dropped | `TestFocusReachesValuePanes` |
+| `Pop` does not refocus | `focus messages [… dlg blur], want [… dlg blur a focus]` |
+| `Wrap` ignores `SetWidth` and `SetHeight` | `textinput width 0, want the content width 38`; `viewport 0x0, want 48x10` |
+| a non-modal overlay takes focus | `TestModalOverlayMovesFocus` |
+
+They ran before one lint fix in `model.go` (below), which touches none of
+their anchors.
+
+**Checks.**
+
+* `make pre-add-check FILES=…` on the five files: first run, one gocritic
+  `evalOrder` finding on `return p, p.focus()`, which mutates `p.M` while
+  the results are evaluated. The call now runs first. Second run:
+  `5 file(s) clean`, govulncheck included with D4's module.
+* `make lint`: `0 issues` for linux, darwin and windows.
+* `go test -race -count=1 ./...` and `LC_ALL=C go test -count=1 ./...`:
+  every package `ok`; no golden file changed.
+* `go mod tidy -diff`: no output, exit 0.
+* `go fix -diff ./workspace/...`: the same four suggestions as before
+  Step 4, which Step 6 owns; none new.
+* **The Windows test host:** `go vet`, `go test -race -count=1 ./...` and
+  `LC_ALL=C go test -count=1 ./...` exited 0, every package `ok`.
