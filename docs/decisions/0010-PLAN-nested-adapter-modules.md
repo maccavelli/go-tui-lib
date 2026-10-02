@@ -62,7 +62,7 @@ workspace holds the root module only, and every loop runs once.
 
 This PLAN runs after `0002-PLAN-harden-workspace-v0-1-1.md` is complete,
 because both change `scripts/go-precheck.sh`, the `Makefile` and CI, and
-`v0.1.1` should not wait for it. It runs before any step that creates an
+`v0.1.3` should not wait for it. It runs before any step that creates an
 adapter module.
 
 ## Rules for every phase

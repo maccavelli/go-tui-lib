@@ -22,8 +22,9 @@ findings into a report then follow recommendations and proceed." The
 recommendation put integration with the Charm v2 stack and Go 1.27 first,
 ahead of the five expansions. The audit's confirmed defects are fixed in
 [0002-PLAN-harden-workspace-v0-1-1.md](0002-PLAN-harden-workspace-v0-1-1.md),
-which ships `v0.1.1`. This record decides what comes next: the changes
-that alter how `workspace` draws, measures and styles, and the API they add.
+which ships across `v0.1.1` to `v0.1.3` (its deviation D3). This record
+decides what comes next: the changes that alter how `workspace` draws,
+measures and styles, and the API they add.
 The owner's standing direction also applies: build speculative API when it
 is sensible, for extensibility, flexibility and idiomatic, modular design.
 
@@ -351,7 +352,7 @@ Chosen option: **"A"**, because:
 
 * This ships as **`v0.2.0`**: it adds API, and it changes the default width
   method from grapheme to wcwidth, which a caller can see.
-* Everything public in `v0.1.1` still compiles. The release notes name the
+* Everything public in `v0.1.3` still compiles. The release notes name the
   width change and `WithWidthMethod(ansi.GraphemeWidth)` as the way back.
 
 ### Consequences

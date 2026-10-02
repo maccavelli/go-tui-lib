@@ -27,8 +27,9 @@ Done means every item under Verification holds, CI is green on the pushed
 tree, and the owner can tag `v0.2.0`.
 
 **Precondition.** [0002-PLAN-harden-workspace-v0-1-1.md](0002-PLAN-harden-workspace-v0-1-1.md)
-is `complete`, so this work starts from the `v0.1.1` tree, with its cache
-and focus fixes in place.
+is `complete`, so this work starts from the `v0.1.3` tree, with its cache
+and focus fixes in place. (That PLAN's deviation D3: `v0.1.1` and
+`v0.1.2` tag only its Steps 1–4.)
 
 ## Scope
 
@@ -101,7 +102,7 @@ Added for this PLAN:
 * The owner accepted the MADR on 2026-10-02, answering Q1–Q4, and the
   answers are recorded in it. When execution is approved, set this PLAN
   `in-progress` and update `docs/README.md`.
-* **Baseline.** On the `v0.1.1` tree, on the macOS development host:
+* **Baseline.** On the `v0.1.3` tree, on the macOS development host:
 
   ```bash
   go test -run '^$' -bench BenchmarkRender -benchmem -count=10 ./workspace \
@@ -130,7 +131,7 @@ Added for this PLAN:
     size;
   * the same string drawn at `WcWidth` and at `GraphemeWidth` differs in
     width exactly for the emoji fixture;
-  * `Render` of a frame drawn like the v0.1.1 canvas equals
+  * `Render` of a frame drawn like the v0.1.3 canvas equals
     `lipgloss.Canvas.Render` for the same layers, byte for byte.
 * **Mutations:**
   * `Draw` does not clear;
@@ -290,7 +291,7 @@ Added for this PLAN:
 * Every step's mutations are killed.
 * The benchmark gate holds: `views` time at most 60% and bytes at most 20%
   of the Step 1 baseline, by benchstat; `TestRenderAllocs` passes.
-* Every golden file from `v0.1.1` is unchanged.
+* Every golden file from `v0.1.3` is unchanged.
 * On the macOS development host and the Windows test host, all pass:
   * `make pre-add-check`, `make lint` and `make vuln`;
   * `go test -race -count=1 ./...`, `go test -shuffle=on -count=2 ./...`

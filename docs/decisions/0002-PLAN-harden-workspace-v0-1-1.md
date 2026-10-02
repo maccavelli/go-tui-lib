@@ -24,7 +24,9 @@ Fix every defect amendment A1 names, so that `v0.1.1`:
 * has a conformance gate that reads uses rather than names.
 
 Done means every item under Verification holds, CI is green on the pushed
-tree, and the owner can tag `v0.1.1`.
+tree, and the owner can tag `v0.1.1`. *Amended by deviation D3: the
+release that completes this PLAN is `v0.1.3`; `v0.1.1` and `v0.1.2`
+both tag Steps 1–4.*
 
 ## Scope
 
@@ -369,7 +371,8 @@ Added 2026-10-02 by deviation D2, for MADR amendment A2.
 * **`AGENTS.md`:** the pre-add section says `-tuitest.update` or
   `TUITEST_UPDATE=1`, and names `make modernize`.
 * **`docs/architecture.md`:** the conformance scan and the gate.
-* **Release notes for `v0.1.1`** in the execution record. They name the
+* **Release notes for `v0.1.3`** (deviation D3) in the execution
+  record, which also say what `v0.1.1` and `v0.1.2` carry. They name the
   behaviour changes: the flag, the default keys, focus messages,
   `Push` replacing an open ID, and `Solve` failing with `ErrBadSplitName`
   for a split name used twice in one solve or starting with `/`.
@@ -394,7 +397,8 @@ Added 2026-10-02 by deviation D2, for MADR amendment A2.
 
 ## Rollout and Rollback
 
-* **Rollout.** The owner pushes Steps 1–8 and tags `v0.1.1`. pi-go, the one
+* **Rollout.** The owner pushes Steps 1–8 and tags `v0.1.3`
+  (deviation D3: `v0.1.1` and `v0.1.2` already tag Steps 1–4). pi-go, the one
   consumer, picks it up under its own records.
 * **Rollback.** Before the push, each step is one local commit. After it,
   a consumer pins `v0.1.0`, and the defects are fixed forward in a
@@ -751,3 +755,32 @@ be the runtime's stack overflow.
   ("`go fix -diff ./workspace` reports nothing"). This step adds none.
 * **The Windows test host:** `go vet`, `go test -race -count=1 ./...` and
   `LC_ALL=C go test -count=1 ./...` exited 0, every package `ok`.
+
+### Deviation D3 (2026-10-02): `v0.1.1` and `v0.1.2` tag Steps 1–4
+
+* **Found.** After Step 4 and the 0010 records were pushed, the owner tagged
+  that commit, `4253e9d`, as `v0.1.1` and then as `v0.1.2`, and pushed both
+  tags. Both hold Steps 1, 2, 3, 3a and 4 of this PLAN, with the records
+  of that day. Steps 5–8 are in neither. The PLAN said `v0.1.1` would carry
+  Steps 1–8.
+* **Evidence.** `git ls-remote --tags origin`: `refs/tags/v0.1.1^{}` and
+  `refs/tags/v0.1.2^{}` are both `4253e9d`; `v0.1.0` is unchanged. The
+  module proxy was not queried, because a query can make it cache a
+  version.
+* **Not a defect in the code.** Every step in those tags passed its gates,
+  and nothing in them is broken, so neither is retracted.
+* **Decision** (the owner, picked from options, 2026-10-02):
+  * Both tags stay. A published tag is never moved or deleted
+    ([0010-REPORT-nested-modules-and-adapter-sources.md](../reports/0010-REPORT-nested-modules-and-adapter-sources.md)
+    §1, `ref/mod.md:3355-3359`), and a proxy and the checksum database may
+    already hold them.
+  * Steps 5–8 ship as `v0.1.3`, a patch for the reasons MADR A1 gives.
+  * The two identical tags are recorded here and in `v0.1.3`'s release
+    notes. No `retract` directive is added.
+* **Changed.** The Goal, Step 8's release notes and Rollout name `v0.1.3`.
+  MADR A1 and A2 carry a dated version note. The records that named
+  `v0.1.1` as the completed hardening now name `v0.1.3`:
+  [0004-MADR-integrate-charm-v2-and-go-1-27.md](0004-MADR-integrate-charm-v2-and-go-1-27.md)
+  and its PLAN, [0007-MADR-keymap-engine.md](0007-MADR-keymap-engine.md),
+  and [0010-PLAN-nested-adapter-modules.md](0010-PLAN-nested-adapter-modules.md).
+* **Unchanged.** Steps 5–8, and this PLAN's file name.

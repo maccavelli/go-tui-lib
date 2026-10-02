@@ -544,6 +544,15 @@ additions the fixes need:
 The renamed tuitest flag and the new default keys are behaviour changes,
 and the release notes say so.
 
+*Amended 2026-10-02*
+([0002-PLAN-harden-workspace-v0-1-1.md](0002-PLAN-harden-workspace-v0-1-1.md)
+deviation D3): the hardening ships across three tags. `v0.1.1` and
+`v0.1.2` both tag `4253e9d`, which holds the plan's Steps 1–4: tuitest's
+flag, the applied resizes and unique split names, and overlays and the
+view cache. Both tags stay, because a published tag is never moved or
+deleted. Steps 5–8 ship as `v0.1.3`, still a patch for the reasons
+above (the owner's choice).
+
 **Owner questions for A1.**
 
 *Answered 2026-10-02* (picked from options): Q5 "alt+. and alt+,"; Q6
@@ -633,7 +642,9 @@ two never meet.
   and reports the error through `Err()`, as it does for every `Solve`
   error.
 
-**Versioning.** `v0.1.1`. `ErrBadSplitName` is a small API addition the fix
+**Versioning.** `v0.1.1`, as tagged: Step 3a is in `4253e9d`, which
+`v0.1.1` and `v0.1.2` both tag (the plan's deviation D3).
+`ErrBadSplitName` is a small API addition the fix
 needs. A tree that arranged two splits with one name used to solve, with a
 wrong result, and now fails. The release notes say so.
 
