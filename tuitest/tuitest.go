@@ -5,8 +5,10 @@
 //
 // Golden files live under the calling package's testdata/golden/. Each line is
 // stored with its width in terminal cells in front of it, so a change of width
-// shows in the diff even when the text looks the same. Run the tests with
-// -update to rewrite the files for the cases a test names.
+// shows in the diff even when the text looks the same. To rewrite the files for
+// the cases a test names, run the tests with -tuitest.update, or with
+// TUITEST_UPDATE=1, which also works across ./..., or with the test binary's
+// own boolean -update flag when it defines one.
 package tuitest
 
 import (
@@ -22,15 +24,24 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// updateFlag is the -update flag. A test binary may already define one, so it
-// is registered only when no flag of that name exists.
-const updateFlag = "update"
+// updateFlag is tuitest's own flag. Its dotted name is one no consumer will
+// define, so registering it cannot clash with a test binary's flags, as an
+// -update registered here once did.
+const updateFlag = "tuitest.update"
 
-func init() {
-	if flag.Lookup(updateFlag) == nil {
-		flag.Bool(updateFlag, false, "rewrite tuitest golden files")
-	}
-}
+// updateEnv is the environment variable that rewrites golden files. A flag
+// only reaches packages whose test binaries define it, but the environment
+// reaches every package under go test ./...
+const updateEnv = "TUITEST_UPDATE"
+
+// consumerFlag is the conventional flag a consumer's test binary may define
+// for its own golden files. tuitest honours it but never registers it.
+const consumerFlag = "update"
+
+// updateHint is how a failure says to write a missing golden file.
+const updateHint = "run the test with -" + updateFlag + " or " + updateEnv + "=1"
+
+var update = flag.Bool(updateFlag, false, "rewrite tuitest golden files")
 
 // T is the part of *testing.T and *testing.B that Golden uses.
 type T interface {
@@ -86,7 +97,8 @@ func (m Matrix) Cases() []Case {
 
 // Golden renders every case of m and compares each with
 // testdata/golden/<name>.<case>.golden, reporting every case that differs.
-// With -update it writes the files instead, for these cases only.
+// When updating (see the package documentation) it writes the files instead,
+// for these cases only.
 func Golden(t T, name string, m Matrix, render func(Case) string) {
 	t.Helper()
 	compare(t, filepath.Join("testdata", "golden"), name, m, render, updating(), false)
@@ -94,7 +106,7 @@ func Golden(t T, name string, m Matrix, render func(Case) string) {
 
 // Text compares got with testdata/golden/<name>.golden, for a rendering
 // that does not vary across the matrix, such as a geometry diagram.
-// With -update it writes the file instead.
+// When updating it writes the file instead.
 func Text(t T, name, got string) {
 	t.Helper()
 	textAt(t, filepath.Join("testdata", "golden"), name, got, updating())
@@ -105,8 +117,18 @@ func textAt(t T, dir, name, got string, update bool) {
 	compare(t, dir, name, Matrix{Widths: []int{0}}, func(Case) string { return got }, update, true)
 }
 
+// updating reports whether golden files are to be rewritten: -tuitest.update
+// is set, TUITEST_UPDATE is "1" or "true", or the test binary defines a
+// boolean -update flag and it is set.
 func updating() bool {
-	f := flag.Lookup(updateFlag)
+	if *update {
+		return true
+	}
+	switch strings.ToLower(os.Getenv(updateEnv)) {
+	case "1", "true":
+		return true
+	}
+	f := flag.Lookup(consumerFlag)
 	if f == nil {
 		return false
 	}
@@ -135,7 +157,7 @@ func compare(t T, dir, name string, m Matrix, render func(Case) string, update, 
 	}
 	root, err := os.OpenRoot(dir)
 	if errors.Is(err, fs.ErrNotExist) {
-		t.Errorf("tuitest: %s: no golden directory %s; run the test with -update", name, dir)
+		t.Errorf("tuitest: %s: no golden directory %s; "+updateHint, name, dir)
 		return
 	}
 	if err != nil {
@@ -167,7 +189,7 @@ func compare(t T, dir, name string, m Matrix, render func(Case) string, update, 
 		}
 		want, err := root.ReadFile(file)
 		if errors.Is(err, fs.ErrNotExist) {
-			t.Errorf("tuitest: %s: no golden file %s; run the test with -update", c.Name(), path)
+			t.Errorf("tuitest: %s: no golden file %s; "+updateHint, c.Name(), path)
 			continue
 		}
 		if err != nil {
@@ -181,14 +203,15 @@ func compare(t T, dir, name string, m Matrix, render func(Case) string, update, 
 }
 
 // Annotate puts each line's width in cells in front of it, as golden files
-// store it. A trailing newline is kept.
+// store it. Every annotated line ends in a newline, whether or not s does, and
+// an empty s is one empty line.
 func Annotate(s string) string {
-	lines := strings.Split(s, "\n")
+	if s == "" {
+		return "  0|\n"
+	}
 	var b strings.Builder
-	for i, l := range lines {
-		if i == len(lines)-1 && l == "" && i > 0 {
-			break
-		}
+	for l := range strings.Lines(s) {
+		l = strings.TrimSuffix(l, "\n")
 		fmt.Fprintf(&b, "%3d|%s\n", ansi.StringWidth(l), l)
 	}
 	return b.String()

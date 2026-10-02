@@ -1,6 +1,7 @@
 package tuitest
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -94,8 +95,116 @@ func TestAnnotateCountsCells(t *testing.T) {
 func TestGoldenMissingFile(t *testing.T) {
 	var r recorder
 	compare(&r, t.TempDir(), "view", Matrix{Widths: []int{60}}, render, false, false)
-	if len(r.errs) != 4 || !strings.Contains(r.errs[0], "run the test with -update") {
-		t.Fatalf("errors = %q, want 4 asking for -update", r.errs)
+	if len(r.errs) != 4 || !strings.Contains(r.errs[0], "run the test with -tuitest.update or TUITEST_UPDATE=1") {
+		t.Fatalf("errors = %q, want 4 naming both update switches", r.errs)
+	}
+}
+
+// consumerUpdate stands in for a consumer's own -update flag, which tuitest
+// honours. tuitest/internal/clash proves that defining it does not panic.
+var consumerUpdate = flag.Bool(consumerFlag, false, "the consumer's update flag, honoured by tuitest")
+
+// setFlag sets a registered flag for the rest of the test.
+func setFlag(t *testing.T, name, value string) {
+	t.Helper()
+	f := flag.Lookup(name)
+	if f == nil {
+		t.Fatalf("no flag %q", name)
+	}
+	old := f.Value.String()
+	if err := flag.Set(name, value); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := flag.Set(name, old); err != nil {
+			t.Error(err)
+		}
+	})
+}
+
+// noTriggers turns off every update switch, so the test does not depend on how
+// go test was run.
+func noTriggers(t *testing.T) {
+	t.Helper()
+	setFlag(t, updateFlag, "false")
+	setFlag(t, consumerFlag, "false")
+	t.Setenv(updateEnv, "")
+}
+
+// plantStale moves the test into an empty directory holding one stale golden
+// file, and returns that file's path.
+func plantStale(t *testing.T) string {
+	t.Helper()
+	t.Chdir(t.TempDir())
+	dir := filepath.Join("testdata", "golden")
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "view.color.utf8.60.golden")
+	if err := os.WriteFile(path, []byte("stale\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestGoldenUpdateTriggers(t *testing.T) {
+	triggers := []struct {
+		name string
+		set  func(*testing.T)
+	}{
+		{"flag -tuitest.update", func(t *testing.T) { setFlag(t, updateFlag, "true") }},
+		{"TUITEST_UPDATE=1", func(t *testing.T) { t.Setenv(updateEnv, "1") }},
+		{"TUITEST_UPDATE=TRUE", func(t *testing.T) { t.Setenv(updateEnv, "TRUE") }},
+		{"the consumer's -update", func(t *testing.T) { setFlag(t, consumerFlag, "true") }},
+	}
+	want := Annotate(render(Case{Color: true, UTF8: true, Width: 60}))
+	for _, tr := range triggers {
+		t.Run(tr.name, func(t *testing.T) {
+			noTriggers(t)
+			path := plantStale(t)
+			tr.set(t)
+			var r recorder
+			Golden(&r, "view", Matrix{Widths: []int{60}}, render)
+			if r.failed() {
+				t.Fatalf("an update failed: %s", r.all())
+			}
+			if b, err := os.ReadFile(path); err != nil || string(b) != want {
+				t.Fatalf("the stale golden file was not rewritten: %q, %v", b, err)
+			}
+		})
+	}
+}
+
+func TestGoldenWithoutTriggerWritesNothing(t *testing.T) {
+	noTriggers(t)
+	path := plantStale(t)
+	var r recorder
+	Golden(&r, "view", Matrix{Widths: []int{60}}, render)
+	if len(r.errs) != 4 {
+		t.Fatalf("errors = %q, want 4: one stale file and three missing", r.errs)
+	}
+	if b, err := os.ReadFile(path); err != nil || string(b) != "stale\n" {
+		t.Fatalf("the stale golden file was changed: %q, %v", b, err)
+	}
+	files, err := os.ReadDir(filepath.Dir(path))
+	if err != nil || len(files) != 1 {
+		t.Fatalf("golden directory holds %d files, want only the planted one (%v)", len(files), err)
+	}
+	_ = consumerUpdate
+}
+
+func TestAnnotateLines(t *testing.T) {
+	for _, tc := range []struct{ in, want string }{
+		{"", "  0|\n"},
+		{"a", "  1|a\n"},
+		{"a\n", "  1|a\n"},
+		{"a\n\n", "  1|a\n  0|\n"},
+		{"\n", "  0|\n"},
+		{"ab\r\n", "  2|ab\r\n"},
+	} {
+		if got := Annotate(tc.in); got != tc.want {
+			t.Errorf("Annotate(%q) = %q, want %q", tc.in, got, tc.want)
+		}
 	}
 }
 

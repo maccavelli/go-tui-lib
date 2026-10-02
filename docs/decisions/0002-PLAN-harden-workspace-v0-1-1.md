@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in-progress
 date: 2026-10-02
 associated-madr: "0002-MADR-multi-pane-workspace-layouts.md"
 ---
@@ -347,4 +347,93 @@ rest of this step, setting it `in-progress`, waits for that approval.
 
 ## Execution Record
 
-None yet.
+### Fixed inputs
+
+* **The development host:** macOS, go1.27.1, golangci-lint through
+  `make lint`, govulncheck through `make pre-add-check`.
+* **The Windows test host,** reached over SSH and never named in a record:
+  go1.27.1 windows/amd64 in a Git Bash (MSYS2) login shell. Each run copies
+  the tracked and untracked, non-ignored files of the working tree into a
+  new directory under the host's `%TEMP%`, runs there, and removes it.
+  Records replace the user-profile path with `<user>`.
+
+### Deviation D1 (2026-10-02): Steps 1 and 2 hand off together
+
+Rule 6 makes each step one commit. Step 1 changes only this PLAN's status and
+its `docs/README.md` row, and Steps 1 and 2 both write this execution record,
+so they cannot be split by path. They hand off as one change, and the owner
+commits it once. From Step 3 on, each step hands off alone.
+
+### Step 1: records (2026-10-02)
+
+* The owner approved execution on 2026-10-02 ("approved to proceed").
+* A1's answers were already recorded and A1 `accepted` (Step 1's note
+  above). This PLAN is `in-progress`, and `docs/README.md` says so.
+
+### Step 2: `tuitest` (2026-10-02)
+
+**What changed.**
+
+* **The flag.** The `init` that registered `-update` is gone. `tuitest`
+  registers `-tuitest.update`. `Golden` and `Text` rewrite files when
+  `-tuitest.update` is set, when `TUITEST_UPDATE` is `1` or `true` (any
+  case), or when the test binary defines a boolean `-update` and it is set.
+  The missing-file message names both switches.
+* **`Annotate`** walks lines with `strings.Lines`. An empty string is still
+  one empty line, `"  0|\n"`. The output is unchanged: the new
+  `TestAnnotateLines` table also passed against `v0.1.0`'s `Annotate`, on a
+  scratch copy.
+* **No map iteration** exists in this package's tests, so the sorted-keys
+  idiom has nothing to change here. The map ranges 0003-REPORT §1.12 names
+  are in `layout`, `glyph` and `workspace`, under Steps 3 and 6.
+* **New files:** `tuitest/internal/clash` (`doc.go`, `clash_test.go`, and
+  its eight golden files, each read before this record was written).
+
+**Regression first.** `tuitest/internal/clash` declares
+`var update = flag.Bool("update", false, …)`, as a consumer does. On a
+scratch copy of `v0.1.0` with only that package added:
+
+```text
+<tmp>/clash.test flag redefined: update
+panic: <tmp>/clash.test flag redefined: update
+github.com/maccavelli/go-tui-lib/tuitest/internal/clash.init()
+	…/tuitest/internal/clash/clash_test.go:12 +0x40
+FAIL	github.com/maccavelli/go-tui-lib/tuitest/internal/clash	0.458s
+```
+
+With the fix, the package passes.
+
+**Tests:** `TestGoldenUpdateTriggers` (each of `-tuitest.update`,
+`TUITEST_UPDATE=1`, `TUITEST_UPDATE=TRUE` and a consumer's `-update`
+rewrites a planted, stale golden file), `TestGoldenWithoutTriggerWritesNothing`
+(the stale file and three missing ones are reported, and nothing is
+written), `TestAnnotateLines`, and the changed `TestGoldenMissingFile`.
+Each test clears every switch first, so it does not depend on how `go test`
+was run.
+
+**Mutation proofs**, each on a scratch copy; none survived:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| `init` registers `update` again | `clash.test flag redefined: update` (panic) |
+| the environment variable is ignored | `TestGoldenUpdateTriggers/TUITEST_UPDATE=1` and `=TRUE`: `the stale golden file was not rewritten` |
+| a consumer's `-update` is ignored | `TestGoldenUpdateTriggers/the_consumer's_-update`: `the stale golden file was not rewritten` |
+
+**Checks.**
+
+* `make pre-add-check FILES=…` on the four Go files: `4 file(s) clean
+  (gofmt, golangci-lint, go vet, go test, govulncheck)`.
+* `make lint`: `0 issues` for linux, darwin and windows.
+* `go test -race -count=1 ./...` and `LC_ALL=C go test -count=1 ./...`:
+  every package `ok`.
+* `go mod tidy -diff` and `go fix -diff ./tuitest/...`: no output, exit 0.
+* **The Windows test host:** `go vet`, `go test -race -count=1 ./...` and
+  `LC_ALL=C go test -count=1 ./...` exited 0, every package `ok`.
+  * The first run failed in `internal/conformance` with
+    `C:\Users\<user>\…\glyph\._glyph.go:1:1: illegal character NUL`. The
+    cause was the transfer, not the code: macOS `tar` had added AppleDouble
+    `._*` metadata files. The tarball is now built with `COPYFILE_DISABLE=1`
+    and `--no-mac-metadata`, holds no `._` entry, and the re-run passed.
+
+**Not done in this step.** The guides and `AGENTS.md` still say `-update`.
+Step 8 changes them, as planned.
