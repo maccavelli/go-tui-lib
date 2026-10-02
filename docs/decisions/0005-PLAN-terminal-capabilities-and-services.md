@@ -13,6 +13,10 @@ default, so Steps 3, 4 and 7 changed, and the original opt-in wording is
 struck through where it stood. MADR amendment A1 (proposed) adds Steps A1.1
 to A1.3, which run between Step 6 and Step 7 only once A1 is accepted.
 
+*Later on 2026-10-02:* the owner accepted A1 and answered its Q5–Q7 with
+the recommendations. Steps A1.1 to A1.3 are in scope, between Step 6 and
+Step 7.
+
 ## Goal
 
 Ship `termcap`, `termcap/termcaptest` and `termsvc`, so that a program
@@ -45,9 +49,9 @@ tree, and the owner can tag the next minor release after `v0.2.0`.
 | 4 | `termcap/termcaptest/` | scripted fake terminals, and the integration tests that use them |
 | 5 | `termcap/` | `Report` and its goldens |
 | 6 | `termsvc/` | `Notifier`, `Copy`, `Link`, prompt marks, `Wrap` |
-| A1.1 | `termcap/` | `FromEnv` and `Identity`, reasons, kitty flag policy, appearance chain, palette, tmux argv, legacy console (pending A1) |
-| A1.2 | `termcap/`, `termcap/termcaptest/` | DA2, reply caps, `IsReplyFragment`, the JetBrains and editor gates (pending A1) |
-| A1.3 | `termcap/`, `termsvc/` | `Findings`; clipboard status and plans; link display and policy; notification results; title, activity, pointer, progress (pending A1) |
+| A1.1 | `termcap/` | `FromEnv` and `Identity`, reasons, kitty flag policy, appearance chain, palette, tmux argv, legacy console (A1) |
+| A1.2 | `termcap/`, `termcap/termcaptest/` | DA2, reply caps, `IsReplyFragment`, the JetBrains and editor gates (A1) |
+| A1.3 | `termcap/`, `termsvc/` | `Findings`; clipboard status and plans; link display and policy; notification results; title, activity, pointer, progress (A1) |
 | 7 | `README.md`, `docs/`, `docs/guides/terminal-capabilities.md` | documentation, release notes, close-out |
 
 No module is added. `go.mod` already requires ultraviolet directly after
@@ -88,9 +92,12 @@ widens from `internal/cells` to `internal/cells` and `internal/termevent`
    nothing writes to `os.Stdout` or `os.Stderr`, nothing sets the alternate
    screen or installs a signal handler, and nothing reads the process
    environment: the environment comes from `tea.EnvMsg`.
-5. **Commit.** One commit per step, with `git commit --no-edit`, after the
-   owner authorizes commits to `main` in that turn. The execution record
-   gets each step's evidence before its commit.
+5. **Commit.** One commit per step, made by the owner. At the end of each
+   step the agent stops with the pre-add checks passed and the step's
+   evidence in the execution record, and stages and commits nothing. The
+   owner commits with `git commit --no-edit` and pushes. (2026-10-02: the
+   org rules forbid agent commits to `main`, and the owner chose this over
+   a `feature/` branch.)
 
 ## Implementation Steps
 
@@ -100,8 +107,7 @@ widens from `internal/cells` to `internal/cells` and `internal/termevent`
   MADR `accepted` and this PLAN `in-progress`, and update `docs/README.md`.~~
   Done 2026-10-02 for the answers and the MADR's status. When Step 2
   starts, set this PLAN `in-progress` and its `docs/README.md` row to
-  match. If A1 has been answered by then, record those answers in the MADR
-  first.
+  match. A1's answers are recorded in the MADR.
 * **Spike, on a scratch copy, nothing committed.** Run a real `tea.Program`
   with `tea.WithInput` (a pipe), `tea.WithOutput` (a buffer the script
   reads), `tea.WithEnvironment` and `tea.WithWindowSize`. Record:
@@ -276,11 +282,13 @@ widens from `internal/cells` to `internal/cells` and `internal/termevent`
 
 ### Steps A1.1 to A1.3: amendment A1
 
-**Pending A1's acceptance.** These steps run after Step 6 and before
+~~**Pending A1's acceptance.** These steps run after Step 6 and before
 Step 7, only once the owner accepts MADR amendment A1 and answers its
 Q5–Q7. If A1 is still proposed when Step 6 is done, Step 7 closes this
-PLAN without them, and A1 gets a plan of its own under this number. Each
-step follows the rules above, mutation proofs included.
+PLAN without them, and A1 gets a plan of its own under this number.~~
+*2026-10-02:* A1 is accepted, and Q5–Q7 took the recommendations. These
+steps run after Step 6 and before Step 7. Each step follows the rules
+above, mutation proofs included.
 
 #### Step A1.1: identity and new facts
 
@@ -293,7 +301,7 @@ step follows the rules above, mutation proofs included.
 * The appearance chain: `WithAppearanceEnv(name)` (and `LC_` + name), the
   desktop hook, and `COLORFGBG`.
 * `Foreground`, `Palette` and `PaletteKnown`, parsed from `Reply.Raw`, with
-  the OSC 4 and OSC 10 queries placed as Q5 decides.
+  the OSC 4 and OSC 10 queries sent behind the heuristic (Q5).
 * `TmuxQuery`, `ParseTmux`, `TmuxFacts` and `Prober.SetTmux`.
 * `LegacyConsole` and `WithConsoleHost`.
 * **Tests:**
@@ -322,14 +330,14 @@ step follows the rules above, mutation proofs included.
   Terminal fingerprint from DA1 and DA2.
 * The 1 KiB reply cap and its reason.
 * `IsReplyFragment(msg)`, from the spike's finding on split replies.
-* The JetBrains gate as Q7 decides, and the editor-terminal gate on the
-  gated set.
+* The JetBrains gate, which sends nothing (Q7), and the editor-terminal
+  gate on the gated set.
 * **Tests:**
   * the batch's exact bytes now include DA2 before DA1;
   * DA1 `1;2` with DA2 `1;95;0` yields the Apple Terminal brand, and
     either alone does not;
   * a 1025-byte reply is not parsed and carries the reason;
-  * under JetBrains the batch matches Q7's answer, and every fact carries
+  * under JetBrains nothing is sent (Q7), and every fact carries
     the JetBrains reason;
   * inside `NVIM` the gated queries are absent;
   * `IsReplyFragment` is true for each reply prefix the spike observed,
@@ -350,7 +358,7 @@ step follows the rules above, mutation proofs included.
   `ImageReadCommands`, and the 100 KB cap.
 * `LinkDisplay`, `Display`, `LinkPolicy`, `Openable` and `OpenURLMsg`.
 * `NotifyResultMsg`, `SkipReason`, the brand table for `Auto`, the text
-  cleaning, `WithGate`, and the `UnlessFocused` policy if Q6 adds it.
+  cleaning, `WithGate`, and the `UnlessFocused` policy (Q6).
 * `SanitizeTitle`, `Activity`, `ParseActivity`, `ActivityBeacon`,
   `Pointer` and `ProgressSupported`.
 * **Tests:**

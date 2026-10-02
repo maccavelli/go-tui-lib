@@ -190,7 +190,9 @@ expressions cannot be proven disjoint when the keymap is built.
 * It has no direct `termcap` import. `Features` (§5) is built from
   `tea.KeyboardEnhancementsMsg.Flags`, which `termcap.Caps` in
   [0005-MADR-terminal-capabilities-and-services.md](0005-MADR-terminal-capabilities-and-services.md)
-  also carries.
+  also carries. *Amended by A1, Q7 (2026-10-02):* `keymap` imports
+  `termcap`'s fact types for `FactsFrom`, while `termcap` stays a leaf
+  package that performs no I/O at import.
 
 ### 2. Notation
 
@@ -682,9 +684,8 @@ Out of scope, and Rollback.
 
 ### A1 (2026-10-02): second-pass findings
 
-*Status: proposed.* Its steps are 9 to 11 of
-[0007-PLAN-keymap-engine.md](0007-PLAN-keymap-engine.md), pending this
-amendment's acceptance.
+*Status: accepted (2026-10-02).* Its steps are 9 to 11 of
+[0007-PLAN-keymap-engine.md](0007-PLAN-keymap-engine.md).
 
 **Found.** A source-level pass over the Kilo, Grok Build, opencode and codex
 TUIs found keymap behaviour this record does not cover
@@ -876,6 +877,12 @@ later minor release. `Default.Fallback` never ships, so replacing it breaks
 nothing.
 
 **Owner questions for A1.**
+
+*Answered 2026-10-02* (picked from options): Q6 "On by default"; Q7
+"keymap imports termcap types". Both are the recommendation, so the text
+above stands, and A1 is accepted. Q7 reverses §1's "no `termcap`
+import": `keymap` may import `termcap`'s fact types for `FactsFrom`, as
+long as `termcap` stays a leaf package that performs no I/O at import.
 
 * **Q6. Editing a pending sequence.** Recommended: `EscClearsPending` and
   `BackspacePops` are on by default, as in opencode. The alternative is off,

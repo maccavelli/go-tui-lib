@@ -658,7 +658,7 @@ is the recommendation.
 
 ### A1 (2026-10-02): second-pass findings
 
-*Status: proposed.* Its steps are A1.1 to A1.4 of
+*Status: accepted (2026-10-02).* Its steps are A1.1 to A1.4 of
 [0009-PLAN-streaming-content-engine.md](0009-PLAN-streaming-content-engine.md).
 
 **Found.** A source-level pass over the Kilo, Grok Build, opencode and
@@ -841,6 +841,10 @@ removes anything from it.
 release, it ships in that minor. Otherwise it ships in the next minor.
 
 **Owner questions for A1.**
+
+*Answered 2026-10-02* (picked from options): Q6 "safetext"; Q7
+"frame"; Q8 "stream, now". Every answer is the recommendation, so the
+text above stands, and A1 is accepted.
 
 * **Q6. Where the escape interpreter lives.** Recommended: `safetext`, as
   `Interpret`, because it shares the sanitizer's parser and states. The

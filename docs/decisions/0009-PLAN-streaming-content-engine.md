@@ -13,6 +13,11 @@ owner approves execution. MADR amendment A1, which is proposed, adds Steps
 A1.1 to A1.4. They run after Step 7 and before Step 8, and only once A1 is
 accepted. Its questions Q6–Q8 decide where three of its types live.
 
+*Later on 2026-10-02:* the owner accepted A1 and answered Q6–Q8 with the
+recommendations: `Interpret` in `safetext`, `Writer` and `Upgrader` in
+`frame`, and `FitTable` in `stream`. Steps A1.1 to A1.4 are in scope, after
+Step 7 and before Step 8.
+
 ## Goal
 
 Ship `safetext`, `frame`, `inputfilter`, `stream` and `stream/glamourmd`,
@@ -40,15 +45,15 @@ tree, and the owner can tag the release.
 | 6 | `stream/` (`Pane`) | a workspace pane over a `Doc` |
 | 7 | `stream/glamourmd/`; `go.mod`, `go.sum` | the glamour adapter |
 | 8 | `stream/example_test.go`, `docs/guides/streaming-content.md`, `docs/` | the example, the guide, close-out |
-| A1.1 | `safetext/` | `Command` and `StatusLine` presets, `Policy` fields, `Interpret` (A1, pending acceptance) |
-| A1.2 | `frame/` | `Coalescer`, `Demand`, `Writer`, `Upgrader` (A1, pending acceptance) |
-| A1.3 | `inputfilter/` | the stage chain, typeahead, paste normalisation, wheel profile (A1, pending acceptance) |
-| A1.4 | `stream/` | `RenderView`, the dialect rules, `Highlighter`, `FitTable`, `Bounded` (A1, pending acceptance) |
+| A1.1 | `safetext/` | `Command` and `StatusLine` presets, `Policy` fields, `Interpret` (A1) |
+| A1.2 | `frame/` | `Coalescer`, `Demand`, `Writer`, `Upgrader` (A1) |
+| A1.3 | `inputfilter/` | the stage chain, typeahead, paste normalisation, wheel profile (A1) |
+| A1.4 | `stream/` | `RenderView`, the dialect rules, `Highlighter`, `FitTable`, `Bounded` (A1) |
 
 `go.mod` gains `charm.land/glamour/v2` v2.0.1, or its newest release on the
 day, in Step 7 and no other step. Steps 2–6 and A1.1–A1.4 add no module.
-Q6–Q8 of A1 may move `Interpret`, `Writer`, `Upgrader` or `FitTable` to
-another package; the paths above are the recommendations.
+Q6–Q8 of A1 kept `Interpret`, `Writer`, `Upgrader` and `FitTable` at the
+paths above.
 
 ### Out of scope
 
@@ -83,9 +88,12 @@ another package; the paths above are the recommendations.
 4. **Conventions.** Every package follows 0001-MADR §6. In particular,
    nothing writes to `os.Stdout` or `os.Stderr`, nothing sets the alternate
    screen or installs a signal handler, and every glyph comes from `glyph`.
-5. **Commit.** One commit per step, with `git commit --no-edit`, after the
-   owner authorizes commits to `main` in that turn. The execution record
-   gets each step's evidence before its commit.
+5. **Commit.** One commit per step, made by the owner. At the end of each
+   step the agent stops with the pre-add checks passed and the step's
+   evidence in the execution record, and stages and commits nothing. The
+   owner commits with `git commit --no-edit` and pushes. (2026-10-02: the
+   org rules forbid agent commits to `main`, and the owner chose this over
+   a `feature/` branch.)
 
 ## Implementation Steps
 
@@ -320,10 +328,9 @@ moves to `in-progress` when the owner approves its execution, and
 
 ### Steps A1.1 to A1.4: MADR amendment A1
 
-These run only once A1 is accepted, with Q6–Q8 answered, and the answers
-are recorded in the MADR first. Each step follows the rules for every step
-above. If A1 is not accepted, these steps are dropped, and Step 8 follows
-Step 7.
+A1 is accepted, with Q6–Q8 answered and recorded in the MADR, so these
+steps run after Step 7 and before Step 8. Each step follows the rules for
+every step above.
 
 ### Step A1.1: `safetext` presets and `Interpret`
 

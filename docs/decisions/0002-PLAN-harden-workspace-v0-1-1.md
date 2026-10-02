@@ -72,9 +72,12 @@ No module is added or removed. `go.mod` does not change.
    screen or installs a signal handler, and every glyph comes from `glyph`.
 5. **Regression first.** Each defect gets a test that fails on `v0.1.0`
    before its fix lands. The execution record quotes that failure.
-6. **Commit.** One commit per step, with `git commit --no-edit`, after the
-   owner authorizes commits to `main` in that turn. The execution record
-   gets each step's evidence before its commit.
+6. **Commit.** One commit per step, made by the owner. At the end of each
+   step the agent stops with the pre-add checks passed and the step's
+   evidence in the execution record, and stages and commits nothing. The
+   owner commits with `git commit --no-edit` and pushes. (2026-10-02: the
+   org rules forbid agent commits to `main`, and the owner chose this over
+   a `feature/` branch.)
 
 ## Implementation Steps
 

@@ -13,8 +13,9 @@ Associated MADR: [0007-MADR-keymap-engine.md](0007-MADR-keymap-engine.md)
   departs from the recommendation: `workspace.KeyMap` is removed now, not
   deprecated. Steps 1, 7 and 8, Out of scope, and Rollback are revised to
   match.
-* Steps 9–11 are added for MADR amendment A1. They are pending that
-  amendment's acceptance and its Q6 and Q7.
+* Steps 9–11 are added for MADR amendment A1. *Later on 2026-10-02:* the
+  owner accepted A1 and answered Q6 and Q7 with the recommendations, so
+  Steps 9–11 are in scope.
 * This PLAN stays `proposed` until the owner approves execution.
 
 ## Goal
@@ -28,7 +29,7 @@ Ship `keymap`, and move `workspace`'s own bindings onto it, so that:
   emitted JSON Schema;
 * bubbles components and `help` still get `key.Binding` and
   `help.KeyMap`;
-* once amendment A1 is accepted: which-key data, defaults chosen by
+* from amendment A1: which-key data, defaults chosen by
   terminal fact, legacy-key normalisation, labels per operating system,
   live hints, and a key-debug explanation.
 
@@ -55,13 +56,12 @@ tree, and the owner can tag the release.
 
 `go.mod` and `go.sum` gain nothing. `keymap` uses the standard library,
 `bubbletea`, `bubbles/key`, `bubbles/help`, and this repository's `command`
-and `when` packages. Once A1 is accepted it also uses this repository's
-`glyph`, and, if Q7 is answered as recommended, `termcap`'s fact types.
+and `when` packages. For A1 it also uses this repository's
+`glyph`, and `termcap`'s fact types (Q7).
 
-**When Steps 9–11 run.** If A1 is accepted before Step 7 starts, they run
-after Step 6 and before Step 7, so the workspace moves onto the finished
-engine. Otherwise they run after Step 8, in a later minor release, with
-their own close-out.
+**When Steps 9–11 run.** A1 was accepted before Step 7 started, so they
+run after Step 6 and before Step 7, and the workspace moves onto the
+finished engine.
 
 ### Out of scope
 
@@ -115,9 +115,12 @@ their own close-out.
 4. **Conventions.** Every package follows 0001-MADR §6. In particular,
    nothing writes to `os.Stdout` or `os.Stderr`, nothing sets the alternate
    screen or installs a signal handler, and every glyph comes from `glyph`.
-5. **Commit.** One commit per step, with `git commit --no-edit`, after the
-   owner authorizes commits to `main` in that turn. The execution record
-   gets each step's evidence before its commit.
+5. **Commit.** One commit per step, made by the owner. At the end of each
+   step the agent stops with the pre-add checks passed and the step's
+   evidence in the execution record, and stages and commits nothing. The
+   owner commits with `git commit --no-edit` and pushes. (2026-10-02: the
+   org rules forbid agent commits to `main`, and the owner chose this over
+   a `feature/` branch.)
 
 ## Implementation Steps
 
@@ -133,9 +136,10 @@ MADR and this PLAN before Step 2.~~
 are amended to match. Still to do:
 
 * set this PLAN `in-progress` when the owner approves execution;
-* record the answers to A1's Q6 and Q7, and set A1 `accepted` or rejected.
+* ~~record the answers to A1's Q6 and Q7, and set A1 `accepted` or rejected.
   If either answer differs from its recommendation, amend Steps 9–11 before
-  they start.
+  they start.~~ Done 2026-10-02: A1 is accepted, and both answers are the
+  recommendation.
 
 ### Step 2: notation
 
@@ -328,7 +332,7 @@ are amended to match. Still to do:
 * **Verification** as below. Mark `complete` after CI is green on the pushed
   tree. The owner tags.
 
-### Step 9 (A1, pending): normalisation, labels and aliases
+### Step 9 (A1): normalisation, labels and aliases
 
 * `Normalize`, `Stroke.Label`, `Sequence.Label`, `ParseAliases`,
   `DisplayAliases`, `CopyStrokes` and `Options.GOOS`, as MADR amendment A1
@@ -355,12 +359,12 @@ are amended to match. Still to do:
   * AltGr text is matched as a binding;
   * `Label` ignores the glyph table's ASCII twin.
 
-### Step 10 (A1, pending): terminal facts, alternatives, reachability and hints
+### Step 10 (A1): terminal facts, alternatives, reachability and hints
 
 * `KeyFacts`, `Alternative`, `Default.Alternatives`, `Options.Facts`,
   `Rebuild` with facts, the release rule, `Keymap.Reachable`,
   `Keymap.Shortcut` and `workspace.PushMode`. `FactsFrom(termcap.Caps)`
-  is added if Q7 is answered as recommended.
+  is added (Q7).
 * `Default.Alternatives` replaces Step 3's `Default.Needs` and
   `Default.Fallback`. Step 3's feature test is rewritten over
   `Alternatives`, as a one-alternative case.
@@ -387,10 +391,10 @@ are amended to match. Still to do:
   * `Shortcut` returns the canonical string for an unbound command;
   * `pop` removes the wrong mode when two are pushed.
 
-### Step 11 (A1, pending): which-key data and the key-debug explanation
+### Step 11 (A1): which-key data and the key-debug explanation
 
 * `Matcher.ActiveKeys`, `Options.EscClearsPending`,
-  `Options.BackspacePops` (defaults per Q6) and `Matcher.Explain`, with
+  `Options.BackspacePops` (on by default, Q6) and `Matcher.Explain`, with
   `ActiveKey` and `Explanation`.
 * **Tests:**
   * after a prefix, `ActiveKeys` lists every completing and continuing
@@ -423,7 +427,7 @@ are amended to match. Still to do:
 * No default binding in `keymap` or `workspace` is `ctrl+c`, and
   `CopyStrokes` is never bound by `keymap` itself.
 * `go doc ./workspace` lists no `KeyMap`, `DefaultKeyMap` or `WithKeyMap`.
-* For Steps 9–11, once A1 is accepted:
+* For Steps 9–11:
   * labels pass the 0001-MADR §6 matrix in UTF-8 and ASCII;
   * `keymap` needs no cgo, which `CGO_ENABLED=0` builds for all three
     operating systems show;
@@ -433,9 +437,9 @@ are amended to match. Still to do:
 
 ## Rollout and Rollback
 
-* **Rollout.** The owner pushes Steps 1–8, with Steps 9–11 when A1 runs
-  before Step 7, and tags the minor release after 0006's. pi-go moves its
-  own bindings onto `keymap` under its own records.
+* **Rollout.** The owner pushes Steps 1–8, with Steps 9–11, and tags the
+  minor release after 0006's. pi-go moves its own bindings onto `keymap`
+  under its own records.
 * **Rollback.** Before the push, each step is one local commit. After it, a
   patch release fixes forward.
   * A program that never called `WithKeyMap` keeps 0002's keys, because

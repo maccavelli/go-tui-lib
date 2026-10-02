@@ -604,7 +604,7 @@ Steps 3, 4 and 7 with them.
 
 ### A1 (2026-10-02): second-pass findings
 
-*Status: proposed.* Its steps are A1.1 to A1.3 in
+*Status: accepted (2026-10-02).* Its steps are A1.1 to A1.3 in
 [0005-PLAN-terminal-capabilities-and-services.md](0005-PLAN-terminal-capabilities-and-services.md).
 
 **Found.** A source-level pass over the Kilo, Grok Build, opencode and codex
@@ -802,6 +802,11 @@ the PLAN's Step 2 starts, it ships in the same minor release as the rest of
 this record; otherwise in the next minor.
 
 **Owner questions for A1.**
+
+*Answered 2026-10-02* (picked from options): Q5 "Yes, behind the
+heuristic"; Q6 "Don't send; add UnlessFocused"; Q7 "Send nothing".
+Every answer is the recommendation, so the text above stands, and A1 is
+accepted.
 
 * **Q5. The palette query.** Should the OSC 4 and OSC 10 queries go out by
   default? Recommended: yes, behind the heuristic, as XTVERSION and OSC 99
