@@ -334,6 +334,13 @@ Added 2026-10-02 by deviation D2, for MADR amendment A2.
   * If the source importer cannot load the module's dependencies on every
     host, stop and record it under plan deviations. Do not fall back to
     name matching.
+  * *Added 2026-10-02 by
+    [0010-MADR-nested-adapter-modules.md](0010-MADR-nested-adapter-modules.md)
+    §4 (proposed):* the scan finds every module by its `go.mod`, and
+    type-checks each one's packages in that module's own context, because
+    one module's type checker does not load another's packages. Today the
+    root is the only module, so this changes how the scan is structured,
+    not what it covers.
 * **A modernisation gate.** `make modernize` runs `go fix -diff ./...`
   and fails on any suggestion. `make lint` and CI's lint job run it.
 * **Tests and proofs.** Each planted file is in a scratch copy, never in

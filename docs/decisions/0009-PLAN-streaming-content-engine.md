@@ -18,6 +18,19 @@ recommendations: `Interpret` in `safetext`, `Writer` and `Upgrader` in
 `frame`, and `FitTable` in `stream`. Steps A1.1 to A1.4 are in scope, after
 Step 7 and before Step 8.
 
+*Revised again 2026-10-02, for MADR amendment A2 (proposed).* The owner
+decided that the glamour adapter is a nested module
+([0010-MADR-nested-adapter-modules.md](0010-MADR-nested-adapter-modules.md)).
+Step 7 now creates `stream/glamourmd` as its own module, with its own
+`go.mod`, after the root release that carries every other step. The order
+is therefore Steps 1–6, A1.1–A1.4 and 8, the root tag, and then Step 7; the
+earlier notes' "A1.1 to A1.4 run after Step 7" is superseded. The root
+`go.mod` never gains glamour. The scope table, Step 7, Verification and
+Rollout changed to match. Step 7 waits for A2 and 0010-MADR to be accepted,
+and for the tooling steps of
+[0010-PLAN-nested-adapter-modules.md](0010-PLAN-nested-adapter-modules.md)
+to be complete.
+
 ## Goal
 
 Ship `safetext`, `frame`, `inputfilter`, `stream` and `stream/glamourmd`,
@@ -43,15 +56,18 @@ tree, and the owner can tag the release.
 | 4 | `inputfilter/`; `workspace/render.go` (`local`) | wheel and motion coalescing, paste bursts, mouse extension point |
 | 5 | `stream/` (`Doc`, `Buffer`, `Plain`, the cut scanner) | the stable-prefix engine |
 | 6 | `stream/` (`Pane`) | a workspace pane over a `Doc` |
-| 7 | `stream/glamourmd/`; `go.mod`, `go.sum` | the glamour adapter |
+| 7 | `stream/glamourmd/` (its own `go.mod` and `go.sum`); `go.work` | the glamour adapter, as a nested module (MADR A2) |
 | 8 | `stream/example_test.go`, `docs/guides/streaming-content.md`, `docs/` | the example, the guide, close-out |
 | A1.1 | `safetext/` | `Command` and `StatusLine` presets, `Policy` fields, `Interpret` (A1) |
 | A1.2 | `frame/` | `Coalescer`, `Demand`, `Writer`, `Upgrader` (A1) |
 | A1.3 | `inputfilter/` | the stage chain, typeahead, paste normalisation, wheel profile (A1) |
 | A1.4 | `stream/` | `RenderView`, the dialect rules, `Highlighter`, `FitTable`, `Bounded` (A1) |
 
-`go.mod` gains `charm.land/glamour/v2` v2.0.1, or its newest release on the
-day, in Step 7 and no other step. Steps 2–6 and A1.1–A1.4 add no module.
+~~`go.mod` gains `charm.land/glamour/v2` v2.0.1, or its newest release on the
+day, in Step 7 and no other step.~~ *2026-10-02 (MADR A2):* the root
+`go.mod` never gains glamour. `stream/glamourmd/go.mod` requires
+`charm.land/glamour/v2` v2.0.1, or its newest release on the day, and a
+published root version, in Step 7. Steps 2–6 and A1.1–A1.4 add no module.
 Q6–Q8 of A1 kept `Interpret`, `Writer`, `Upgrader` and `FitTable` at the
 paths above.
 
@@ -259,6 +275,11 @@ moves to `in-progress` when the owner approves its execution, and
   Each `Write` that completes a line calls `Request`.
 * **Fuzz.** `FuzzDoc`, over arbitrary text and split points, finds no
   panic, and checks chunking invariance and Finish exactness.
+* **`stream/streamtest`** (MADR A2, if accepted): the chunking-invariance
+  and Finish-exactness properties live in `CheckRenderer(t, r, o...)`,
+  built on `stream`'s exported API only, and `stream`'s tests call it with
+  `Plain`. A test that calls it with a renderer whose output depends on
+  where the source was cut must fail; that mutation is recorded.
 * **Benchmarks:** streaming 200 KB in 20-byte chunks with `Plain`,
   reporting allocations, against a naive re-render of the whole source per
   chunk.
@@ -296,41 +317,95 @@ moves to `in-progress` when the owner approves its execution, and
   * following ignores the user's scroll;
   * the scroll indicators do not use `glyph`.
 
-### Step 7: `stream/glamourmd`
+### Step 7: `stream/glamourmd`, a nested module
 
+*Revised 2026-10-02 for MADR amendment A2.* The original step added glamour
+to the root `go.mod`; it now creates a nested module.
+
+* **Blocked** until MADR A2 and
+  [0010-MADR-nested-adapter-modules.md](0010-MADR-nested-adapter-modules.md)
+  are accepted, and Phases 2–5 of
+  [0010-PLAN-nested-adapter-modules.md](0010-PLAN-nested-adapter-modules.md)
+  are complete: the per-module loop in `scripts/go-precheck.sh`, `make` and
+  CI, the `go.work` check, and the per-module depguard rules.
+* **Order** (0010-MADR §3). This step runs last: after Steps 2–6,
+  A1.1–A1.4 and 8 have landed and the owner has tagged that root release,
+  so that the adapter can require a published root version. If it ran
+  before that tag existed, its `GOWORK=off` gates would fail by design, so
+  it waits.
+* **Documentation** for the adapter lands in this step: its package
+  documentation, a section in `docs/guides/streaming-content.md` on
+  `go get`ting the module and on `FromTheme`, and its `docs/README.md` and
+  `docs/architecture.md` rows.
 * Before the requirement is added, record in the execution record:
-  * glamour's newest release and its `go.mod`;
-  * the licence of each module it adds to `go.mod`, from each module's
-    licence file;
-  * `govulncheck ./...` with the requirement on a scratch copy;
-  * which `ansi.StyleConfig` fields set list bullets, rules and quote bars,
-    and any glyph glamour draws that no field controls (MADR §7).
+  * glamour's newest release and its `go.mod` (0010-REPORT §9 found v2.0.1
+    on 2026-10-02);
+  * the licence of each module it adds to `stream/glamourmd/go.mod`, from
+    each module's licence file;
+  * `GOWORK=off govulncheck ./...` in `stream/glamourmd` with the
+    requirement, on a scratch copy;
+  * which `ansi.StyleConfig` fields set list bullets, rules, quote bars and
+    table separators, and any glyph glamour draws that no field controls
+    (MADR §7).
 
   A finding there stops the step for the owner.
-* The API of MADR §7: `New`, `Renderer.Render`, `WithStyle`, `FromTheme`,
-  `WithEmoji`, `WithChromaFormatter`.
+* **The module:**
+  * `stream/glamourmd/go.mod`: `module
+    github.com/maccavelli/go-tui-lib/stream/glamourmd`, `go 1.27.1`, and
+    `require` of the root at the tagged release and of
+    `charm.land/glamour/v2`, with no `replace`;
+  * `go work use ./stream/glamourmd` adds it to `go.work`, in the same
+    commit;
+  * the package imports only the root's exported packages, never
+    `internal/`.
+* The API of MADR §7, as amended by A2: `New`, `Renderer.Render`,
+  `WithStyle`, `FromTheme`, `WithEmoji`, `WithChromaFormatter`. `FromTheme`
+  builds the `StyleConfig` from `theme` and `glyph`, with
+  `CodeBlock.Chroma` nil, `CodeBlock.Theme` a built-in chroma style name,
+  `Document.Margin` 0, and table separators from `glyph`. The adapter never
+  calls `WithEnvironmentConfig`, `WithStylePath` or
+  `WithStylesFromJSONFile`.
 * **Tests:**
-  * renderers are cached per width, at most four, least recently used
-    first out;
-  * concurrent `Render` calls under `-race` are serialized;
+  * renderers are cached per (width, theme revision, emoji), at most four,
+    least recently used first out;
+  * concurrent `Render` calls under `-race`, at one key and at two, are
+    serialized per key through its lock, and no render sees another's
+    state;
+  * **chroma's global registry is not touched.** One test process renders
+    a code block with the dark theme, then with the light theme, and the
+    code colours of each follow its own theme. A second check finds no
+    style named `charm` in chroma's registry afterwards;
   * `FromTheme` under the dark, light and unknown palettes, and the ASCII
     and NoTTY profiles through `colorprofile`, gives goldens across the
     matrix with no colour where rule 4 forbids it;
-  * the ASCII glyph set gives an all-ASCII render of a list, a rule and a
-    quote;
-  * the Step 5 properties run again with this renderer: chunking
-    invariance and Finish exactness must hold. The "stated differences"
-    check is run and its result recorded per construct, as the MADR says.
+  * the ASCII glyph set gives an all-ASCII render of a list, a rule, a
+    quote and a table, borders included;
+  * a style with `Row` and `Column` separators set renders a table without
+    a panic, because `CenterSeparator` is always set;
+  * the rendered output has no leading or trailing document margin;
+  * the Step 5 properties run again with this renderer, through
+    `streamtest.CheckRenderer` (MADR A2): chunking invariance and Finish
+    exactness must hold. The "stated differences" check is run and its
+    result recorded per construct, as the MADR says.
 * **Mutations:**
   * the cache ignores width;
-  * the mutex is removed (caught by `-race`);
-  * `FromTheme` ignores the background.
+  * the cache ignores the theme revision;
+  * the per-key lock is removed (caught by `-race`);
+  * `FromTheme` ignores the background;
+  * `CodeBlock.Chroma` is left set (the two-theme test must fail);
+  * `CenterSeparator` is left unset (the table test must panic or fail).
+* **Checks,** per 0010-MADR §4, in `stream/glamourmd` with `GOWORK=off`:
+  `go vet`, `go test -race`, `LC_ALL=C go test`, golangci-lint for linux,
+  darwin and windows, `go mod tidy -diff` and `govulncheck`. The tests also
+  run once in workspace mode. The root module's gates run unchanged, and
+  its `go mod tidy -diff` stays clean with no glamour line.
 
 ### Steps A1.1 to A1.4: MADR amendment A1
 
 A1 is accepted, with Q6–Q8 answered and recorded in the MADR, so these
-steps run after Step 7 and before Step 8. Each step follows the rules for
-every step above.
+steps run ~~after Step 7 and before Step 8~~ after Step 6 and before Step 8
+(*2026-10-02, MADR A2:* Step 7 now runs last, after the root release). Each
+step follows the rules for every step above.
 
 ### Step A1.1: `safetext` presets and `Interpret`
 
@@ -455,8 +530,11 @@ every step above.
   * if A1 landed: the `Command` and `StatusLine` presets, `Interpret`, the
     coalescer and tick demand, the output `Writer`, the input stages, and
     `RenderView`.
-* `docs/architecture.md` lists the five packages and their imports.
-  `docs/README.md` gains rows. Release notes go in the execution record.
+* `docs/architecture.md` lists the ~~five~~ four root packages and their
+  imports; Step 7 adds `stream/glamourmd` as a nested module
+  (*2026-10-02, MADR A2*). `docs/README.md` gains rows. Release notes go in
+  the execution record. The owner then tags the root release, which Step 7
+  waits for.
 
 ## Verification
 
@@ -467,8 +545,15 @@ every step above.
     and `LC_ALL=C go test ./...`;
   * `make fuzz`, including `FuzzClean` and `FuzzDoc`, and `FuzzInterpret`
     if A1 landed.
-* `go mod tidy -diff` is clean. `go.mod` adds exactly
-  `charm.land/glamour/v2` as a direct requirement, and only in Step 7.
+* ~~`go mod tidy -diff` is clean. `go.mod` adds exactly
+  `charm.land/glamour/v2` as a direct requirement, and only in Step 7.~~
+  *2026-10-02 (MADR A2):* `go mod tidy -diff` is clean in every module, with
+  `GOWORK=off`. The root `go.mod` gains no requirement in any step, and has
+  no glamour, goldmark, chroma or bluemonday line. `stream/glamourmd/go.mod`
+  requires exactly the root, at a release version, and
+  `charm.land/glamour/v2`, and has no `replace`.
+* Every gate of 0010-MADR §4 passes for `stream/glamourmd` as well as the
+  root, and `go.work` lists both.
 * `internal/conformance` finds no `os.Stdout`, `os.Stderr`, `AltScreen` or
   `signal.Notify` in the new packages.
 * No new package starts a goroutine outside `Scheduler`'s timer callback
@@ -480,12 +565,23 @@ every step above.
 ## Rollout and Rollback
 
 * **Rollout.** The steps land in order. pi-go adopts `stream.Pane`,
-  `frame` and `inputfilter` under its own records. The owner tags.
+  `frame` and `inputfilter` under its own records. The owner tags, in the
+  order 0010-MADR §3 sets:
+  1. the root release that carries Steps 2–6, A1.1–A1.4 and 8;
+  2. `stream/glamourmd/v0.1.0`, once Step 7's `go.mod` requires that root
+     release;
+  3. a consumer smoke test, in a scratch module outside the repository:
+     `go get github.com/maccavelli/go-tui-lib/stream/glamourmd@v0.1.0` and
+     `go build ./...`. A second scratch consumer that gets only the root
+     release has no glamour line in `go.mod`, `go.sum` or `go list -m all`.
+
+  Both results go in the execution record.
 * **Rollback.** Before the push, each step is one local commit. After it,
   the packages are new and additive, so a fix goes forward in a patch
   release. If glamour's graph proves unacceptable, `stream/glamourmd` is
-  removed with its requirement, and `stream` keeps working with `Plain` or
-  a program's own renderer.
+  not tagged again, its directory and `go.work` entry are removed, and
+  `stream` keeps working with `Plain` or a program's own renderer. Its
+  published tags stay, as tags are never deleted (0010-REPORT §1).
 
 ## Execution Record
 

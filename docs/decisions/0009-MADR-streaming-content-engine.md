@@ -2,7 +2,7 @@
 status: accepted
 date: 2026-10-02
 decision-makers: owner
-consulted: 0003-REPORT-agent-tui-ecosystem-research.md (§3 agent TUIs, §5 terminal standards); crush, codex, gemini-cli, goose and aider source; Charm v2 APIs (bubbletea v2.0.10, lipgloss v2.0.6, bubbles v2.2.1, x/ansi v0.11.8); charm.land/glamour/v2 v2.0.1
+consulted: 0003-REPORT-agent-tui-ecosystem-research.md (§3 agent TUIs, §5 terminal standards); crush, codex, gemini-cli, goose and aider source; Charm v2 APIs (bubbletea v2.0.10, lipgloss v2.0.6, bubbles v2.2.1, x/ansi v0.11.8); charm.land/glamour/v2 v2.0.1; for amendment A2, 0010-REPORT-nested-modules-and-adapter-sources.md (§2, §9, §10)
 informed: pi-go
 ---
 # Stream agent output through a stable-prefix Markdown engine, a frame scheduler, an input filter and a safe-text sanitizer
@@ -857,6 +857,113 @@ text above stands, and A1 is accepted.
   (report §11.2, candidate 14), and leave `Plain` showing a table's
   source until then.
 
+### A2 (2026-10-02): the glamour adapter as a nested module
+
+*Status: proposed.* Its plan is Step 7 of
+[0009-PLAN-streaming-content-engine.md](0009-PLAN-streaming-content-engine.md),
+as revised on 2026-10-02.
+
+**Found.** On 2026-10-02 the owner decided:
+
+> Nested modules. Glamour as nested module. Go.work in repo.
+
+That supersedes the answer to Q1 ("stream/glamourmd subpackage"), which
+put glamour in this module's `go.mod`.
+[0010-REPORT-nested-modules-and-adapter-sources.md](../reports/0010-REPORT-nested-modules-and-adapter-sources.md)
+§2 measured why it matters: a requirement of the root module reaches every
+consumer's `go.sum` and `go list -m all`, even a consumer that imports none
+of the packages using it. §1's "a program that never imports that
+subpackage compiles none of glamour" is true, and is not enough.
+[0010-MADR-nested-adapter-modules.md](0010-MADR-nested-adapter-modules.md)
+decides the layout, the `go.work`, the release order and the gates. A
+source read of glamour v2.0.1 (REPORT §9) also corrects and sharpens §7.
+
+**What changes in the decision.** §1's package table, §1's "One new module"
+bullet, §7's location and the Q1 answer are superseded as follows. Their
+text above is kept as it was decided.
+
+* **The module.** `stream/glamourmd` is the nested module
+  `github.com/maccavelli/go-tui-lib/stream/glamourmd`, package `glamourmd`,
+  with its own `go.mod`.
+  * It requires `charm.land/glamour/v2` v2.0.1, the newest release on
+    2026-10-02 (REPORT §9), and a published version of the root module, with
+    no `replace` (0010-MADR §3).
+  * The root module's `go.mod` never requires glamour. A program that does
+    not `go get` the adapter has no glamour, goldmark, chroma or bluemonday
+    in its build, its `go.sum` or its module graph.
+  * Tags are `stream/glamourmd/vX.Y.Z`, starting at `v0.1.0`
+    (0010-MADR §1, §3).
+  * It imports only the root's exported packages (`stream`, `theme`,
+    `glyph`), never `internal/`.
+* **glamour is pure, so the adapter owns style.** v2 removed
+  `WithAutoStyle` and `WithColorProfile`; it never queries the terminal
+  (REPORT §9).
+  * `FromTheme` builds the whole `ansi.StyleConfig` from the library's
+    theme and glyph table, ASCII twins included, and passes it with
+    `WithStyles`.
+  * The adapter never uses `WithEnvironmentConfig`, which reads
+    `GLAMOUR_STYLE`, or `WithStylePath` and `WithStylesFromJSONFile`, which
+    read files. A program that wants one of glamour's built-in styles passes
+    it through `WithStyle`.
+  * Colour downsampling stays the caller's, through `colorprofile`, as §7
+    already says. glamour emits hex and 256-colour values as given, and its
+    code blocks use chroma's `terminal256` formatter by default
+    (REPORT §9).
+* **Code-block colours never touch chroma's global registry.** A style with
+  `CodeBlock.Chroma` set registers a chroma style named `charm` once per
+  process, and the first registration wins, so a later theme's code would
+  keep the first theme's colours (REPORT §9). The adapter sets
+  `CodeBlock.Chroma` to nil and `CodeBlock.Theme` to a built-in chroma style
+  name that `FromTheme` chooses for the theme's background. The built-in
+  styles that set `CodeBlock.Chroma` (dark, light, dracula, tokyo-night)
+  are copied with that field cleared before use.
+* **The renderer cache is keyed by width and theme.** A `TermRenderer` is
+  not safe for concurrent use: every render mutates one shared
+  `RenderContext` (REPORT §9). §7's four-width LRU becomes an LRU keyed by
+  (width, theme revision, emoji), four entries by default, each renderer
+  behind its own lock. `WithWordWrap` still fixes a renderer's width at
+  construction.
+* **The pane owns padding.** `Document.Margin` is 0 in every style the
+  adapter builds; glamour's built-in styles use 2 (REPORT §9). §4's trim of
+  leading and trailing blank lines stays.
+* **Tables use the glyph table.** The adapter sets the table's row, column
+  and centre separators from `glyph`, so an ASCII set gives an ASCII table;
+  otherwise glamour draws `lipgloss.NormalBorder()` (REPORT §9). It always
+  sets `CenterSeparator` when it sets `Row` and `Column`, because glamour
+  dereferences it without a nil check in that case (`ansi/table.go:116`).
+* **The rules hold** (REPORT §10): glamour writes nothing, queries nothing,
+  and reads the environment only through the options the adapter never
+  uses.
+* **The engine's properties are exported for any renderer.** A nested
+  module sees only `stream`'s exported API, so the property checks the
+  PLAN runs on `Plain` move to a test-helper package in the root module,
+  `stream/streamtest`, as `net/http/httptest` serves `net/http`:
+
+  ```go
+  // CheckRenderer streams generated documents through a Doc built on r,
+  // in random chunks, and reports chunking invariance and Finish
+  // exactness through t. It uses only stream's exported API.
+  func CheckRenderer(t testing.TB, r stream.Renderer, o ...Option)
+  ```
+
+  `stream`'s own tests call it with `Plain`, and the glamour module's tests
+  call it with its renderer. A program can check its own renderer the same
+  way. It is test-only code that imports `testing`, so no program
+  compiles it unless its tests import it.
+
+**What does not change.**
+
+* The `Renderer` interface in `stream`, the stable-prefix engine, `Plain`,
+  and every other package of §1.
+* Amendment A1.
+* The API of §7: `New`, `Render`, `WithStyle`, `FromTheme`, `WithEmoji`,
+  `WithChromaFormatter`.
+
+**Versioning.** The root release that carries `stream` comes first. The
+adapter's `go.mod` then requires that release, and the owner tags
+`stream/glamourmd/v0.1.0` after it, in the order 0010-MADR §3 sets. The
+root release itself gains no requirement.
+
 ## More Information
 
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md):
@@ -873,13 +980,24 @@ text above stands, and A1 is accepted.
   `tea.PasteStartMsg`.
 * [0001-MADR-scaffold-charm-tui-library.md](0001-MADR-scaffold-charm-tui-library.md)
   §3 and §6: the stack, and the conventions every package follows.
+* [0010-MADR-nested-adapter-modules.md](0010-MADR-nested-adapter-modules.md):
+  the nested-module layout, the `go.work`, the release order and the
+  per-module gates amendment A2 relies on.
+* [0010-REPORT-nested-modules-and-adapter-sources.md](../reports/0010-REPORT-nested-modules-and-adapter-sources.md):
+  §2 (module graph pruning, measured), §9 (glamour v2.0.1's source) and §10
+  (the rules, per adapter).
 * CommonMark 0.31.2, sections 4.5 (fenced code), 4.6 (HTML blocks), 4.7
   (link reference definitions) and 5.2 (list items):
   <https://spec.commonmark.org/0.31.2/>.
 * ECMA-48, 5th edition, §5 (control functions):
   <https://ecma-international.org/publications-and-standards/standards/ecma-48/>.
   The DEC parser state machine: <https://vt100.net/emu/dec_ansi_parser>.
+* Verified since §Context was written (0010-REPORT §9): a glamour
+  `TermRenderer` is not safe for concurrent use, which §7's lock already
+  assumed; glamour v2 never queries the terminal; and the code-block chroma
+  style is process-wide.
 * Not verified: whether glamour v2 enables GFM footnotes by default (§4
-  treats footnote definitions as reference definitions either way), and the
-  licences of glamour's transitive dependencies, which Step 7 of the PLAN
-  checks before the requirement is added.
+  treats footnote definitions as reference definitions either way);
+  `WithWordWrap(0)`'s behaviour; and the licences of glamour's transitive
+  dependencies, which Step 7 of the PLAN checks before the requirement is
+  added.

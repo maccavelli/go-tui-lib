@@ -2,7 +2,7 @@
 status: accepted
 date: 2026-10-02
 decision-makers: owner
-consulted: 0003-REPORT-agent-tui-ecosystem-research.md (opencode, gemini-cli, codex, crush, toad, Textual, VS Code, k9s, lazygit, gh-dash); MCP specification 2025-11-25; Agent Client Protocol; Go 1.27.1 standard library
+consulted: 0003-REPORT-agent-tui-ecosystem-research.md (opencode, gemini-cli, codex, crush, toad, Textual, VS Code, k9s, lazygit, gh-dash); MCP specification 2025-11-25; Agent Client Protocol; Go 1.27.1 standard library; for amendment A1, 0010-REPORT-nested-modules-and-adapter-sources.md (Cobra v1.10.2, pflag v1.0.10, fang v2.0.1 and Kong v1.16.1 at source)
 informed: pi-go
 ---
 # Make one command registry the source of every action, for keys, palette, slash commands, the shell and agents, on open standards
@@ -779,6 +779,253 @@ accepted.
   `command/cli` now, and a Cobra or fang adapter only when a consumer asks,
   under its own record.
 
+## Amendments
+
+### A1 (2026-10-02): native Cobra and Kong front ends as nested modules
+
+*Status: proposed.* Its steps are Steps 4, 10 and 11 of
+[0006-PLAN-command-registry.md](0006-PLAN-command-registry.md).
+
+**Found.** On 2026-10-02 the owner asked whether the library is neutral
+between Cobra, Viper, Kong or no framework, and said it "needs to support,
+and be fully optimized for kong". The owner then asked for:
+
+> a native cobra module, a native kong module, each fully optimized and
+> full-featured api, only the one compiled in as needed
+
+and decided:
+
+> Nested modules. Glamour as nested module. Go.work in repo.
+
+[0010-MADR-nested-adapter-modules.md](0010-MADR-nested-adapter-modules.md)
+decides the module layout, the release order and the gates. This amendment
+decides the two front ends' APIs, and §4's tags, which as written would be
+misparsed by Kong. The facts are in
+[0010-REPORT-nested-modules-and-adapter-sources.md](../reports/0010-REPORT-nested-modules-and-adapter-sources.md)
+§6 (Cobra and pflag), §7 (fang) and §8 (Kong).
+
+**What changes in the decision.** §4 and §10 above are left as written;
+the items below supersede them where they differ.
+
+* **§1 and §10, the front ends.** Three front ends read one registry:
+
+  ```text
+   command/cli       the standard-library front end (root module, no module added)
+   command/cobracmd  nested module github.com/maccavelli/go-tui-lib/command/cobracmd
+                                             → command, theme, glyph, spf13/cobra
+   command/kongcmd   nested module github.com/maccavelli/go-tui-lib/command/kongcmd
+                                             → command, theme, glyph, alecthomas/kong
+  ```
+
+  * `command/cobra` becomes the nested module `command/cobracmd`, package
+    `cobracmd`. The package name does not shadow `cobra` at an import site
+    that uses both (0010-MADR §1).
+  * `command/kongcmd`, package `kongcmd`, is new.
+  * `command/cli` stays in the root module, the zero-dependency path.
+  * A program imports one front end. The others, and their dependencies,
+    never reach its build, its `go.sum` or its module graph (REPORT §2).
+  * §10's "Cobra and fang" and its dependency record are replaced by
+    0010-MADR, which names Cobra and Kong.
+* **fang is not used** (0010-MADR Q1, answered 2026-10-02). fang
+  queries the terminal on every help and error render, reads stdout's size,
+  and writes its man page to `os.Stdout`, with no option to stop any of
+  them (REPORT §7). `cobracmd` gives what fang gave, inside the rules:
+  * **Charm-styled help** through `SetHelpFunc` and `SetUsageFunc`, drawn
+    with the library's `theme` and `glyph` at the width the caller gives,
+    across 0001-MADR §6's colour, charset and width matrix;
+  * **version** through `cobra.Command.Version`, set by the program;
+  * **man and Markdown pages** from an optional subpackage,
+    `cobracmd/docs`, which calls `cobra/doc`'s `GenMan` and
+    `GenMarkdownCustom` with the caller's writer. It sets
+    `DisableAutoGenTag` and takes a fixed date, because both functions
+    otherwise stamp the time (REPORT §6), and golden files would change on
+    every run. md2man and YAML are compiled only by importers of
+    `cobracmd/docs`.
+* **§4, tags aligned with Kong.** One argument struct then drives the
+  registry's schema, slash commands, the palette, agents, `command/cli`,
+  Cobra flags and a Kong grammar.
+  * **Why.** Kong reads bare struct tags, and makes any field with an `arg`
+    tag positional, whatever the tag's value (`tag.go:260`, REPORT §8).
+    §4's `arg:"min=-200,max=200,pos=0"` would therefore turn every
+    constrained field into a positional argument in a Kong grammar.
+  * **The vocabulary:**
+
+    | Tag | Meaning here | Kong | Cobra and `command/cli` |
+    | :--- | :--- | :--- | :--- |
+    | `json:"name,omitzero"` | the property name; required unless a pointer, `omitempty` or `omitzero` | — (the adapter sets `name`) | the flag name |
+    | `help:"…"` | the description; replaces `doc` | `help` | the flag's usage |
+    | `default:"…"` | the default; replaces `arg:"default=…"` | `default` | the flag's default |
+    | `enum:"a,b"` | the allowed values, comma-separated; replaces `arg:"enum=a\|b"` | `enum` | a custom `pflag.Value` and its completion |
+    | `arg:""` | positional, in field order; replaces `arg:"pos=N"` | `arg` | a positional argument |
+    | `short:"d"` | a one-letter flag | `short` | the flag's shorthand |
+    | `hidden:""` | in the schema, not in help | `hidden` | `MarkHidden` |
+    | `placeholder:"PANE"` | the value's name in help | `placeholder` | the usage's value name |
+    | `group:"…"` | the flag's help group | `group` | not used: Cobra groups commands, not flags |
+    | `schema:"min=…,max=…,minLen=…,maxLen=…,secret"` | registry-only constraints | ignored, but kept readable through `Tag.Get` (`tag.go:58-59`) | checked by the registry's decoder |
+
+  * **Enums follow Kong's rule:** a scalar `enum` field must be required
+    or have a `default` (`tag.go:326-329`). `SchemaOf` returns an error
+    for one that is neither, so a struct the registry accepts is one Kong
+    accepts.
+  * **§4's example becomes:**
+
+    ```go
+    type resizeArgs struct {
+        Delta int           `json:"delta" arg:"" help:"cells to grow; negative shrinks" schema:"min=-200,max=200"`
+        Pane  layout.PaneID `json:"pane,omitzero" help:"pane to resize; default the focused pane" placeholder:"PANE"`
+    }
+    ```
+
+    `Delta` is the first positional because it is the first `arg` field;
+    `/resize 4` still fills it.
+  * The JSON Schema, strict decoding, slash parsing and the supported types
+    are unchanged.
+* **`cobracmd`, the native Cobra front end.**
+
+  ```go
+  // New builds a root command holding every CLI command of r.
+  func New(r *command.Registry, o ...Option) (*cobra.Command, error)
+  // Mount grafts r's commands into a program's existing Cobra tree.
+  func Mount(parent *cobra.Command, r *command.Registry, o ...Option) error
+  // Run executes root against args with the caller's streams, and returns
+  // command/cli's exit code. It never calls os.Exit.
+  func Run(ctx context.Context, root *cobra.Command, args []string,
+      stdin io.Reader, stdout, stderr io.Writer) int
+  // Options: WithName, WithConfirm, WithContext(when.Context),
+  // WithTheme(theme.Theme), WithGlyphs(glyph.Set), WithWidth(int)
+  ```
+
+  * **The tree.** A dotted ID becomes nested commands: `Use` is the last
+    segment, and `Aliases` holds the command's slash aliases. The registry's
+    categories become Cobra groups, added with `AddGroup` before any child,
+    because Cobra panics on an undefined `GroupID` (`command.go:1205-1210`).
+    `Annotations` carries the ID, the danger level and the surfaces.
+    `Hidden` and `Deprecated` come from the command.
+  * **Flags come from the JSON Schema** through pflag. An enum is a custom
+    `pflag.Value` with `FixedCompletions`, because pflag has no enum type
+    (REPORT §6). A required property is `MarkFlagRequired`. Positional
+    properties set `Args`. Where the schema expresses them, mutually
+    exclusive and required-together properties use
+    `MarkFlagsMutuallyExclusive` and `MarkFlagsRequiredTogether`.
+  * **Completion comes from the registry:** `ValidArgsFunction` and
+    `RegisterFlagCompletionFunc` serve enums and the registry's completion
+    providers. Scripts for bash, zsh, fish and PowerShell come from Cobra's
+    generators, written to the caller's writer.
+  * **The same verbs, flags and exit codes as `command/cli`:** `--args`,
+    `--json`, `--yes`, `list`, `describe`, `schema`, and exit codes 0, 1, 2
+    and 3. Every invocation is `Origin: CLI`, and runs `RunE` through the
+    registry, so the gate and the audit trail apply as in §7.
+  * **Rules** (0010-MADR §6, REPORT §6):
+    * `Run` always calls `SetArgs`, `SetOut`, `SetErr` and `SetIn`, because
+      Cobra otherwise reads `os.Args` and writes to `os.Stdout` and
+      `os.Stderr`; it sets `SilenceErrors` and `SilenceUsage`, calls
+      `ExecuteContextC`, and turns the error into an exit code.
+    * It never calls `cobra.CheckErr`, and never sets Cobra's process-wide
+      variables (`EnableTraverseRunHooks`, `EnablePrefixMatching`,
+      `MousetrapHelpText`). The package documentation tells a Windows
+      program to set `MousetrapHelpText = ""` itself if it may be started
+      from Explorer, where Cobra otherwise exits.
+    * Build the tree once per process. Cobra keeps flag completions in a
+      process-wide map keyed by flag, with no delete, and refuses only a
+      second registration for the same flag (`completions.go:38-41`,
+      `178`), so every rebuild adds entries that are never freed. The
+      package documentation says so.
+    * A failing hidden `__complete` command writes to `os.Stderr` inside
+      Cobra, which no setter reaches. It is documented, not hidden.
+* **`kongcmd`, the native Kong front end.**
+
+  ```go
+  func New(r *command.Registry, o ...Option) (*Adapter, error)
+  // Options returns the kong options that mount r's commands into a
+  // program's own kong.New, beside its static commands.
+  func (a *Adapter) Options() []kong.Option
+  // Parser returns a parser of r's commands alone.
+  func (a *Adapter) Parser(o ...kong.Option) (*kong.Kong, error)
+  // Run parses args, runs the selected registry command, and returns its
+  // exit code with handled true. When the program's own command is
+  // selected, it returns the context with handled false.
+  func (a *Adapter) Run(ctx context.Context, p *kong.Kong, args []string) (kctx *kong.Context, code int, handled bool)
+  // Resolver gives a Kong parser values from the registry's settings.
+  func (a *Adapter) Resolver() kong.Resolver
+  // Options: WithName, WithConfirm, WithContext(when.Context),
+  // WithTheme(theme.Theme), WithGlyphs(glyph.Set), WithWidth(int)
+  ```
+
+  * **Mounting.** Each top-level ID segment is a `kong.DynamicCommand`,
+    Kong's mechanism for commands known only at run time (`options.go:100`).
+    A program keeps its own static grammar and adds `a.Options()` to its
+    `kong.New`.
+  * **Grammars are built per command** with `reflect.StructOf` from the
+    schema: scalars, enums with their default or required, slices with
+    `sep`, `hidden`, `group`, and nested `cmd` fields for dotted IDs. Each
+    field carries custom `id` and `danger` tags, which Kong keeps readable.
+    This was run in probes: values decode, enums are checked, nested
+    commands select (REPORT §8).
+  * **Dispatch is the adapter's.** A `StructOf` type has no methods, so
+    `kong.Context.Run` cannot find one (REPORT §8). `Run` calls `Parse`,
+    then dispatches from `ctx.Selected()` through the registry, as
+    `Origin: CLI`, so the gate and the audit trail apply.
+  * **`Bind` and `BindTo`** give a program's own static commands the
+    registry and the invocation context, so a hand-written Kong command can
+    dispatch a registry command too.
+  * **Groups and help.** The registry's categories become
+    `kong.ExplicitGroups`. `PostBuild` sets `Hidden` and `Help` from the
+    command. Help is printed by the adapter's own `kong.Help(HelpPrinter)`,
+    with the library's theme and glyphs at the caller's width, because
+    Kong's printer takes its width from `$COLUMNS` or an ioctl on the
+    writer (REPORT §8).
+  * **Settings.** `Resolver` is the Kong form of configuration, Kong's
+    answer to Viper: it lets a Kong program fill flags from the values a
+    later configuration record stores. No `env` tag is generated unless the
+    program asks, because `env` reads the process environment.
+  * **Completion** is generated in this module from the registry, for
+    bash, zsh, fish and PowerShell, written to the caller's writer, with
+    no further module (0010-MADR Q2, answered 2026-10-02).
+  * **The same verbs, flags and exit codes as `command/cli`.**
+  * **Rules** (0010-MADR §6, REPORT §8):
+    * Every parser the adapter builds or mounts into gets `kong.Name`,
+      because the default is `os.Args[0]`, and `kong.Writers` with the
+      caller's writers.
+    * Its `Exit` panics a sentinel that `Run` recovers into an exit code.
+      An `Exit` that returns lets Kong keep parsing after `--help`; this
+      was observed in a probe, where `--help` printed help and `Parse`
+      then failed.
+    * It never calls `kong.Parse`, `Fatalf` or `FatalIfErrorf`, which read
+      `os.Args` or exit.
+* **One conformance test for three front ends.** The same requests, run
+  through `command/cli`, `cobracmd` and `kongcmd`, build the same
+  `Request`, write the same `--json` output and return the same exit code.
+  Each nested module carries a copy of the cases, because a test cannot
+  import across modules' test files.
+
+**What does not change.**
+
+* Option A, the registry, the command, handlers, the gate, the audit trail,
+  `when`, the loaders and the exporters.
+* The answers to Q1 to Q3, and Q4's "both": the standard-library front end
+  and a Cobra front end ship, now with a Kong one beside them.
+* `command/cli`'s shape, verbs and exit codes, which both nested front
+  ends copy.
+
+**Consequences, changed.** The Bad bullet "the Cobra and fang adapter puts
+two modules … in this module's `go.mod` for every consumer" no longer
+holds: Cobra and Kong live in nested modules, and the root's `go.mod` never
+names them (0010-MADR, REPORT §2). In its place:
+
+* Bad, because a front end is released apart from the root, after the root
+  release whose API it uses (0010-MADR §3).
+* Bad, because the tag vocabulary of §4 changes before it ships, and its
+  names are Kong's, not this library's own.
+
+**Versioning.** `command/cli` ships in the root's release, as before.
+`cobracmd` and `kongcmd` are tagged `command/cobracmd/v0.1.0` and
+`command/kongcmd/v0.1.0`, each after the root release that contains Steps
+1 to 9 of the PLAN, and each requires that root version (0010-MADR §3).
+
+**Owner questions for A1.** None beyond 0010-MADR's Q1 (fang) and Q2 (Kong
+completion), which this amendment follows. Both were answered on
+2026-10-02 as recommended: no fang, and Kong completion generated here.
+
 ## More Information
 
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md):
@@ -799,3 +1046,7 @@ accepted.
   ACP tool calls and permissions: <https://agentclientprotocol.com/protocol/tool-calls>.
 * VS Code when clauses: <https://code.visualstudio.com/api/references/when-clause-contexts>.
 * JSON Schema 2020-12: <https://json-schema.org/draft/2020-12/schema>.
+* [0010-MADR-nested-adapter-modules.md](0010-MADR-nested-adapter-modules.md)
+  and [0010-REPORT-nested-modules-and-adapter-sources.md](../reports/0010-REPORT-nested-modules-and-adapter-sources.md):
+  the nested modules, and the Cobra, fang and Kong facts amendment A1
+  relies on.
