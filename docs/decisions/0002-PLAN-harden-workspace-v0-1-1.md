@@ -1,0 +1,342 @@
+---
+status: proposed
+date: 2026-10-02
+associated-madr: "0002-MADR-multi-pane-workspace-layouts.md"
+---
+# Harden multi-pane workspaces (`v0.1.1`)
+
+Associated MADR: [0002-MADR-multi-pane-workspace-layouts.md](0002-MADR-multi-pane-workspace-layouts.md),
+amendment A1. The first plan for that MADR,
+[0002-PLAN-multi-pane-workspace-layouts.md](0002-PLAN-multi-pane-workspace-layouts.md),
+shipped `v0.1.0` and is complete. This plan fixes what an audit then found in
+it ([0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md)
+§1).
+
+## Goal
+
+Fix every defect amendment A1 names, so that `v0.1.1`:
+
+* cannot crash, show a stale or a foreign view, or mis-size an overlay;
+* focuses value-type panes and bubbles models;
+* resizes without a dead zone;
+* has default keys that legacy terminals decode reliably;
+* lets consumers keep their own `-update` flag;
+* has a conformance gate that reads uses rather than names.
+
+Done means every item under Verification holds, CI is green on the pushed
+tree, and the owner can tag `v0.1.1`.
+
+## Scope
+
+### In scope
+
+| Step | Paths | Finding (0003-REPORT §1) |
+| :--- | :--- | :--- |
+| 1 | `docs/decisions/0002-*`, `docs/README.md` | accept amendment A1 |
+| 2 | `tuitest/` | 4: the `-update` panic; 12 and 13 in this package |
+| 3 | `layout/` | 8: applied resize deltas, `Separator.Resizable`; 12 and 13 in this package |
+| 4 | `workspace/overlay.go`, `workspace/render.go`, `workspace/workspace.go` | 1, 2, 3: the crash, the cache, overlay sizes |
+| 5 | `workspace/focus.go` (new), `workspace/model.go` (new), `workspace/workspace.go`, `workspace/overlay.go` | 7: focus as messages, `Wrap` and `Model` |
+| 6 | `workspace/keys.go`, `workspace/workspace.go`, `workspace/*_test.go` | 8 in the workspace, 9, 12 and 13 |
+| 7 | `internal/conformance/`, `Makefile`, `.github/workflows/ci.yml` | 11, and a `go fix` gate |
+| 8 | `README.md`, `AGENTS.md`, `docs/` | documentation, release notes, close-out |
+
+No module is added or removed. `go.mod` does not change.
+
+### Out of scope
+
+* **The width method** (0003-REPORT §1.6). It needs the direct drawing in
+  [0004-MADR-integrate-charm-v2-and-go-1-27.md](0004-MADR-integrate-charm-v2-and-go-1-27.md),
+  because the lipgloss canvas fixes its own method.
+* **Render performance and the under-used Charm features** (§1.5, §1.10).
+  They belong to 0004.
+* `git push` and tags, which are the owner's.
+* Any change in pi-go.
+
+## Rules for every step
+
+1. **Order.** Each step compiles, passes its tests and passes the pre-add
+   gate before the next step starts.
+2. **Mutation proofs.** Each step names mutations of its key invariants.
+   Each is applied to a scratch copy and must make a named test fail. A
+   mutation that survives, or does not compile, is replaced and recorded.
+3. **Checks per step:**
+   * `make pre-add-check FILES=…`;
+   * `make lint`;
+   * `go test -race -count=1 ./...`;
+   * `LC_ALL=C go test ./...`;
+   * the Windows test host on a scratch copy;
+   * `go mod tidy -diff`.
+4. **Conventions.** Every package follows 0001-MADR §6. In particular,
+   nothing writes to `os.Stdout` or `os.Stderr`, nothing sets the alternate
+   screen or installs a signal handler, and every glyph comes from `glyph`.
+5. **Regression first.** Each defect gets a test that fails on `v0.1.0`
+   before its fix lands. The execution record quotes that failure.
+6. **Commit.** One commit per step, with `git commit --no-edit`, after the
+   owner authorizes commits to `main` in that turn. The execution record
+   gets each step's evidence before its commit.
+
+## Implementation Steps
+
+### Step 1: records
+
+The owner accepts amendment A1 and answers Q5 and Q6. Record the answers
+in A1, set it `accepted`, set this PLAN `in-progress`, and update
+`docs/README.md`.
+
+### Step 2: `tuitest`
+
+* **The flag.**
+  * Remove the `init` that registers `-update`.
+  * Register `-tuitest.update` instead. A dotted name is legal for the
+    `flag` package, and no consumer will define it.
+  * `Golden` rewrites files when any of these holds:
+    * `-tuitest.update` is set;
+    * `TUITEST_UPDATE` is `1` or `true`;
+    * a boolean flag named `update` exists in the test binary and is set.
+* **Idioms.** `Annotate` walks lines with `strings.Lines`. Subtests that
+  range over a map range over `slices.Sorted(maps.Keys(…))`.
+* **Tests:**
+  * a test package `tuitest/internal/clash` defines
+    `var update = flag.Bool("update", false, "")`, imports `tuitest` and
+    calls `Golden`. It must run without a panic. On `v0.1.0` it panics
+    with `flag redefined: update`;
+  * each of the three triggers rewrites a planted, stale golden file in a
+    temporary copy, and no trigger leaves it untouched;
+  * with no trigger, a mismatch fails and writes nothing.
+* **Mutations:**
+  * `init` registers `update` again;
+  * the environment variable is ignored;
+  * a consumer's `-update` is ignored.
+
+### Step 3: `layout`
+
+* **Applied deltas.** `Plan` gains `Resize map[string]int`: for each
+  separator of a named split, the delta `Solve` actually applied after
+  clamping. A separator with nothing applied is absent.
+* **`Separator.Resizable`** is true only for a named split's separators.
+  A positional ID changes with the tree, and `resizeKey` never reads one.
+* **Idioms:**
+  * `dropFirst` uses `slices.Backward`;
+  * `State.clone` uses `maps.Copy`;
+  * the map ranges in tests are sorted.
+* **Tests:**
+  * a delta of +1000 against a limit reports the limit in `Plan.Resize`;
+  * an unnamed split's separators are not `Resizable`, and a named
+    split's are;
+  * the existing property and fuzz tests pass unchanged, so applied
+    deltas never break tiling.
+* **Mutations:**
+  * `Plan.Resize` reports the requested delta;
+  * `Resizable` is always true.
+
+### Step 4: overlays and the view cache
+
+* **The crash.** `overlayRect` places a `BelowCursor` overlay with a new
+  `paneCursor()`. It returns the focused pane's cursor in screen cells and
+  never consults overlays. `Cursor()` keeps its contract: the top modal
+  overlay's cursor, else the focused pane's.
+* **The cache:**
+  * the key is a struct, `{kind, id}`, with `kind` one of pane or overlay;
+  * the value holds width, height, focus and the view. This removes the
+    `fmt.Sprintf`;
+  * `SetPane` deletes the pane's entry, and `Pop` deletes the overlay's;
+  * a replaced overlay is evicted.
+* **Overlay IDs.**
+  * `Push` with an ID already open removes that overlay, then pushes the
+    new one on top.
+  * `SendOverlay(id string, msg tea.Msg) tea.Cmd` reaches an overlay
+    only.
+  * `Send` keeps trying panes first, as documented.
+* **Overlay sizes.** `resolve` keeps a size per open overlay. It sends a
+  `SizeMsg` to each overlay whose content size changed.
+* **Tests (each fails on `v0.1.0`):**
+  * pushing a modal `BelowCursor` overlay returns, and the overlay sits
+    one row under the focused pane's cursor;
+  * after `SetPane`, a replacement `Changer` that reports no change is
+    drawn with its own view;
+  * a pane and an overlay that share an ID each show their own view;
+  * after a resize from 120×40 to 60×20, an open overlay has received its
+    new content size;
+  * pushing an ID twice leaves one overlay with the second content;
+  * after `Pop`, the cache holds no entry for the overlay.
+* **Mutations:**
+  * `overlayRect` calls `Cursor()` again;
+  * `SetPane` keeps the entry;
+  * the cache key drops `kind`;
+  * `resolve` skips overlays.
+
+### Step 5: focus as messages
+
+* **Messages.** `PaneFocusMsg{}` and `PaneBlurMsg{}` are delivered with
+  `Send`, so the value a pane's `Update` returns is kept. They are sent:
+  * on `Init`, focus to the focused pane;
+  * on every focus change, blur to the old pane and then focus to the new
+    one;
+  * when `resolve` moves focus off a hidden pane.
+* **`Focuser`** is still called, before the message, so a `v0.1.0` pointer
+  pane works unchanged. Its doc says to implement one or the other, not
+  both.
+* **Modal overlays:**
+  * `Push` of a modal overlay blurs the focused pane and focuses the
+    overlay's pane;
+  * `Pop` blurs the popped pane, and, when no modal overlay remains,
+    focuses the focused pane again;
+  * a non-modal overlay changes no focus.
+* **`Wrap` and `Model[M]`,** in `model.go`:
+
+  ```go
+  type Bubble[M any] interface {
+      Update(tea.Msg) (M, tea.Cmd)
+      View() string
+  }
+  type Model[M Bubble[M]] struct {
+      M M // the hosted model, readable and settable by the program
+      // unexported: options
+  }
+  func Wrap[M Bubble[M]](m M, opts ...WrapOption[M]) *Model[M]
+  func (p *Model[M]) Update(msg tea.Msg) (Pane, tea.Cmd)
+  func (p *Model[M]) View(width, height int) string
+  func (p *Model[M]) Cursor() *tea.Cursor
+  // Options, each overriding what Wrap finds by type assertion:
+  func OnSize[M Bubble[M]](f func(m *M, width, height int)) WrapOption[M]
+  func OnFocus[M Bubble[M]](f func(m *M) tea.Cmd) WrapOption[M]
+  func OnBlur[M Bubble[M]](f func(m *M)) WrapOption[M]
+  func WithCursor[M Bubble[M]](f func(m M) *tea.Cursor) WrapOption[M]
+  func WithKeys[M Bubble[M]](f func(m M) []key.Binding) WrapOption[M]
+  ```
+
+  * **Size.** `SizeMsg` calls `SetSize`, or `SetWidth` and `SetHeight`, on
+    `*M` when it has them. bubbles `list`, `viewport`, `textinput` and
+    `textarea` have them with pointer receivers.
+  * **Focus.** `PaneFocusMsg` and `PaneBlurMsg` call `Focus() tea.Cmd` and
+    `Blur()` on `*M`. bubbles `textinput.go:268,275` and
+    `textarea.go:799,806` have pointer receivers.
+  * **Cursor.** `Cursor` calls `Cursor() *tea.Cursor` on `M`, as bubbles
+    `textinput.go:916` and `textarea.go:1751` define it.
+  * **View.** `View` clips `m.View()` to the size, as the workspace does
+    every view.
+* **Tests:**
+  * a value-type pane records `PaneFocusMsg` and `PaneBlurMsg` in order
+    across `Init`, a focus cycle, a click and a hidden pane;
+  * a wrapped bubbles `textinput` is focused, gets typed keys, and shows
+    its cursor at the pane's offset. On `v0.1.0` it is never focused;
+  * a modal `Push` blurs the pane beneath, and `Pop` focuses it again;
+  * a non-modal `Push` sends neither message;
+  * a wrapped `viewport` receives its size;
+  * each option overrides the found method.
+* **Mutations:**
+  * focus messages go through `Update`, but the returned value is
+    dropped;
+  * `Pop` does not refocus;
+  * `Wrap` ignores `SetSize`;
+  * a non-modal overlay blurs.
+
+### Step 6: keys, resize and tidying
+
+* **Keys.** `FocusNext` and `FocusPrev` take the defaults Q5 chooses
+  (recommended `alt+.` and `alt+,`). `DefaultKeyMap`'s doc names the legacy
+  sequence introducers that a default must avoid: `[`, `]`, `O`, `P`, `_`,
+  `^`, `X` and `\`.
+* **Resize:**
+  * `Resize` solves with the new delta and stores the separator's entry
+    from `Plan.Resize`;
+  * a separator that is not `Resizable` is ignored by `Resize`, by keyboard
+    resize and by a drag;
+  * a later window resize does not touch the stored state.
+* **Concurrency.** `Workspace`'s doc says it is not safe for concurrent
+  use, and why.
+* **Tests:**
+  * `TestCommandsRunConcurrently` is renamed `TestCommandsAreIndependent`,
+    because `Update` is serial in Bubble Tea. It runs the batch's commands
+    on goroutines with `wg.Go` under `-race`;
+  * holding resize right 50 times against a limit, then once left, moves
+    the separator one cell;
+  * a drag past the limit and back moves it at once;
+  * shrinking the window and growing it again restores the layout;
+  * no default binding starts with `alt+` followed by a sequence
+    introducer;
+  * `go fix -diff ./workspace` reports nothing.
+* **Mutations:**
+  * `Resize` stores the requested delta;
+  * a non-`Resizable` separator is resized;
+  * a default is set to `alt+[` again.
+
+### Step 7: gates
+
+* **Conformance by type.**
+  * `internal/conformance` loads each package with `go/parser`, and
+    type-checks it with `go/types` and `importer.ForCompiler(fset,
+    "source", nil)`.
+  * It resolves every use to its object, and fails on any of these
+    outside tests:
+    * the objects `os.Stdout` and `os.Stderr`;
+    * the functions `fmt.Print`, `fmt.Printf` and `fmt.Println`;
+    * every function of `log` that writes to standard error;
+    * the `print` and `println` builtins;
+    * `signal.Notify`;
+    * a write to a field named `AltScreen` of `tea.View`.
+  * An alias, a dot import or a method value cannot hide a use.
+  * If the source importer cannot load the module's dependencies on every
+    host, stop and record it under plan deviations. Do not fall back to
+    name matching.
+* **A modernisation gate.** `make modernize` runs `go fix -diff ./...`
+  and fails on any suggestion. `make lint` and CI's lint job run it.
+* **Tests and proofs.** Each planted file is in a scratch copy, never in
+  the tree. Each must fail the scan:
+  * `o := os; o.Stdout.Write(…)`;
+  * `import xfmt "fmt"; xfmt.Println()`;
+  * `log.Print`;
+  * `println`;
+  * `v := tea.View{}; v.AltScreen = true`.
+
+  A planted `for k, v := range m { out[k] = v }` must fail
+  `make modernize`.
+* **Mutations:**
+  * the scan skips the `log` package;
+  * the scan stops resolving aliases;
+  * `make modernize` drops `-diff`.
+
+### Step 8: documentation and close-out
+
+* **`docs/guides/building-workspaces.md`:**
+  * focus messages, `Wrap` and a bubbles example;
+  * overlay IDs and `SendOverlay`;
+  * resize behaviour, and the new default keys.
+* **`AGENTS.md`:** the pre-add section says `-tuitest.update` or
+  `TUITEST_UPDATE=1`, and names `make modernize`.
+* **`docs/architecture.md`:** the conformance scan and the gate.
+* **Release notes for `v0.1.1`** in the execution record. They name the
+  behaviour changes: the flag, the default keys, focus messages, and
+  `Push` replacing an open ID.
+* **Verification** as below. Mark `complete` after CI is green on the
+  pushed tree. The owner tags.
+
+## Verification
+
+* Every step's regression test failed on `v0.1.0` before its fix, and the
+  failure is quoted.
+* Every step's mutations are killed.
+* On the macOS development host and the Windows test host, all pass:
+  * `make pre-add-check`, `make lint`, `make modernize` and `make vuln`;
+  * `go test -race -count=1 ./...`, `go test -shuffle=on -count=2 ./...`
+    and `LC_ALL=C go test ./...`;
+  * `make fuzz`.
+* All `v0.1.0` golden files pass byte for byte, except those the default
+  keys change. Each changed file is read and listed.
+* `go mod tidy -diff` is clean, and `go.mod` is unchanged.
+* The identifier scan of 0001-PLAN V7 finds nothing.
+* After the owner's push, CI is green on all three operating systems.
+
+## Rollout and Rollback
+
+* **Rollout.** The owner pushes Steps 1–8 and tags `v0.1.1`. pi-go, the one
+  consumer, picks it up under its own records.
+* **Rollback.** Before the push, each step is one local commit. After it,
+  a consumer pins `v0.1.0`, and the defects are fixed forward in a
+  `v0.1.2`. No state format changes: `layout.State` JSON from `v0.1.0`
+  loads unchanged.
+
+## Execution Record
+
+None yet.

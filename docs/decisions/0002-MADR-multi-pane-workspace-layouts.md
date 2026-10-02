@@ -445,6 +445,116 @@ amendment A2). Every answer is the recommendation.
   inert until the program sets `MouseMode`. The alternative is to leave it
   out of `v0.1.0`.
 
+## Amendments
+
+### A1 (2026-10-02): `v0.1.1` hardening
+
+*Status: proposed.* Its plan is
+[0002-PLAN-harden-workspace-v0-1-1.md](0002-PLAN-harden-workspace-v0-1-1.md).
+
+**Found.** An audit of the tagged `v0.1.0` found defects in this record's
+deliverable. Four were confirmed with failing probe tests:
+
+* a modal overlay anchored `BelowCursor` overflows the stack;
+* the view cache goes stale after `SetPane`, and a pane and an overlay with
+  one ID share an entry;
+* overlays get no new size on resize;
+* tuitest's `-update` flag panics a consumer that defines its own.
+
+The audit also found:
+
+* focus that never reaches value-type panes, including every bubbles
+  model;
+* resize deltas that grow without bound;
+* default keys that collide with escape-sequence prefixes;
+* a conformance scan that matches names rather than uses.
+
+[0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md)
+§1 has the evidence, file by file. These are bugs in this record's
+deliverable, so they are fixed under this number.
+
+**What changes in the decision.** Each of these changes something §3 or §4
+above says:
+
+* **§3, focus is a message.**
+  * The workspace sends `PaneFocusMsg` and `PaneBlurMsg` through a pane's
+    `Update`, as it sends `SizeMsg`. The value `Update` returns is kept,
+    so a value-type pane sees its own focus.
+  * `Focuser` stays for pointer panes.
+  * A modal overlay blurs the pane beneath it when pushed, and that pane
+    is focused again when the last modal overlay is popped. A non-modal
+    overlay changes no focus, because the focused pane drives it.
+  * The names avoid `tea.FocusMsg` and `tea.BlurMsg`, which mean that the
+    terminal gained or lost focus.
+* **§3, bubbles models are hosted directly.** `Wrap(m)` returns a `Model[M]`
+  that hosts any `(M, tea.Cmd)` model, such as bubbles `textinput`,
+  `textarea` or `viewport`. It finds `Focus`, `Blur`, `SetWidth`,
+  `SetHeight`, `SetSize` and `Cursor` on `*M` or `M` by type assertion, and
+  options override each one.
+
+  ```go
+  type Bubble[M any] interface {
+      Update(tea.Msg) (M, tea.Cmd)
+      View() string
+  }
+  func Wrap[M Bubble[M]](m M, opts ...WrapOption[M]) *Model[M]
+  type Model[M Bubble[M]] struct{ M M /* … */ } // implements Pane, Cursorer
+  ```
+
+* **§3, overlay IDs.** An overlay's ID is its own namespace, apart from
+  pane IDs, in the view cache and in a new `SendOverlay`. `Send` still
+  tries a pane first. Pushing an ID that is already open replaces that
+  overlay, at the top.
+* **§3, overlays are sized.** Each overlay is told its content size as each
+  pane is: when pushed, and whenever a resize changes it.
+* **§3, `BelowCursor`** anchors on the focused pane's cursor. It never
+  looks at overlays, so a modal overlay can be anchored there.
+* **§3, resize.**
+  * `Resize` stores the delta the solver applied, not the delta asked
+    for, so a held key or a drag past a limit has no dead zone.
+  * A window that shrinks does not rewrite the stored value, so the
+    user's layout comes back when the window grows.
+  * `layout.Separator` gains `Resizable`. It is false on an unnamed split,
+    whose positional ID would change with the tree, and the workspace
+    does not resize it.
+* **§3, default keys.** `alt+[` and `alt+]` are replaced, because in legacy
+  key encoding they are the CSI and OSC introducers. Owner question Q5.
+* **§4, `tuitest` does not take `-update`.**
+  * It registers `-tuitest.update`, which no consumer will define. It
+    also reads `TUITEST_UPDATE=1`, which works across `./...`.
+  * It honours a boolean `-update` flag when the test binary defines one.
+* **§3, concurrency is documented.** A `Workspace` is not safe for
+  concurrent use. Bubble Tea calls `Update` and `View` on one goroutine,
+  which is where it belongs.
+
+**What does not change.** The package set, the layout solver, the chrome
+and the presets stay as decided. A cell-width mismatch with Bubble Tea's
+renderer was also found (0003-REPORT §1.6). It cannot be fixed while the
+frame is composed on a lipgloss canvas, whose width method is fixed, so it
+moves to
+[0004-MADR-integrate-charm-v2-and-go-1-27.md](0004-MADR-integrate-charm-v2-and-go-1-27.md),
+with the direct ultraviolet drawing that the fix needs.
+
+**Version.** `v0.1.1` (owner question Q6). `v0` permits the small API
+additions the fixes need:
+
+* `PaneFocusMsg`, `PaneBlurMsg`, `Wrap` and `Model`;
+* `SendOverlay` and `Separator.Resizable`.
+
+The renamed tuitest flag and the new default keys are behaviour changes,
+and the release notes say so.
+
+**Owner questions for A1.**
+
+* **Q5. Default focus keys.** Recommended: `alt+.` for the next pane and
+  `alt+,` for the previous one. Neither is a sequence introducer in legacy
+  encoding, and they sit on the keys marked `>` and `<`. The alternative
+  is `alt+n` and `alt+p`, which many editors use for history.
+* **Q6. Version.** Recommended: `v0.1.1`, because the release fixes a
+  crash and a consumer panic, and its additions exist only to make the
+  fixes possible. The alternative is `v0.2.0`, which 0004 would then take
+  as `v0.3.0`.
+
 ## More Information
 
 * [0001-MADR-scaffold-charm-tui-library.md](0001-MADR-scaffold-charm-tui-library.md):
