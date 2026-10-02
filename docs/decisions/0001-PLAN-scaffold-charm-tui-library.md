@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-10-01
 associated-madr: "0001-MADR-scaffold-charm-tui-library.md"
 ---
@@ -259,3 +259,127 @@ hook writes the message. No `-m`, `-F` or `--amend`.
   local configuration without being printed. A comparison showed them
   equal to the identity the owner named, and
   `git config --local --get user.name` succeeds.
+* Committed as `bcfab0b`, the two records alone.
+
+### Phase 1: agent rules and repository hygiene (2026-10-01)
+
+* **Verbatim.** `cmp` passed on all eight files: `.claude/.gitignore`,
+  `.claude/rules/madr-and-plan-skill.md`,
+  `.grok/rules/madr-plan-before-mutating-work.md`, `.opencode/rules.md`,
+  `opencode.json`, `.gitignore`, `.markdownlint-cli2.jsonc` and `LICENSE`.
+* **`.gitattributes`.** The diff against go-core-lib shows only:
+  * the fixture bullet, now about golden files;
+  * the citation, now this record's §4;
+  * the `manifest-parity` rule, removed.
+* **`AGENTS.md`.** The diff, read in full, shows only step 3's changes:
+  * the intro;
+  * Dependencies, with the named stack, the "never" list and `depguard`;
+  * the new "TUI conventions" section;
+  * the `TestManifestDifferential` sentence, dropped;
+  * the citation of go-core-lib's 0002 §5, dropped;
+  * the "no packages" sentence.
+* **markdownlint.** `markdownlint-cli2 AGENTS.md` lints every non-record
+  file the config globs, so it also read `README.md`. It exited 1 on two
+  MD013 findings in `README.md` lines 3 and 5 (235 and 289 characters).
+  * Those lines are the owner's file at `ff5c504`, untouched by Phase 1.
+    `AGENTS.md` had no finding.
+  * The commit (`a65b2c8`) went ahead because the command chain did not
+    gate on that exit status. That was an execution slip: from Phase 2
+    on, every check gated its commit.
+  * Phase 3 re-wrapped the README, and markdownlint is clean (V6).
+* **Identifiers.** The staged diff had no hit for the local account name,
+  a real-machine home path, either development hostname or its domain,
+  the owner's email, or ocp-login's org-internal module host.
+
+### Phase 2: Go module, lint, pre-add gate and CI (2026-10-01)
+
+* **`go.mod`** is the three lines. `go mod verify` printed `all modules
+  verified`, and `go mod tidy -diff` exited 0. `cmp` against the three
+  lines passed, and there is no `go.sum` (V2).
+* **`.golangci.yml`.** The diff against go-core-lib is `depguard` in
+  `enable`, plus a `forbidden` rule (`list-mode: lax`, `files: $all`)
+  denying the six paths of MADR §3, each with a message citing it.
+  `golangci-lint config verify` exited 0 with golangci-lint v2.14.0.
+* **`Makefile`.** The diff is the header, the `.PHONY` list, the removed
+  `apicheck` and `fuzz` targets, and one citation (D1).
+* **`scripts/go-precheck.sh`.** Mode `0755`. The diff is the provenance
+  comment and one citation (D1). `shellcheck` exited 0.
+* **`.github/workflows/ci.yml`.**
+  * Kept, from go-core-lib: checkout, setup-go, `go mod download`,
+    `go test`, `-race`, `-shuffle`, cross `go vet`, the vet / gofmt /
+    tidy / lint step, govulncheck, and the shellcheck / markdownlint /
+    actionlint step. The action SHAs, the shellcheck SHA-256 and
+    `concurrency` are unchanged.
+  * Removed: the seven selfupdate-specific steps, the full-history
+    `fetch-depth`, and `SELFUPDATE_REQUIRE_PYTHON`.
+  * Added: `go test LC_ALL=C` on Linux.
+  * govulncheck is `v1.8.0`, the value go-core-lib's 0007 already
+    committed.
+  * Citations of go-core-lib's records name that repository (D1).
+  * The first build of the file attached each step's comment to the
+    step before it, which the full read caught. The splitter was fixed
+    and the file rebuilt and read again. actionlint v1.7.12 exited 0, and
+    the YAML parses to 11 steps.
+* **Expected failures, on the working tree** (V3):
+
+  | Command | rc | First line |
+  | :--- | :--- | :--- |
+  | `make test` | 2 | `go: warning: "./..." matched no packages` / `no packages to test` |
+  | `make vet` | 2 | `no packages to vet` |
+  | `make lint` | 2 | `context loading failed: no go files to analyze` (each GOOS) |
+  | `make vuln` | 2 | `govulncheck: no packages matched the provided patterns` |
+  | `make pre-add-check` | 0 | `go-precheck: no Go files to check.` |
+
+  `make` exits 2 when a recipe fails.
+* **First-fail experiment, on a scratch copy, then deleted** (V4):
+
+  | Case | Command | rc | Failure line |
+  | :--- | :--- | :--- | :--- |
+  | (a) undocumented export | `make pre-add-check`, `make lint` | 2, 2 | `exported: exported function Exported should have comment or be unexported (revive)` |
+  | (b) misformatted | `make pre-add-check` | 2 | `gofmt: these files are not formatted` / `probe/probe.go` |
+  | (c) v1 lipgloss, unrequired | `make lint` | 2 | `could not import github.com/charmbracelet/lipgloss … (typecheck)`, not depguard, so the case was repeated |
+  | (c) v1 lipgloss, required (v1.1.0) | `make lint` | 2 | `import 'github.com/charmbracelet/lipgloss' is not allowed from list 'forbidden': Charm v1: use charm.land/lipgloss/v2 (…§3) (depguard)` |
+  | (d) mcplib, required (v1.6.0) | `make lint` | 2 | `import 'github.com/maccavelli/mcplib' is not allowed from list 'forbidden': this module never imports mcplib (…§3) (depguard)` |
+  | (e) clean, `charm.land/lipgloss/v2` v2.0.6 | pre-add, lint, vet, test, vuln, `tidy -diff` | 0 each | `go-precheck: 2 file(s) clean (…)` |
+  | (f) clean, `LC_ALL=C go test ./...` | | 0 | `ok  github.com/maccavelli/go-tui-lib/probe` |
+
+  In (e), the first `go mod tidy -diff` exited 1. The experiment had run
+  `go get` without the `go mod tidy` that follows it, which left lipgloss
+  `// indirect`. That is the gate refusing an untidy `go.mod`. After
+  `go mod tidy`, every gate in (e) and (f) exited 0. The pre-add gate does
+  not run `tidy -diff`; CI does.
+* Committed as `5530ac9`.
+
+**Deviation D1 (2026-10-01): citations of go-core-lib records.**
+
+* **Found.** Copied text cited `docs/decisions/0002-…`, `0003-…` and
+  `0004-…` records that exist only in go-core-lib:
+  * the `Makefile` lint comment;
+  * one comment in `scripts/go-precheck.sh`;
+  * six citations in `ci.yml`.
+
+  Kept as they were, those citations would resolve to nothing here.
+* **Resolution.** Each now names go-core-lib and the record's full
+  filename, as AGENTS.md "Records" requires for another repository's
+  record. Steps 3 and 4 allowed only the header and provenance comments
+  to change, so this is recorded here.
+  * The provenance comment of `go-precheck.sh` says so.
+  * No behaviour changed, and the MADR is unaffected.
+
+### Phase 3: documentation tree (2026-10-01)
+
+* **`README.md`.** The owner's three paragraphs and title are kept word
+  for word. A comparison with whitespace normalised found all four blocks
+  of `ff5c504`. The lines are re-wrapped to clear MD013. Added: Status,
+  Documentation, "I want to…" and License.
+* **`docs/README.md`** holds the record index and ten "I want to…" rows;
+  **`docs/architecture.md`** the tree, dependencies, tooling, and "What is
+  not here".
+* **Checks** (V6):
+  * markdownlint-cli2 0.23.2 linted 5 files with 0 issues;
+  * the link resolver found 0 broken links over the three files;
+  * on a scratch copy with a planted missing record and a planted bad
+    anchor, it reported both and exited 1.
+* **Not run here.** Under MADR §8 the scaffold is not pushed, so CI has
+  not run on it. Its first run is with the first package.
+* V1–V7 hold, so this PLAN is `complete`.
