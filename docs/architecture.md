@@ -37,6 +37,7 @@ docs/
   README.md                 record index and the "I want to…" table
   architecture.md           this file
   decisions/                MADR and PLAN records
+  reports/                  REPORT records
 ```
 
 ## Dependencies
@@ -91,6 +92,5 @@ docs/
   is its own record.
 - **`make apicheck`.** It needs a release tag to compare against. It comes
   with the first release.
-- **`docs/reports/` and `docs/guides/`.** Each is created by its first
-  document.
+- **`docs/guides/`.** It is created by its first document.
 - **A release workflow, Dependabot, and any tag.**

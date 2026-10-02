@@ -213,6 +213,66 @@ hook writes the message. No `-m`, `-F` or `--amend`.
 5. Set this PLAN `status: complete` once V1–V7 hold, fill in the execution
    record, and commit Phase 3's files with this PLAN.
 
+### Phase 4: record the evidence in this repository *(added 2026-10-01)*
+
+The owner asked, after Phase 3: "ensure all go-tui-lib related docs are
+written into the go-tui-lib project documentation in the repo". Three bodies
+of go-tui-lib material lived elsewhere:
+
+* the survey of ocp-login's TUI layer behind MADR §6, which existed only in
+  the working session;
+* `updatetea`'s planned API and its Phase 2 Confirmation, in go-core-lib
+  `docs/decisions/0004-MADR-evolve-selfupdate-api-and-tui-support.md` §1
+  and §4, and `docs/decisions/0004-PLAN-v1-2-0-interaction-stream.md`;
+* pi-go as a second planned consumer: pi-go
+  `docs/decisions/0005-MADR-v1-feature-scope.md` ("Charm v2, extracting
+  shared widgets into go-tui-lib as they settle") and
+  `docs/decisions/0004-MADR-go-module-architecture.md`, both `proposed`.
+
+Phase 4 brings them here. It decides nothing new.
+
+1. **`docs/reports/0001-REPORT-tui-working-example-and-consumers.md`**
+   (new). A REPORT pairs with this MADR, so it takes number 0001. It
+   records, as observations:
+   * **ocp-login's TUI layer, at commit `a0d1fc4`:** *(D2: by pattern,
+     without file names)*
+     * its packages and Charm imports;
+     * its building blocks, with file names;
+     * which are generic, and where the domain coupling is (names and
+       strings, not types);
+     * how it tests rendering;
+     * the records that govern it, one line each;
+     * its tooling and its module versions;
+   * **the fleet's TUI programs:** each one's Charm generation and Go
+     version, and pi-go's plan;
+   * **`updatetea` as go-core-lib's 0004-MADR plans it:** the API sketch,
+     the inline-only rule, `ctrl+c` handling, and the Phase 2
+     Confirmation this repository owes;
+   * **the current releases** of the named stack on the module proxy;
+   * **candidates for the first packages,** listed and not chosen. Choosing
+     is the next pair's job.
+
+   Every ocp-login claim is checked against its source at `a0d1fc4`
+   before it is written: a grep or read per claim, with the command kept
+   in this execution record. A claim that does not check out is corrected
+   or dropped, and the record says which. ocp-login's org-internal module
+   host never appears; ocp-login is cited by name and record number.
+2. **MADR amendment A1:** pi-go joins the informed consumers, and the
+   report is cited as this record's evidence. The decision is unchanged.
+3. **`docs/README.md`:** the report in the index, and rows for "see what
+   ocp-login's TUI layer offers for extraction", "know who will use this
+   library" and "see the planned `updatetea` API".
+4. **`docs/architecture.md`:** `docs/reports/` in the tree, and dropped
+   from "What is not here".
+5. **Checks:**
+   * markdownlint-cli2 over the report and the two changed documents (its
+     config lints REPORT files);
+   * the link resolver over the same three files, proven again on a
+     planted bad link;
+   * the identifier scan of V7 over the whole tree.
+6. Set this PLAN `status: complete`, record Phase 4, and commit the
+   report, the amended pair and the two documents together.
+
 ## Verification
 
 * **V1. Provenance.** `cmp` passes on the eight verbatim files. `diff`
@@ -228,6 +288,9 @@ hook writes the message. No `-m`, `-F` or `--amend`.
   and actionlint exit 0.
 * **V6. Markdown.** markdownlint-cli2 is clean over every non-record
   Markdown file, and every relative link resolves.
+* **V8. Evidence.** *(Phase 4)* Every ocp-login claim in the report has a
+  recorded check against `a0d1fc4`, and the report, the index and the
+  architecture document pass V6.
 * **V7. Identifiers.** The committed tree contains none of these:
   * the local account name, the hostname, or a real-machine absolute path;
   * ocp-login's org-internal module host.
@@ -383,3 +446,46 @@ hook writes the message. No `-m`, `-F` or `--amend`.
 * **Not run here.** Under MADR §8 the scaffold is not pushed, so CI has
   not run on it. Its first run is with the first package.
 * V1–V7 hold, so this PLAN is `complete`.
+
+### Phase 4: the evidence in this repository (2026-10-01)
+
+* **Approval.** The owner approved Phase 4 ("Yes, run Phase 4 first"),
+  with commits to `main` authorized for the turn.
+
+**Deviation D2 (2026-10-01): ocp-login by pattern only.**
+
+* **Found.** Writing the 0002 MADR showed that ocp-login's module lives on
+  an org-internal host, while this repository is public. Phase 4 as
+  written would have published its building blocks with file names, and
+  0001-MADR's evidence already named its files, tests and variables.
+* **Decision.** The owner chose "Patterns only". ocp-login is a design
+  reference, no code is copied, and this repository's documents describe
+  its patterns, not its files.
+* **Records.**
+  * 0001-MADR amendment A2 re-words its evidence.
+  * 0002-MADR's working-example bullet is re-worded the same way, and its
+    §6 states the provenance rule.
+  * Step 1 above is annotated.
+
+**What was done.**
+
+* **Claims checked.** 21 pattern-level claims about ocp-login were checked
+  against its source at `a0d1fc4` by a scripted, read-only check that
+  prints a verdict per claim and no path.
+  * One claim, the non-interactive fallback, was not found at first: the
+    pattern looked for a function where the source has a method. The
+    pattern was broadened, and the claim confirmed.
+  * Result: `21 of 21 confirmed at a0d1fc4`.
+* **The report** is
+  [0001-REPORT-tui-working-example-and-consumers.md](../reports/0001-REPORT-tui-working-example-and-consumers.md).
+  It covers:
+  * ocp-login by pattern;
+  * the fleet's TUI programs, with Charm generation and Go version;
+  * pi-go's TUI plan and the import rules it must amend;
+  * `updatetea` as go-core-lib's 0004-MADR plans it, with its Phase 2
+    Confirmation;
+  * current releases, and package candidates, listed and not chosen.
+* **Amendment A1** adds pi-go to 0001-MADR's informed list and cites the
+  report. **A2** is the re-wording above.
+* **Index and architecture.** `docs/README.md` indexes the report and gains
+  three rows. `docs/architecture.md` lists `docs/reports/`.

@@ -3,7 +3,7 @@ status: accepted
 date: 2026-10-01
 decision-makers: go-tui-lib maintainers
 consulted: go-core-lib repository conventions; ocp-login (the working example for the Charm v2 stack)
-informed: fleet programs with a terminal UI (ocp-login, ocp-login-macos, mcp-server-magicdev, mcp-server-magictools, mcp-server-recall, mcp-server-socratic-thinker)
+informed: fleet programs with a terminal UI (ocp-login, ocp-login-macos, mcp-server-magicdev, mcp-server-magictools, mcp-server-recall, mcp-server-socratic-thinker, pi-go)
 ---
 # Scaffold go-tui-lib as a Go 1.27.1 Charm v2 library to the go-core-lib standard, with honest gates until the first package lands
 
@@ -53,9 +53,10 @@ Evidence gathered for this record (read-only, 2026-10-01):
   * `scripts/go-precheck.sh`, a GitHub Actions CI on three operating
     systems with SHA-pinned actions, golangci-lint v2.14.0 and govulncheck
     v1.7.0, and an Apache-2.0 `LICENSE`.
-* **The working example is ocp-login**, on the Charm v2 stack. ocp-login is
-  an org-internal program, and this repository is public, so it is described
-  here by its design patterns only, never by its files.
+* **The working example is ocp-login**, on the Charm v2 stack. *(Evidence
+  re-worded to patterns by amendment A2.)* ocp-login is an org-internal
+  program, and this repository is public, so it is described here by its
+  design patterns only, never by its files.
   * **Stack.** Charm v2 under `charm.land` (Bubble Tea, Lip Gloss,
     Bubbles), with `colorprofile` and `x/ansi`, and fang for its command
     layer.
@@ -385,6 +386,39 @@ to go-core-lib. The email is not repeated in this record.
   v1.7.0 for parity.
 * **Q4. Local identity.** Recommended: set it to go-core-lib's local
   identity. The alternative is to inherit the global configuration.
+
+## Amendments
+
+### A1 (2026-10-01): pi-go, and the evidence in this repository
+
+* **pi-go is a planned consumer.** Its
+  `docs/decisions/0005-MADR-v1-feature-scope.md` (`proposed`) decides a Charm
+  v2 TUI, "extracting shared widgets into go-tui-lib as they settle". Its
+  `docs/decisions/0004-MADR-go-module-architecture.md` (`proposed`) puts that
+  TUI in `internal/tui` on `charm.land/…/v2`, with fang. pi-go has no Go code
+  yet. It is added to `informed`.
+* **The evidence behind this record** is now kept here:
+  [0001-REPORT-tui-working-example-and-consumers.md](../reports/0001-REPORT-tui-working-example-and-consumers.md).
+  It covers ocp-login's TUI layer, the fleet's TUI programs, and
+  `updatetea` as go-core-lib plans it.
+* **The decision is unchanged.** pi-go plans fang, which §3 leaves to its
+  own record here, and Charm v2, which §3 already names.
+
+### A2 (2026-10-01): ocp-login is described by pattern, not by file
+
+* **The owner's decision**, made while accepting
+  [0002-MADR-multi-pane-workspace-layouts.md](0002-MADR-multi-pane-workspace-layouts.md):
+  * ocp-login is a design reference only, and no code is copied from it;
+  * this repository's documents describe its design patterns only.
+* **Why.** ocp-login's module lives on an org-internal host, and this
+  repository is public.
+* **What changed.** The evidence bullet "The working example is
+  ocp-login" was re-worded before any push. File, package, test and
+  variable names were replaced by the patterns they showed. Each
+  pattern was confirmed against ocp-login's source at commit `a0d1fc4`
+  (0001-PLAN Phase 4).
+* **What did not change.** §6's six conventions, and every other
+  decision, are unchanged. ocp-login's record numbers are still cited.
 
 ## More Information
 
