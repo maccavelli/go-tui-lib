@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-10-02
 decision-makers: owner
 consulted: 0003-REPORT-agent-tui-ecosystem-research.md (opencode, gemini-cli, codex, crush, toad, Textual, VS Code, k9s, lazygit, gh-dash); MCP specification 2025-11-25; Agent Client Protocol; Go 1.27.1 standard library
@@ -132,7 +132,9 @@ Evidence (read-only, 2026-10-02; the research is in
 * **The workspace is not concurrency-safe.** Commands that touch it run on
   the event loop. Slow commands run off it, can be cancelled, and report
   back as messages.
-* **Standard library only.** No new module (AGENTS.md Dependencies).
+* **Standard library only.** The core packages add no module (AGENTS.md
+  Dependencies). The Cobra and fang adapter of §10 is the one exception,
+  and it lands only under its own dependency record.
 * **Extensible without changing the library.** New sources (plugins,
   skills), new surfaces (a Cobra adapter, an MCP server in the host) and
   new metadata fit without breaking callers.
@@ -152,7 +154,8 @@ Chosen option: **"A"**, because:
   slash, help, shell and agent;
 * it speaks MCP, ACP, JSON Schema and VS Code's `when` grammar without
   importing any of their SDKs;
-* it adds no module.
+* its core adds no module. Cobra and fang, which option C would make the
+  registry, are only an adapter over it (§10).
 
 ### 1. Packages and their dependencies
 
@@ -162,6 +165,9 @@ Chosen option: **"A"**, because:
                                               → when, bubbletea, stdlib
  command/cli   run commands as shell subcommands with flags and --json
                                               → command, stdlib flag
+ command/cobra the same commands as a Cobra tree, styled by fang
+                                              → command, cobra, fang
+                                                (after its dependency record)
  when          context-key expressions: parse, check, evaluate → stdlib only
  workspace     gains Commands(w) and WhenContext()  → command, when (new)
 ```
@@ -615,8 +621,18 @@ func Run(ctx context.Context, r *command.Registry, args []string,
   registry. With no subcommand it starts its `tea.Program` and dispatches
   from `Update`. With one, it calls `cli.Run`. Help, flags and JSON output
   come from the same definitions.
-* **Cobra and fang are not used now.** A `command/cobra` adapter is a later
-  record if a consumer asks (owner question Q4).
+* **A Cobra and fang adapter ships too** (owner question Q4).
+  `command/cobra` builds a `cobra.Command` tree from the registry, with the
+  same word paths, flags from the schemas, `--json` and exit codes as
+  `command/cli`, and fang for styled help, man pages, completion and
+  version. The registry stays the source; Cobra is only a front end.
+  * AGENTS.md Dependencies requires a record naming
+    `github.com/spf13/cobra` and `github.com/charmbracelet/fang` before
+    either is required. That dependency record is not written yet, and the
+    adapter waits for it to be accepted.
+  * `command/cli` stays the standard-library path. A program that does not
+    import `command/cobra` never compiles Cobra or fang in.
+  * `depguard` allows the two modules in `command/cobra` only.
 
 ### 11. Versioning and conventions
 
@@ -624,9 +640,10 @@ func Run(ctx context.Context, r *command.Registry, args []string,
   [0005-PLAN-terminal-capabilities-and-services.md](0005-PLAN-terminal-capabilities-and-services.md).
   The owner tags. `v0` allows API change.
 * `command`, `when` and `command/cli` render nothing except CLI help, which
-  is plain ASCII text. CLI help is golden-tested at two widths, and
-  `internal/conformance` covers the new packages: they write only to the
-  writers they are given.
+  is plain ASCII text. `command/cobra`'s help is fang's, and its output
+  goes to the writers Cobra is given. CLI help is golden-tested at two
+  widths, and `internal/conformance` covers the new packages: they write
+  only to the writers they are given.
 
 ### Consequences
 
@@ -651,6 +668,10 @@ func Run(ctx context.Context, r *command.Registry, args []string,
   YAML. A user who writes YAML features gets an error naming the line.
 * Bad, because the `when` parser is new code that parses user input. It is
   fuzzed and limited in size and depth.
+* Bad, because the Cobra and fang adapter puts two modules, and their
+  requirements, in this module's `go.mod` for every consumer, though only
+  importers of `command/cobra` compile them. It also waits on a dependency
+  record.
 
 ### Confirmation
 
@@ -681,6 +702,9 @@ func Run(ctx context.Context, r *command.Registry, args []string,
   names the file and line; a symlink out of the root is refused.
 * `command/cli`: the golden help, flag parsing from schemas, `--json`, exit
   codes, and the `--yes` requirement.
+* `command/cobra`, once its dependency record is accepted: the same requests,
+  outputs and exit codes as `command/cli` for the same arguments, and
+  `depguard` refusing Cobra and fang anywhere else.
 * `workspace.Commands`: each built-in drives a real workspace through
   `Dispatch` and gives the same frame as the method it wraps.
 * Mutation proofs for each package's key invariants, seen failing on a
@@ -726,6 +750,16 @@ func Run(ctx context.Context, r *command.Registry, args []string,
   VS Code's grammar would not carry over.
 
 ## Owner questions
+
+*Answered 2026-10-02* (picked from options): Q1 "Markdown, strict front
+matter"; Q2 "ReadOnly and UI free"; Q3 "workspace.Commands(w)"; Q4 "both 1
+and 2", that is, the standard-library `command/cli` now and a Cobra/fang
+adapter now. Q1, Q2 and Q3 are the recommendation. Q4 is not: the
+recommendation deferred the adapter until a consumer asked. Decision
+Drivers, Decision Outcome, §1, §10, Consequences and Confirmation were
+revised to add `command/cobra`, which lands only after its own dependency
+record for `github.com/spf13/cobra` and `github.com/charmbracelet/fang` is
+accepted.
 
 * **Q1. Command file format.** Recommended: Markdown with this record's
   strict front-matter subset, which needs no module. The alternatives are

@@ -7,6 +7,12 @@ associated-madr: "0004-MADR-integrate-charm-v2-and-go-1-27.md"
 
 Associated MADR: [0004-MADR-integrate-charm-v2-and-go-1-27.md](0004-MADR-integrate-charm-v2-and-go-1-27.md)
 
+**Revision, 2026-10-02.** The owner answered the MADR's Q1–Q4, and the
+MADR is `accepted`. Q2 departs from the recommendation: `Init` asks for the
+background by default, and `WithoutBackgroundQuery()` replaces
+`WithBackgroundQuery()`. Step 1 and Step 5 changed to match. This PLAN is
+still `proposed`, because execution is not yet approved.
+
 ## Goal
 
 Ship the MADR's §§1–7 as `v0.2.0`. That means:
@@ -89,8 +95,9 @@ Added for this PLAN:
 
 ### Step 1: records and the baseline
 
-* The owner accepts the MADR, answering Q1–Q4. Record the answers, set the
-  MADR `accepted` and this PLAN `in-progress`, and update `docs/README.md`.
+* The owner accepted the MADR on 2026-10-02, answering Q1–Q4, and the
+  answers are recorded in it. When execution is approved, set this PLAN
+  `in-progress` and update `docs/README.md`.
 * **Baseline.** On the `v0.1.1` tree, on the macOS development host:
 
   ```bash
@@ -201,7 +208,8 @@ Added for this PLAN:
   `lipgloss.LightDark` and `lipgloss.Complete`.
 * `workspace`: `SetTheme`, `ThemeBuilder`, `WithThemeBuilder`, the follow
   rules for `tea.ColorProfileMsg` and `tea.BackgroundColorMsg`, a fixed
-  theme for `WithTheme`, and `WithBackgroundQuery`.
+  theme for `WithTheme`, the background query in `Init` by default, and
+  `WithoutBackgroundQuery`.
 * **Tests:**
   * a `LightDarkColor` resolves to its light, dark and unknown colours on
     each background, and to the dark colour when the unknown one is nil;
@@ -213,14 +221,16 @@ Added for this PLAN:
     view cached before it is redrawn;
   * a fixed theme ignores both messages, and both messages still reach a
     recording pane;
-  * `Init` contains `tea.RequestBackgroundColor` only with
-    `WithBackgroundQuery`;
+  * `Init` contains `tea.RequestBackgroundColor` by default, and does not
+    with `WithoutBackgroundQuery`;
   * `WithPaletteFor` survives a background change.
 * **Mutations:**
   * the cache key leaves out `themeGen`;
   * the fixed theme follows `BackgroundColorMsg`;
   * `LightDarkColor` swaps light and dark;
-  * a `ProfileColor` is converted again after `Complete`.
+  * a `ProfileColor` is converted again after `Complete`;
+  * `Init` leaves out the background query by default;
+  * `WithoutBackgroundQuery` is ignored.
 
 ### Step 6: help, view and chrome
 

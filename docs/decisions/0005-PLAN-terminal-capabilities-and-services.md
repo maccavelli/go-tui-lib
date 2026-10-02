@@ -7,13 +7,19 @@ associated-madr: "0005-MADR-terminal-capabilities-and-services.md"
 
 Associated MADR: [0005-MADR-terminal-capabilities-and-services.md](0005-MADR-terminal-capabilities-and-services.md)
 
+*Revised 2026-10-02.* The owner answered the MADR's Q1–Q4, and the MADR is
+`accepted`. Q2 departs from the recommendation: mode 2031 is subscribed by
+default, so Steps 3, 4 and 7 changed, and the original opt-in wording is
+struck through where it stood. MADR amendment A1 (proposed) adds Steps A1.1
+to A1.3, which run between Step 6 and Step 7 only once A1 is accepted.
+
 ## Goal
 
 Ship `termcap`, `termcap/termcaptest` and `termsvc`, so that a program
 learns its terminal's capabilities with one probe that ends by DA1 or by
-timeout, sees live light and dark changes when it opts in, and sends
-notifications, clipboard writes, links and prompt marks that suit that
-terminal, over SSH and inside tmux.
+timeout, sees live light and dark changes by default and restores the
+terminal when it quits, and sends notifications, clipboard writes, links
+and prompt marks that suit that terminal, over SSH and inside tmux.
 
 Done means every item under Verification holds, CI is green on the pushed
 tree, and the owner can tag the next minor release after `v0.2.0`.
@@ -39,6 +45,9 @@ tree, and the owner can tag the next minor release after `v0.2.0`.
 | 4 | `termcap/termcaptest/` | scripted fake terminals, and the integration tests that use them |
 | 5 | `termcap/` | `Report` and its goldens |
 | 6 | `termsvc/` | `Notifier`, `Copy`, `Link`, prompt marks, `Wrap` |
+| A1.1 | `termcap/` | `FromEnv` and `Identity`, reasons, kitty flag policy, appearance chain, palette, tmux argv, legacy console (pending A1) |
+| A1.2 | `termcap/`, `termcap/termcaptest/` | DA2, reply caps, `IsReplyFragment`, the JetBrains and editor gates (pending A1) |
+| A1.3 | `termcap/`, `termsvc/` | `Findings`; clipboard status and plans; link display and policy; notification results; title, activity, pointer, progress (pending A1) |
 | 7 | `README.md`, `docs/`, `docs/guides/terminal-capabilities.md` | documentation, release notes, close-out |
 
 No module is added. `go.mod` already requires ultraviolet directly after
@@ -52,7 +61,10 @@ widens from `internal/cells` to `internal/cells` and `internal/termevent`
   They are a later record, which adds `Query` values (MADR §6).
 * Enabling mode 2048 (MADR owner question Q3).
 * Native clipboard or notification back ends. They are hooks a program
-  supplies (MADR Q4).
+  supplies (MADR Q4). Every command A1 adds (`TmuxQuery`,
+  `TmuxLoadBuffer`, `ImageReadCommands`) is returned as an argv, never run.
+* Mode plans, teardown, hand-off and Windows console helpers (the later
+  `termmode` record), and inline scrollback (the later `inline` record).
 * Any change to `workspace`, `theme` or `keymap`. 0004-MADR and
   [0007-MADR-keymap-engine.md](0007-MADR-keymap-engine.md) consume `Caps` in
   their own PLANs.
@@ -84,8 +96,12 @@ widens from `internal/cells` to `internal/cells` and `internal/termevent`
 
 ### Step 1: records and the spike
 
-* The owner accepts the MADR, answering Q1–Q4. Record the answers, set the
-  MADR `accepted` and this PLAN `in-progress`, and update `docs/README.md`.
+* ~~The owner accepts the MADR, answering Q1–Q4. Record the answers, set the
+  MADR `accepted` and this PLAN `in-progress`, and update `docs/README.md`.~~
+  Done 2026-10-02 for the answers and the MADR's status. When Step 2
+  starts, set this PLAN `in-progress` and its `docs/README.md` row to
+  match. If A1 has been answered by then, record those answers in the MADR
+  first.
 * **Spike, on a scratch copy, nothing committed.** Run a real `tea.Program`
   with `tea.WithInput` (a pipe), `tea.WithOutput` (a buffer the script
   reads), `tea.WithEnvironment` and `tea.WithWindowSize`. Record:
@@ -96,7 +112,10 @@ widens from `internal/cells` to `internal/cells` and `internal/termevent`
   * that `uv.DarkColorSchemeEvent`, `uv.PrimaryDeviceAttributesEvent` and
     `uv.UnknownOscEvent` arrive in `Update` as themselves;
   * that `tea.Sequence(tea.Raw(seq), tea.Quit)` writes `seq` before the
-    program exits.
+    program exits;
+  * for A1: how the DA2 reply arrives (a tea or ultraviolet type, or an
+    unknown CSI), and whether a reply split across reads, or arriving after
+    the timeout, ever reaches `Update` as key messages.
 
   A finding that contradicts the MADR's evidence stops the PLAN for an
   amendment.
@@ -133,9 +152,10 @@ widens from `internal/cells` to `internal/cells` and `internal/termevent`
 
 ### Step 3: `termcap` probe
 
-* `Prober`, `New`, `Init`, `Update`, `Caps`, `Restore`, `Query` and the
-  options of MADR §3: `WithTimeout`, `WithQuery`, `WithoutHeuristic`,
-  `WithOverride`, `WithColorSchemeUpdates`, `WithoutBackgroundRequest` and
+* `Prober`, `New`, `Init`, `Update`, `Caps`, `Restore`, `Quit`, `Query`
+  and the options of MADR §3: `WithTimeout`, `WithQuery`,
+  `WithoutHeuristic`, `WithOverride`, ~~`WithColorSchemeUpdates`~~
+  `WithoutColorSchemeUpdates` (MADR Q2), `WithoutBackgroundRequest` and
   `WithDisabled`.
 * The batch order of MADR §3: the Kitty keyboard request, the DECRQM set
   and DSR 996, the gated queries (wrapped for tmux where the MADR says),
@@ -164,8 +184,14 @@ widens from `internal/cells` to `internal/cells` and `internal/termevent`
     `GraphemeWidth`; with no report, they stay `NotQueried`;
   * DSR 997 after the probe yields `ColorSchemeMsg` and a background
     request;
-  * `WithColorSchemeUpdates` sets 2031 only when it is `Supported`, and
-    `Restore()` then returns its reset; otherwise `Restore()` is empty;
+  * ~~`WithColorSchemeUpdates` sets 2031 only when it is `Supported`, and
+    `Restore()` then returns its reset; otherwise `Restore()` is empty;~~
+    by default the prober sets 2031 only when it is `Supported`, and
+    `Restore()` then returns its reset; with `WithoutColorSchemeUpdates`,
+    or when 2031 is not `Supported`, it sets nothing and `Restore()` is
+    empty;
+  * `Quit()` yields `Restore()`'s bytes before `tea.Quit`, and is safe when
+    `Restore()` is empty;
   * `WithDisabled` makes `Init` return nil;
   * an added `Query` is sent before DA1 and parses its reply;
   * an override beats a query.
@@ -177,6 +203,8 @@ widens from `internal/cells` to `internal/cells` and `internal/termevent`
   * a query with no reply stays `Unknown` after the sentinel;
   * `CapsMsg` is sent twice;
   * `Restore` omits `ResetModeLightDark`;
+  * the default does not subscribe to 2031;
+  * `Quit()` orders `tea.Quit` before the restore;
   * the tmux wrap is skipped;
   * the source test skips `os.LookupEnv`.
 
@@ -198,10 +226,16 @@ widens from `internal/cells` to `internal/cells` and `internal/termevent`
     durably blocked, so the timeout logic itself is proven in Step 3 under
     `synctest` and only the wiring is proven here;
   * the program's output contains no DECRQM 2026 or 2027 beyond tea's own;
-  * a DSR 997 written mid-run reaches the model as `ColorSchemeMsg`.
+  * a DSR 997 written mid-run reaches the model as `ColorSchemeMsg`;
+  * for the Kitty-like profile, which supports 2031, the fake terminal
+    sees `SetModeLightDark` after the probe and `ResetModeLightDark` before
+    the program exits through `Quit()`; with `WithoutColorSchemeUpdates`
+    it sees neither.
 * **Mutations:**
   * the fake terminal answers out of order (the sentinel test must fail);
-  * the tmux profile forwards queries without passthrough.
+  * the tmux profile forwards queries without passthrough;
+  * the test program quits with `tea.Quit` instead of `Quit()` (the
+    reset-before-exit test must fail).
 
 ### Step 5: `Report`
 
@@ -240,12 +274,121 @@ widens from `internal/cells` to `internal/cells` and `internal/termevent`
   * `Link` accepts any scheme;
   * the tmux wrap is skipped for notifications.
 
+### Steps A1.1 to A1.3: amendment A1
+
+**Pending A1's acceptance.** These steps run after Step 6 and before
+Step 7, only once the owner accepts MADR amendment A1 and answers its
+Q5–Q7. If A1 is still proposed when Step 6 is done, Step 7 closes this
+PLAN without them, and A1 gets a plan of its own under this number. Each
+step follows the rules above, mutation proofs included.
+
+#### Step A1.1: identity and new facts
+
+* `Brand`, `Editor`, `Identity` and `FromEnv(env, goos)`, with the
+  detection order of MADR A1, and `Brand` refined from `EnvBrand` on
+  Windows.
+* `Fact[T].Reason`, the reason tokens as exported constants, and
+  `Keyboard()`, `Links()` and `Notifications()`.
+* `KeyboardFlags(c Caps) KittyFlags` and `ReleasesReported()`.
+* The appearance chain: `WithAppearanceEnv(name)` (and `LC_` + name), the
+  desktop hook, and `COLORFGBG`.
+* `Foreground`, `Palette` and `PaletteKnown`, parsed from `Reply.Raw`, with
+  the OSC 4 and OSC 10 queries placed as Q5 decides.
+* `TmuxQuery`, `ParseTmux`, `TmuxFacts` and `Prober.SetTmux`.
+* `LegacyConsole` and `WithConsoleHost`.
+* **Tests:**
+  * a table of environments, one row per brand in the detection order,
+    including the traps: JetBrains with `TERM_SESSION_ID` set, tmux with
+    a stale `TERM_PROGRAM`, an editor fork over SSH, and Windows with no
+    terminal variables;
+  * `EnvBrand` stays unknown where `Brand` is refined;
+  * `KeyboardFlags` for each terminal the MADR names, and for tmux with
+    and without `csi-u`;
+  * the appearance chain's order, each source with its `Origin`;
+    `COLORFGBG` values `0;15`, `15;0`, `default;default` and malformed;
+  * `ParseTmux` on real-shaped output, on empty output and on output with
+    a missing field;
+  * every reason token appears in a `const` block and is unique.
+* **Mutations:**
+  * `TERMINAL_EMULATOR` is read after `TERM_SESSION_ID`;
+  * Ghostty is given event types;
+  * `LC_` + name is not read;
+  * `COLORFGBG` `default` is read as dark;
+  * two reason constants share a string.
+
+#### Step A1.2: probe discipline
+
+* DA2 in the safe set, before DA1, and `SecondaryAttributes`; the Apple
+  Terminal fingerprint from DA1 and DA2.
+* The 1 KiB reply cap and its reason.
+* `IsReplyFragment(msg)`, from the spike's finding on split replies.
+* The JetBrains gate as Q7 decides, and the editor-terminal gate on the
+  gated set.
+* **Tests:**
+  * the batch's exact bytes now include DA2 before DA1;
+  * DA1 `1;2` with DA2 `1;95;0` yields the Apple Terminal brand, and
+    either alone does not;
+  * a 1025-byte reply is not parsed and carries the reason;
+  * under JetBrains the batch matches Q7's answer, and every fact carries
+    the JetBrains reason;
+  * inside `NVIM` the gated queries are absent;
+  * `IsReplyFragment` is true for each reply prefix the spike observed,
+    and false for an ordinary `alt+[`.
+* **`termcaptest`:** an Apple-Terminal-over-SSH profile and a profile that
+  paints queries as text, which the JetBrains gate must leave untouched.
+* **Mutations:**
+  * DA2 is sent after DA1;
+  * the reply cap is off by one;
+  * the JetBrains gate is skipped (the painting profile must show query
+    bytes on its screen).
+
+#### Step A1.3: doctor findings and services
+
+* `Finding`, `Disposition` and `Findings(c Caps)`; `Report` prints them;
+  the JSON form gains `schema_version`.
+* `CopiedMsg`, `Status`, `Route`, `CopyPlan`, `TmuxLoadBuffer`,
+  `ImageReadCommands`, and the 100 KB cap.
+* `LinkDisplay`, `Display`, `LinkPolicy`, `Openable` and `OpenURLMsg`.
+* `NotifyResultMsg`, `SkipReason`, the brand table for `Auto`, the text
+  cleaning, `WithGate`, and the `UnlessFocused` policy if Q6 adds it.
+* `SanitizeTitle`, `Activity`, `ParseActivity`, `ActivityBeacon`,
+  `Pointer` and `ProgressSupported`.
+* **Tests:**
+  * every reason token that can appear in `Caps` has a finding, checked
+    by walking the constants;
+  * report goldens gain the findings, at 80 and 120 columns;
+  * an OSC 52 copy is `Unconfirmed`; a backend's success is `Confirmed`;
+    a 100 KB + 1 payload is `Failed` and sends nothing;
+  * `ImageReadCommands` for each `goos`, with and without Wayland;
+  * `LinkDisplay` for each terminal the MADR names, and under tmux 3.3
+    and 3.4;
+  * `Openable` refuses `javascript:`, `file:` and a URL with control
+    bytes;
+  * `Auto` picks each protocol by brand when OSC 99 is `Unsupported`;
+  * with focus unknown, `WhenUnfocused` reports `focus-unknown`;
+  * a title with ESC, U+202E and 300 characters comes out clean and 240
+    long; a notification body is cut by cells, not bytes, on a CJK string;
+  * `ParseActivity` rejects a version 2 payload, a timestamp 6 s ahead and
+    one 15 s old, and accepts one 4 s old;
+  * `Pointer` is empty under tmux.
+* **Mutations:**
+  * `Copy` reports a terminal route `Confirmed`;
+  * the title keeps U+202E;
+  * the body is cut by bytes;
+  * `ParseActivity` skips the version check;
+  * `Openable` accepts `file:`.
+
 ### Step 7: documentation and close-out
 
 * **`docs/guides/terminal-capabilities.md`:**
   * embedding a `Prober` beside a workspace;
   * reading `CapsMsg` and `ColorSchemeMsg`;
-  * `Restore()` before quitting, and why;
+  * ~~`Restore()` before quitting, and why;~~ quitting through `Quit()`,
+    or sending `Restore()` first, which every program must do because 2031
+    is on by default (MADR Q2), and `WithoutColorSchemeUpdates` for
+    programs that cannot;
+  * if A1 landed: reason tokens, `FromEnv` in tests, running the returned
+    tmux and clipboard commands, and clipboard delivery status;
   * not probing without input;
   * notifications and focus reports;
   * clipboard and links inside tmux;
@@ -259,7 +402,11 @@ widens from `internal/cells` to `internal/cells` and `internal/termevent`
 
 ## Verification
 
-* Every step's mutations are killed.
+* Every step's mutations are killed, A1's included when it landed.
+* No example program, guide snippet or `termcaptest` program quits a
+  `Prober` without `Quit()` or `Restore()`; the Step 4 reset-before-exit
+  test is seen failing on a scratch copy whose test program uses
+  `tea.Quit`.
 * On the macOS development host and the Windows test host, all pass:
   * `make pre-add-check`, `make lint` and `make vuln`;
   * `go test -race -count=1 ./...`, `go test -shuffle=on -count=2 ./...`
@@ -272,7 +419,10 @@ widens from `internal/cells` to `internal/cells` and `internal/termevent`
   two real terminals on different operating systems, once inside tmux and
   once over SSH. Its output is recorded in the execution record, with the
   terminals named by product only. It shows whether tmux delivers
-  passthrough replies (an open MADR item).
+  passthrough replies (an open MADR item), and that the shell receives no
+  DSR 997 report after the example quits on a terminal with 2031. If A1
+  landed, it also records the brand, the reasons and the findings, and a
+  JetBrains terminal if one is available (MADR Q7).
 * The identifier scan of 0001-PLAN V7 finds nothing. Nothing is copied from
   crush or any other project (MADR evidence).
 * After the owner's push, CI is green on all three operating systems.

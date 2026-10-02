@@ -84,6 +84,11 @@ The owner accepts amendment A1 and answers Q5 and Q6. Record the answers
 in A1, set it `accepted`, set this PLAN `in-progress`, and update
 `docs/README.md`.
 
+*2026-10-02:* the owner answered Q5 (`alt+.` and `alt+,`) and Q6
+(`v0.1.1`) before approving execution. The answers are recorded, A1 is
+`accepted`, and `docs/README.md` says so. This PLAN stays `proposed`; the
+rest of this step, setting it `in-progress`, waits for that approval.
+
 ### Step 2: `tuitest`
 
 * **The flag.**
@@ -234,8 +239,8 @@ in A1, set it `accepted`, set this PLAN `in-progress`, and update
 
 ### Step 6: keys, resize and tidying
 
-* **Keys.** `FocusNext` and `FocusPrev` take the defaults Q5 chooses
-  (recommended `alt+.` and `alt+,`). `DefaultKeyMap`'s doc names the legacy
+* **Keys.** `FocusNext` and `FocusPrev` take the defaults Q5 chose:
+  `alt+.` and `alt+,`. `DefaultKeyMap`'s doc names the legacy
   sequence introducers that a default must avoid: `[`, `]`, `O`, `P`, `_`,
   `^`, `X` and `\`.
 * **Resize:**

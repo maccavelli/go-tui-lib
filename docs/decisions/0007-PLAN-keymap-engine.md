@@ -7,6 +7,16 @@ associated-madr: "0007-MADR-keymap-engine.md"
 
 Associated MADR: [0007-MADR-keymap-engine.md](0007-MADR-keymap-engine.md)
 
+*Revised 2026-10-02.*
+
+* The owner answered the MADR's Q1–Q5, and the MADR is `accepted`. Q4
+  departs from the recommendation: `workspace.KeyMap` is removed now, not
+  deprecated. Steps 1, 7 and 8, Out of scope, and Rollback are revised to
+  match.
+* Steps 9–11 are added for MADR amendment A1. They are pending that
+  amendment's acceptance and its Q6 and Q7.
+* This PLAN stays `proposed` until the owner approves execution.
+
 ## Goal
 
 Ship `keymap`, and move `workspace`'s own bindings onto it, so that:
@@ -17,7 +27,10 @@ Ship `keymap`, and move `workspace`'s own bindings onto it, so that:
 * users can edit a VS Code-format `keybindings.json`, checked by an
   emitted JSON Schema;
 * bubbles components and `help` still get `key.Binding` and
-  `help.KeyMap`.
+  `help.KeyMap`;
+* once amendment A1 is accepted: which-key data, defaults chosen by
+  terminal fact, legacy-key normalisation, labels per operating system,
+  live hints, and a key-debug explanation.
 
 Done means every item under Verification holds, CI is green on the pushed
 tree, and the owner can tag the release.
@@ -34,12 +47,21 @@ tree, and the owner can tag the release.
 | 4 | `keymap/matcher.go` and tests | chords, leader, timeouts, replay, release events |
 | 5 | `keymap/vscode.go`, `keymap/jsonc.go`, `keymap/schema.go` and tests | loader, exporter, JSON Schema |
 | 6 | `keymap/help.go` and tests | `Binding`, `Help`, `Describer` |
-| 7 | `workspace/keys.go`, `workspace/workspace.go`, `workspace/*_test.go` | command IDs, `DefaultRules`, `WithBindings`, `KeyPath`, `KeyContexter`, deprecations |
+| 7 | `workspace/keys.go`, `workspace/workspace.go`, `workspace/*_test.go` | command IDs, `DefaultRules`, `WithBindings`, `KeyPath`, `KeyContexter`, removal of `KeyMap`, `DefaultKeyMap` and `WithKeyMap` |
 | 8 | `docs/guides/`, `docs/architecture.md`, `docs/README.md`, `README.md` | documentation, release notes, close-out |
+| 9 (A1) | `keymap/normalize.go`, `keymap/label.go`, `keymap/alias.go` and tests | `Normalize`, `Label`, `ParseAliases`, `DisplayAliases`, `CopyStrokes` |
+| 10 (A1) | `keymap/keymap.go`, `keymap/facts.go`, `workspace/workspace.go` and tests | `KeyFacts`, `Alternative`, `Default.Alternatives`, release degrade, `Reachable`, `Shortcut`, `PushMode` |
+| 11 (A1) | `keymap/matcher.go`, `keymap/explain.go` and tests | `ActiveKeys`, pending-sequence editing, `Explain` |
 
 `go.mod` and `go.sum` gain nothing. `keymap` uses the standard library,
 `bubbletea`, `bubbles/key`, `bubbles/help`, and this repository's `command`
-and `when` packages.
+and `when` packages. Once A1 is accepted it also uses this repository's
+`glyph`, and, if Q7 is answered as recommended, `termcap`'s fact types.
+
+**When Steps 9–11 run.** If A1 is accepted before Step 7 starts, they run
+after Step 6 and before Step 7, so the workspace moves onto the finished
+engine. Otherwise they run after Step 8, in a later minor release, with
+their own close-out.
 
 ### Out of scope
 
@@ -47,9 +69,15 @@ and `when` packages.
   [0006-PLAN-command-registry.md](0006-PLAN-command-registry.md).
 * Where the user's file lives. An XDG config loader is a later record.
 * A vim keymap layer for an editor pane. The `mode:` contexts allow one,
-  and it is its own record.
-* Removing the deprecated `workspace.KeyMap`, which is a later record
-  (MADR Q4).
+  and its engine belongs to the composer record (MADR amendment A1,
+  "Placed elsewhere").
+* ~~Removing the deprecated `workspace.KeyMap`, which is a later record
+  (MADR Q4).~~ *2026-10-02:* the owner answered Q4 "remove now", so the
+  removal is in Step 7.
+* A which-key panel, and the `keys debug` view. Steps 10 and 11 give their
+  data, and the components are later records.
+* The macOS dropped-modifier probe, which needs cgo or `purego` (MADR
+  amendment A1).
 * Any change in pi-go.
 * `git push` and tags, which the owner does.
 
@@ -64,6 +92,11 @@ and `when` packages.
   `Registry.Lookup` exist.
   If 0006's final names differ from those in the MADR, this PLAN is
   amended to match before Step 2 starts.
+* For Step 10 only:
+  [0005-PLAN-terminal-capabilities-and-services.md](0005-PLAN-terminal-capabilities-and-services.md)
+  is complete, so the facts behind `KeyFacts` exist. This includes the
+  record of Kitty flags actually pushed. If 0005's final names differ,
+  this PLAN is amended before Step 10.
 
 ## Rules for every step
 
@@ -90,10 +123,19 @@ and `when` packages.
 
 ### Step 1: records
 
-The owner accepts the MADR, answering Q1–Q5. Record the answers, set the
+~~The owner accepts the MADR, answering Q1–Q5. Record the answers, set the
 MADR `accepted` and this PLAN `in-progress`, and add the rows to
 `docs/README.md`. If an answer differs from the recommendation, amend the
-MADR and this PLAN before Step 2.
+MADR and this PLAN before Step 2.~~
+
+*2026-10-02: partly done.* The answers are recorded, and the MADR is
+`accepted`. Q4 differed from the recommendation, and the MADR and this PLAN
+are amended to match. Still to do:
+
+* set this PLAN `in-progress` when the owner approves execution;
+* record the answers to A1's Q6 and Q7, and set A1 `accepted` or rejected.
+  If either answer differs from its recommendation, amend Steps 9–11 before
+  they start.
 
 ### Step 2: notation
 
@@ -224,17 +266,26 @@ MADR and this PLAN before Step 2.
 ### Step 7: move `workspace` onto the engine
 
 * The command IDs, `DefaultRules`, `WithBindings`, `KeyPath` and
-  `KeyContexter`, as MADR §9 gives them. `KeyMap`, `DefaultKeyMap` and
-  `WithKeyMap` are marked `// Deprecated:` and converted into rules for the
-  `workspace` context.
+  `KeyContexter`, as MADR §9 gives them.
+* `DefaultRules` holds MADR §9's table: `alt+.`, `alt+,`, `alt+1`–`alt+9`,
+  `alt+z`, `alt+shift+` arrows and `esc` in `overlay`. These are
+  0002-PLAN-harden-workspace-v0-1-1.md's keys.
+* ~~`KeyMap`, `DefaultKeyMap` and `WithKeyMap` are marked `// Deprecated:`
+  and converted into rules for the `workspace` context.~~ *2026-10-02 (Q4):*
+  `KeyMap`, `DefaultKeyMap` and `WithKeyMap` are deleted, with every use
+  inside the repository.
 * `Workspace.key` asks a `keymap.Matcher` with `KeyPath()`. It keeps the
   `EscConsumer` check, and sends unmatched keys and `Replay` strokes to the
   focused pane or the top modal overlay.
 * The workspace's `help.KeyMap` delegates to `keymap.Help`.
 * **Tests:**
-  * every existing workspace test passes unchanged, with no option and with
-    the deprecated `WithKeyMap`;
-  * the same behaviour through `WithBindings` with `DefaultRules`;
+  * every existing workspace test that sets no key option passes unchanged;
+  * tests that built a `KeyMap` are rewritten as rules, and the same
+    behaviour holds through `WithBindings` with `DefaultRules`;
+  * a golden table of `DefaultRules` (command, keys, context) pins MADR §9's
+    defaults;
+  * `go doc ./workspace` output, checked by a test, names no `KeyMap`,
+    `DefaultKeyMap` or `WithKeyMap`;
   * a user rule rebinds `workspace.zoom`, and a `-workspace.zoom` rule
     removes it;
   * `KeyPath` for a focused pane, a `KeyContexter` pane, a non-modal
@@ -246,7 +297,10 @@ MADR and this PLAN before Step 2.
 * **Mutations:**
   * `KeyPath` keeps the layout contexts under a modal overlay;
   * `Replay` strokes are dropped;
-  * `WithKeyMap` ignores the struct.
+  * ~~`WithKeyMap` ignores the struct;~~ *(removed with `WithKeyMap`)*
+  * a default is set back to `alt+]`, which the golden table must catch;
+  * an exported `KeyMap` type is left in place, which the `go doc` test must
+    catch.
 
 ### Step 8: documentation and close-out
 
@@ -263,9 +317,96 @@ MADR and this PLAN before Step 2.
   * `docs/architecture.md`, with `keymap` and its imports;
   * `docs/README.md` rows;
   * the README Status.
-* **Release notes** in the execution record, naming the deprecations.
+* **Release notes** in the execution record, under a breaking-changes
+  heading, as MADR §10 lists them:
+  * the removal of `KeyMap`, `DefaultKeyMap` and `WithKeyMap`;
+  * their replacements;
+  * the field-to-command mapping;
+  * one rebinding written as a rule.
+* The guide's "moving from `workspace.KeyMap`" section gives the same
+  mapping, as a migration for programs that called `WithKeyMap`.
 * **Verification** as below. Mark `complete` after CI is green on the pushed
   tree. The owner tags.
+
+### Step 9 (A1, pending): normalisation, labels and aliases
+
+* `Normalize`, `Stroke.Label`, `Sequence.Label`, `ParseAliases`,
+  `DisplayAliases`, `CopyStrokes` and `Options.GOOS`, as MADR amendment A1
+  gives them. `Matcher.Update` normalises before matching.
+* **Tests:**
+  * **normalisation:** a table of legacy messages, each built as
+    ultraviolet decodes it, with the decoder lines cited in the test:
+    * C0 bytes with no modifier, where ESC, TAB, CR and BS keep their names;
+    * upper-case letters with `ctrl` and no `shift`;
+    * `ctrl+5` and `ctrl+4`;
+    * BS and DEL with modifiers;
+    * Windows AltGr as `ctrl+alt` with printable `Text`;
+    * `super` with stray `meta` and `hyper`;
+  * no rule changes once `Disambiguate` is in the features, except AltGr and
+    `super`;
+  * **labels:** golden files for every modifier and arrow, on `darwin`,
+    `linux` and `windows`, each in UTF-8 and ASCII; `<leader>` shows the
+    leader's label;
+  * **aliases:** every `ParseAliases` entry parses to its canonical stroke;
+    `DisplayAliases` never appears in `Stroke.String()`.
+* **Mutations:**
+  * ESC is mapped to `ctrl+[`;
+  * normalisation runs with `Disambiguate` set;
+  * AltGr text is matched as a binding;
+  * `Label` ignores the glyph table's ASCII twin.
+
+### Step 10 (A1, pending): terminal facts, alternatives, reachability and hints
+
+* `KeyFacts`, `Alternative`, `Default.Alternatives`, `Options.Facts`,
+  `Rebuild` with facts, the release rule, `Keymap.Reachable`,
+  `Keymap.Shortcut` and `workspace.PushMode`. `FactsFrom(termcap.Caps)`
+  is added if Q7 is answered as recommended.
+* `Default.Alternatives` replaces Step 3's `Default.Needs` and
+  `Default.Fallback`. Step 3's feature test is rewritten over
+  `Alternatives`, as a one-alternative case.
+* **Tests:**
+  * **alternatives:** a newline default whose preferred key is
+    `shift+enter`, with alternatives `alt+enter` (needs `AltEnter`) and
+    `ctrl+j`. It binds each of the three under a fact set planted from the
+    terminals in 0003-REPORT §9 (VTE before 8200, Apple Terminal, tmux
+    before 3.3, a VS Code-family host);
+  * a default with no alternative whose needs hold is not bound, and
+    `Build` reports nothing;
+  * **release:** a `Release` default binds its alternative without the
+    `Releases` fact; a user `Release` rule without it is `Unsupported`;
+  * `Rebuild` with new facts changes the binding, and help follows;
+  * **reachability:** `Reachable` excludes commands bound only in contexts
+    off the path, or behind a `when` that fails;
+  * **hints:** `Shortcut` is the primary label, and `""` after a `-` rule
+    removes the command's last binding;
+  * **modes:** `PushMode` adds the context at the end of `KeyPath`, and
+    `pop` removes it; a second `pop` does nothing.
+* **Mutations:**
+  * alternatives are tried last first;
+  * a fact named in `Facts` is ignored;
+  * `Shortcut` returns the canonical string for an unbound command;
+  * `pop` removes the wrong mode when two are pushed.
+
+### Step 11 (A1, pending): which-key data and the key-debug explanation
+
+* `Matcher.ActiveKeys`, `Options.EscClearsPending`,
+  `Options.BackspacePops` (defaults per Q6) and `Matcher.Explain`, with
+  `ActiveKey` and `Explanation`.
+* **Tests:**
+  * after a prefix, `ActiveKeys` lists every completing and continuing
+    stroke on the path, with labels; with nothing pending it lists the
+    path's first strokes;
+  * while pending, `esc` clears the sequence and is not replayed;
+    `backspace` removes one stroke and leaves the rest pending; with both
+    options off, they end the sequence as MADR §6 says;
+  * `Explain` reports the raw and normalised key, the winning rule first,
+    and the shadowed rules, for a planted keymap with a shadow;
+  * neither method changes the matcher's state, which a test checks by
+    comparing `Pending()` before and after.
+* **Mutations:**
+  * `backspace` clears the whole sequence;
+  * `ActiveKeys` omits continuing strokes;
+  * `Explain` lists the shadowed rule as the winner.
 
 ## Verification
 
@@ -279,18 +420,28 @@ MADR and this PLAN before Step 2.
 * `keymap` starts no goroutine and reads no clock outside `Options.Tick`.
   A test runs the matcher inside `testing/synctest` to show it.
 * `internal/conformance` passes for `keymap`.
-* No default binding in `keymap` or `workspace` is `ctrl+c`.
+* No default binding in `keymap` or `workspace` is `ctrl+c`, and
+  `CopyStrokes` is never bound by `keymap` itself.
+* `go doc ./workspace` lists no `KeyMap`, `DefaultKeyMap` or `WithKeyMap`.
+* For Steps 9–11, once A1 is accepted:
+  * labels pass the 0001-MADR §6 matrix in UTF-8 and ASCII;
+  * `keymap` needs no cgo, which `CGO_ENABLED=0` builds for all three
+    operating systems show;
+  * `keymap` imports only what the Scope section lists.
 * The identifier scan of 0001-PLAN V7 finds nothing.
 * After the owner's push, CI is green on all three operating systems.
 
 ## Rollout and Rollback
 
-* **Rollout.** The owner pushes Steps 1–8 and tags the minor release after
-  0006's. pi-go moves its own bindings onto `keymap` under its own
-  records.
+* **Rollout.** The owner pushes Steps 1–8, with Steps 9–11 when A1 runs
+  before Step 7, and tags the minor release after 0006's. pi-go moves its
+  own bindings onto `keymap` under its own records.
 * **Rollback.** Before the push, each step is one local commit. After it, a
-  patch release fixes forward. A program that never calls `WithBindings`
-  keeps 0002's behaviour, because the deprecated `KeyMap` path stays.
+  patch release fixes forward.
+  * A program that never called `WithKeyMap` keeps 0002's keys, because
+    `DefaultRules` carries them.
+  * A program that called `WithKeyMap` must move to rules, or pin the
+    previous minor release. `KeyMap` is not restored in a patch release.
 
 ## Execution Record
 

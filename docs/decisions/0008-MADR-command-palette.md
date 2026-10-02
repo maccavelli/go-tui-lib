@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-10-02
 decision-makers: owner
 consulted: 0003-REPORT-agent-tui-ecosystem-research.md (§3, §4, §7); Textual's command palette; crush, toad and codex sources; fzf's and sahilm/fuzzy's scoring; Charm v2 APIs (bubbles v2.2.1, lipgloss v2.0.6, x/ansi v0.11.8)
@@ -517,6 +517,10 @@ type Scope struct{ When string } // a 0006 `when` expression; "" is global
 * Bad, because adding async later changes the provider contract.
 
 ## Owner questions
+
+*Answered 2026-10-02* (picked from options): Q1 "Yes, simple schema
+subset"; Q2 "Opt-in Extended()"; Q3 "ctrl+p"; Q4 "Not here; PathFilter".
+Every answer is the recommendation, so the decision text is unchanged.
 
 * **Q1. Argument prompts in this record.** Recommended: yes, for the
   simple schema subset in §6. It makes commands with arguments runnable

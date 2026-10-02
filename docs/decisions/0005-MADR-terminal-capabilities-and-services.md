@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-10-02
 decision-makers: owner
 consulted: 0003-REPORT-agent-tui-ecosystem-research.md; Charm v2 sources (bubbletea v2.0.10, ultraviolet at the commit go.sum pins, x/ansi v0.11.8); crush's capability layer as a design reference
@@ -310,9 +310,13 @@ type Reply struct {
     Raw string // an unknown CSI, OSC, DCS or APC reply; "" otherwise
 }
 
+// Quit restores every mode the prober set, then quits:
+// tea.Sequence(tea.Raw(p.Restore()), tea.Quit).
+func (p *Prober) Quit() tea.Cmd
+
 // Options: WithTimeout(d) (default 2 s), WithQuery(Query),
 // WithoutHeuristic(), WithOverride(func(*Caps)),
-// WithColorSchemeUpdates() (subscribe to 2031 when supported),
+// WithoutColorSchemeUpdates() (never subscribe to 2031),
 // WithoutBackgroundRequest(), WithDisabled().
 ```
 
@@ -352,12 +356,20 @@ type Reply struct {
     `tea.RequestBackgroundColor`, so a workspace following the theme gets
     the exact colour;
   * `ColorProfileMsg` updates `Profile`.
-* **Live light and dark.** `WithColorSchemeUpdates` writes
-  `SetModeLightDark` once 2031 is `Supported`. `Restore()` then returns
-  `ResetModeLightDark`. Tea does not know about this mode. The program sends
-  `tea.Sequence(tea.Raw(p.Restore()), tea.Quit)` to quit, or writes
-  `Restore()` itself after `Run` returns. Without the reset, the shell would
-  receive DSR 997 reports after the program exits.
+* **Live light and dark, on by default** (owner question Q2). The prober
+  writes `SetModeLightDark` once 2031 is `Supported`.
+  `WithoutColorSchemeUpdates` declines it. `Restore()` then returns
+  `ResetModeLightDark`. Tea does not know about this mode.
+  * **Every program that embeds a `Prober` must restore before it exits.**
+    It quits with `p.Quit()`, or sends
+    `tea.Sequence(tea.Raw(p.Restore()), tea.Quit)` itself, or writes
+    `Restore()` after `Run` returns. Without the reset, the shell receives
+    DSR 997 reports after the program exits.
+  * `Restore()` is empty when 2031 was never set, so calling it is always
+    safe.
+  * The restore bytes of the planned `termmode` record (0003-REPORT §8.4,
+    §11.2) will include `ResetModeLightDark`, so a program that uses them
+    on a crash path is also covered.
 * **In-band resize (2048)** is detected and reported, not enabled. Tea
   resizes from SIGWINCH, and enabling 2048 would need the same reset
   discipline for a gain this record does not need (owner question Q3).
@@ -457,8 +469,11 @@ here.
   fields, without an incompatible change.
 * Good, because notifications, clipboard and links carry the sanitising
   and passthrough rules that each agent TUI otherwise rewrites.
-* Neutral, because live light and dark needs the program to send
-  `Restore()`. The guide and the package documentation carry that rule.
+* Bad, because live light and dark is on by default, so every program that
+  embeds a `Prober` must send `Restore()` before it exits, and one that
+  forgets leaves DSR 997 reports to the shell. `Quit()`, the guide, the
+  package documentation and the fake-terminal test that checks the reset
+  is written before exit all carry that rule.
 * Bad, because the heuristic gate is a list that ages. It is one function,
   overridable with `WithoutHeuristic`, and every gated fact is reported as
   `NotQueried` rather than `Unsupported`.
@@ -488,13 +503,17 @@ here.
   * `CapsMsg` is delivered exactly once;
   * DSR 997 after the probe yields `ColorSchemeMsg` and a background
     request;
+  * by default 2031 is set when `Supported` and not otherwise;
+    `WithoutColorSchemeUpdates` never sets it;
+  * `Quit()` writes `Restore()` before `tea.Quit`;
   * an override beats a query.
 * **Fake-terminal tests** (`termcaptest`) run a real `tea.Program` with
   `WithInput`, `WithOutput` and `WithEnvironment`. A scripted terminal
   reads the program's output and answers in bytes, as each profile would:
   a Kitty-like terminal, an xterm-like one, tmux with and without
   passthrough, a terminal that answers only DA1, and one that answers
-  nothing.
+  nothing. For a profile that supports 2031, the fake terminal sees
+  `ResetModeLightDark` before the program exits through `Quit()`.
 * **Golden output** of `Report` for each profile. The report is ASCII
   text with no colour, so the matrix reduces to its widths.
 * **termsvc:** byte-exact sequences for each protocol; passthrough
@@ -508,6 +527,8 @@ here.
   * a missing reply stays `Unknown` after the sentinel;
   * `CapsMsg` is sent twice;
   * `Restore` omits `ResetModeLightDark`;
+  * the default does not subscribe to 2031;
+  * `Quit()` sends `tea.Quit` before the restore;
   * notifications ignore focus;
   * the control-byte strip is skipped.
 * **Conformance:** `internal/conformance` (as hardened by
@@ -552,6 +573,16 @@ here.
 
 ## Owner questions
 
+*Answered 2026-10-02* (picked from options): Q1 "Gated"; Q2 "On by
+default"; Q3 "Detect and report only". Q4 was answered by the second-pass
+question "May the library spawn processes?" with "Return commands only":
+the library returns an argv or a hook, and the program runs it. Q1, Q3
+and Q4 are the recommendation. **Q2 departs from it.** §3 ("Live light and
+dark", the options and `Quit`), Consequences and Confirmation changed to
+match, and
+[0005-PLAN-terminal-capabilities-and-services.md](0005-PLAN-terminal-capabilities-and-services.md)
+Steps 3, 4 and 7 with them.
+
 * **Q1. Gated queries.** Should XTVERSION, OSC 99 and the Kitty graphics
   query be sent only behind the environment heuristic? Recommended: yes,
   as crush and tea do. `WithoutHeuristic` sends them always. The safe
@@ -569,11 +600,231 @@ here.
   notifications are hooks the program supplies. Over SSH a native call
   would act on the remote host.
 
+## Amendments
+
+### A1 (2026-10-02): second-pass findings
+
+*Status: proposed.* Its steps are A1.1 to A1.3 in
+[0005-PLAN-terminal-capabilities-and-services.md](0005-PLAN-terminal-capabilities-and-services.md).
+
+**Found.** A source-level pass over the Kilo, Grok Build, opencode and codex
+TUIs
+([0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md)
+§8) found detection and service rules this record does not yet have. §11.1
+of the report lists them against this record. Three owner answers given
+with that pass bound what this record takes:
+
+* the library returns commands and never starts a process (the same
+  answer as Q4);
+* terminal mode plans, teardown, hand-off and the Windows console mode
+  helpers belong to a later `termmode` record, and inline scrollback to a
+  later `inline` record;
+* a direct `golang.org/x/sys` import may be proposed, in its own
+  dependency record.
+
+**What changes in the decision.**
+
+* **§2, identity is a pure function of the environment** (report §8.2).
+  * `termcap.FromEnv(env Env, goos string) Identity` builds the identity
+    the prober starts from. `goos` is the caller's `runtime.GOOS`, and
+    `env` still comes from `tea.EnvMsg`.
+  * `Identity` holds a `Brand`, the raw `EnvBrand`, a version kept only
+    when the brand corroborates it, the `Mux`, an embedded `Editor`
+    (`NVIM`, `VIM_TERMINAL`, `INSIDE_EMACS`), `Remote`, `TERM` and
+    `TERM_FEATURES`.
+  * The detection order is the report's: editor-fork markers that survive
+    SSH and tmux, then `TERM_PROGRAM`, then `TERMINAL_EMULATOR` (JetBrains)
+    before `TERM_SESSION_ID`, then `LC_TERMINAL`, then `TERM`, then
+    `TERMINATOR_UUID` before `VTE_VERSION`, and `WT_SESSION` last.
+  * **Raw and refined brands stay apart.** On Windows an unknown brand is
+    refined to Windows Terminal, because its default-terminal hand-off
+    omits `WT_SESSION`. A decision that must not trust the guess, such as
+    the legacy-console glyph tier, reads `EnvBrand`.
+  * `Caps` gains `Brand`, `EnvBrand`, `Editor`, `SecondaryAttributes`
+    (DA2), `LegacyConsole` and `Tmux` as new fields. Existing fields keep
+    their meaning (§2, "fields are added, never repurposed").
+* **§2, every fact can carry a reason** (report §8.2, §8.16).
+  * `Fact[T]` gains `Reason string`: a stable dotted token, such as
+    `tmux.extended-keys-off` or `terminal.jetbrains-paints-queries`, that
+    says why a fact is `Unsupported`, `Unknown` or gated.
+  * Tokens are API. A token is added, never renamed, and the doctor's
+    finding IDs (§4 below) are the same strings.
+  * Per-feature views read from `Caps` rather than the brand:
+    `Keyboard() KeyboardCaps`, `Links() LinkCaps` and
+    `Notifications() NotifyCaps`.
+* **§2, the kitty flag policy** (report §8.5, §9).
+  `KeyboardFlags(c Caps) KittyFlags` returns the flags a program should put
+  in `View.KeyboardEnhancements`:
+  * disambiguate when the terminal supports the protocol;
+  * no event types (press, repeat, release) on iTerm2 and Ghostty, which
+    leak releases for shortcuts they consume, on Alacritty 0.14 or older
+    (from DA2), and in tmux unless tmux reports
+    `extended-keys-format csi-u`;
+  * no flags at all on mintty and MSYS2 (`TERM_PROGRAM=mintty`, any
+    `MSYSTEM`), and under WSL when VS Code is detected or detection is
+    inconclusive.
+  * `Caps.KeyboardFlags`, from `KeyboardEnhancementsMsg`, is the ledger of
+    what the terminal accepted. `ReleasesReported()` says whether a binding
+    may wait for a key release, which
+    [0007-MADR-keymap-engine.md](0007-MADR-keymap-engine.md) reads.
+  * A program's environment overrides go through `WithOverride`, as for
+    any fact.
+* **§2, appearance has a chain** (report §8.2). `Dark` takes the strongest
+  of:
+  1. an override;
+  2. DSR 997, then OSC 11 luminance (`Origin` `Query`);
+  3. an environment variable the program names with
+     `WithAppearanceEnv(name)`, which also reads `LC_` + name, because a
+     default `sshd` forwards `LC_*` (`Origin` `Env`);
+  4. a program-supplied desktop hook (macOS appearance, the XDG portal,
+     the Windows registry), because reading those needs a process or an OS
+     binding (`Origin` `Heuristic`);
+  5. `COLORFGBG`, read with Vim's heuristic, where `default` means unknown
+     (`Origin` `Heuristic`).
+* **§2, palette facts for a generated theme** (report §8.2). `Caps` gains
+  `Foreground` (OSC 10) and `Palette` (OSC 4 for indexes 0–15) with a
+  `PaletteKnown` flag. They are parsed from `Reply.Raw`, because the
+  decoder has no OSC 4 event. A later theme record builds a theme from
+  them. Owner question Q5.
+* **§2, tmux is asked through a returned command** (report §8.3).
+  `TmuxQuery() []string` returns the argv of one
+  `tmux display-message -p` for `extended-keys-format`, `mouse`,
+  `client_termfeatures` and `client_flags`. `ParseTmux(out string)
+  TmuxFacts` reads its output. The program runs the command and passes the
+  result with `p.SetTmux(TmuxFacts)`. Nothing here starts it.
+* **§2, the legacy console** (report §8.11, §9). `LegacyConsole` is a
+  heuristic fact until a Windows record can ask the console host:
+  `goos` is `windows` and `EnvBrand` is unknown (no `WT_SESSION`,
+  `TERM_PROGRAM` or `WEZTERM_PANE`), because bare `cmd.exe` sets no
+  terminal variables. A hook, `WithConsoleHost(func() (classic bool, ok
+  bool))`, lets that later record supply the `ConsoleWindowClass` check,
+  which tells classic conhost from ConPTY.
+* **§3, probe discipline** (report §8.3).
+  * **DA2 joins the safe set,** before DA1. Its reply gives the Alacritty
+    version, and with DA1 `1;2` the Apple Terminal fingerprint
+    (`1;95;0`) that identifies Terminal.app over SSH.
+  * **One deadline still covers the batch** (`WithTimeout`). A reply that
+    arrives after the sentinel or the timeout still updates its fact, as
+    §3 already says.
+  * **Reply caps.** A raw reply longer than 1 KiB is not parsed, and its
+    fact gets the reason `probe.reply-too-long`.
+  * **Late replies are named, not dropped.** `IsReplyFragment(msg tea.Msg)
+    bool` reports a key message that matches the start of a reply the
+    probe is still waiting for. The input filter of
+    [0009-MADR-streaming-content-engine.md](0009-MADR-streaming-content-engine.md)
+    uses it to swallow fragments. The prober itself still never hides a
+    message.
+  * **Gates.** Under JetBrains, which paints queries as text, the prober
+    sends nothing, and every fact comes from the environment with the
+    reason `terminal.jetbrains-paints-queries` (owner question Q7). Inside
+    an editor's `:terminal`, the gated set is skipped.
+  * **The sole-reader rule.** `termcap` has no synchronous probe. Any
+    later query that must read stdin directly runs only before
+    `tea.Program` starts reading, and lives in `termmode`, not here.
+* **§4, the doctor reports findings** (report §8.16).
+  `Findings(c Caps) []Finding` returns
+  `Finding{ID, Disposition (Issue, Recommendation), Message, Fix string}`,
+  where `ID` is a reason token and `Fix` is text, never an action.
+  `Report` prints them after the facts. The JSON form carries a
+  `schema_version` that changes only when a field is removed or retyped.
+* **§5, clipboard delivery is reported** (report §8.13).
+  * `Copy` delivers `CopiedMsg{Status, Route}`, where `Status` is
+    `Unconfirmed` for any terminal route (OSC 52 never replies),
+    `Confirmed` or `Failed` from a program-supplied backend, and `Failed`
+    for a payload over 100 KB.
+  * `CopyPlan(c Caps) []Route` orders the routes: the backend, the tmux
+    buffer, OSC 52, and OSC 52 wrapped for tmux.
+  * `TmuxLoadBuffer() []string` returns the argv of
+    `tmux load-buffer -w -`, which the program runs with the text on stdin.
+  * `ImageReadCommands(goos string, wayland bool) [][]string` returns the
+    clipboard-image readers in order: `osascript` on macOS, PowerShell on
+    Windows and WSL, then `wl-paste` and `xclip`. It is a pure function.
+* **§5, links follow the terminal** (report §8.13).
+  * `LinkDisplay(c Caps) Display` is `LabelOnly` on the terminals the
+    report lists and `LabelAndURL` on Apple Terminal, Warp, unknown
+    terminals, any multiplexer, or tmux older than 3.4.
+  * `LinkPolicy{Schemes []string}` and `Openable(url) bool` decide whether
+    a click may open a link. The default is `http` and `https`. The
+    program opens it, from an `OpenURLMsg`.
+* **§5, notifications** (report §8.13, §8.12).
+  * When OSC 99 did not answer, `Auto` picks by brand: OSC 9 for iTerm2,
+    WezTerm and Warp; OSC 777 for Ghostty, VTE and foot; the bell for
+    Zellij and the rest.
+  * Focus is tri-state. `Notify` delivers
+    `NotifyResultMsg{Sent bool; Skipped SkipReason}`, where the reasons are
+    disabled, empty, focused and focus-unknown. Owner question Q6.
+  * Text is cleaned before encoding: escape sequences stripped, newline
+    runs collapsed to a space, controls removed, and cut by cells to 80 for
+    the title and 240 for the body.
+  * `WithGate(func(Notification) bool)` lets a caller apply a turn-outcome
+    policy, such as Kilo's "completed root turns only". The policy itself
+    belongs to the planned agent widgets, not here.
+* **§5, more services, each a string or a command** (report §8.13):
+  * `SanitizeTitle(s string) string` removes controls and bidi codepoints
+    and caps the title at 240 characters, for `View.WindowTitle`. A
+    program that is not on a terminal sets no title.
+  * `Activity(vendor string, s ActivityState, t time.Time) string` writes
+    `OSC 777;<vendor>;activity;1;<state>;<unix-ms>`, Kilo's versioned
+    beacon. `ParseActivity(payload, now)` reads one, rejecting a wrong
+    version, a timestamp more than 5 s ahead or 15 s old. `ActivityBeacon`
+    is a 5 s ticker. It is opt-in.
+  * `Pointer(c Caps, shape string) string` writes OSC 22 only on Ghostty
+    and Kitty outside a multiplexer, and an empty OSC 22 resets it on
+    Kitty.
+  * `ProgressSupported(c Caps) bool` is true on Ghostty, WezTerm and
+    iTerm2 3.6 or later, for a program deciding whether to set
+    `View.ProgressBar`. Older iTerm2 shows OSC 9;4 as alert text.
+
+**What does not change.**
+
+* Option A, the two packages and `termcaptest`.
+* The observer rule: nothing re-sends what tea asks.
+* DA1 as the sentinel, and the timeout.
+* No process is started. Every command above is returned for the program
+  to run, and the source test against `os/exec` stays.
+* The environment comes from `tea.EnvMsg`.
+* ultraviolet stays in `internal/termevent`.
+* No module is added. A direct `golang.org/x/sys` import, for the console
+  host check, belongs to a later record.
+
+**Left to other records.** Mode plans, the teardown order, restore bytes,
+the DA1 pop fence, hand-off to external programs, the tmux resize sampler
+and the Windows console mode helpers go to `termmode`. The per-terminal
+scrollback strategy and the width-shrink model go to `inline`. Wheel
+profiles go to 0009's input filter, which takes the events per notch as an
+option (`WithWheelProfile`) and does not import `termcap`. The program
+derives that count from `Caps.Brand` and `Caps.Mux`.
+The legacy glyph tier goes to the theme and glyph record, which reads
+`Caps.LegacyConsole`.
+
+**Versioning.** Everything A1 adds is new API. If A1 is accepted before
+the PLAN's Step 2 starts, it ships in the same minor release as the rest of
+this record; otherwise in the next minor.
+
+**Owner questions for A1.**
+
+* **Q5. The palette query.** Should the OSC 4 and OSC 10 queries go out by
+  default? Recommended: yes, behind the heuristic, as XTVERSION and OSC 99
+  do, which matches the owner's choice of a background query in `Init`
+  (0004-MADR Q2). The alternative is opt-in with `WithPalette()`, because
+  it is 17 queries the program did not ask for.
+* **Q6. Notifications without focus reports.** codex turns focus reporting
+  off on Windows, so focus stays unknown there and `WhenUnfocused` never
+  sends. Recommended: keep "unknown means do not send" as the default, and
+  add a policy, `UnlessFocused`, that sends when blurred or unknown, for
+  programs that accept the risk. The alternative is that `WhenUnfocused`
+  sends when focus is unknown.
+* **Q7. JetBrains.** Recommended: send nothing under JetBrains, as Grok
+  does, and take every fact from the environment. The alternative is to
+  send the safe set anyway and accept that the queries may be painted.
+  Not verified here; the PLAN's real-terminal check covers it when a
+  JetBrains terminal is available.
+
 ## More Information
 
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md)
   §3 (crush, opencode, codex), §4 (notcurses, yazi) and §5 (the standards
-  table).
+  table); for amendment A1, §8.2–§8.5, §8.13, §8.16, §9 and §11.1.
 * [0004-MADR-integrate-charm-v2-and-go-1-27.md](0004-MADR-integrate-charm-v2-and-go-1-27.md):
   the ultraviolet import and its containment rule, which this record widens
   to `internal/termevent`, and the workspace's theme following

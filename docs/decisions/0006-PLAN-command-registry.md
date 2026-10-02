@@ -7,6 +7,13 @@ associated-madr: "0006-MADR-command-registry.md"
 
 Associated MADR: [0006-MADR-command-registry.md](0006-MADR-command-registry.md)
 
+**Revision, 2026-10-02.** The owner answered the MADR's Q1–Q4, and the
+MADR is `accepted`. Q4 departs from the recommendation: a Cobra and fang
+adapter, `command/cobra`, ships as well as `command/cli`. It needs its own
+dependency record first, so it is Step 10, blocked on that record. Step 1,
+the scope tables and Verification changed to match. This PLAN is still
+`proposed`, because execution is not yet approved.
+
 ## Goal
 
 Ship `when`, `command` and `command/cli`, and the workspace's built-in
@@ -31,9 +38,13 @@ tree, and the owner can tag the release.
 | 7 | `workspace/` | `Commands(w)`, `WhenContext()`, `Contexter`, context keys |
 | 8 | `command/cli/` | shell subcommands, flags, `--json`, exit codes |
 | 9 | `README.md`, `docs/`, `docs/guides/commands.md`, `Makefile` (`fuzz`) | documentation, release notes, close-out |
+| 10 | `command/cobra/`; `go.mod`, `go.sum`; `.golangci.yml` (`depguard`); `AGENTS.md` (Dependencies) | the Cobra and fang adapter, blocked on its dependency record |
 
-No module is added. `go.mod` and `go.sum` do not change. Every import is
-the standard library or a module 0001-MADR §3 already names.
+Steps 1–9 add no module. `go.mod` and `go.sum` do not change in them, and
+every import is the standard library or a module 0001-MADR §3 already
+names. Step 10 adds `github.com/spf13/cobra` and
+`github.com/charmbracelet/fang`, and only once their dependency record is
+accepted.
 
 ### Out of scope
 
@@ -45,8 +56,9 @@ the standard library or a module 0001-MADR §3 already names.
   default refusal; the dialog is a later widget record.
 * An MCP server or ACP transport. The exporters produce the shapes; a host
   wires them.
-* Cobra or fang adapters, shell completion scripts, YAML or TOML command
-  files (MADR Q1, Q4).
+* Writing the Cobra and fang dependency record. Step 10 waits for it.
+* Shell completion scripts from `command/cli`, and YAML or TOML command
+  files (MADR Q1). Completion comes through fang in Step 10.
 * Any change in pi-go.
 * `git push` and tags, which are the owner's.
 
@@ -75,10 +87,10 @@ the standard library or a module 0001-MADR §3 already names.
 
 ### Step 1: records
 
-The owner accepts the MADR, answering Q1–Q4. Record the answers, set the
-MADR `accepted` and this PLAN `in-progress`, and update `docs/README.md`.
-If an answer changes a decision (for example YAML for Q1, which needs a
-module and its own record), amend the MADR before Step 2.
+The owner accepted the MADR on 2026-10-02, answering Q1–Q4, and the
+answers are recorded in it. Q4 added `command/cobra`, which is Step 10.
+When execution is approved, set this PLAN `in-progress` and update
+`docs/README.md`.
 
 ### Step 2: `when`
 
@@ -314,8 +326,39 @@ module and its own record), amend the MADR before Step 2.
   adding a command, letting an agent drive the TUI, and running commands
   from the shell; README Status.
 * **`Makefile`:** the `fuzz` target gains `./when` and `./command`.
-* **Release notes** in the execution record. Mark `complete` after CI is
+* **Release notes** in the execution record. Steps 1–9 can be released
+  without Step 10. Mark `complete` only after Step 10 too, and after CI is
   green on the pushed tree. The owner tags.
+
+### Step 10: `command/cobra` (blocked)
+
+* **Blocked** until a dependency record naming `github.com/spf13/cobra` and
+  `github.com/charmbracelet/fang` is accepted (AGENTS.md Dependencies). That
+  record takes the next free number when it is written, and pins the
+  versions. If it is refused, this step is dropped, and the deviation is
+  recorded here and in the MADR.
+* **What lands** (MADR §10):
+  * `command/cobra` builds a `*cobra.Command` tree from a registry: one
+    command per ID word path and per dotted ID, flags from each schema,
+    `--args`, `--json` and `--yes`, and the exit codes of `command/cli`;
+  * fang wraps the root for styled help, man pages, completion and
+    version;
+  * `go.mod` and `go.sum` gain the two modules in this step's commit, and
+    `go mod tidy -diff` stays clean;
+  * `.golangci.yml`: `depguard` allows Cobra and fang in `command/cobra/`
+    and denies them everywhere else;
+  * AGENTS.md's Dependencies list names them and the dependency record.
+* **Tests:**
+  * for the same arguments, `command/cobra` and `command/cli` build the same
+    `Request`, write the same `--json` output and return the same exit code;
+  * commands without `Surfaces&CLI`, and hidden ones, are not in the tree;
+  * output goes only to the writers given to Cobra; the conformance scan
+    covers the package;
+  * golden help at 60 and 100 columns, under `NO_COLOR` and with colour.
+* **Mutations:**
+  * a flag's type is taken from the Go field instead of the schema;
+  * `Destructive` runs without `--yes`;
+  * `depguard` allows Cobra in `command`.
 
 ## Verification
 
@@ -325,11 +368,13 @@ module and its own record), amend the MADR before Step 2.
   * `go test -race -count=1 ./...`, `go test -shuffle=on -count=2 ./...`
     and `LC_ALL=C go test ./...`;
   * `make fuzz`.
-* `go mod tidy -diff` is clean, and `go.mod` is unchanged by this PLAN.
+* `go mod tidy -diff` is clean. `go.mod` is unchanged by Steps 1–9, and
+  Step 10 adds only Cobra and fang, at the versions their record pins.
+* `depguard` allows Cobra and fang in `command/cobra/` only.
 * `depguard` still refuses the Charm v1 paths, mcplib, the MCP go-sdk and
   go-llmprovider-sdk in every package, the new ones included.
-* `internal/conformance` covers `when`, `command` and `command/cli`, and
-  finds nothing.
+* `internal/conformance` covers `when`, `command`, `command/cli` and
+  `command/cobra`, and finds nothing.
 * The exporters' field names match the MCP 2025-11-25 and ACP pages cited
   in the MADR.
 * The identifier scan of 0001-PLAN V7 finds nothing.
@@ -337,7 +382,8 @@ module and its own record), amend the MADR before Step 2.
 
 ## Rollout and Rollback
 
-* **Rollout.** The owner pushes Steps 1–9 and tags the release. pi-go
+* **Rollout.** The owner pushes Steps 1–9 and tags the release. Step 10
+  follows in a later release once its dependency record is accepted. pi-go
   adopts the registry under its own records: its slash commands, user and
   project command files, ACP agent commands and palette all register here.
 * **Rollback.** Before the push, each step is one local commit. After it, a

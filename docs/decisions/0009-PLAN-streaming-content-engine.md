@@ -7,6 +7,12 @@ associated-madr: "0009-MADR-streaming-content-engine.md"
 
 Associated MADR: [0009-MADR-streaming-content-engine.md](0009-MADR-streaming-content-engine.md)
 
+*Revised 2026-10-02.* The owner answered the MADR's Q1–Q5, each with its
+recommendation, and the MADR is accepted. This PLAN stays proposed until the
+owner approves execution. MADR amendment A1, which is proposed, adds Steps
+A1.1 to A1.4. They run after Step 7 and before Step 8, and only once A1 is
+accepted. Its questions Q6–Q8 decide where three of its types live.
+
 ## Goal
 
 Ship `safetext`, `frame`, `inputfilter`, `stream` and `stream/glamourmd`,
@@ -34,16 +40,27 @@ tree, and the owner can tag the release.
 | 6 | `stream/` (`Pane`) | a workspace pane over a `Doc` |
 | 7 | `stream/glamourmd/`; `go.mod`, `go.sum` | the glamour adapter |
 | 8 | `stream/example_test.go`, `docs/guides/streaming-content.md`, `docs/` | the example, the guide, close-out |
+| A1.1 | `safetext/` | `Command` and `StatusLine` presets, `Policy` fields, `Interpret` (A1, pending acceptance) |
+| A1.2 | `frame/` | `Coalescer`, `Demand`, `Writer`, `Upgrader` (A1, pending acceptance) |
+| A1.3 | `inputfilter/` | the stage chain, typeahead, paste normalisation, wheel profile (A1, pending acceptance) |
+| A1.4 | `stream/` | `RenderView`, the dialect rules, `Highlighter`, `FitTable`, `Bounded` (A1, pending acceptance) |
 
 `go.mod` gains `charm.land/glamour/v2` v2.0.1, or its newest release on the
-day, in Step 7 and no other step. Steps 2–6 add no module.
+day, in Step 7 and no other step. Steps 2–6 and A1.1–A1.4 add no module.
+Q6–Q8 of A1 may move `Interpret`, `Writer`, `Upgrader` or `FitTable` to
+another package; the paths above are the recommendations.
 
 ### Out of scope
 
 * A virtualized transcript of many `Doc`s, watermark pruning, and inline
   scrollback with OSC 133. Each is a later record (MADR option D and
-  0003-REPORT §7).
-* Syntax highlighting other than glamour's own chroma use.
+  0003-REPORT §7). The owner chose an `inline` record on 2026-10-02
+  (0003-REPORT §11.2).
+* Syntax highlighting other than glamour's own chroma use. A1.4 adds the
+  `Highlighter` interface only; a lexer adapter needs its own dependency
+  record.
+* Re-sending the mouse modes on focus-in, which belongs to the planned
+  `termmode` record (MADR A1, "What does not change").
 * Images, and the terminal services of
   [0005-MADR-terminal-capabilities-and-services.md](0005-MADR-terminal-capabilities-and-services.md).
 * Any change in pi-go.
@@ -80,6 +97,10 @@ The records this one builds on
 ([0004-MADR-integrate-charm-v2-and-go-1-27.md](0004-MADR-integrate-charm-v2-and-go-1-27.md)
 for `ansi.Method`, and the records before it in the order) are complete
 first, or this step records which parts wait for them.
+
+*2026-10-02:* the answers are recorded and the MADR is accepted. This PLAN
+moves to `in-progress` when the owner approves its execution, and
+`docs/README.md` is updated then.
 
 ### Step 2: `safetext`
 
@@ -297,6 +318,120 @@ first, or this step records which parts wait for them.
   * the mutex is removed (caught by `-race`);
   * `FromTheme` ignores the background.
 
+### Steps A1.1 to A1.4: MADR amendment A1
+
+These run only once A1 is accepted, with Q6–Q8 answered, and the answers
+are recorded in the MADR first. Each step follows the rules for every step
+above. If A1 is not accepted, these steps are dropped, and Step 8 follows
+Step 7.
+
+### Step A1.1: `safetext` presets and `Interpret`
+
+* The API of MADR A1, §2: `Command`, `StatusLine`, and the `Policy` fields
+  `Escape`, `KeepSGR` and `LinkSchemes`; `Interpret`, `InterpretOptions`
+  and `Row`.
+* **Tests:**
+  * `Command` escapes each C0 and C1 control, DEL and each listed bidi or
+    format code point, and removes nothing: a table with one row per code
+    point, including a Trojan Source sample whose escaped form shows the
+    real order;
+  * `Command` output is one line and holds no 0x1B;
+  * `StatusLine` keeps SGR, drops every other CSI, swallows DCS, SOS, PM
+    and APC, keeps `ESC ( B` from painting `(B`, and keeps OSC 8 only for
+    http, https and mailto with a host;
+  * the zero `Policy` and the `Text`, `Strict` and `Line` presets give the
+    same output as before A1 (the Step 2 tables pass unchanged);
+  * `Interpret`: SGR in `;` and `:` forms, a CR-overwritten progress bar
+    ending as its last state, BS, tabs, each listed CSI, an OSC dropped, a
+    wide rune advancing two cells, and the row and column caps;
+  * `Interpret` is deterministic: two calls over the same bytes are equal.
+* **`FuzzClean`** gains the new presets and `Escape`, and `FuzzInterpret`
+  checks that no output line is wider than the column cap and none holds a
+  sequence other than SGR.
+* **Mutations:**
+  * `Command` drops a control instead of escaping it;
+  * `StatusLine` keeps a non-SGR CSI;
+  * `StatusLine` accepts a `javascript:` link;
+  * `Interpret` advances one column per rune.
+
+### Step A1.2: `frame` additions
+
+* The API of MADR A1, §3: `Coalescer`, `NewCoalescer`, `Demand`, `Combine`,
+  `TickCmd`, `Writer`, `Upgrader`, `UpgradeMsg`.
+* **Tests, inside `testing/synctest.Test`:**
+  * a barrier pushed between deltas is applied after the earlier deltas and
+    before the later ones, for every interleaving of a generated sequence;
+  * the maximum wait applies a batch when no frame comes;
+  * `Combine` is the maximum; `TickCmd(None)` is nil; an idle program
+    whose views all report `None` schedules no timer;
+  * `Writer` over a writer that blocks collapses many draws into one, emits
+    one stall event after the configured time and one recovery event after
+    it unblocks, and loses no byte;
+  * `Upgrader`: a newer job for a key replaces an older one; a result with
+    an old generation is dropped; cancelling the context stops a job.
+* **Mutations:**
+  * the barrier does not flush first;
+  * `TickCmd(None)` returns a command;
+  * `Writer` sends a second frame while one is in flight;
+  * `Upgrader` keeps stale results.
+
+### Step A1.3: `inputfilter` stages
+
+* The API of MADR A1, §6: the stage options, `Capture`, `Quarantine`,
+  `ClipboardImageRequestMsg`, `PastedPath`, the new `PasteBurstConfig`
+  options and `WithWheelProfile`.
+* **Tests:**
+  * **Split at every byte boundary.** Each SGR mouse report, focus report,
+    corrupted X10 report and late probe reply is fed split at every byte
+    position, and in every two-way split. Each reaches the model as exactly
+    one message, or none for a swallowed reply, and no stray key.
+  * a bare Esc flushes a held fragment at once;
+  * `Capture` keeps text, Backspace, Shift and Alt+Enter, and pastes, and
+    cuts at the first Esc; `Quarantine` drops everything until its
+    deadline, then passes input;
+  * CRLF and lone CR become LF inside a bracketed paste; an empty
+    bracketed paste becomes `ClipboardImageRequestMsg`;
+  * `PastedPath` accepts a quoted path, `file://`, a drive letter and a UNC
+    path, unescapes backslashes except on Windows, and refuses prose;
+  * grok's PowerShell burst cases, including Enter followed by Ctrl+J;
+  * a profile of 3 events per notch turns 3 wheel events into one notch.
+* **Broken input.** A deliberately truncated SGR mouse report at the end of
+  the input is held, then flushed as keys by the next bare Esc, and never
+  reaches the model as a mouse event.
+* **Mutations:**
+  * fragment reassembly is skipped;
+  * the X10 repair is skipped;
+  * late replies pass as keys;
+  * Esc does not flush.
+
+### Step A1.4: `stream` additions
+
+* The API of MADR A1, §4: `Doc.View`, `RenderView`, `Highlighter`,
+  `FitTable`, `Bounded`, and the dialect rules.
+* **Tests:**
+  * the chunking-invariance property of Step 5 also holds for `RenderView`:
+    the line map, links, code blocks and tables after the last chunk equal
+    those of a one-shot `Append`;
+  * a link wrapped across rows keeps one ID, before and after a tail
+    re-render;
+  * `~**10%**` is not struck through; `~~x~~` is; an unclosed `\(` is held
+    until `Finish` when math is on;
+  * a counting `Highlighter` highlights each line of a growing open fence
+    once; a theme revision or a width change drops its caches; inputs past
+    each limit are shown plain;
+  * `FitTable` keeps numbers and URLs whole, pads a row with a wide glyph to
+    the exact width, and falls back to records, stacked records and source
+    as the width shrinks; goldens across the 0001 §6 matrix, including the
+    ASCII border set;
+  * `Bounded` keeps head and tail past its limit, closes an escape cut at
+    the head, and reports the same omitted count at two widths.
+* **Mutations:**
+  * `RenderView` is not cut back on a tail re-render;
+  * a single `~` strikes through;
+  * the open fence is re-highlighted whole on each line;
+  * `FitTable` clips by byte;
+  * `Bounded` counts omitted rows instead of lines.
+
 ### Step 8: example, guide and close-out
 
 * `ExampleDoc_stream` streams a Markdown answer through a `Buffer` from a
@@ -309,7 +444,10 @@ first, or this step records which parts wait for them.
   * choosing a drain policy;
   * the input filter, `Attach`, and paste bursts;
   * what `safetext` removes, and adding trusted links;
-  * what may differ before `Finish`.
+  * what may differ before `Finish`;
+  * if A1 landed: the `Command` and `StatusLine` presets, `Interpret`, the
+    coalescer and tick demand, the output `Writer`, the input stages, and
+    `RenderView`.
 * `docs/architecture.md` lists the five packages and their imports.
   `docs/README.md` gains rows. Release notes go in the execution record.
 
@@ -320,13 +458,15 @@ first, or this step records which parts wait for them.
   * `make pre-add-check`, `make lint` and `make vuln`;
   * `go test -race -count=1 ./...`, `go test -shuffle=on -count=2 ./...`
     and `LC_ALL=C go test ./...`;
-  * `make fuzz`, including `FuzzClean` and `FuzzDoc`.
+  * `make fuzz`, including `FuzzClean` and `FuzzDoc`, and `FuzzInterpret`
+    if A1 landed.
 * `go mod tidy -diff` is clean. `go.mod` adds exactly
   `charm.land/glamour/v2` as a direct requirement, and only in Step 7.
 * `internal/conformance` finds no `os.Stdout`, `os.Stderr`, `AltScreen` or
   `signal.Notify` in the new packages.
 * No new package starts a goroutine outside `Scheduler`'s timer callback
-  and `inputfilter`'s drain send. A test with `synctest` checks each.
+  and `inputfilter`'s drain send, and, if A1 landed, `Writer`'s writer and
+  `Upgrader`'s jobs. A test with `synctest` checks each.
 * The identifier scan finds nothing.
 * After the owner's push, CI is green on all three operating systems.
 

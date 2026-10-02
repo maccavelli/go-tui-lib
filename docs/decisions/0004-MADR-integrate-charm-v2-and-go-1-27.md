@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-10-02
 decision-makers: owner
 consulted: the v0.1.0 audit in 0003-REPORT-agent-tui-ecosystem-research.md §1; Charm v2 sources (lipgloss v2.0.6, bubbletea v2.0.10, bubbles v2.2.1, ultraviolet at the pinned pseudo-version); the Go 1.27.1 toolchain
@@ -262,11 +262,18 @@ Chosen option: **"A"**, because:
     change. `WithThemeBuilder` turns following back on.
   * Both messages still reach the panes, so a pane with its own styles can
     follow too.
-* **Asking for the background is the program's choice.**
-  `WithBackgroundQuery()` adds `tea.RequestBackgroundColor` to `Init`.
-  Without it the workspace sends no query (owner question Q2).
-  [0005-MADR-terminal-capabilities-and-services.md](0005-MADR-terminal-capabilities-and-services.md)
-  adds a full probe, and live light and dark switching, on top of this.
+* **The workspace asks for the background by default.** `Init` includes
+  `tea.RequestBackgroundColor`, so a following theme gets its light or dark
+  answer without the program doing anything (owner question Q2).
+  `WithoutBackgroundQuery()` leaves the query out, for a program that runs
+  its own probe or must send nothing unasked.
+  * Once `termcap` exists, the query follows 0005's gates. Some terminals
+    paint a query as text (JetBrains), and an editor's `:terminal` answers
+    for the editor rather than the user's terminal
+    ([0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md)
+    §8.3). Until then the query is unconditional.
+  * [0005-MADR-terminal-capabilities-and-services.md](0005-MADR-terminal-capabilities-and-services.md)
+    adds a full probe, and live light and dark switching, on top of this.
 * **`theme` gains adaptive colours,** with no Bubble Tea import:
 
   ```go
@@ -368,6 +375,9 @@ Chosen option: **"A"**, because:
   `WithWidthMethod`.
 * Bad, because the hit test and the dirty flag are ours now. A missed dirty
   case shows a stale frame. The tests drive each case.
+* Bad, because the workspace sends a terminal query by default that the
+  program did not write. A terminal that shows queries as text shows it
+  until 0005's gates apply. `WithoutBackgroundQuery()` turns it off.
 
 ### Confirmation
 
@@ -391,8 +401,9 @@ Chosen option: **"A"**, because:
   joiner and a VS16 selector in a title and in a body, at both methods. A
   test sends `ModeReportMsg` for mode 2027 with each value and checks the
   switch, and checks that `WithWidthMethod` pins it.
-* **Theme.** A `ColorProfileMsg` and a `BackgroundColorMsg` restyle the next
-  frame, and a fixed theme ignores both. A view cached before a theme
+* **Theme.** `Init` asks for the background by default, and not with
+  `WithoutBackgroundQuery()`. A `ColorProfileMsg` and a `BackgroundColorMsg`
+  restyle the next frame, and a fixed theme ignores both. A view cached before a theme
   change is redrawn after it. `LightDarkColor` and `ProfileColor` resolve
   per background and profile, and the unknown-palette contrast test still
   holds.
@@ -446,6 +457,13 @@ Chosen option: **"A"**, because:
   for the stack to be tightly integrated and optimized.
 
 ## Owner questions
+
+*Answered 2026-10-02* (picked from options): Q1 "Accept, in
+internal/cells"; Q2 "Query in Init"; Q3 "WcWidth, follow mode 2027"; Q4
+"v0.2.0". Q1, Q3 and Q4 are the recommendation. Q2 is not: the workspace
+requests the background in `Init` by default, and
+`WithoutBackgroundQuery()` replaces the recommended `WithBackgroundQuery()`
+opt-in. §4, Consequences and Confirmation were revised to match.
 
 * **Q1. The ultraviolet import.** Recommended: accept it, at the version the
   graph selects, confined to `internal/cells` by `depguard`. The alternative

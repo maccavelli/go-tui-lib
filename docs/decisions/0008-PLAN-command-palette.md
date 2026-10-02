@@ -7,6 +7,10 @@ associated-madr: "0008-MADR-command-palette.md"
 
 Associated MADR: [0008-MADR-command-palette.md](0008-MADR-command-palette.md)
 
+**Revision, 2026-10-02.** The owner answered the MADR's Q1–Q4, each with
+the recommendation, and the MADR is `accepted`. Only Step 1 changed. This
+PLAN is still `proposed`, because execution is not yet approved.
+
 ## Goal
 
 Ship `fuzzy` and `palette`, so that a program finds and runs any command,
@@ -70,9 +74,10 @@ No module is added. `fuzzy` uses the standard library and `x/ansi`.
 
 ### Step 1: records
 
-The owner accepts the MADR and answers Q1–Q4. Record the answers, set the
-MADR `accepted` and this PLAN `in-progress`, and update `docs/README.md`.
-Confirm that 0006 and 0007 are complete, since Steps 4–6 import their
+The owner accepted the MADR on 2026-10-02, answering Q1–Q4, and the
+answers are recorded in it. When execution is approved, set this PLAN
+`in-progress` and update `docs/README.md`. Confirm that 0006 and 0007 are
+complete, since Steps 4–6 import their
 packages. If either is not, stop and ask.
 
 ### Step 2: `fuzzy`, the matcher

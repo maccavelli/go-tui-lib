@@ -18,9 +18,9 @@ decisions:
 - [0008-MADR-command-palette.md](../decisions/0008-MADR-command-palette.md);
 - [0009-MADR-streaming-content-engine.md](../decisions/0009-MADR-streaming-content-engine.md).
 
-§8 to §11, added on 2026-10-02, support no record yet. They feed amendments
-to the proposed records 0004 to 0009 and the records that items 6, 7, 9 and
-10 of §7 still need.
+§8 to §11, added on 2026-10-02, support amendment A1 of 0005, 0007 and
+0009 (§11.5), and the records that items 6, 7, 9 and 10 of §7 and items 11
+to 13 of §11.2 still need.
 
 ## Why, and how
 
@@ -2142,3 +2142,30 @@ Each needs its own record under AGENTS.md, Dependencies.
   need.
 - **Then the harness (10)** and its emulator record, before `inline` (12)
   and `termpane`, which cannot be tested without it.
+
+### 11.5 What the owner chose
+
+On 2026-10-02 the owner answered the second pass's questions by picking
+from options. Each answer below was the recommendation unless it says
+otherwise.
+
+| Question | Answer |
+| :--- | :--- |
+| What next | Amend 0005, 0007 and 0009 first. Not the recommendation, which was to run the `v0.1.1` hardening first |
+| Records to write eventually | all four groups: `termmode` and `inline`; `transcript` and `composer`; `agentui`; theme v2 and the harness |
+| May the library spawn processes | No. It returns the command or a hook, and the program runs it. This also answers 0005's Q4 |
+| Inline mode | In scope, as its own `inline` record. 0009's option D stays rejected there |
+| Glyph tiers | An optional legacy-console (CP437) tier between Unicode and ASCII. A glyph without one falls back to ASCII. All tiers share one width, and the golden matrix gains a legacy-console row |
+| Default theme | Terminal-native: `Reset` and named ANSI-16 only, DIM and REVERSE |
+| Modules that may be proposed in a dependency record | `golang.org/x/sys` as a direct import; `charmbracelet/x/vt` with a PTY module; `alecthomas/chroma`; `golang.org/x/text`. Not chosen: `golang.org/x/net/idna`, purego and a websocket module |
+
+The answers to the owner questions in 0002 (A1) and 0004 to 0009 are
+recorded in each record's "Owner questions" section.
+
+| Item | Record |
+| :--- | :--- |
+| 0005, second-pass findings | [0005-MADR-terminal-capabilities-and-services.md](../decisions/0005-MADR-terminal-capabilities-and-services.md), amendment A1 |
+| 0007, second-pass findings | [0007-MADR-keymap-engine.md](../decisions/0007-MADR-keymap-engine.md), amendment A1 |
+| 0009, second-pass findings | [0009-MADR-streaming-content-engine.md](../decisions/0009-MADR-streaming-content-engine.md), amendment A1 |
+
+Items 6, 7, 9, 10, 11, 12 and 13 have no record yet.

@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-10-02
 decision-makers: owner
 consulted: 0003-REPORT-agent-tui-ecosystem-research.md (§3 agent TUIs, §5 terminal standards); crush, codex, gemini-cli, goose and aider source; Charm v2 APIs (bubbletea v2.0.10, lipgloss v2.0.6, bubbles v2.2.1, x/ansi v0.11.8); charm.land/glamour/v2 v2.0.1
@@ -630,6 +630,11 @@ the tag.
 
 ## Owner questions
 
+*Answered 2026-10-02* (picked from options): Q1 "stream/glamourmd
+subpackage"; Q2 "frame.Adaptive()"; Q3 "Opt-in WithPasteBurst"; Q4 "Silent;
+Policy.Visible opts in"; Q5 "Kept by Text, dropped by Strict". Every answer
+is the recommendation.
+
 * **Q1. Where the glamour adapter lives.** Recommended: the subpackage
   `stream/glamourmd` in this module, adding `charm.land/glamour/v2` v2.0.1
   to `go.mod`. The alternatives are a nested module (its own tags and
@@ -649,11 +654,210 @@ the tag.
   which permission dialogs and command previews use. The alternative is to
   drop them everywhere, which breaks right-to-left prose.
 
+## Amendments
+
+### A1 (2026-10-02): second-pass findings
+
+*Status: proposed.* Its steps are A1.1 to A1.4 of
+[0009-PLAN-streaming-content-engine.md](0009-PLAN-streaming-content-engine.md).
+
+**Found.** A source-level pass over the Kilo, Grok Build, opencode and
+codex TUIs
+([0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md)
+§8) found problems this record's packages meet and do not yet answer. The
+report's §11.1 lists them against this record. On 2026-10-02 the owner chose
+to amend 0005, 0007 and this record with them before anything is built.
+
+**What changes in the decision.** Each item adds to a section above. None
+removes anything from it.
+
+* **§2, `safetext` gains two presets and an interpreter.**
+  * **`Command()`** is for commands and URLs shown for approval (report
+    §8.12). It removes nothing silently. Each C0 and C1 control, DEL, and
+    each bidi or format code point (U+200E/F, U+2028/9, U+202A–E,
+    U+2066–9) is shown escaped, as `\xNN`, `\uNNNN`, `\n`, `\r` or `\t`,
+    on one line. A command then cannot repaint the terminal, and a Trojan
+    Source reorder cannot make the visible text differ from what runs. This
+    is Kilo's `displayCommand`.
+  * **`StatusLine()`** is for an external program's output in a status row
+    (report §8.15). It keeps SGR and nothing else of CSI. It swallows DCS,
+    SOS, PM, APC and two-character escapes, so `ESC ( B` from `tput sgr0`
+    does not paint `(B`. It keeps OSC 8 only for http, https and mailto
+    targets with a host. This is grok's status-line sanitizer. It is the
+    one preset that keeps any sequence, and it is never the default.
+  * `Policy` gains the fields these need: `Escape bool` (show controls
+    escaped, instead of removing them), `KeepSGR bool`, and
+    `LinkSchemes []string`. Their zero values keep §2's behaviour.
+  * **`Interpret(raw []byte, opts InterpretOptions) []Row`** turns
+    captured tool output into styled rows, where `Clean` would strip it
+    (report §8.10). It handles SGR in both `;` and `:` sub-parameter forms,
+    CR overwrite (so a progress bar rewrites its line), BS, tabs to
+    multiples of 8, and `CSI K`, `J`, `A`, `B`, `C`, `D` and `G`. It drops
+    every other sequence, including OSC. Each `Row` holds a styled and a
+    plain form, the plain one for copy and search. (The type is `Row`, not
+    `Line`, because `Line()` is already a preset.)
+    * It advances by cell width with `x/ansi`, not one column per
+      character. Grok's interpreter does the latter, which §8.10 records as
+      a defect.
+    * It caps rows and columns (defaults 50 000 and 8192, as in grok).
+    * Each call starts from a fresh state, so its result is deterministic
+      and can be cached.
+* **§3, `frame` gains four types.**
+  * **`Coalescer[T]`** batches mergeable items once per frame, and treats
+    every other item as a barrier (report §8.17, Kilo's frame queue). A
+    barrier first flushes the batch, then is applied, so a lifecycle event
+    keeps its order relative to the deltas around it. A maximum wait
+    covers a frame that never comes (Kilo uses 100 ms).
+
+    ```go
+    func NewCoalescer[T any](apply func([]T), mergeable func(T) bool, maxWait time.Duration) *Coalescer[T]
+    func (c *Coalescer[T]) Push(v T) tea.Cmd // a tick command when one is newly needed
+    func (c *Coalescer[T]) Flush()
+    ```
+
+  * **`Demand`** is how often a view needs ticks: `None`, `Slow` or `Fast`
+    (report §8.17, grok's tick demand). `Combine` takes the maximum.
+    `TickCmd(None)` returns nil, so an idle program wakes for nothing. A
+    view that paints an animation reports which animations it painted, and
+    a tick redraws only when one of those changes on that tick.
+  * **`Writer`** wraps the output the caller passes to `tea.WithOutput`
+    (report §8.17). It keeps `queued` and `written` counters and allows one
+    frame in flight, so draws during a stalled terminal collapse into one.
+    It reports a stall once after a configurable time with no progress
+    (grok uses 5 s), and once when writes resume. It writes only to the
+    writer it wraps, so rule 1 holds.
+  * **`Upgrader[K, R]`** runs an expensive render off the event loop and
+    returns it as a message (report §8.17). Jobs are keyed, so the newest
+    job for a key replaces an older one. Each result carries a generation,
+    and a stale one is dropped. A cheap render is shown until the upgrade
+    arrives.
+
+    ```go
+    func (u *Upgrader[K, R]) Submit(key K, gen uint64, fn func(context.Context) R) tea.Cmd
+    type UpgradeMsg[K comparable, R any] struct{ Key K; Gen uint64; Result R }
+    ```
+
+* **§4, `stream` returns side-tables with its lines.**
+  * **`Doc.View(width) RenderView`** joins `Render`. A `RenderView` holds
+    the lines and, for each line, its source offset; the links, with an ID,
+    a row and a column range; the code blocks, with their info string and
+    source and output ranges; and table copy metadata (report §8.10,
+    grok's streaming renderer). Each table is cut back and carried forward
+    when the tail re-renders, as the lines are. This is what lets "copy
+    code block", link hit-testing and selection work while a reply still
+    streams. A `Renderer` that cannot report a table returns none, and
+    `Doc` derives the line map itself.
+  * **Link IDs continue across tail renders,** so the fragments of one
+    wrapped link keep one ID.
+  * **Model-output dialect.** Only `~~` is strikethrough, so `~**10%**`
+    stays literal, as grok renders it. With math rendering enabled, inline
+    holdback also holds an unclosed `\(` or `$$` at a chunk edge until
+    `Finish`.
+  * **`Highlighter`** is an interface `Doc` and `Plain` call for code
+    blocks (report §8.10):
+
+    ```go
+    type Highlighter interface {
+        Highlight(lang string, lines []string, state any) (out []string, next any)
+    }
+    ```
+
+    * The open fence is highlighted resumably. The state after the last
+      committed newline is kept, so each line is highlighted once, which is
+      O(N) instead of O(N²). A highlighter that cannot resume returns a nil
+      state, and only the uncommitted tail is highlighted again.
+    * Closed fences in the tail are memoised by `(info, body)` under a byte
+      budget, cleared at once when it overflows.
+    * A theme revision or a width change drops both caches.
+    * Limits, as in codex: over 512 KiB, 10 000 lines or 4 KiB in one line,
+      the code is shown plain.
+    * Only the first token of an info string selects the language.
+    * No lexer ships with this record. A chroma adapter needs its own
+      dependency record, which the owner allowed to be proposed on
+      2026-10-02. glamour's own chroma use is unchanged.
+  * **`FitTable`** lays out a closed table at a width, for `Plain` and for
+    a program's own renderer (report §8.10). Columns are sized from their
+    widest cell, then from word minimums, with extra space shared in
+    proportion to want. Numbers and URLs are never broken. When the table
+    does not fit, it falls back to key/value records, then to stacked
+    records, then to the pipe source, as codex does. Each row is padded or
+    clipped by grapheme with `x/ansi`, so a wide glyph cannot leave a ghost
+    cell. Border glyphs come from `glyph`, with their ASCII twins, so
+    `stream` gains an import of `glyph`, which is downward.
+  * **`Bounded`** holds live tool output (report §8.10, codex's live
+    output). It keeps everything up to a byte limit, then the first and
+    last lines, with a per-line byte cap so output with no newlines stays
+    bounded. An escape sequence cut off at the head is closed before the
+    omitted-bytes marker. Truncation counts wrapped rows and reports the
+    omitted count in logical lines, so the count does not change with
+    width.
+* **§6, `inputfilter` becomes a chain of stages.**
+  * **Fragment reassembly.** SGR mouse and focus reports split across reads
+    are rejoined (report §8.5).
+  * **X10 repair.** X10 mouse reports that ConPTY and WSL relays corrupt,
+    for columns 95 and beyond, are re-encoded so they parse as one mouse
+    event and not as a mouse event plus a typed character.
+  * **Reply swallowing.** A probe reply that arrives after its deadline is
+    removed, not delivered as keys. The matchers come from 0005's probes.
+    `inputfilter` takes them as functions, so it does not import `termcap`.
+  * **A bare Esc flushes** anything a stage holds, so Esc never waits.
+  * **Typeahead.** The caller chooses per screen between `Capture`, which
+    keeps real typing from a window (text, Backspace, Shift or Alt+Enter,
+    pastes; cut at the first Esc) and replays it, and `Quarantine`, which
+    drops all input until a deadline, before a security-sensitive screen.
+    Neither is on by default (report §8.5, grok and codex).
+  * **Paste normalisation.** CRLF and lone CR become LF, because ConPTY
+    sends CR-only line ends. An empty bracketed paste becomes
+    `ClipboardImageRequestMsg`, because Windows Terminal before 1.25 sends
+    an image-only clipboard that way. `PastedPath(s, goos)` recognises a
+    dropped or pasted path: quoted, `file://`, drive letters and UNC, with
+    backslash escapes undone except on Windows (report §8.5).
+  * **Paste-burst cases.** `PasteBurstConfig` gains grok's PowerShell
+    rules as options: a shorter first gap, a longer run for path-shaped
+    input on Windows, and Enter followed by Ctrl+J read as a pasted CRLF.
+    Detection stays opt-in (Q3).
+  * **Wheel profiles.** `WithWheelProfile(eventsPerNotch int)` takes the
+    count a program derives from 0005's `Caps.Brand` and `Caps.Mux`: 1 for
+    iTerm2, WezTerm and the
+    xterm.js family, 3 for Apple Terminal, kitty, Ghostty and Alacritty,
+    and 1 under tmux, screen and zellij (report §8.5).
+
+**What does not change.**
+
+* Option A, the package set and the import direction. `inputfilter` still
+  imports only Bubble Tea, and `safetext` only the standard library and
+  `glyph`. The one new import is `stream` → `glyph`, for `FitTable`.
+* The answers to Q1 to Q5. `Text`, `Strict` and `Line` keep their meaning.
+  `Command` and `StatusLine` are new presets beside them.
+* The one new module stays `charm.land/glamour/v2`. A1 adds none.
+* Option D stays rejected for this record. On 2026-10-02 the owner chose a
+  separate `inline` record for scrollback output (report §11.2, candidate
+  12), which can build on `RenderView` and on the committed segments.
+* Re-sending the mouse modes on focus-in, which some relays need (report
+  §8.5), sets terminal modes, so it belongs to the planned `termmode`
+  record, not to this one.
+
+**Versioning.** A1 is additive. If it is accepted before this record's
+release, it ships in that minor. Otherwise it ships in the next minor.
+
+**Owner questions for A1.**
+
+* **Q6. Where the escape interpreter lives.** Recommended: `safetext`, as
+  `Interpret`, because it shares the sanitizer's parser and states. The
+  alternative is its own package, which keeps `safetext` to one job.
+* **Q7. Where `Writer` and `Upgrader` live.** Recommended: `frame`, beside
+  the scheduler they pace. The alternative is a new `termio` package for
+  `Writer`, which `frame` would not need to import.
+* **Q8. Where `FitTable` lives.** Recommended: `stream`, now, so `Plain`
+  can lay out tables. The alternative is to wait for the `table` record
+  (report §11.2, candidate 14), and leave `Plain` showing a table's
+  source until then.
+
 ## More Information
 
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md):
   §3 (crush, codex, gemini-cli, goose, aider), §5 (terminal standards), §7
-  (candidate 5).
+  (candidate 5); for A1, §8.5, §8.10, §8.12, §8.15, §8.17, §10 and §11.1.
 * [0002-MADR-multi-pane-workspace-layouts.md](0002-MADR-multi-pane-workspace-layouts.md)
   §3: `Pane`, `Changer` and mouse routing, which §5 and §6 build on.
 * [0002-PLAN-harden-workspace-v0-1-1.md](0002-PLAN-harden-workspace-v0-1-1.md):

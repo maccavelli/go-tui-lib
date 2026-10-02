@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-01
+date: 2026-10-02
 decision-makers: owner
 consulted: pi-go records 0004 and 0005 (the first consumer); go-core-lib 0004-MADR (the updatetea adapter); Charm v2 APIs (lipgloss v2.0.6, bubbletea v2.0.10, bubbles v2.2.1)
 informed: pi-go; ocp-login; go-core-lib
@@ -449,7 +449,7 @@ amendment A2). Every answer is the recommendation.
 
 ### A1 (2026-10-02): `v0.1.1` hardening
 
-*Status: proposed.* Its plan is
+*Status: accepted (2026-10-02).* Its plan is
 [0002-PLAN-harden-workspace-v0-1-1.md](0002-PLAN-harden-workspace-v0-1-1.md).
 
 **Found.** An audit of the tagged `v0.1.0` found defects in this record's
@@ -545,6 +545,13 @@ The renamed tuitest flag and the new default keys are behaviour changes,
 and the release notes say so.
 
 **Owner questions for A1.**
+
+*Answered 2026-10-02* (picked from options): Q5 "alt+. and alt+,"; Q6
+"v0.1.1". Both are the recommendation, so nothing above changes. The
+answers come before the plan's execution is approved: its Step 1 is done
+except for setting the plan `in-progress`.
+[0007-MADR-keymap-engine.md](0007-MADR-keymap-engine.md) later moves
+these defaults into the keymap engine and removes `workspace.KeyMap`.
 
 * **Q5. Default focus keys.** Recommended: `alt+.` for the next pane and
   `alt+,` for the previous one. Neither is a sequence introducer in legacy

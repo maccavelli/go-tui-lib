@@ -1,8 +1,8 @@
 ---
-status: proposed
+status: accepted
 date: 2026-10-02
 decision-makers: owner
-consulted: 0003-REPORT-agent-tui-ecosystem-research.md (§3, §4, §6, §7); Charm v2 APIs (bubbletea v2.0.10, bubbles v2.2.1, the ultraviolet revision in go.sum); VS Code keybindings and when-clause documentation; codex, gemini-cli and opencode keymap sources
+consulted: 0003-REPORT-agent-tui-ecosystem-research.md (§3, §4, §6, §7; §8, §9 and §11 for amendment A1); Charm v2 APIs (bubbletea v2.0.10, bubbles v2.2.1, the ultraviolet revision in go.sum); VS Code keybindings and when-clause documentation; codex, gemini-cli and opencode keymap sources
 informed: pi-go; go-core-lib
 ---
 # Bind keys to command IDs through a context-aware keymap engine, with chords, a leader key and VS Code-format user keymaps
@@ -480,10 +480,25 @@ func Schema(ids []command.ID, args func(command.ID) json.RawMessage) ([]byte, er
 * **Defaults.** `workspace.DefaultRules() []keymap.Default` returns the
   defaults that
   [0002-PLAN-harden-workspace-v0-1-1.md](0002-PLAN-harden-workspace-v0-1-1.md)
-  sets, unchanged, in the `workspace` context. No default is `ctrl+c`.
-* **New option.** `WithBindings(*keymap.Keymap)` is the new way in. It is
-  not named `WithKeymap`, because revive's `confusing-naming` rule rejects
-  names that differ from `WithKeyMap` only in case.
+  sets, unchanged, in the `workspace` and `overlay` contexts. They are the
+  only place the workspace's keys are written:
+
+  | Command | Default | Context |
+  | :--- | :--- | :--- |
+  | `workspace.focus.next` | `alt+.` | `workspace` |
+  | `workspace.focus.prev` | `alt+,` | `workspace` |
+  | `workspace.focus.pane` | `alt+1` … `alt+9`, `args` `{"index": n}` | `workspace` |
+  | `workspace.zoom` | `alt+z` | `workspace` |
+  | `workspace.resize.left`, `.right`, `.up`, `.down` | `alt+shift+left`, `+right`, `+up`, `+down` | `workspace` |
+  | `workspace.overlay.close` | `esc` | `overlay` |
+
+  `alt+.` and `alt+,` are the answer to 0002-MADR amendment A1, Q5. No
+  default is `ctrl+c`.
+* **New option.** `WithBindings(*keymap.Keymap)` is the only way in. The
+  name stays as first proposed. It was chosen over `WithKeymap` while
+  `WithKeyMap` was to stay beside it, because revive's `confusing-naming`
+  rule rejects names that differ only in case. With `WithKeyMap` removed,
+  that reason no longer applies, but renaming gains nothing.
 * **Focus path.**
   * `Workspace.KeyPath() keymap.Path` returns global, workspace, the
     focused pane as `pane:<id>`, then its own contexts, and then
@@ -493,13 +508,20 @@ func Schema(ids []command.ID, args func(command.ID) json.RawMessage) ([]byte, er
     `kind:editor` or `mode:vim-normal`.
   * While a modal overlay is open, the path is global and then that
     overlay only, so the layout's bindings do not reach through it.
-* **Compatibility for `v0`.**
-  * `KeyMap`, `DefaultKeyMap` and `WithKeyMap` stay, marked
-    `// Deprecated:`. `WithKeyMap` converts the struct into rules for the
-    `workspace` context, so there is one code path inside.
-  * A program that never calls either option behaves as before. Its tests
-    pass unchanged.
-  * Removal is a later minor release with its own record.
+* **`KeyMap` is removed in this release** (owner question Q4, answered
+  "remove now").
+  * `KeyMap`, `DefaultKeyMap` and `WithKeyMap` are deleted, not
+    deprecated. There is one code path, and no struct-to-rules converter.
+  * **This breaks** any program that names `workspace.KeyMap`, calls
+    `DefaultKeyMap`, or passes `WithKeyMap`. It fails to compile, so the
+    break cannot pass unnoticed. `v0` allows it.
+  * A program that never called `WithKeyMap` behaves as before, because
+    `DefaultRules` carries the same keys. Its tests pass unchanged.
+  * **A field maps to a command.** Each old field is one command ID from the
+    table above: `FocusNext` is `workspace.focus.next`, `FocusPane[i]` is
+    `workspace.focus.pane` with `{"index": i+1}`, `Close` is
+    `workspace.overlay.close`, and so on. A program that changed a field
+    writes one rule for that command in a program layer.
 * **`EscConsumer` keeps its meaning.** An overlay that handles Esc itself
   still gets it before `workspace.overlay.close`.
 * **Unmatched keys** go to the focused pane, or the top modal overlay, as
@@ -510,7 +532,15 @@ func Schema(ids []command.ID, args func(command.ID) json.RawMessage) ([]byte, er
 `keymap` ships in a minor release after
 [0006-MADR-command-registry.md](0006-MADR-command-registry.md)'s, because
 it needs `command.ID` and `when`. The owner names and tags the release.
-`v0` allows the deprecations in §9.
+`v0` allows the removals in §9.
+
+The release notes say, under a breaking-changes heading:
+
+* `workspace.KeyMap`, `DefaultKeyMap` and `WithKeyMap` are removed;
+* `WithBindings` and `DefaultRules` replace them;
+* the field-to-command mapping from §9, with one rebinding written as a
+  rule;
+* the default keys are unchanged from `v0.1.1`.
 
 ### Consequences
 
@@ -527,8 +557,9 @@ it needs `command.ID` and `when`. The owner names and tags the release.
 * Neutral, because the notation is Bubble Tea's, not VS Code's. Both
   parse, and the exporter writes VS Code's spellings where the file needs
   them.
-* Neutral, because `workspace.KeyMap` stays deprecated for a while. That
-  leaves two ways in until it is removed.
+* Bad, because removing `workspace.KeyMap` in this release breaks every
+  program that calls `WithKeyMap`. The break is a compile error, the
+  release notes give the mapping, and there is only one way in afterwards.
 * Bad, because `keymap` cannot land before `command` and `when`
   ([0006-MADR-command-registry.md](0006-MADR-command-registry.md)).
 * Bad, because the JSONC scanner, the schema emitter and the conflict
@@ -562,8 +593,14 @@ it needs `command.ID` and `when`. The owner names and tags the release.
   * Exporting and re-loading returns the same rules.
   * The schema's `key` pattern compiles under Go's `regexp` and accepts
     every canonical form the property tests produce.
-* **Workspace.** The 0002 workspace tests pass unchanged with the
-  deprecated `KeyMap`, and again through `WithBindings`.
+* **Workspace.**
+  * The 0002 workspace tests that set no key option pass unchanged, through
+    `DefaultRules`.
+  * Tests that built a `KeyMap` are rewritten as rules, and pass through
+    `WithBindings`.
+  * A golden table of `DefaultRules` pins the §9 defaults.
+  * `go doc ./workspace` lists no `KeyMap`, `DefaultKeyMap` or
+    `WithKeyMap`.
 * **Mutation proofs,** each seen failing on a scratch copy:
   * resolution walks the path outermost first;
   * a stale timeout is not ignored;
@@ -614,6 +651,14 @@ it needs `command.ID` and `when`. The owner names and tags the release.
 
 ## Owner questions
 
+*Answered 2026-10-02* (picked from options): Q1 "No default"; Q2 "Four";
+Q3 "Prefix error"; Q4 "Remove now"; Q5 "VS Code keybindings.json". Q1, Q2, Q3
+and Q5 are the recommendation. Q4 is not: `workspace.KeyMap` is removed in
+this release rather than deprecated. That changed §9 (compatibility and
+defaults), §10 (release notes), Consequences and Confirmation, and in
+[0007-PLAN-keymap-engine.md](0007-PLAN-keymap-engine.md) Steps 1, 7 and 8,
+Out of scope, and Rollback.
+
 * **Q1. The leader key.** Recommended: no library default. A program sets
   `Options.Leader`, and pi-go chooses. opencode's `ctrl+x` is the
   documented suggestion. The alternative is `ctrl+x` as the library
@@ -633,11 +678,222 @@ it needs `command.ID` and `when`. The owner names and tags the release.
   and Helix use, or YAML, as lazygit uses. Each needs a parser module and
   its own record.
 
+## Amendments
+
+### A1 (2026-10-02): second-pass findings
+
+*Status: proposed.* Its steps are 9 to 11 of
+[0007-PLAN-keymap-engine.md](0007-PLAN-keymap-engine.md), pending this
+amendment's acceptance.
+
+**Found.** A source-level pass over the Kilo, Grok Build, opencode and codex
+TUIs found keymap behaviour this record does not cover
+([0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md)
+§8.5, §8.13 and §9; the 0007 row of §11.1):
+
+* help and footers go stale after a rebind;
+* defaults that a terminal cannot deliver, such as Shift+Enter on VTE
+  before 8200 or Ctrl+Enter on Apple Terminal, are offered anyway;
+* legacy encodings reach the matcher unnormalised;
+* nothing shows a user what their terminal actually sent.
+
+None of it needs a new module.
+
+**What changes in the decision.**
+
+* **§6, the pending state is data for a which-key view.** opencode's panel
+  reads the keymap's pending sequence and the keys that can follow it
+  (0003-REPORT §8.5).
+
+  ```go
+  type ActiveKey struct {
+      Stroke    Stroke
+      Label     string     // as §2's Label writes it
+      Continues bool       // extends the sequence rather than completing it
+      Command   command.ID // "" when Continues
+  }
+  func (m *Matcher) ActiveKeys(p Path, ctx when.Context) []ActiveKey
+  ```
+
+  * `Pending()` already exists. With `ActiveKeys`, a which-key panel needs
+    nothing else. The panel is a component for a later record.
+  * **Editing a pending sequence.** While a sequence is pending, `esc`
+    clears it and is swallowed, and `backspace` removes its last stroke.
+    These are `Options.EscClearsPending` and `Options.BackspacePops`.
+    Owner question Q6 asks about the default.
+* **§5, defaults choose among alternatives by terminal fact.** A default
+  today has one `Fallback`, chosen by Kitty `Features` alone. The second
+  pass shows that the right key also depends on the terminal and the host
+  (0003-REPORT §8.5, §9):
+  * Shift+Enter arrives as a bare CR on VTE before 8200, in the xterm.js
+    family, and on unknown terminals with no multiplexer;
+  * Alt+Enter is preferred over SSH and under tmux before 3.3;
+  * Apple Terminal never delivers Ctrl+Enter;
+  * VS Code, Cursor, Windsurf and Zed take Ctrl+Q and Ctrl+I;
+  * Cmd+Enter is never a default, because many terminals bind it to
+    fullscreen.
+
+  ```go
+  type KeyFacts uint16 // ShiftEnter, AltEnter, CtrlEnter, Releases, HostTakesCtrlQ, HostTakesCtrlI
+  type Alternative struct {
+      Keys  Sequence
+      Needs Features
+      Facts KeyFacts // every fact named must hold
+  }
+  type Default struct {
+      Rule
+      Alternatives []Alternative // the first whose needs hold is bound; none means no binding
+  }
+  ```
+
+  * `Default.Fallback` and `Default.Needs` are replaced before they ship.
+    `Rule.Keys` is the preferred binding, and `Alternatives` are tried in
+    order when it cannot be delivered.
+  * `Options.Facts` carries the facts. They come from
+    [0005-MADR-terminal-capabilities-and-services.md](0005-MADR-terminal-capabilities-and-services.md).
+    Owner question Q7 asks how they get here.
+  * `Rebuild` takes facts as well as features, so a late probe reply
+    changes a default as a `KeyboardEnhancementsMsg` does today.
+  * Library defaults stay few. The newline case is a program's or the
+    composer's default, which this mechanism serves.
+* **§6, release bindings degrade.** A `Release` or `Repeat` stroke needs
+  `EventTypes` and the `Releases` fact. That fact comes from 0005's record
+  of the Kitty flags actually pushed (`Caps.ReleasesReported()`, 0005
+  amendment A1). It is false on Alacritty 0.14 and
+  older, and where iTerm2 or Ghostty leak releases for consumed shortcuts
+  (0003-REPORT §8.5).
+  * A default that binds a release names an alternative, such as hold to
+    talk becoming toggle.
+  * A user rule that binds one where releases are not reported is
+    `Unsupported` (§4), as now.
+* **§2, messages are normalised before matching.** When `Disambiguate` is
+  not in effect, `Matcher.Update` normalises a key first (codex and Grok,
+  0003-REPORT §8.5):
+  * a C0 byte with no modifier is `ctrl+` its letter, except ESC, TAB, CR
+    and BS, which keep their names;
+  * an upper-case letter with `ctrl` but no `shift` is `ctrl+shift+` its
+    lower case;
+  * `ctrl+5` is `ctrl+]`, and `ctrl+4` is `ctrl+\`;
+  * a raw BS or DEL is `backspace`, whatever the modifiers.
+
+  Two more rules apply always:
+  * on Windows, `ctrl+alt` with a printable `Text` is AltGr, and is text
+    for the pane, never a binding;
+  * a stroke with `super` ignores extra `meta` and `hyper` bits on the
+    message.
+
+  ```go
+  func Normalize(k tea.Key, f Features, goos string) (tea.Key, bool) // bool: changed
+  ```
+
+  `Options.GOOS` defaults to `runtime.GOOS`, and tests set it.
+* **§2, labels per operating system, with ASCII twins.**
+
+  ```go
+  func (s Stroke) Label(goos string, g glyph.Table) string
+  func (q Sequence) Label(goos string, g glyph.Table) string
+  ```
+
+  * macOS shows `⌥ ⌘ ⌃ ⇧`, and other systems show `alt+`, `super+`,
+    `ctrl+` and `shift+`. Arrows are `↑ ↓ ← →`.
+  * Each glyph comes from `glyph` with an ASCII twin (rule 3), so under
+    `LC_ALL=C` macOS shows `opt+` and `cmd+`, and every system shows `up`
+    for `↑`.
+  * `<leader>` displays as the leader's own label.
+  * Parsing still uses canonical strings. Labels are for display only.
+  * Over SSH from another operating system, the program passes the client's
+    system, which it may know and `keymap` cannot.
+  * `keymap` therefore imports `glyph`, an in-repository package (§1).
+* **§2, parse aliases apart from display aliases.** Two read-only tables:
+  * `ParseAliases`: `return`, `escape`, `pageup`, `pagedown`, `del`,
+    `option`, `cmd` and `win`, accepted on input only;
+  * `DisplayAliases`: `pgup`, `pgdn` and `del`, used by `Label` only.
+
+  opencode keeps these apart (0003-REPORT §8.5), so input stays liberal
+  while output stays short.
+* **§3, modes and reachability.**
+  * `workspace.PushMode(keymap.Context) (pop func())` appends a `mode:`
+    context to the focus path until `pop` is called. A dialog pushes
+    `mode:modal`.
+  * `Keymap.Reachable(p Path, ctx when.Context) iter.Seq[command.ID]`
+    lists the commands with a binding reachable along the path whose `when`
+    holds. [0008-MADR-command-palette.md](0008-MADR-command-palette.md) may
+    filter by it.
+* **§7, live hints.** `Keymap.Shortcut(id command.ID, p Path, goos string, g glyph.Table) string`
+  is the primary binding's label, or `""` when the command is unbound.
+  Tips, footers and help tables built from it drop a hint whose command is
+  unbound, so no hint goes stale after a rebind (0003-REPORT §8.5).
+* **A key-debug explanation.** It is data for a `keys debug` command that
+  shows a user what their terminal sent (codex, 0003-REPORT §8.5).
+
+  ```go
+  type Explanation struct {
+      Raw        tea.Key
+      Normalized tea.Key
+      Changed    bool     // Normalize changed it
+      Stroke     Stroke
+      Matches    []Rule   // in resolution order; the first wins
+      Shadowed   []Rule
+  }
+  func (m *Matcher) Explain(k tea.Key, p Path, ctx when.Context) Explanation
+  ```
+
+  The view, and its "your terminal is not sending that key" message after a
+  quiet interval, belong to the program.
+* **The copy keys.** `CopyStrokes` lists `ctrl+c`, `super+c` and
+  `ctrl+shift+c`: the keys a terminal may send for copy (codex,
+  0003-REPORT §8.13). They are for a program's own `selection` context.
+  `keymap` binds none of them, and `ctrl+c` stays the program's (rule 2).
+
+**What does not change.**
+
+* the notation's grammar, `MaxStrokes`, and the VS Code mapping;
+* contexts, layers, resolution order and the conflict kinds;
+* the matcher as a goroutine-free state machine driven by `Update`;
+* the user file format and the schema;
+* the bubbles adapters;
+* §9's move of the workspace, as answered in Q4;
+* `go.mod`, which gains nothing.
+
+**Placed elsewhere.**
+
+* **A vim engine** goes to the composer record (0003-REPORT §11.2, item
+  13), not here. It edits a document: it needs counts (`3dw`), undo groups,
+  atomic chips and grapheme offsets, which are the composer's model. A
+  sequence cannot express a count. `keymap` supplies only the `mode:vim-*`
+  contexts, and keys no rule matches already reach the focused pane, where
+  the engine reads them. Kilo's engine works on a document interface
+  (0003-REPORT §8.5), and that interface belongs with the composer.
+* **The macOS dropped-modifier probe** stays out. It needs cgo or
+  `purego`. On 2026-10-02 the owner allowed records for `golang.org/x/sys`,
+  `x/vt` with a PTY module, chroma and `golang.org/x/text`, and not for
+  `purego`. CI builds with `CGO_ENABLED=0`, which rules out cgo. Terminals
+  that drop modifiers get §5's alternatives instead.
+
+**Version.** Every addition is new API in `keymap`'s first release, if this
+amendment is accepted before 0007-PLAN Step 7 starts. Otherwise it is a
+later minor release. `Default.Fallback` never ships, so replacing it breaks
+nothing.
+
+**Owner questions for A1.**
+
+* **Q6. Editing a pending sequence.** Recommended: `EscClearsPending` and
+  `BackspacePops` are on by default, as in opencode. The alternative is off,
+  where `esc` ends the sequence and is replayed to the pane with the other
+  strokes.
+* **Q7. Where `KeyFacts` come from.** Recommended: `keymap` imports
+  `termcap`'s fact types and offers `FactsFrom(termcap.Caps) KeyFacts`.
+  This holds only while `termcap` stays a leaf package that performs no
+  I/O at import. The alternative keeps §1's "no `termcap` import": each
+  program converts 0005's facts into `KeyFacts` itself, a few lines that
+  every program repeats.
+
 ## More Information
 
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md):
   §1 findings 9 and 10, §3 (codex, gemini-cli, opencode), §6 (VS Code
-  keybindings, JSON Schema) and §7, item 4.
+  keybindings, JSON Schema) and §7, item 4; for amendment A1, §8.5, §8.13,
+  §9 and §11.1.
 * [0002-MADR-multi-pane-workspace-layouts.md](0002-MADR-multi-pane-workspace-layouts.md)
   §3: the workspace's key routing, which §9 moves onto this engine.
 * [0002-PLAN-harden-workspace-v0-1-1.md](0002-PLAN-harden-workspace-v0-1-1.md):
