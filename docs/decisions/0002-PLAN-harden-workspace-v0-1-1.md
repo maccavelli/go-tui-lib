@@ -1,6 +1,6 @@
 ---
-status: in-progress
-date: 2026-10-02
+status: complete
+date: 2026-10-03
 associated-madr: "0002-MADR-multi-pane-workspace-layouts.md"
 ---
 # Harden multi-pane workspaces (`v0.1.1`)
@@ -28,7 +28,8 @@ tree, and the owner can tag `v0.1.1`. *Amended by deviation D3: the
 release that completes this PLAN is `v0.1.3`; `v0.1.1` and `v0.1.2`
 both tag Steps 1–4.* *Amended by deviation D6: `v0.1.4` tags Steps 5–7a,
 there is no `v0.1.3`, and the release that completes this PLAN is
-`v0.1.5`.*
+`v0.1.5`.* *Amended by deviation D7: `v0.1.5` tags Step 8 without its
+`AGENTS.md` and architecture edits, and `v0.1.6` completes this PLAN.*
 
 ## Scope
 
@@ -1406,7 +1407,9 @@ Step 8 says, which is a records-only change.
 ### Release notes: `v0.1.5`
 
 `v0.1.5` completes this PLAN. The hardening of `v0.1.0` shipped in three
-tags, and there is no `v0.1.3`:
+tags, and there is no `v0.1.3`. *Deviation D7: `v0.1.6` completes it, and
+these notes stand for `v0.1.5` and `v0.1.6` together, as the table in deviation D7
+shows.*
 
 | Tag | Commit | Carries |
 | :--- | :--- | :--- |
@@ -1462,3 +1465,41 @@ No tag is retracted: each passed its gates. `layout.State` JSON written by
 * **Gates (`v0.1.4`), not API.** The conformance scan type-checks every
   package and also refuses `log/slog`'s default logger; `make modernize`
   fails on any `go fix` suggestion, and `make lint` runs it.
+
+### Deviation D7 (2026-10-03): `v0.1.5` and `v0.1.6` tag Step 8
+
+* **Found.** The owner tagged `4c6261e` as `v0.1.5`, and then `78129ef`
+  as `v0.1.6`, and pushed both.
+  * `v0.1.5` holds the guide, deviation D6 and the release notes, but not
+    Step 8's `AGENTS.md` and `docs/architecture.md` edits, which landed
+    after it in `823f233`.
+  * `v0.1.6` holds all of Step 8, and also another session's
+    [0001-PLAN-scaffold-charm-tui-library.md](0001-PLAN-scaffold-charm-tui-library.md)
+    Phase 6 record (`78129ef`).
+* **Evidence.** `git ls-remote --tags origin`: `refs/tags/v0.1.5^{}` is
+  `4c6261e`, and `refs/tags/v0.1.6^{}` is `78129ef`, the tip of `main`.
+  `git diff --stat v0.1.4 v0.1.6 -- '*.go' go.mod go.sum` is empty: no Go
+  file, `go.mod` or `go.sum` changed after `v0.1.4`. Both tags are
+  documentation releases.
+* **Not a defect.** Nothing is broken in either tag; neither is retracted.
+* **Decision.** Record only, as for D3 and D6. Both tags stay. `v0.1.6`
+  is the release that completes this PLAN. The release notes above stand
+  for `v0.1.5` and `v0.1.6`, with this table:
+
+  | Tag | Commit | Carries |
+  | :--- | :--- | :--- |
+  | `v0.1.5` | `4c6261e` | the guide, deviation D6, these release notes, and the 0001 records of another session |
+  | `v0.1.6` | `78129ef` | Step 8's `AGENTS.md` and `docs/architecture.md`, and the 0001 Phase 6 record |
+
+* **Changed.** The Goal and the release notes carry a D7 note. This PLAN
+  is `complete`. The records that name `v0.1.5` as the completed
+  hardening (D6's list) are not changed: `v0.1.5` and `v0.1.6` hold the
+  same Go code and the same API, so their statements about code,
+  baselines and golden files hold for either.
+
+### Close-out (2026-10-03)
+
+* CI run 37135649460 on the `v0.1.6` tag: `completed success` on ubuntu-24.04, macos-15 and windows-2025. The run on `main`
+  at the same commit also passed.
+* Every item under Verification holds, per the Step 8 record, and CI is
+  green on the pushed tree. This PLAN is `complete`.

@@ -255,3 +255,175 @@ as Order says (that PLAN's deviation D6 replaced `v0.1.3`).
   `accepted`.
 * Phase 2 starts after `v0.1.5` is tagged (0002-PLAN-harden-workspace-v0-1-1.md
   deviation D6).
+
+### Phase 2: `go.work` (2026-10-03)
+
+The owner approved Phase 2 ("Proceed") after the hardening PLAN closed:
+[0002-PLAN-harden-workspace-v0-1-1.md](0002-PLAN-harden-workspace-v0-1-1.md)
+is `complete`, and its deviation D7 made `v0.1.6` the release that
+completes it, in place of `v0.1.5`.
+
+**What changed.** `go work init .` at the root wrote `go.work`:
+
+```text
+go 1.27.1
+
+use .
+```
+
+No `toolchain`, `godebug` or `replace` line. The `go` command wrote no
+`go.work.sum`: with one module, every checksum is in `go.sum`.
+`.gitignore` ignores neither file, and is unchanged.
+
+**Checks.**
+
+* `go env GOWORK` names the file at the root. `go list -m` prints
+  `github.com/maccavelli/go-tui-lib` only.
+* `go build ./...` and `go test -count=1 ./...` exit 0 in workspace mode,
+  and again with `GOWORK=off`. `go mod tidy -diff` exits 0 both ways.
+* **Proof on a scratch copy.** With the `go` line lowered to `go 1.26.0`,
+  `go build ./...` exits 1:
+
+  ```text
+  go: module . listed in go.work file requires go >= 1.27.1, but go.work lists go 1.26.0; to download and use go 1.27.1:
+      go work use
+  ```
+
+  0010-REPORT §3's rule holds: a workspace's `go` line must be at least
+  every listed module's.
+* `make pre-add-check`: `29 file(s) clean`, govulncheck included, in
+  workspace mode. `make lint`: `make modernize` clean and `0 issues` for
+  linux, darwin and windows, in workspace mode and again with
+  `GOWORK=off`.
+* `go test -race -count=1 ./...` and `LC_ALL=C go test -count=1 ./...`:
+  every package `ok`, the conformance scan included, which now runs
+  `go list` inside the workspace.
+* **The Windows test host,** with `go.work` in the copied tree: `go vet`,
+  `go test -race -count=1 ./...` and `LC_ALL=C go test -count=1 ./...`
+  exited 0.
+* No script or workflow changed, so shellcheck and actionlint have nothing
+  new to check.
+
+**Note for Phase 5.** Until then, CI runs in workspace mode, because the
+committed `go.work` is found from the checkout's root. With the root as
+the only module, that builds and tests the same packages with the same
+requirements as `GOWORK=off`, as the checks above show. Phase 3 sets
+`GOWORK=off` in the gates, and Phase 5 in CI.
+
+### Phase 3: module discovery and per-module gates (2026-10-03)
+
+The owner approved Phase 3 ("Proceed").
+
+**What changed.**
+
+* **`scripts/go-modules.sh` (new).**
+  * With no argument it prints each module directory relative to the root,
+    `.` for the root, from `go list -m -f '{{.Dir}}'`. It sets `GOWORK` to
+    the root's `go.work` itself, so a caller running its gates with
+    `GOWORK=off` still gets every module.
+  * `--check` compares that list with the directories of the tracked
+    `go.mod` files. It names each module `go.work` lists without a tracked
+    `go.mod`, and each tracked `go.mod` missing from `go.work`, and exits 1.
+    A `go.work` entry with no `go.mod` fails in `go list` itself, and that
+    message is shown.
+  * It skips a tracked `go.mod` under `testdata`, or under a directory
+    whose name starts with `.` or `_`, as the `go` command does. None
+    exists today; the PLAN did not say, and the tests pin it.
+  * Without a `go.work`, `--check` exits 1 and listing exits 2.
+* **`scripts/go-precheck.sh`** runs per module, in the module's
+  directory, with the modules from `go-modules.sh`:
+  * `gofmt` on the module's files;
+  * with `GOWORK=off`: golangci-lint with the root's `.golangci.yml` for
+    linux, darwin and windows; `go vet`; `go test`; `go mod tidy -diff`;
+    `govulncheck` unless `GO_PRECHECK_SKIP_VULN=1`;
+  * `go test` again with `GOWORK` set to the root's `go.work`;
+  * for a module other than the root: no `replace` directive, and a
+    requirement of the root, if any, at `vX.Y.Z` (from
+    `go mod edit -print`);
+  * then, once, `go-modules.sh --check`.
+
+  Given files, it checks the modules that own them; a file belongs to the
+  deepest module containing it. Each module's output starts with
+  `go-precheck: module <dir> (<n> file(s))`. The summary line now names
+  `go mod tidy` and the module count:
+  `go-precheck: 29 file(s) clean in 1 module(s) (gofmt, golangci-lint, go vet, go test, go mod tidy, govulncheck).`
+  It runs under bash 3.2, macOS's `/bin/bash`, as well as bash 5.
+* **`Makefile`.**
+  * `test`, `vet`, `lint`, `vuln` and the new `tidy-check` run once per
+    module, in its directory, with `GOWORK=off`. A failure to list the
+    modules fails the target, rather than looping over nothing.
+  * `modernize`, which Step 7 of
+    [0002-PLAN-harden-workspace-v0-1-1.md](0002-PLAN-harden-workspace-v0-1-1.md)
+    added after this PLAN was written, runs per module too: it is a gate,
+    and 0010-MADR §4 runs every gate per module.
+  * `release-check` (new) runs the precheck over every module with no file
+    list. `fuzz`, `fmt`, `tidy` and `test-sum` are unchanged.
+* **`scripts/go-modules_test.sh` (new)** builds throwaway git
+  repositories under `mktemp -d`. It asserts 13 things:
+  * a root and a nested module in `go.work` list as two lines, even with
+    `GOWORK=off` set by the caller, and `--check` passes;
+  * a nested `go.mod` missing from `go.work` fails `--check`, which names
+    it;
+  * a `go.work` entry with no `go.mod` fails `--check`, which names it;
+  * a module in `go.work` whose `go.mod` is untracked fails `--check`;
+  * a `go.mod` under `testdata` or `_scratch` is skipped;
+  * no `go.work` fails `--check` and listing;
+  * an unknown argument exits 2.
+
+  It passes, 13 of 13. With `go-modules.sh`'s missing-module branch
+  mutated away (a scratch copy, passed in as `MODULES`), it fails:
+  `FAIL a module missing from go.work fails --check: want 1, got 0`.
+
+**Proofs.** A scratch copy of the tree gained `scratchmod/`, a module
+requiring the root at `v0.1.0`, tidied with `GOWORK=off`, and listed in
+`go.work`. Clean, the precheck over every module passes:
+`go-precheck: 30 file(s) clean in 2 module(s) (…)`. Each fault below is
+then the only one in its copy:
+
+| Fault | The precheck fails with |
+| :--- | :--- |
+| `require` of the root deleted | golangci-lint, `go vet` and `go test`: `no required module provides package github.com/maccavelli/go-tui-lib/glyph`; and `go mod tidy -diff`. In workspace mode, `go build ./...` in `scratchmod` exits 0, as 0010-REPORT §3 observed |
+| requires `v0.9.9`, which is not tagged | `reading github.com/maccavelli/go-tui-lib/go.mod at revision v0.9.9: unknown revision v0.9.9` |
+| requires `v9.9.9`, the PLAN's example | `version "v9.9.9" invalid: should be v0 or v1, not v9`. The path has no `/v9`, so the `go` command refuses the version before any lookup; `v0.9.9` is the case that is truly untagged |
+| `replace github.com/maccavelli/go-tui-lib => ../`, then tidied | `go.mod (scratchmod): a replace directive (a module builds from published versions only)` |
+| a pseudo-version of the root (`go get …@823f233`, then tidied) | `requires github.com/maccavelli/go-tui-lib at v0.1.6-0.20261003154935-823f23388bbb, which is not a release version (vX.Y.Z).` |
+| uses `layout.ErrBadSplitName`, which `v0.1.0` lacks, with `go.mod` and `go.sum` tidy | `./scratch.go:13:22: undefined: layout.ErrBadSplitName (typecheck)`, from golangci-lint, `go vet` and `go test` |
+| missing from `go.work`, over every module | `go-modules: scratchmod/go.mod is tracked, but go.work does not list scratchmod (run 'go work use scratchmod').` |
+| `func Undocumented() {}` | `exported: exported function Undocumented should have comment or be unexported (revive)`, for each GOOS |
+| `fmt.Sprintf("%d", "s")` | `go vet (scratchmod)`: `fmt.Sprintf format %d has arg "s" of wrong type string`, and golangci-lint's govet |
+
+The newer-API fault is added to the PLAN's list. It is the fault 0010-MADR
+§4 exists for: `go.mod` and `go.sum` are tidy, the workspace build passes,
+and only a build with `GOWORK=off` sees it. The deleted `require` does not
+prove `GOWORK=off`, because `go mod tidy -diff` catches it either way.
+
+**Mutations of the precheck,** each on the copy with its fault; each
+fault then passes, so each check is what catches it:
+
+| Check mutated away | Its fault then |
+| :--- | :--- |
+| `export GOWORK=off` removed | the newer-API fault passes, exit 0 |
+| the `replace` check | the tidied `replace` passes, exit 0 |
+| the release-version check | the tidied pseudo-version passes, exit 0 |
+| `go-modules.sh --check` | the module missing from `go.work` passes, exit 0 |
+
+With those checks in place, `make test` and `make lint` in a copy with no
+`go.work` exit 2 with `go-modules: no go.work at the repository root.`
+
+**Checks.**
+
+* `shellcheck scripts/*.sh`: exit 0. `scripts/go-fuzz_test.sh` and
+  `scripts/go-modules_test.sh`: pass.
+* `make pre-add-check` (all files), `make test`, `make vet`, `make lint`
+  (with `make modernize`), `make tidy-check`, `make vuln` and
+  `make release-check`: exit 0, each reporting module `.`.
+* `go test -race -count=1 ./...`, `LC_ALL=C go test -count=1 ./...` and
+  `go mod tidy -diff`: clean.
+* **The Windows test host:** `go vet`, `go test -race -count=1 ./...` and
+  `LC_ALL=C go test -count=1 ./...` exited 0. The scripts are bash, and CI
+  runs them on Linux only.
+* No workflow changed. CI runs `scripts/go-modules_test.sh` from Phase 5,
+  which owns the workflow; `shellcheck scripts/*.sh` there already covers
+  both new scripts.
+* `AGENTS.md`'s pre-add section still describes the steps correctly for
+  one module. Phase 6 documents the per-module behaviour.

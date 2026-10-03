@@ -14,7 +14,7 @@ it was when they were written
 | 0001 | REPORT | [TUI working example, fleet consumers and the planned packages](reports/0001-REPORT-tui-working-example-and-consumers.md) | — |
 | 0002 | MADR | [Build multi-pane terminal workspaces from a pure layout solver and a Bubble Tea pane host, with pi-go's agent session as the first consumer](decisions/0002-MADR-multi-pane-workspace-layouts.md) | accepted; A1, A2 accepted |
 | 0002 | PLAN | [Implement multi-pane workspaces (`v0.1.0`)](decisions/0002-PLAN-multi-pane-workspace-layouts.md) | complete |
-| 0002 | PLAN | [Harden multi-pane workspaces (`v0.1.1`)](decisions/0002-PLAN-harden-workspace-v0-1-1.md) | in-progress |
+| 0002 | PLAN | [Harden multi-pane workspaces (`v0.1.1`)](decisions/0002-PLAN-harden-workspace-v0-1-1.md) | complete |
 | 0003 | REPORT | [Agent TUI ecosystem research, an audit of `v0.1.0`, and a source pass over four agent TUIs](reports/0003-REPORT-agent-tui-ecosystem-research.md) | — |
 | 0004 | MADR | [Draw the workspace on an ultraviolet cell buffer, follow the terminal's width method and theme, and adopt Go 1.27 idioms in the public API](decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md) | accepted |
 | 0004 | PLAN | [Implement direct cell drawing, terminal-following width and theme, and Go 1.27 accessors (`v0.2.0`)](decisions/0004-PLAN-integrate-charm-v2-and-go-1-27.md) | proposed |

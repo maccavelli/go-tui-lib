@@ -559,6 +559,11 @@ deviation D6): `v0.1.4` tags `54bb489`, which holds Steps 5–7a, and there
 is no `v0.1.3`. Step 8, documentation only, ships as `v0.1.5`. The tag
 stays, for the reason D3 gives.
 
+*Amended 2026-10-03*
+([0002-PLAN-harden-workspace-v0-1-1.md](0002-PLAN-harden-workspace-v0-1-1.md)
+deviation D7): Step 8 is split across `v0.1.5` (`4c6261e`) and `v0.1.6`
+(`78129ef`), both documentation only. `v0.1.6` completes the hardening.
+
 *Amended 2026-10-02*
 ([0002-PLAN-harden-workspace-v0-1-1.md](0002-PLAN-harden-workspace-v0-1-1.md)
 deviation D4): testing `Wrap` against a real bubbles `textinput` makes
