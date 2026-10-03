@@ -542,8 +542,8 @@ The release notes say, under a breaking-changes heading:
 * `WithBindings` and `DefaultRules` replace them;
 * the field-to-command mapping from §9, with one rebinding written as a
   rule;
-* the default keys are unchanged from `v0.1.3`, the release that set
-  them (0002-PLAN-harden-workspace-v0-1-1.md deviation D3).
+* the default keys are unchanged from `v0.1.4`, the release that set
+  them (0002-PLAN-harden-workspace-v0-1-1.md deviations D3 and D6).
 
 ### Consequences
 

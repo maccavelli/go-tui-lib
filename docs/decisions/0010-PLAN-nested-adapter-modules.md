@@ -62,7 +62,7 @@ workspace holds the root module only, and every loop runs once.
 
 This PLAN runs after `0002-PLAN-harden-workspace-v0-1-1.md` is complete,
 because both change `scripts/go-precheck.sh`, the `Makefile` and CI, and
-`v0.1.3` should not wait for it. It runs before any step that creates an
+`v0.1.5` should not wait for it. It runs before any step that creates an
 adapter module.
 
 ## Rules for every phase
@@ -95,8 +95,8 @@ PLAN stays `proposed` until the owner approves its execution.
 
 *2026-10-03: done.* The owner approved this PLAN, and accepted 0006-MADR
 A1 and 0009-MADR A2. This PLAN is `in-progress`. Phases 2–6 run after
-0002-PLAN-harden-workspace-v0-1-1.md is complete and `v0.1.3` is tagged,
-as Order says.
+0002-PLAN-harden-workspace-v0-1-1.md is complete and `v0.1.5` is tagged,
+as Order says (that PLAN's deviation D6 replaced `v0.1.3`).
 
 ### Phase 2: `go.work`
 
@@ -253,4 +253,5 @@ as Order says.
   Phase 2.
 * `docs/README.md` shows this PLAN `in-progress`, and both amendments
   `accepted`.
-* Phase 2 starts after `v0.1.3` is tagged.
+* Phase 2 starts after `v0.1.5` is tagged (0002-PLAN-harden-workspace-v0-1-1.md
+  deviation D6).

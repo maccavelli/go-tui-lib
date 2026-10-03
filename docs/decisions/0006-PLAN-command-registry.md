@@ -26,7 +26,7 @@ Steps 1 to 9.
 
 **Revision, 2026-10-03.** The owner accepted MADR amendment A1, and
 approved [0010-PLAN-nested-adapter-modules.md](0010-PLAN-nested-adapter-modules.md),
-whose Phases 2–6 run after `v0.1.3`. Nothing in this PLAN's steps changes.
+whose Phases 2–6 run after `v0.1.5`. Nothing in this PLAN's steps changes.
 Steps 10 and 11 still wait for 0010-PLAN's Phases 2–5. This PLAN stays
 `proposed`, because its execution is not yet approved.
 

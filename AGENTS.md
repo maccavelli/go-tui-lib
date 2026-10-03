@@ -13,10 +13,12 @@ helpers shared between packages live under `internal/`. Requires Go 1.27.1.
 ## Dependencies
 
 No module may be required without a MADR in this repository that names it.
-`docs/decisions/0001-MADR-scaffold-charm-tui-library.md` §3 names the stack:
-`charm.land/bubbletea/v2`, `charm.land/lipgloss/v2`, `charm.land/bubbles/v2`,
+`docs/decisions/0001-MADR-scaffold-charm-tui-library.md` §3, with its
+amendment A3, names the stack: `charm.land/bubbletea/v2`,
+`charm.land/lipgloss/v2`, `charm.land/bubbles/v2`,
 `github.com/charmbracelet/colorprofile`, `github.com/charmbracelet/x/ansi` and
-`github.com/maccavelli/go-core-lib`. Any other module needs its own MADR.
+`github.com/maccavelli/go-selfupdate-lib` (formerly `go-core-lib`). Any other
+module needs its own MADR.
 
 Never import the Charm v1 paths `github.com/charmbracelet/bubbletea`,
 `github.com/charmbracelet/lipgloss` or `github.com/charmbracelet/bubbles`;

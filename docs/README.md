@@ -3,6 +3,9 @@
 ## Records
 
 Decisions and their implementation plans, in one numbered sequence.
+go-core-lib was renamed go-selfupdate-lib at `v1.5.0`. Records name it as
+it was when they were written
+([0001-MADR, A3](decisions/0001-MADR-scaffold-charm-tui-library.md#a3-2026-10-03-go-core-lib-is-now-go-selfupdate-lib)).
 
 | No. | Kind | Title | Status |
 | :--- | :--- | :--- | :--- |
@@ -53,7 +56,7 @@ Decisions and their implementation plans, in one numbered sequence.
 | know who will use this library | [0001-REPORT, §2 and §3](reports/0001-REPORT-tui-working-example-and-consumers.md#2-the-fleets-tui-programs) |
 | see the planned `updatetea` API | [0001-REPORT, §4](reports/0001-REPORT-tui-working-example-and-consumers.md#4-updatetea-as-go-core-lib-plans-it) |
 | know how the multi-pane workspace is designed | [0002-MADR](decisions/0002-MADR-multi-pane-workspace-layouts.md) |
-| know how this scaffold differs from go-core-lib's | [0001-MADR, §5](decisions/0001-MADR-scaffold-charm-tui-library.md#5-deliberate-differences-from-go-core-lib) |
+| know how this scaffold differs from go-core-lib's (now go-selfupdate-lib) | [0001-MADR, §5](decisions/0001-MADR-scaffold-charm-tui-library.md#5-deliberate-differences-from-go-core-lib) |
 | know what was wrong in `v0.1.0`, and how `v0.1.1` fixes it | [0003-REPORT, §1](reports/0003-REPORT-agent-tui-ecosystem-research.md#1-audit-of-v010) and [0002-PLAN-harden-workspace-v0-1-1.md](decisions/0002-PLAN-harden-workspace-v0-1-1.md) |
 | see how other agent TUIs solved streaming, keymaps, palettes and terminal features | [0003-REPORT](reports/0003-REPORT-agent-tui-ecosystem-research.md) |
 | know which terminal standards Bubble Tea v2 already handles | [0003-REPORT, §5](reports/0003-REPORT-agent-tui-ecosystem-research.md#5-terminal-standards) |

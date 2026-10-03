@@ -26,7 +26,9 @@ Fix every defect amendment A1 names, so that `v0.1.1`:
 Done means every item under Verification holds, CI is green on the pushed
 tree, and the owner can tag `v0.1.1`. *Amended by deviation D3: the
 release that completes this PLAN is `v0.1.3`; `v0.1.1` and `v0.1.2`
-both tag Steps 1–4.*
+both tag Steps 1–4.* *Amended by deviation D6: `v0.1.4` tags Steps 5–7a,
+there is no `v0.1.3`, and the release that completes this PLAN is
+`v0.1.5`.*
 
 ## Scope
 
@@ -409,7 +411,9 @@ Added 2026-10-02 by deviation D2, for MADR amendment A2.
 * **`docs/architecture.md`:** the conformance scan and the gate,
   including `log/slog` (Step 7a).
 * **Release notes for `v0.1.3`** (deviation D3) in the execution
-  record, which also say what `v0.1.1` and `v0.1.2` carry. They name the
+  record, which also say what `v0.1.1` and `v0.1.2` carry. *Deviation D6:
+  the notes are for `v0.1.5`, and also say what `v0.1.4` carries and that
+  there is no `v0.1.3`.* They name the
   behaviour changes: the flag, the default keys, focus messages,
   `Push` replacing an open ID, and `Solve` failing with `ErrBadSplitName`
   for a split name used twice in one solve or starting with `/`.
@@ -435,7 +439,9 @@ Added 2026-10-02 by deviation D2, for MADR amendment A2.
 ## Rollout and Rollback
 
 * **Rollout.** The owner pushes Steps 1–8 and tags `v0.1.3`
-  (deviation D3: `v0.1.1` and `v0.1.2` already tag Steps 1–4). pi-go, the one
+  (deviation D3: `v0.1.1` and `v0.1.2` already tag Steps 1–4).
+  *Deviation D6: `v0.1.4` already tags Steps 5–7a, so the owner tags
+  Step 8 `v0.1.5`.* pi-go, the one
   consumer, picks it up under its own records.
 * **Rollback.** Before the push, each step is one local commit. After it,
   a consumer pins `v0.1.0`, and the defects are fixed forward in a
@@ -1283,3 +1289,153 @@ and `slog.New(h)`, passed before and after.
 * `go mod tidy -diff`: no output, exit 0.
 * **The Windows test host:** `go vet`, `go test -race -count=1 ./...` and
   `LC_ALL=C go test -count=1 ./...` exited 0, every package `ok`.
+
+### Deviation D6 (2026-10-03): `v0.1.4` tags Steps 5–7a
+
+* **Found.** After Step 7a was pushed, the owner tagged that commit,
+  `54bb489`, as `v0.1.4` and pushed the tag. The owner first reported it
+  as `v1.4.0`; there is no such tag.
+* **Evidence.** `git ls-remote --tags origin`: `refs/tags/v0.1.4^{}` is
+  `54bb489`, the tip of `main`; `v0.1.0`, `v0.1.1` and `v0.1.2` are
+  unchanged; no `v0.1.3` and no `v1` tag exist. CI ran on the tag
+  (`v0.1.4`, push) and passed. The module proxy was not queried, as in D3.
+* **Not a defect in the code.** `v0.1.4` holds Steps 5, 6, 7 and 7a, each
+  of which passed its gates. Only Step 8, which is documentation, is
+  missing from it.
+* **Consequence.** The `go` command takes the highest version as latest.
+  A `v0.1.3` tagged later, on newer code, would rank below `v0.1.4` and
+  never be chosen.
+* **Decision** (the owner, 2026-10-03: "Proceed", on the recommendation):
+  * `v0.1.4` stays. A published tag is never moved or deleted, as in D3.
+  * `v0.1.3` is skipped; a gap in patch versions is legal.
+  * Step 8 ships as `v0.1.5`. Its release notes say what `v0.1.1`,
+    `v0.1.2` and `v0.1.4` carry, and that there is no `v0.1.3`.
+  * No `retract` directive: nothing is broken.
+* **Changed.** The Goal, Step 8's release notes and Rollout carry a D6
+  note. MADR A1 carries a dated note. Records that named `v0.1.3` as the
+  completed hardening now name `v0.1.5`:
+  [0004-MADR-integrate-charm-v2-and-go-1-27.md](0004-MADR-integrate-charm-v2-and-go-1-27.md)
+  and its PLAN, [0006-PLAN-command-registry.md](0006-PLAN-command-registry.md),
+  [0009-PLAN-streaming-content-engine.md](0009-PLAN-streaming-content-engine.md)
+  and [0010-PLAN-nested-adapter-modules.md](0010-PLAN-nested-adapter-modules.md).
+  [0007-MADR-keymap-engine.md](0007-MADR-keymap-engine.md), which names
+  the release that set the default keys, now names `v0.1.4`.
+* **Unchanged.** Step 8's content, the execution records' "for the
+  `v0.1.3` release notes" headings, which say where those notes were
+  meant to go and now go into `v0.1.5`'s, and D3's text.
+
+### Step 8: documentation and close-out (2026-10-03, in progress)
+
+The owner approved Step 8 ("Proceed") with deviation D6. At the owner's
+request the agent first committed the 0001 records another session had
+written (`de692a0`, records only).
+
+**Done.**
+
+* **`docs/guides/building-workspaces.md`:**
+  * split names: unresizable unnamed splits, unique within a solve,
+    reusable across `Responsive` rules, never starting with `/`, and
+    `ErrBadSplitName`;
+  * a Focus section: who has the keyboard, the two messages, a value-type
+    pane handling them, when focus moves, `Focus` under a modal overlay,
+    and `Focuser` for a pointer pane, one or the other;
+  * a "Host a bubbles component" section: `Wrap` over `textinput` and
+    `viewport`, the methods it finds, the five options, reading the
+    component back, and `SetVirtualCursor(false)`;
+  * keys: `alt+.` and `alt+,`, why `[ ] O P _ ^ X \` are avoided, and the
+    `v0.1.0` keys;
+  * resize: moved from where it is drawn, applied deltas stored, a no-op
+    press stores nothing, a window resize never changes the state;
+  * overlays: sizes, focus, IDs as their own namespace, replacing an open
+    ID, `SendOverlay`;
+  * concurrency: a `Workspace` is called from `Update` and `View` only.
+* The guide's new Go samples were compiled and run as a test on a scratch
+  copy: typed text reached the wrapped, focused `textinput`, and the
+  value-type `list` compiled. `markdownlint-cli2`: 0 issues.
+
+**Pending.** `AGENTS.md` (the tuitest switches and `make modernize`) and
+`docs/architecture.md` (the conformance scan, `log/slog` and the gate).
+Another session has uncommitted, finished edits in both files, under
+[0001-PLAN-scaffold-charm-tui-library.md](0001-PLAN-scaffold-charm-tui-library.md)
+Phase 5. They are edited here only after that work is committed, so that
+neither commit carries the other's change.
+
+**Verification**, on the tree at this point:
+
+* `make pre-add-check` over every tracked Go file: `29 file(s) clean`,
+  govulncheck included.
+* `make lint`: `make modernize` clean for linux, darwin and windows, then
+  `0 issues` for each.
+* `make vuln`: `No vulnerabilities found.`
+* `go test -race -count=1 ./...`, `go test -shuffle=on -count=2 ./...` and
+  `LC_ALL=C go test -count=1 ./...`: every package `ok`.
+* `make fuzz`: the layout fuzz target ran 20 s clean
+  (`go-fuzz: 1 fuzz targets ran clean in ./layout`).
+* `go mod tidy -diff`: exit 0. Against `v0.1.0`, `go.mod` differs by one
+  line, `github.com/atotto/clipboard v0.1.4 // indirect`: deviation D4.
+* Golden files: no file under any `testdata/` from `v0.1.0` is modified or
+  deleted. Eight were added, Step 2's `tuitest/internal/clash` goldens.
+  No golden file showed a focus key, so the new keys changed none.
+* **The Windows test host:** `go vet`, `go test -race -count=1 ./...` and
+  `LC_ALL=C go test -count=1 ./...` exited 0.
+* The identifier scan finds nothing in the changed files.
+
+### Release notes: `v0.1.5`
+
+`v0.1.5` completes this PLAN. The hardening of `v0.1.0` shipped in three
+tags, and there is no `v0.1.3`:
+
+| Tag | Commit | Carries |
+| :--- | :--- | :--- |
+| `v0.1.1`, `v0.1.2` | `4253e9d` | Steps 1–4 (deviation D3: one commit, two tags) |
+| `v0.1.4` | `54bb489` | Steps 5, 6, 7 and 7a (deviation D6) |
+| `v0.1.5` | the Step 8 commit | documentation only; no Go file changes from `v0.1.4` |
+
+No tag is retracted: each passed its gates. `layout.State` JSON written by
+`v0.1.0` loads unchanged.
+
+**Behaviour changes since `v0.1.0`:**
+
+* **`tuitest` (`v0.1.1`).** It no longer registers `-update`, which
+  panicked in a consumer that defined its own. It registers
+  `-tuitest.update`, reads `TUITEST_UPDATE=1` (or `true`), and honours a
+  boolean `-update` that the test binary defines.
+* **`layout` (`v0.1.1`).**
+  * `Plan.Resize` reports the delta `Solve` applied to each moved
+    separator, after clamping.
+  * `Separator.Resizable` is true for a named split's separators only.
+  * `Solve` fails with `ErrBadSplitName` when one split name is used
+    twice in a solve, or a name starts with `/`.
+* **Overlays and the view cache (`v0.1.1`).**
+  * A modal overlay anchored `BelowCursor` no longer overflows the stack.
+  * Views are cached by kind and ID, so a pane and an overlay may share an
+    ID; `SetPane` drops the replaced pane's view.
+  * Each overlay is told its content size when pushed and on every resize.
+  * Pushing an open overlay ID replaces it, on top. `SendOverlay` reaches
+    an overlay only.
+* **Focus (`v0.1.4`).**
+  * Panes receive `PaneFocusMsg` and `PaneBlurMsg` through `Update`, and
+    the workspace keeps the returned value, so value-type panes and
+    bubbles models see their focus. A `Focuser` is still called first.
+  * `Wrap` and `Model` host a bubbles component as a pane.
+  * A non-modal overlay no longer has its `Focuser` called.
+  * `Focus` while a modal overlay is open takes effect when it closes.
+* **Keys (`v0.1.4`).** The default focus keys are `alt+.` and `alt+,`, in
+  place of `alt+]` and `alt+[`, which legacy terminals cannot tell from
+  the start of a control sequence.
+* **Resize (`v0.1.4`).**
+  * `State().Resize` holds the delta the layout applied, and a resize
+    moves from where the separator is drawn, so moving back from a limit
+    responds at once.
+  * A press that moves nothing stores nothing. A window resize never
+    changes the state.
+  * A separator that is not `Resizable` is ignored by `Resize`, the keys
+    and a drag; the keys move the nearest resizable one.
+* **Concurrency (`v0.1.4`).** A `Workspace` is documented as not safe
+  for concurrent use.
+* **Module (`v0.1.4`).** `go.mod` requires
+  `github.com/atotto/clipboard v0.1.4 // indirect`, which bubbles'
+  `textinput` imports. Only tests import it (deviation D4).
+* **Gates (`v0.1.4`), not API.** The conformance scan type-checks every
+  package and also refuses `log/slog`'s default logger; `make modernize`
+  fails on any `go fix` suggestion, and `make lint` runs it.

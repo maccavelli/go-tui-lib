@@ -583,3 +583,40 @@ requirement, and no Go file changes.
 | `447f508` | `ff1ff54` |
 | `0152171` | `1f6497a` |
 | `85ab9c1` | `b54b217` |
+
+### Phase 5: go-core-lib is now go-selfupdate-lib (2026-10-03)
+
+* **Approval.** The owner approved Phase 5: "A3, remove reference. Update
+  docs. Proceed". "A3, remove reference" settled the question A3 had left
+  open. §1's "UI-free code belongs in go-core-lib" is withdrawn, and §1
+  strikes it through. A3 and step 1 were revised to say so before any
+  commit.
+* **Records.** Another session committed A3 and this phase, records only,
+  as `de692a0`, at the owner's request ("Commit those docs"). That commit
+  carries the revised text.
+* **What was done.**
+  * `AGENTS.md`: the stack cites amendment A3 and ends with
+    `github.com/maccavelli/go-selfupdate-lib` (formerly `go-core-lib`).
+  * `docs/architecture.md`: "Named but not yet required" is
+    `github.com/maccavelli/go-selfupdate-lib` (formerly `go-core-lib`).
+  * `docs/README.md`: a sentence under Records on the rename, linking A3,
+    and the row "know how this scaffold differs from go-core-lib's (now
+    go-selfupdate-lib)".
+* **Checks.** The link, marker and identifier checks are one scratch
+  Python script. Each was run on the tree, then on a scratch copy with a
+  planted break.
+
+  | Check | Result |
+  | :--- | :--- |
+  | markdownlint-cli2 over the three documents | 0 issues |
+  | relative links, anchors included, in the three documents and this pair | 65 checked, 0 broken |
+  | the same, with `[broken](missing.md)` appended to a copy of `docs/README.md` | `FAIL docs/README.md:77: broken relative link: missing.md`, exit 1 |
+  | marker scan over the three documents | no unexpected mention. Allowed: "formerly `go-core-lib`", "go-core-lib's (now go-selfupdate-lib)", "go-core-lib was renamed go-selfupdate-lib", link targets, and rows of the records index |
+  | the same, with a stray mention appended to a copy of `docs/architecture.md` | `FAIL docs/architecture.md:136: unexpected go-core-lib mention`, exit 1 |
+  | identifier scan (V7) over the three documents and this pair | none found; a home path planted in a copy of `AGENTS.md` failed |
+  | `git diff --check` | clean |
+
+* **Not done, as step 5 states.** The comments in
+  `.github/workflows/ci.yml`, `Makefile`, `scripts/go-precheck.sh`,
+  `scripts/go-fuzz.sh` and `scripts/go-fuzz_test.sh` still cite go-core-lib
+  records by the former name. They wait for a change of their own.

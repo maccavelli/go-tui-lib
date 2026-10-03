@@ -95,7 +95,19 @@ root := layout.Split{Name: "cols", Axis: layout.Horizontal, Gap: 1, Children: []
   `layout.Leaver` so its hidden panes are reported.
 
 Name a split (`Name: "cols"`) to make its separators resizable. They are
-called `cols:0`, `cols:1`, and so on.
+called `cols:0`, `cols:1`, and so on. An unnamed split's separators are
+named by position, which changes when the tree does, so they cannot be
+resized.
+
+Split names follow two rules, and `layout.Solve` returns
+`layout.ErrBadSplitName` when one is broken:
+
+- **A name is used once in a solve.** Two splits with one name would share
+  their separators' IDs, so one resize would move both. Each alternative of
+  a `layout.Responsive` is solved alone, so the same name may appear in
+  several of its rules; that is how a resize survives a fold.
+- **A name never starts with `/`.** That prefix is reserved for the
+  positional IDs of unnamed splits.
 
 ## Write a pane
 
@@ -115,7 +127,7 @@ changes. Optional interfaces add the rest:
 | :--- | :--- |
 | `Titled` | a title in the chrome (default: the pane's ID) |
 | `Badged` | a badge after the title, such as an unread count |
-| `Focuser` | `Focus() tea.Cmd` and `Blur()` when focus moves |
+| `Focuser` | `Focus() tea.Cmd` and `Blur()` when focus moves, for a pointer pane |
 | `Focusable` | `Focusable() bool`, false for a footer |
 | `Sizer` | a minimum content size, which raises the layout minimum |
 | `Cursorer` | the terminal cursor, in pane cells, while focused |
@@ -131,15 +143,97 @@ Messages reach panes like this:
 - `workspace.To(id, msg)` from a command, or `ws.Send(id, msg)` directly,
   targets one pane.
 
+A `Workspace` is not safe for concurrent use. Call it from your model's
+`Update` and `View`, which Bubble Tea runs on one goroutine. Commands run
+elsewhere, and reach the workspace only as the messages they return.
+
+## Focus
+
+One pane has the keyboard: the focused pane, or the top modal overlay while
+one is open. When that changes, the pane losing it gets
+`workspace.PaneBlurMsg` and the pane gaining it gets
+`workspace.PaneFocusMsg`, through `Update`. The workspace keeps the value
+`Update` returns, so a pane with value semantics sees its own focus:
+
+```go
+type list struct {
+    items   []string
+    focused bool
+}
+
+func (l list) Update(msg tea.Msg) (workspace.Pane, tea.Cmd) {
+    switch msg.(type) {
+    case workspace.PaneFocusMsg:
+        l.focused = true
+    case workspace.PaneBlurMsg:
+        l.focused = false
+    }
+    return l, nil
+}
+```
+
+The first pane is told in `ws.Init()`. Focus moves on the focus keys, a
+click, `ws.Focus(id)`, hiding the focused pane, and opening or closing a
+modal overlay. `ws.Focus(id)` while a modal overlay is open changes the
+focused pane, which is told when the overlay closes.
+
+A pointer pane may implement `Focuser` instead; its `Focus` and `Blur` are
+called first, and it gets the messages too. Implement one or the other,
+not both.
+
+## Host a bubbles component
+
+`workspace.Wrap` hosts a bubbles component, or any model built like one,
+as a pane:
+
+```go
+ti := textinput.New()
+ti.SetVirtualCursor(false) // the terminal's cursor, which ws.Cursor() places
+
+ws := workspace.New(layout.SidebarRight("chat", "log"), map[layout.PaneID]workspace.Pane{
+    "chat": workspace.Wrap(ti),
+    "log":  workspace.Wrap(viewport.New()),
+})
+```
+
+`Wrap` finds the component's own methods:
+
+- `SizeMsg` calls `SetSize(width, height)`, or `SetWidth` and `SetHeight`;
+- `PaneFocusMsg` calls `Focus()`, and `PaneBlurMsg` calls `Blur()`;
+- the pane's cursor is the component's `Cursor()`, and its bindings are
+  `Keys()`;
+- every other message reaches the component's `Update`, and its `View` is
+  clipped to the pane.
+
+`OnSize`, `OnFocus`, `OnBlur`, `WithCursor` and `WithKeys` replace any of
+them. Read the component back through the pane:
+
+```go
+if p, ok := ws.Pane("chat"); ok {
+    value := p.(*workspace.Model[textinput.Model]).M.Value()
+    _ = value
+}
+```
+
+`textinput` and `textarea` draw a virtual cursor in their view by default,
+and then report none. Call `SetVirtualCursor(false)` for the terminal's
+cursor, as above.
+
 ## Keys and the mouse
 
 `workspace.DefaultKeyMap()` uses alt, so tab, the arrows and alt+arrows stay
 with your panes:
 
-- `alt+]` and `alt+[` move focus, and `alt+1` to `alt+9` focus a pane;
+- `alt+.` and `alt+,` move focus, and `alt+1` to `alt+9` focus a pane;
 - `alt+z` zooms the focused pane, and restores it;
-- `alt+shift+arrows` move the nearest separator;
+- `alt+shift+arrows` move the nearest resizable separator;
 - `esc` closes the top overlay.
+
+Without an enhanced keyboard protocol a terminal sends alt+x as ESC and x.
+ESC followed by `[`, `]`, `O`, `P`, `_`, `^`, `X` or `\` also starts a
+control sequence, so those keys cannot be told reliably from one. No
+default uses alt with them; avoid them when you rebind. (`v0.1.0` used
+`alt+]` and `alt+[`.)
 
 Rebind any of them with `SetKeys`, remove one with `Unbind`, and pass the
 result with `WithKeyMap`.
@@ -150,6 +244,13 @@ With a mouse mode set:
 - the wheel scrolls the pane under the pointer, focused or not;
 - dragging a separator resizes;
 - panes receive their mouse events in their own cells.
+
+A resize, by key, by drag or by `ws.Resize(sep, delta)`, moves the
+separator from where it is drawn, as far as the panes' bounds allow. The
+state keeps what moved, not what was asked for, so after holding a key or
+dragging past a limit, moving back responds at once. A press that moves
+nothing changes nothing. A window resize never changes the state, so a
+layout squeezed by a small window comes back when the window grows.
 
 ## Overlays
 
@@ -164,12 +265,21 @@ ws.Push(workspace.Overlay{ID: "permission", Pane: dialog, Width: 40, Height: 7, 
   drives it.
 - **Placement.** `Anchor{Kind: workspace.BelowCursor}` places it under the
   cursor, and `Anchor{Kind: workspace.OnPane, Pane: id}` relative to a pane.
+- **Size.** An overlay's pane gets `SizeMsg` with its content size when it
+  opens, and again whenever a resize changes it.
+- **Focus.** A modal overlay takes the keyboard: the focused pane gets
+  `PaneBlurMsg`, and the overlay's pane `PaneFocusMsg`; closing it gives
+  the keyboard back. A non-modal overlay changes no focus.
+- **IDs.** Overlay IDs are their own namespace, apart from pane IDs, so an
+  overlay may share a pane's ID. Pushing an ID that is already open
+  replaces that overlay, on top. `ws.SendOverlay(id, msg)` reaches an open
+  overlay only; `ws.Send(id, msg)` tries a pane first, then an overlay.
 - **Closing.** `esc` or `ws.Pop()` closes it.
 
 ## Persist the layout
 
-`ws.State()` returns what the user changed: separator moves, hidden panes,
-the zoomed pane. It marshals to JSON. Store it in your settings and give it
+`ws.State()` returns what the user changed: separator moves, as applied,
+hidden panes, the zoomed pane. It marshals to JSON. Store it in your settings and give it
 back with `workspace.WithState(st)`. It is re-clamped at every size, so a
 layout saved on a wide terminal opens safely on a narrow one. An unknown
 version is refused.

@@ -76,8 +76,8 @@ docs/
   v2.0.6, `charm.land/bubbles/v2` v2.2.1,
   `github.com/charmbracelet/colorprofile` v0.4.3 and
   `github.com/charmbracelet/x/ansi` v0.11.8.
-- **Named but not yet required:** `github.com/maccavelli/go-core-lib`, for
-  `updatetea`.
+- **Named but not yet required:** `github.com/maccavelli/go-selfupdate-lib`
+  (formerly `go-core-lib`), for `updatetea`.
 - **Refused by `depguard`,** in source and tests:
   - the Charm v1 paths `github.com/charmbracelet/bubbletea`, `…/lipgloss`
     and `…/bubbles`;
