@@ -1048,3 +1048,136 @@ rule 2:
   `LC_ALL=C go test -count=1 ./...` exited 0, every package `ok`.
 * `docs/guides/building-workspaces.md` still names `alt+]` and `alt+[`.
   Step 8 updates it with the other guide changes.
+
+### Step 7: gates (2026-10-02)
+
+The owner approved Step 7 ("proceed") after committing Step 6 (`8b83603`).
+
+**What changed.**
+
+* **`internal/conformance` scans by type.**
+  * Each package is parsed with `go/parser` and type-checked with
+    `go/types` and `importer.ForCompiler(fset, "source", nil)`. Every
+    identifier is resolved through `types.Info.Uses`, so a renamed import,
+    a dot import, a function value and a method value name the same object
+    as a plain use. A local name that only matches a rule is not a use. A
+    package that does not type-check fails the test.
+  * Outside tests, it fails on:
+    * the objects `os.Stdout` and `os.Stderr`;
+    * `fmt.Print`, `fmt.Printf` and `fmt.Println`;
+    * `log`'s `Print`, `Printf`, `Println`, `Fatal`, `Fatalf`, `Fatalln`,
+      `Panic`, `Panicf`, `Panicln` and `Output`, and also `Default` and
+      `Writer`, which hand out the standard logger and its writer, so
+      that a method value on them cannot hide a write;
+    * the `print` and `println` builtins;
+    * `signal.Notify`;
+    * a write to `tea.View`'s `AltScreen` field, matched by object, so
+      that a field promoted through an embedded `tea.View` counts too.
+      Assigning it, setting it in a composite literal, and taking its
+      address are writes; reading it is not.
+  * **Modules (0010-MADR §4).** The scan finds every module by its
+    `go.mod`, skipping `testdata`, `.` and `_` directories, and scans each
+    module in its own subtest. It does not descend into a nested module's
+    directory from its parent.
+    * The source importer resolves imports with `go list` in the working
+      directory, not the importing package's (`go/build`, `importGo`).
+      So each subtest calls `t.Chdir` into its module before type-checking.
+    * Today the root is the only module, and the result is the same set of
+      packages as before, plus `tuitest/internal/clash`, which the list of
+      required packages now names.
+  * **cgo is off for the scan** (`build.Default.CgoEnabled = false`), as
+    for every cross-target command here, so that reading a dependency
+    never needs a C toolchain. The source importer passes the setting to
+    `go list` as `CGO_ENABLED`.
+  * **Files are read for the host's GOOS.** CI runs the test on Linux,
+    macOS and Windows, so each operating system's files are scanned there.
+    The name-matching scan read every file whatever its build constraints;
+    the matrix covers that now.
+  * The planted-source test type-checks each source as if it were a file
+    in `internal/conformance`, so its imports, bubbletea included, resolve
+    in this module. Nothing is written to the tree.
+* **`make modernize`** runs `go fix -diff ./...` for linux, darwin and
+  windows with `CGO_ENABLED=0`, as `make lint` does. It fails on any
+  suggestion: `go fix -diff` exits 1 when it prints a diff, measured on a
+  scratch copy before the target was written. `make lint` depends on it,
+  so CI's lint job runs it. The step is renamed "vet, gofmt, tidy,
+  modernize, lint", with a comment citing this step.
+
+**Readings of the PLAN's text.**
+
+* The planted `o := os; o.Stdout.Write(…)` does not compile: a package is
+  not a value. The proof uses the import alias `import o "os"`, which is
+  the alias the bullet "an alias … cannot hide a use" means.
+* "Every function of `log` that writes to standard error" is the ten
+  writing functions, plus `Default` and `Writer`, as above.
+* **Not covered:** `log/slog`'s package-level functions (`slog.Info` and
+  the others) also write to standard error through the default logger.
+  The PLAN names `log` only, so the scan does not cover `slog`. Recorded
+  as a candidate for a later amendment, not done here.
+
+**Regression first.** Each planted file went into `workspace/zz_plant.go`
+on a scratch copy. Each was run against the new scan, and against
+`HEAD`'s name-matching scan:
+
+| Planted | New scan | `HEAD`'s scan |
+| :--- | :--- | :--- |
+| `import o "os"` and `o.Stdout.Write(nil)` | fails: `workspace/zz_plant.go:5 uses os.Stdout` | passes |
+| `import xfmt "fmt"` and `xfmt.Println()` | fails: `prints to standard output with fmt.Println` | passes |
+| `log.Print("x")` | fails: `writes to standard error with log.Print` | passes |
+| `println("x")` | fails: `calls the builtin println` | passes |
+| `v := tea.View{}; v.AltScreen = true` | fails: `workspace/zz_plant.go:7 sets AltScreen` | fails: `sets AltScreen` |
+
+A planted `for k, v := range m { out[k] = v }` in `glyph` fails
+`make modernize`: each of the three targets prints the `maps.Copy`
+diff, `go fix has suggestions for GOOS=…`, and make exits 2.
+
+**Tests** (`internal/conformance/conformance_test.go`):
+
+* `TestNoPackageOwnsTheTerminal` scans every module, and requires that
+  `glyph`, `layout`, `theme`, `tuitest`, `tuitest/internal/clash` and
+  `workspace` were read;
+* `TestScanFindsEachRule` type-checks ten planted sources:
+  * an import alias of `os`;
+  * a renamed `fmt`;
+  * a dot import of `fmt`;
+  * function and method values;
+  * `os.Stderr` passed as a writer;
+  * `log.Print` and `log.Default().Println`;
+  * both print builtins;
+  * `signal.Notify`;
+  * `AltScreen`, set three ways, its address taken and a read not
+    counted;
+  * names that only match: a parameter named `os`, a local `Println`, a
+    `*log.Logger` the code was given, and a local struct's `AltScreen`.
+    These must find nothing.
+
+**Mutation proofs**, each on a scratch copy; none survived:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| the scan skips the `log` package | `found map[], want map[… log.Default:1 … log.Print:1]` |
+| the scan stops resolving aliases: a use through a renamed or dot import is skipped | `found map[], want map[uses os.Stdout:1]`; the same for the renamed `fmt` |
+| `make modernize` drops `-diff` | the planted-loop proof: `make modernize` exits 0, so the gate passes the loop |
+| the scan misses a field promoted through an embedded `tea.View` | `"sets AltScreen" found 2 times, want 3` |
+| the scan matches any field named `AltScreen` | `names that only match`: `found map[sets AltScreen:2], want map[]` |
+| the scan skips packages nested two levels down | `the scan did not read tuitest/internal/clash` |
+
+The last three are added to the PLAN's three, for the field matching by
+object and for the walk.
+
+**Checks.**
+
+* `make pre-add-check FILES=internal/conformance/conformance_test.go`:
+  `1 file(s) clean`, govulncheck included.
+* `make lint`: `make modernize` reports nothing for the three targets,
+  then `0 issues` for linux, darwin and windows.
+* `go test -race -count=1 ./...`, `LC_ALL=C go test -count=1 ./...` and
+  `go test -shuffle=on -count=2 ./...`: every package `ok`. The
+  conformance package takes about 5 s, and 17 s under `-race`.
+* `go mod tidy -diff`: no output, exit 0. `go.mod` is unchanged: the scan
+  uses the standard library only.
+* `actionlint` v1.7.12 on the workflows: exit 0.
+* **The Windows test host:** `go vet`, `go test -race -count=1 ./...` and
+  `LC_ALL=C go test -count=1 ./...` exited 0, every package `ok`. The
+  source importer loaded every dependency there. The conformance package
+  takes 40 s under `-race` and 15 s without it.

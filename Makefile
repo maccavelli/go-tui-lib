@@ -9,7 +9,7 @@ GOVULNCHECK   ?= $(or $(wildcard $(GOBIN)/govulncheck),$(GOPATH_BIN)/govulncheck
 GOTESTSUM     ?= $(or $(wildcard $(GOBIN)/gotestsum),$(GOPATH_BIN)/gotestsum,$(shell command -v gotestsum 2>/dev/null))
 FLEET_LINT_CFG := .golangci.yml
 
-.PHONY: all help test test-sum fmt vet lint tidy vuln fuzz pre-add-check
+.PHONY: all help test test-sum fmt vet lint modernize tidy vuln fuzz pre-add-check
 
 all: help
 
@@ -34,7 +34,7 @@ vet: ## Runs go vet
 # (go-core-lib docs/decisions/0002-MADR-rehome-selfupdate-from-mcplib.md §5).
 LINT_GOOS := linux darwin windows
 
-lint: ## Runs golangci-lint with fleet config for linux, darwin and windows
+lint: modernize ## Runs make modernize, then golangci-lint with fleet config for linux, darwin and windows
 	@if [ ! -x "$(GOLANGCI_LINT)" ]; then \
 		echo "golangci-lint not found at $(GOLANGCI_LINT)"; \
 		echo "Install: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest"; \
@@ -43,6 +43,14 @@ lint: ## Runs golangci-lint with fleet config for linux, darwin and windows
 	@status=0; for os in $(LINT_GOOS); do \
 		echo "golangci-lint (GOOS=$$os)"; \
 		CGO_ENABLED=0 GOOS=$$os $(GOLANGCI_LINT) run -c $(FLEET_LINT_CFG) ./... || { echo "golangci-lint failed for GOOS=$$os"; status=1; }; \
+	done; exit $$status
+
+# go fix -diff prints what go fix would change and exits 1 when that is
+# anything (docs/decisions/0002-PLAN-harden-workspace-v0-1-1.md Step 7).
+modernize: ## Fails on any go fix suggestion, for linux, darwin and windows
+	@status=0; for os in $(LINT_GOOS); do \
+		echo "go fix -diff (GOOS=$$os)"; \
+		CGO_ENABLED=0 GOOS=$$os go fix -diff ./... || { echo "go fix has suggestions for GOOS=$$os"; status=1; }; \
 	done; exit $$status
 
 tidy: ## Runs go mod tidy

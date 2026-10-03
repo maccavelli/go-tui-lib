@@ -68,7 +68,9 @@ jobs:
             echo "go vet ($target)"
             CGO_ENABLED=0 GOOS="${target%/*}" GOARCH="${target#*/}" go vet ./...
           done
-      - name: vet, gofmt, tidy, lint
+      # make lint runs make modernize first: go fix -diff for each target
+      # fails on any suggestion (docs/decisions/0002-PLAN-harden-workspace-v0-1-1.md Step 7).
+      - name: vet, gofmt, tidy, modernize, lint
         if: runner.os == 'Linux'
         run: |
           go vet ./...
