@@ -1324,7 +1324,7 @@ and `slog.New(h)`, passed before and after.
   `v0.1.3` release notes" headings, which say where those notes were
   meant to go and now go into `v0.1.5`'s, and D3's text.
 
-### Step 8: documentation and close-out (2026-10-03, in progress)
+### Step 8: documentation and close-out (2026-10-03)
 
 The owner approved Step 8 ("Proceed") with deviation D6. At the owner's
 request the agent first committed the 0001 records another session had
@@ -1353,12 +1353,35 @@ written (`de692a0`, records only).
   copy: typed text reached the wrapped, focused `textinput`, and the
   value-type `list` compiled. `markdownlint-cli2`: 0 issues.
 
-**Pending.** `AGENTS.md` (the tuitest switches and `make modernize`) and
-`docs/architecture.md` (the conformance scan, `log/slog` and the gate).
-Another session has uncommitted, finished edits in both files, under
+**Then, after the other session's work was committed.** `AGENTS.md`
+and `docs/architecture.md` held another session's finished, uncommitted
+edits under
 [0001-PLAN-scaffold-charm-tui-library.md](0001-PLAN-scaffold-charm-tui-library.md)
-Phase 5. They are edited here only after that work is committed, so that
-neither commit carries the other's change.
+Phase 5. They were edited here only after the owner committed that work
+together with the changes above (`4c6261e`).
+
+* **`AGENTS.md`,** Pre-add checks:
+  * what `internal/conformance` refuses, and that it resolves uses by
+    type, `log/slog` included;
+  * golden files rewritten with `-tuitest.update` or `TUITEST_UPDATE=1`,
+    or a test binary's own boolean `-update`;
+  * `make lint` runs `make modernize`, and `go fix ./...` applies its
+    suggestions.
+* **`docs/architecture.md`:**
+  * "Nothing writes to the terminal" names every refused use;
+  * Tooling lists `modernize` among the targets, says `make lint` runs
+    it, and describes `make modernize` and the conformance scan: modules,
+    the source importer, cgo off, resolution by object, the refused uses,
+    and files read for the host's `GOOS`;
+  * the golden-file bullet and CI's lint bullet match.
+* Both documented update commands were run on a scratch copy of
+  `4c6261e`: `go test ./tuitest/ -tuitest.update` and
+  `TUITEST_UPDATE=1 go test ./...` exited 0. `markdownlint-cli2`: 0
+  issues.
+
+**Left for the owner.** Push, check that CI is green on all three
+operating systems, and tag `v0.1.5`. This PLAN is then set `complete`, as
+Step 8 says, which is a records-only change.
 
 **Verification**, on the tree at this point:
 

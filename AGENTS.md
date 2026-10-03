@@ -149,14 +149,26 @@ not used: its checks are `revive`'s `exported`, `package-comments` and
 `var-naming` rules in `.golangci.yml`. A file that fails is not committed.
 
 `internal/conformance` checks rules 1 and 2 of the TUI conventions on
-every package. Golden files are rewritten with `-update` and read before
-they are committed.
+every package of every module. It type-checks each package and resolves
+every use, so a renamed import, a dot import or a method value hides
+nothing. Outside tests it fails on `os.Stdout` and `os.Stderr`,
+`fmt.Print`, `fmt.Printf` and `fmt.Println`, `log`'s standard logger,
+`log/slog`'s default logger, the `print` and `println` builtins,
+`signal.Notify`, and a write to `tea.View`'s `AltScreen`.
+
+Golden files are rewritten with `go test ./<pkg>/ -tuitest.update`, or
+across packages with `TUITEST_UPDATE=1 go test ./...`, and read before they
+are committed. A test binary that defines its own boolean `-update` flag
+may use it instead.
 
 The machine-wide agent gate runs the same script before every agent
 `git commit` that stages Go files, and denies the commit when it fails. There
 is no `git add` hook on every host; do not rely on one.
 
 `make lint` and `make vuln` must be clean before a release-shaped change.
+`make lint` runs `make modernize` first, which fails on any `go fix -diff`
+suggestion for `GOOS=linux`, `darwin` and `windows`; `go fix ./...`
+applies them.
 
 Cross-target commands set `CGO_ENABLED=0` explicitly: a host `go env` may
 set `CGO_ENABLED=1`, and cgo cannot cross-compile to another OS here.

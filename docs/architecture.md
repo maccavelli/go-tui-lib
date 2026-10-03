@@ -35,8 +35,10 @@ of terminal-UI packages on the Charm v2 stack. It has no binary.
   layer clipped to its rectangle; separators sit at Z 1 and overlays at Z 10
   and up. The same compositor answers mouse hit tests.
 - **Nothing writes to the terminal.** No package writes to `os.Stdout` or
-  `os.Stderr`, calls `signal.Notify` or sets `AltScreen`;
-  `internal/conformance` checks this.
+  `os.Stderr`, prints with `fmt.Print*` or the `print` builtins, logs
+  through `log`'s standard logger or `log/slog`'s default logger, calls
+  `signal.Notify` or sets `AltScreen`; `internal/conformance` checks
+  this by type (see Tooling).
 
 ## Tree
 
@@ -87,10 +89,32 @@ docs/
 
 ## Tooling
 
-- **`make` targets:** `test`, `test-sum`, `fmt`, `vet`, `lint`, `tidy`,
-  `vuln`, `fuzz`, `pre-add-check`, `help`.
-- **`make lint`** runs `golangci-lint run -c .golangci.yml ./...` three
-  times: `GOOS=linux`, `darwin` and `windows`, each with `CGO_ENABLED=0`.
+- **`make` targets:** `test`, `test-sum`, `fmt`, `vet`, `lint`,
+  `modernize`, `tidy`, `vuln`, `fuzz`, `pre-add-check`, `help`.
+- **`make lint`** runs `make modernize`, then `golangci-lint run -c
+  .golangci.yml ./...` three times: `GOOS=linux`, `darwin` and `windows`,
+  each with `CGO_ENABLED=0`.
+- **`make modernize`** runs `go fix -diff ./...` for the same three
+  targets, with `CGO_ENABLED=0`, and fails on any suggestion: `go fix
+  -diff` exits 1 when it prints a diff.
+- **`internal/conformance`** is the terminal-ownership scan, run by
+  `go test`.
+  - It finds every module by its `go.mod`, and type-checks each module's
+    packages from that module's directory with `go/types` and the source
+    importer (`importer.ForCompiler(fset, "source", nil)`), which resolves
+    imports with `go list` in the working directory. cgo is off for the
+    scan, so no C toolchain is needed.
+  - Every identifier is resolved to its object, so a renamed or dot
+    import, a function value or a method value is a use, and a local name
+    that only matches a rule is not.
+  - Outside tests it refuses `os.Stdout` and `os.Stderr`; `fmt.Print`,
+    `Printf` and `Println`; `log`'s writing functions and `log.Default`
+    and `log.Writer`; `log/slog`'s `Debug`, `Info`, `Warn` and `Error`
+    and their `Context` forms, `Log`, `LogAttrs` and `Default`; the
+    `print` and `println` builtins; `signal.Notify`; and a write to
+    `tea.View`'s `AltScreen`, however the field is reached.
+  - It reads each package's files for the host's `GOOS`; CI's three
+    operating systems cover the rest.
 - **`make fuzz`** fuzzes `layout`'s fuzz target for `FUZZTIME` (default
   20s).
 - **`scripts/go-precheck.sh`** runs `gofmt` on the given Go files, the same
@@ -105,8 +129,10 @@ docs/
   - gofmt and goimports as formatters;
   - test files exempt from `errcheck`, `gosec`, `unparam`, `revive`,
     `gocritic` and `goconst`, but not from `depguard`.
-- **Golden files** are written with `go test ./<pkg>/ -run <Test> -update`,
-  and read before they are committed.
+- **Golden files** are written with
+  `go test ./<pkg>/ -run <Test> -tuitest.update`, or with
+  `TUITEST_UPDATE=1 go test ./...`, and read before they are committed. A
+  test binary that defines its own boolean `-update` may use it instead.
 - **CI** (`.github/workflows/ci.yml`) runs on `ubuntu-24.04`, `macos-15` and
   `windows-2025`, with the Go version read from `go.mod`.
   - **Every OS:** `go test`.
@@ -116,8 +142,8 @@ docs/
     - the fuzz script's test, then `make fuzz`, uploading the corpus as an
       artifact on failure;
     - `go vet` for `freebsd/amd64`, `openbsd/amd64` and `linux/386`;
-    - `go vet`, `gofmt`, `go mod tidy -diff`, and `make lint` with
-      golangci-lint v2.14.0;
+    - `go vet`, `gofmt`, `go mod tidy -diff`, and `make lint` (with
+      `make modernize`) with golangci-lint v2.14.0;
     - `govulncheck` v1.8.0;
     - `shellcheck` v0.11.0 (pinned by SHA-256 and first on `PATH`),
       `markdownlint-cli2` 0.23.2 and `actionlint` v1.7.12.
