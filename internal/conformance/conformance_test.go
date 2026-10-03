@@ -1,7 +1,8 @@
 // Package conformance checks every package against the rules no package may
 // break (docs/decisions/0001-MADR-scaffold-charm-tui-library.md §6, rules 1
-// and 2): nothing writes to standard output or standard error, nothing calls
-// signal.Notify, and nothing sets tea.View's AltScreen.
+// and 2): nothing writes to standard output or standard error, nothing logs
+// through log/slog's default logger, nothing calls signal.Notify, and
+// nothing sets tea.View's AltScreen.
 //
 // The scan type-checks each package with go/types and the source importer,
 // and resolves every identifier to the object it denotes. A renamed or dot
@@ -55,6 +56,17 @@ var stderrLog = []string{
 	"Output", "Default", "Writer",
 }
 
+// defaultSlog is every function of package log/slog that logs through the
+// default logger, or hands it out. That logger writes to standard error
+// until the program replaces it, and it is the program's either way: a
+// package logs through a *slog.Logger or a handler its caller passes
+// (docs/decisions/0002-PLAN-harden-workspace-v0-1-1.md Step 7a).
+var defaultSlog = []string{
+	"Debug", "DebugContext", "Info", "InfoContext",
+	"Warn", "WarnContext", "Error", "ErrorContext",
+	"Log", "LogAttrs", "Default",
+}
+
 // forbidden returns the rule a use of obj breaks, or "".
 func forbidden(obj types.Object) string {
 	switch o := obj.(type) {
@@ -83,6 +95,10 @@ func forbidden(obj types.Object) string {
 	case "log":
 		if slices.Contains(stderrLog, name) {
 			return "writes to standard error with log." + name
+		}
+	case "log/slog":
+		if slices.Contains(defaultSlog, name) {
+			return "logs through the default logger with slog." + name
 		}
 	case "os/signal":
 		if name == "Notify" {
@@ -360,6 +376,10 @@ func f() { p := fmt.Print; w := os.Stderr.Write; _, _ = p, w }`, map[string]int{
 func f() { fmt.Fprintln(os.Stderr, "x") }`, map[string]int{"uses os.Stderr": 1}},
 		{"the log package", `import "log"
 func f() { log.Print("x"); log.Default().Println("x") }`, map[string]int{"writes to standard error with log.Print": 1, "writes to standard error with log.Default": 1}},
+		{"the slog package", `import "log/slog"
+func f() { slog.Info("x"); slog.Default().Info("x") }`, map[string]int{"logs through the default logger with slog.Info": 1, "logs through the default logger with slog.Default": 1}},
+		{"a renamed slog", `import ("context"; lg "log/slog")
+func f(ctx context.Context) { lg.WarnContext(ctx, "x") }`, map[string]int{"logs through the default logger with slog.WarnContext": 1}},
 		{"the print builtins", `func f() { println("x"); print("x") }`, map[string]int{"calls the builtin println": 1, "calls the builtin print": 1}},
 		{"signal.Notify", `import ("os"; "os/signal")
 func f(c chan os.Signal) { signal.Notify(c) }`, map[string]int{"calls signal.Notify": 1}},
@@ -375,13 +395,15 @@ func f() {
 	_ = p
 	_ = v.AltScreen // a read
 }`, map[string]int{"sets AltScreen": 3, "takes the address of AltScreen": 1}},
-		{"names that only match", `import ("fmt"; "io"; "log")
+		{"names that only match", `import ("fmt"; "io"; "log"; "log/slog")
 type view struct{ AltScreen bool }
 // os.Stdout, fmt.Println and AltScreen in a comment.
 func Println() {}
-func f(os struct{ Stdout io.Writer }, l *log.Logger) {
+func f(os struct{ Stdout io.Writer }, l *log.Logger, sl *slog.Logger, h slog.Handler) {
 	fmt.Fprintln(os.Stdout, "x")
 	l.Println("x")
+	sl.Info("x")
+	_ = slog.New(h)
 	Println()
 	v := view{AltScreen: true}
 	v.AltScreen = true

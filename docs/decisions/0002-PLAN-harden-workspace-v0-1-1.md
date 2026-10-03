@@ -1230,3 +1230,56 @@ object and for the walk.
   Step 8's architecture bullet names it. MADR A1 carries a dated note.
 * **Unchanged.** Step 7's code and record, Steps 1–6 and 8, and the
   `v0.1.3` release, which now also carries Step 7a.
+
+### Step 7a: `log/slog` in the conformance scan (2026-10-03)
+
+The owner committed the D5 records (`062434e`) and approved Step 7a
+("proceed").
+
+**What changed.** `internal/conformance/conformance_test.go` only:
+
+* `defaultSlog` lists `Debug`, `DebugContext`, `Info`, `InfoContext`,
+  `Warn`, `WarnContext`, `Error`, `ErrorContext`, `Log`, `LogAttrs` and
+  `Default`. `forbidden` refuses a use of any of them, as "logs through
+  the default logger with slog.<name>". It resolves by object, as the
+  other rules do, so a renamed import or a method value does not hide a
+  use.
+* The package comment names the rule.
+* `SetDefault` and `NewLogLogger` are not refused, as Step 7a says.
+
+**Regression first.** The new planted cases, before the rule existed:
+
+```text
+--- FAIL: TestScanFindsEachRule/the_slog_package (0.10s)
+    conformance_test.go:408: found map[], want map[logs through the default logger with slog.Default:1 logs through the default logger with slog.Info:1]
+--- FAIL: TestScanFindsEachRule/a_renamed_slog (0.00s)
+    conformance_test.go:408: found map[], want map[logs through the default logger with slog.WarnContext:1]
+```
+
+The "names that only match" case, which gained a `*slog.Logger`'s `Info`
+and `slog.New(h)`, passed before and after.
+
+**Proof on a scratch copy.** A planted `slog.Info("x")` in
+`workspace/zz_plant.go`:
+
+* the new scan fails:
+  `workspace/zz_plant.go:5 logs through the default logger with slog.Info`;
+* Step 7's scan (`d13bd45`) passes it.
+
+**Mutation proof**, on a scratch copy:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| the scan skips `log/slog` | `found map[], want map[… slog.Default:1 … slog.Info:1]`; `found map[], want map[… slog.WarnContext:1]` |
+
+**Checks.**
+
+* `make pre-add-check FILES=internal/conformance/conformance_test.go`:
+  `1 file(s) clean`, govulncheck included.
+* `make lint`: `make modernize` reports nothing for the three targets,
+  then `0 issues` for linux, darwin and windows.
+* `go test -race -count=1 ./...` and `LC_ALL=C go test -count=1 ./...`:
+  every package `ok`.
+* `go mod tidy -diff`: no output, exit 0.
+* **The Windows test host:** `go vet`, `go test -race -count=1 ./...` and
+  `LC_ALL=C go test -count=1 ./...` exited 0, every package `ok`.
