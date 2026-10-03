@@ -513,3 +513,71 @@ linux, darwin and windows, each with the `cobra` list's message.
   `LC_ALL=C go test -count=1 ./...` exited 0.
 * `AGENTS.md` names depguard's refusals under Dependencies. Phase 6 adds
   the adapters' rules there.
+
+### Phase 5: CI (2026-10-03, real-CI proof pending)
+
+The owner committed Phase 4 (`f3ea608`) and approved Phase 5 ("proceed").
+`main` has no branch protection and no rulesets
+(`gh api …/branches/main/protection`: 404, "Branch not protected";
+`…/rulesets`: `[]`), so renaming the jobs breaks no required check.
+
+**What changed.** `.github/workflows/ci.yml`. The single `validate`
+matrix over three operating systems becomes three jobs:
+
+* **`modules`** (Linux) runs `scripts/go-modules_test.sh` and
+  `scripts/go-modules.sh --check`, and writes the module list as JSON,
+  `["."]` today, to `$GITHUB_OUTPUT` for the matrix.
+* **`test`** runs for each module × `ubuntu-24.04`, `macos-15` and
+  `windows-2025`, named `test (<module>, <os>)`, with
+  `working-directory` set to the module and `GOWORK: 'off'` for the job. It
+  keeps today's steps (`go mod download`, `go test`, race where cgo allows,
+  shuffle and `LC_ALL=C` on Linux), and adds `go test` in workspace mode,
+  where the step sets `GOWORK` empty so the `go` command finds `go.work`.
+* **`gates`** (Linux) runs the gates that loop over the modules
+  themselves, through the `Makefile` and `go-modules.sh`, so CI and
+  `make pre-add-check` share one implementation, as 0010-MADR §4 asks:
+  * fuzz, with its corpus upload, stays with `layout` in the root module
+    (`GOWORK=off`);
+  * cross `go vet` for `freebsd/amd64`, `openbsd/amd64` and `linux/386`
+    loops over the modules with `GOWORK=off`;
+  * `make vet`, `gofmt -l .`, `make tidy-check`, `make lint` (with
+    `make modernize`) and `make vuln`, each per module;
+  * shellcheck over `scripts/*.sh`, which now includes both new scripts,
+    markdownlint and actionlint, as before.
+* Every `actions/setup-go` reads `go-version-file: go.work` and caches with
+  `cache-dependency-path: '**/go.sum'`. `GOFLAGS=-mod=mod` is not set.
+
+**Reading of the PLAN.** "The lint, tidy, vet, govulncheck, cross-vet and
+fuzz steps run per module" is met by the `gates` job's per-module loops
+rather than by one matrix entry per module: the `Makefile` targets already
+loop, and running them in each entry would repeat every module's lint in
+every entry.
+
+**Checks.**
+
+* An empty `GOWORK` finds `go.work` from a module's subdirectory:
+  `GOWORK= go env GOWORK` in `layout/` names the root's file;
+  `GOWORK=off go env GOWORK` prints `off`.
+* actionlint v1.7.12: exit 0. `make pre-add-check`, `make lint`,
+  `shellcheck scripts/*.sh` and `go mod tidy -diff`: clean. The Windows
+  test host: `go vet`, `go test -race -count=1 ./...` and
+  `LC_ALL=C go test -count=1 ./...` exited 0.
+* **The workflow's own commands, locally.** A script read `ci.yml` and ran
+  its `run:` blocks on a scratch copy with a planted `scratchmod/`, a
+  module requiring the root at `v0.1.0`, with a test, listed in `go.work`:
+  * the `modules` step printed `go-modules_test: 13 passed, 0 failed` and
+    `modules: [".","scratchmod"]`, and wrote
+    `list=[".","scratchmod"]` to the output file;
+  * each `test` step exited 0 in `.` and in `scratchmod`, with the
+    job's environment;
+  * the `gates` steps `cross go vet`, `vet, gofmt, tidy, modernize, lint`
+    and `govulncheck` exited 0, each reporting modules `.` and
+    `scratchmod`.
+
+**Pending: the real-CI proof.** The owner chose a proof branch (picked
+from options, 2026-10-03). The workflow runs on pushes to `main`, on tags
+and on pull requests, so the branch is opened as a draft pull request. It
+carries the same `scratchmod/` module, and the run must show
+`test (scratchmod, …)` for all three operating systems. The pull request
+is then closed and the branch deleted, unmerged. The result is recorded
+here.

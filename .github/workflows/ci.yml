@@ -12,18 +12,55 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Every gate runs once per module, in the module's directory, with
+# GOWORK=off, so that a module builds from its own go.mod and published
+# versions only; the tests run once more in workspace mode
+# (docs/decisions/0010-MADR-nested-adapter-modules.md §4;
+# docs/decisions/0010-PLAN-nested-adapter-modules.md Phase 5). Go comes from
+# go.work, and the module cache keys on every module's go.sum.
 jobs:
-  validate:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, macos-15, windows-2025]
-    runs-on: ${{ matrix.os }}
+  # The modules go.work lists, checked against the tracked go.mod files,
+  # as the test matrix's input.
+  modules:
+    runs-on: ubuntu-24.04
+    outputs:
+      list: ${{ steps.list.outputs.list }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
+          go-version-file: go.work
+          cache-dependency-path: '**/go.sum'
+      - name: go-modules.sh, its tests, and --check
+        id: list
+        shell: bash
+        run: |
+          ./scripts/go-modules_test.sh
+          ./scripts/go-modules.sh --check
+          list="$(./scripts/go-modules.sh | jq -R . | jq -cs .)"
+          echo "modules: $list"
+          echo "list=$list" >>"$GITHUB_OUTPUT"
+
+  test:
+    needs: modules
+    name: test (${{ matrix.module }}, ${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        module: ${{ fromJSON(needs.modules.outputs.list) }}
+        os: [ubuntu-24.04, macos-15, windows-2025]
+    runs-on: ${{ matrix.os }}
+    env:
+      GOWORK: 'off'
+    defaults:
+      run:
+        working-directory: ${{ matrix.module }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: '**/go.sum'
       - run: go mod download
       - run: go test ./...
       # The race detector needs cgo, which the Linux and macOS runners have
@@ -42,16 +79,37 @@ jobs:
         env:
           LC_ALL: C
         run: go test -count=1 ./...
+      # Against the tree's other modules: the workspace's build list is the
+      # maximum over every module's requirements (0010-MADR §4). An empty
+      # GOWORK lets the go command find go.work.
+      - name: go test, workspace mode
+        env:
+          GOWORK: ''
+        run: go test -count=1 ./...
+
+  # The gates that loop over the modules themselves, through the Makefile
+  # and scripts/go-modules.sh, as `make pre-add-check` does.
+  gates:
+    needs: modules
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: '**/go.sum'
       # Each fuzz target for 20 s; a failing input is kept as an artifact
       # (docs/decisions/0002-PLAN-multi-pane-workspace-layouts.md Step 5).
+      # Only layout, in the root module, has fuzz targets.
       - name: fuzz
-        if: runner.os == 'Linux'
         shell: bash
+        env:
+          GOWORK: 'off'
         run: |
           ./scripts/go-fuzz_test.sh
           make fuzz
       - name: fuzz corpus
-        if: failure() && runner.os == 'Linux'
+        if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: fuzz-corpus
@@ -61,28 +119,31 @@ jobs:
       # Targets the matrix does not run: a build-tag gap fails here
       # (go-selfupdate-lib docs/decisions/0004-MADR-evolve-selfupdate-api-and-tui-support.md H7).
       - name: cross go vet
-        if: runner.os == 'Linux'
         shell: bash
         run: |
-          for target in freebsd/amd64 openbsd/amd64 linux/386; do
-            echo "go vet ($target)"
-            CGO_ENABLED=0 GOOS="${target%/*}" GOARCH="${target#*/}" go vet ./...
+          mods="$(./scripts/go-modules.sh)"
+          status=0
+          for m in $mods; do
+            for target in freebsd/amd64 openbsd/amd64 linux/386; do
+              echo "go vet (module $m, $target)"
+              (cd "$m" && GOWORK=off CGO_ENABLED=0 GOOS="${target%/*}" GOARCH="${target#*/}" go vet ./...) || status=1
+            done
           done
+          exit "$status"
       # make lint runs make modernize first: go fix -diff for each target
       # fails on any suggestion (docs/decisions/0002-PLAN-harden-workspace-v0-1-1.md Step 7).
+      # Each target loops over the modules with GOWORK=off.
       - name: vet, gofmt, tidy, modernize, lint
-        if: runner.os == 'Linux'
         run: |
-          go vet ./...
+          make vet
           test -z "$(gofmt -l .)"
-          go mod tidy -diff
+          make tidy-check
           go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
           GOLANGCI_LINT="$(go env GOPATH)/bin/golangci-lint" make lint
       - name: govulncheck
-        if: runner.os == 'Linux'
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
-          "$(go env GOPATH)/bin/govulncheck" ./...
+          GOVULNCHECK="$(go env GOPATH)/bin/govulncheck" make vuln
       # Scripts, Markdown and workflows are checked as the pre-add gate and
       # the records require (go-selfupdate-lib docs/decisions/0003-MADR-remediate-debugging-pass-findings.md D9).
       # shellcheck is pinned to the release the pre-add hosts use (the
@@ -91,7 +152,6 @@ jobs:
       # and reports differently (go-selfupdate-lib docs/decisions/0003-PLAN-remediate-debugging-pass-findings.md
       # deviation D5).
       - name: shellcheck, markdownlint, actionlint
-        if: runner.os == 'Linux'
         shell: bash
         env:
           SHELLCHECK_VERSION: v0.11.0
