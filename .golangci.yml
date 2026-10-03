@@ -48,6 +48,44 @@ linters:
               desc: "this module never imports the MCP go-sdk (docs/decisions/0001-MADR-scaffold-charm-tui-library.md §3)"
             - pkg: github.com/maccavelli/go-llmprovider-sdk
               desc: "this module never imports go-llmprovider-sdk (docs/decisions/0001-MADR-scaffold-charm-tui-library.md §3)"
+            - pkg: charm.land/fang/v2
+              desc: "fang is not used, in any module (docs/decisions/0010-MADR-nested-adapter-modules.md Q1)"
+            - pkg: github.com/charmbracelet/fang
+              desc: "fang is not used, in any module (docs/decisions/0010-MADR-nested-adapter-modules.md Q1)"
+        # Each adapter's dependency stays in the adapter's own module
+        # (docs/decisions/0010-MADR-nested-adapter-modules.md §5). depguard
+        # matches `files` against each file's absolute, slash-separated path,
+        # and a leading "!" excludes a match (depguard v2.2.1, settings.go),
+        # so each rule covers every file but the one module that may import
+        # the package. The patterns are unanchored: golangci-lint's
+        # ${config-path} would put a Windows path's backslashes, glob
+        # escapes, into the pattern.
+        cobra:
+          list-mode: lax
+          files:
+            - $all
+            - "!**/command/cobracmd/**"
+          deny:
+            - pkg: github.com/spf13/cobra
+              desc: "Cobra only in the command/cobracmd module (docs/decisions/0010-MADR-nested-adapter-modules.md §5)"
+            - pkg: github.com/spf13/pflag
+              desc: "pflag only in the command/cobracmd module (docs/decisions/0010-MADR-nested-adapter-modules.md §5)"
+        kong:
+          list-mode: lax
+          files:
+            - $all
+            - "!**/command/kongcmd/**"
+          deny:
+            - pkg: github.com/alecthomas/kong
+              desc: "Kong only in the command/kongcmd module (docs/decisions/0010-MADR-nested-adapter-modules.md §5)"
+        glamour:
+          list-mode: lax
+          files:
+            - $all
+            - "!**/stream/glamourmd/**"
+          deny:
+            - pkg: charm.land/glamour/v2
+              desc: "glamour only in the stream/glamourmd module (docs/decisions/0010-MADR-nested-adapter-modules.md §5)"
     errcheck:
       check-type-assertions: true
       check-blank: true

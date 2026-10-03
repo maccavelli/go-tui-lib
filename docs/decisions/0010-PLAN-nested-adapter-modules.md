@@ -427,3 +427,89 @@ With those checks in place, `make test` and `make lint` in a copy with no
   both new scripts.
 * `AGENTS.md`'s pre-add section still describes the steps correctly for
   one module. Phase 6 documents the per-module behaviour.
+
+### Phase 4: depguard (2026-10-03)
+
+The owner committed Phases 2 and 3 (`32a2d74`) and approved Phase 4
+("proceed"). Another session's
+[0001-PLAN-scaffold-charm-tui-library.md](0001-PLAN-scaffold-charm-tui-library.md)
+Phase 6 committed comment-only changes to `Makefile`, `ci.yml` and three
+scripts meanwhile (`df04fc2`); this phase touched none of them.
+
+**What depguard can express, checked at the source first.** golangci-lint
+v2.14.0, the version CI pins, bundles `github.com/OpenPeeDeeP/depguard/v2`
+v2.2.1 (`go version -m`).
+
+* golangci-lint passes each rule's `files` through a replacer for
+  `${base-path}` and `${config-path}` only
+  (`pkg/golinters/depguard/depguard.go`, `pkg/config/placeholders.go`).
+* depguard compiles each pattern with `glob.Compile(exp, '/')`. A leading
+  `!` makes it a negative pattern. `$all` expands to `**/*.go`
+  (`settings.go:60-84`, `internal/utils/variables.go:31-33`).
+* A rule applies to a file whose absolute, slash-separated path matches a
+  positive pattern and no negative one (`settings.go:133-137`,
+  `depguard.go:71`). Every rule that applies is checked.
+* `deny` matches by plain string prefix (`settings.go:224-247`), so
+  `github.com/alecthomas/kong` also covers a module such as
+  `github.com/alecthomas/kong-yaml`. Kong's companion modules belong in
+  `command/kongcmd` too.
+
+So one root `.golangci.yml` can allow each package in one directory. The
+PLAN's fallback, a `.golangci.yml` per adapter module, is not needed.
+
+**What changed.** `.golangci.yml` only:
+
+* `forbidden` also denies `charm.land/fang/v2` and
+  `github.com/charmbracelet/fang`, everywhere (0010-MADR Q1).
+* Three new rules, each over `$all` less one module:
+
+  | Rule | Files | Denies |
+  | :--- | :--- | :--- |
+  | `cobra` | `$all`, `!**/command/cobracmd/**` | `github.com/spf13/cobra`, `github.com/spf13/pflag` |
+  | `kong` | `$all`, `!**/command/kongcmd/**` | `github.com/alecthomas/kong` |
+  | `glamour` | `$all`, `!**/stream/glamourmd/**` | `charm.land/glamour/v2` |
+
+* The patterns are unanchored. `${config-path}` would anchor them to the
+  repository, but on a Windows host it would put backslashes, which the
+  glob library treats as escapes, into the pattern. Lint runs on Linux
+  and macOS hosts today, for all three targets.
+
+**Proofs, on scratch copies.** Every planted import resolves: each module
+was fetched at the version 0010-REPORT examined (`go get`, then
+`go mod tidy`, with `GOWORK=off`). A failure can therefore come only from
+lint, and each is shown to be depguard's. Each planted adapter module has a
+package comment; without one, revive's `package-comments` failed first,
+which an earlier run showed. golangci-lint ran in each module's directory
+with the root's configuration, `GOWORK=off` and `GOOS=linux`. With the rule
+mutated, each outcome flips:
+
+| Planted | Lint | With the rule mutated |
+| :--- | :--- | :--- |
+| Kong in `layout` | fails: `import 'github.com/alecthomas/kong' is not allowed from list 'kong': Kong only in the command/kongcmd module (…§5) (depguard)` | Kong's deny removed: passes |
+| glamour in `layout` | fails: `import 'charm.land/glamour/v2' is not allowed from list 'glamour'` | glamour's deny removed: passes |
+| Kong in a `command/kongcmd` module | passes | its `!**/command/kongcmd/**` removed: fails, `not allowed from list 'kong'` |
+| Kong and Cobra in `command/kongcmd` | fails: `import 'github.com/spf13/cobra' is not allowed from list 'cobra'` | Cobra's deny removed: passes |
+| Kong and fang in `command/kongcmd` | fails: `import 'charm.land/fang/v2' is not allowed from list 'forbidden': fang is not used, in any module (…Q1)` | fang's deny removed: passes |
+| Cobra in a `command/cobracmd` module | passes | its negation removed: fails, `not allowed from list 'cobra'` |
+| glamour in a `stream/glamourmd` module | passes | its negation removed: fails, `not allowed from list 'glamour'` |
+
+The PLAN's three proofs are rows 1, 3 and 4. The others cover glamour,
+fang and the Cobra module.
+
+**End to end.** In a scratch copy with a `command/kongcmd` module importing
+Kong and Cobra, listed in `go.work`, `make lint` exits 2. It lints module
+`.` clean for three targets, then fails module `command/kongcmd` for
+linux, darwin and windows, each with the `cobra` list's message.
+
+**Checks.**
+
+* `golangci-lint config verify`: exit 0.
+* `make lint` (with `make modernize`): `0 issues` for module `.` on
+  linux, darwin and windows.
+* `make pre-add-check`: `29 file(s) clean in 1 module(s)`.
+* `go test -race -count=1 ./...`, `LC_ALL=C go test -count=1 ./...`,
+  `go mod tidy -diff` and actionlint v1.7.12: clean.
+* **The Windows test host:** `go vet`, `go test -race -count=1 ./...` and
+  `LC_ALL=C go test -count=1 ./...` exited 0.
+* `AGENTS.md` names depguard's refusals under Dependencies. Phase 6 adds
+  the adapters' rules there.
