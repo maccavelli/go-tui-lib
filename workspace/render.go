@@ -188,7 +188,7 @@ func (w *Workspace) renderBox(r layout.Rect, p Pane, k viewKey, focused bool) st
 	out.WriteString(edge.Render(b.TopLeft+b.Top) + tstyle.Render(label) + edge.Render(strings.Repeat(b.Top, max(fill, 0))+b.TopRight))
 	if in.H > 0 {
 		body := w.view(k, p, in.W, in.H, focused)
-		for _, line := range strings.Split(body, "\n") {
+		for line := range strings.SplitSeq(body, "\n") {
 			out.WriteString("\n" + edge.Render(b.Left) + line + edge.Render(b.Right))
 		}
 	}

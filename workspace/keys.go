@@ -25,13 +25,19 @@ type KeyMap struct {
 	Close key.Binding
 }
 
-// DefaultKeyMap returns the default bindings: alt+] and alt+[ to move focus,
+// DefaultKeyMap returns the default bindings: alt+. and alt+, to move focus,
 // alt+1 to alt+9 to focus a pane, alt+z to zoom, alt+shift+arrows to resize,
 // and esc to close an overlay.
+//
+// A terminal without an enhanced keyboard protocol sends alt+x as ESC
+// followed by x. When x is one of [ ] O P _ ^ X or \, that is also how a
+// control sequence starts (CSI, OSC, SS3, DCS, APC, PM, SOS and ST), so the
+// key cannot be told reliably from the sequence. No default uses alt with
+// one of them, and a rebinding should not either.
 func DefaultKeyMap() KeyMap {
 	k := KeyMap{
-		FocusNext:   key.NewBinding(key.WithKeys("alt+]"), key.WithHelp("alt+]", "next pane")),
-		FocusPrev:   key.NewBinding(key.WithKeys("alt+["), key.WithHelp("alt+[", "previous pane")),
+		FocusNext:   key.NewBinding(key.WithKeys("alt+."), key.WithHelp("alt+.", "next pane")),
+		FocusPrev:   key.NewBinding(key.WithKeys("alt+,"), key.WithHelp("alt+,", "previous pane")),
 		Zoom:        key.NewBinding(key.WithKeys("alt+z"), key.WithHelp("alt+z", "zoom")),
 		ResizeLeft:  key.NewBinding(key.WithKeys("alt+shift+left"), key.WithHelp("alt+shift+left", "resize")),
 		ResizeRight: key.NewBinding(key.WithKeys("alt+shift+right"), key.WithHelp("alt+shift+right", "resize")),

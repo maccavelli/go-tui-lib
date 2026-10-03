@@ -19,6 +19,7 @@
 package workspace
 
 import (
+	"maps"
 	"slices"
 	"strings"
 
@@ -103,6 +104,11 @@ const (
 const fallbackWidth, fallbackHeight = 80, 24
 
 // Workspace hosts panes. Its zero value is not usable; call New.
+//
+// A Workspace is not safe for concurrent use. Bubble Tea calls a program's
+// Update and View on one goroutine, and the program calls the workspace
+// from there; the commands it returns run elsewhere, and reach it only as
+// messages to Update.
 type Workspace struct {
 	root     layout.Node
 	panes    map[layout.PaneID]Pane
@@ -214,9 +220,7 @@ func New(root layout.Node, panes map[layout.PaneID]Pane, opts ...Option) *Worksp
 		osizes: map[string]SizeMsg{},
 		cache:  map[viewKey]cached{},
 	}
-	for id, p := range panes {
-		w.panes[id] = p
-	}
+	maps.Copy(w.panes, panes)
 	for _, o := range opts {
 		o(w)
 	}
@@ -456,14 +460,31 @@ func (w *Workspace) Toggle(id layout.PaneID) tea.Cmd {
 	return w.resolve()
 }
 
-// Resize moves separator sep by delta cells (see layout.State.Resize).
+// Resize moves separator sep by delta cells from where it is shown (see
+// layout.State.Resize), as far as the panes' bounds allow. It stores the
+// delta the layout applied, not the one asked for, so a held key or a drag
+// past a limit moves back at once. It does nothing when the separator does
+// not move: at a limit, or when it is not a Resizable separator of the
+// current plan, since the layout applies nothing to one. A window resize
+// never changes what Resize stored, so the layout comes back when the
+// window grows.
 func (w *Workspace) Resize(sep string, delta int) tea.Cmd {
-	w.state = w.state.WithResize(sep, delta)
+	shown := w.plan.Resize[sep]
+	want := w.state.WithResize(sep, shown+delta-w.state.Resize[sep])
+	plan, err := layout.Solve(w.withMinimums(w.root), layout.Rect{W: w.width, H: w.height}, want)
+	if err != nil {
+		return nil
+	}
+	applied := plan.Resize[sep]
+	if applied == shown {
+		return nil
+	}
+	w.state = w.state.WithResize(sep, applied-w.state.Resize[sep])
 	return w.resolve()
 }
 
-// resizeFocused moves the separator on the focused pane's trailing edge
-// along axis, or its leading edge when it has none.
+// resizeFocused moves the Resizable separator on the focused pane's
+// trailing edge along axis, or its leading edge when it has none.
 func (w *Workspace) resizeFocused(axis layout.Axis, delta int) tea.Cmd {
 	r, ok := w.plan.Panes[w.focus]
 	if !ok {
@@ -472,7 +493,7 @@ func (w *Workspace) resizeFocused(axis layout.Axis, delta int) tea.Cmd {
 	var lead, trail *layout.Separator
 	for i := range w.plan.Separators {
 		s := &w.plan.Separators[i]
-		if s.Axis != axis {
+		if s.Axis != axis || !s.Resizable {
 			continue
 		}
 		if axis == layout.Horizontal && s.Rect.Y <= r.Y && s.Rect.Y+s.Rect.H >= r.Y+r.H {

@@ -40,9 +40,13 @@ both tag Steps 1–4.*
 | 3a | `layout/` | MADR A2: a split name is used once per solve (found in Step 3; deviation D2) |
 | 4 | `workspace/overlay.go`, `workspace/render.go`, `workspace/workspace.go` | 1, 2, 3: the crash, the cache, overlay sizes |
 | 5 | `workspace/focus.go` (new), `workspace/model.go` (new), `workspace/workspace.go`, `workspace/overlay.go` | 7: focus as messages, `Wrap` and `Model` |
-| 6 | `workspace/keys.go`, `workspace/workspace.go`, `workspace/*_test.go` | 8 in the workspace, 9, 12 and 13 |
+| 6 | `workspace/keys.go`, `workspace/workspace.go`, `workspace/render.go`, `workspace/*_test.go` | 8 in the workspace, 9, 12 and 13 |
 | 7 | `internal/conformance/`, `Makefile`, `.github/workflows/ci.yml` | 11, and a `go fix` gate |
 | 8 | `README.md`, `AGENTS.md`, `docs/` | documentation, release notes, close-out |
+
+*Step 6 also edits `workspace/render.go`: its one `go fix` suggestion
+(`strings.SplitSeq`) is there, and the step requires `go fix -diff
+./workspace` to report nothing (recorded 2026-10-02).*
 
 No module is added or removed. `go.mod` does not change. *Amended by
 deviation D4: Step 5 adds `github.com/atotto/clipboard v0.1.4 // indirect`,
@@ -914,3 +918,133 @@ their anchors.
   Step 4, which Step 6 owns; none new.
 * **The Windows test host:** `go vet`, `go test -race -count=1 ./...` and
   `LC_ALL=C go test -count=1 ./...` exited 0, every package `ok`.
+
+### Step 6: keys, resize and tidying (2026-10-02)
+
+The owner approved Step 6 ("proceed") after committing Step 5 (`d5bb885`).
+
+**What changed.**
+
+* **Keys (`keys.go`).** `FocusNext` and `FocusPrev` default to `alt+.` and
+  `alt+,` (Q5). `DefaultKeyMap`'s comment says why: without an enhanced
+  keyboard protocol, alt+x is ESC x, and ESC followed by `[`, `]`, `O`,
+  `P`, `_`, `^`, `X` or `\` opens a control sequence (CSI, OSC, SS3, DCS,
+  APC, PM, SOS, ST). No default uses alt with one of them.
+* **Resize (`workspace.go`).**
+  * `Resize` solves with the separator moved `delta` cells from where it
+    is shown (`Plan.Resize`), and stores the delta that plan applied.
+    When nothing moved, it stores nothing and returns `nil`.
+  * Measuring from the shown delta, not the stored one, is how a press
+    after a window shrink moves the separator at once: the stored delta
+    may exceed what the narrower window applies. Storing nothing when
+    nothing moved keeps the user's stored layout through a press against
+    a limit the window imposed.
+  * A separator that is not `Resizable` is ignored. `Resize` needs no check
+    of its own: the solver applies nothing to an unnamed split, so nothing
+    moves and nothing is stored. A drag calls `Resize`, so it is ignored
+    the same way. Keyboard resize skips such a separator when it picks the
+    trailing or leading edge, so it moves the named one beside it.
+  * A window resize still only re-solves; it never writes the state.
+* **Concurrency.** `Workspace`'s comment says it is not safe for
+  concurrent use: Bubble Tea calls `Update` and `View` on one goroutine,
+  and commands reach the workspace only as messages.
+* **`go fix`.** `maps.Copy` in `New`, `strings.SplitSeq` in `render.go`,
+  and `wg.Go` in the test helper `run`. `go fix -diff ./...` now reports
+  nothing for the whole module.
+* **Tests.**
+  * `TestCommandsRunConcurrently` is `TestCommandsAreIndependent`. It runs
+    the batch's commands on goroutines with `wg.Go` under `-race` and
+    feeds their messages to `Update` one at a time. The second goroutine
+    loop, which only moved messages through a channel, is gone.
+  * `TestFocusCycles`, `TestModalOverlayTrapsKeys` and
+    `TestCursorIsOffsetByThePane` press `alt+.` and `alt+,`.
+  * The `press` helper panics on a multi-character name it does not
+    know. Removing its `alt+]` case first turned two `press("alt+]")`
+    calls into a plain `a` key, and both tests still passed; the panic
+    makes that mistake fail loudly.
+
+**Behaviour changes,** for the `v0.1.3` release notes:
+
+* the default focus keys are `alt+.` and `alt+,`;
+* `State().Resize` holds the delta the layout applied, so a held key or a
+  drag past a limit moves back at once;
+* `Resize` on a separator that is not `Resizable` no longer writes a
+  positional entry into the state;
+* keyboard resize moves the nearest `Resizable` separator.
+
+**Regression first.** The new and changed tests over `d5bb885`'s source,
+on a scratch copy:
+
+```text
+--- FAIL: TestDefaultKeysAvoidSequenceIntroducers (0.00s)
+    keys_test.go:22: default "alt+]" is alt and a sequence introducer, which a legacy terminal cannot tell from the sequence
+    keys_test.go:22: default "alt+[" is alt and a sequence introducer, which a legacy terminal cannot tell from the sequence
+--- FAIL: TestHeldResizeKeyHasNoDeadZone (0.00s)
+    resize_test.go:32: after 50 presses against the limit: stored 50, applied 12; the store must be what was applied
+--- FAIL: TestDragPastTheLimitAndBack (0.00s)
+    resize_test.go:49: after a drag past the limit: stored 100, applied 11; the store must be what was applied
+--- FAIL: TestResizeAtAWindowLimit (0.00s)
+    resize_test.go:85: a press at the window's limit stored 51 over 50
+--- FAIL: TestUnnamedSeparatorIsNotResized (0.00s)
+    resize_test.go:116: Resize resized an unnamed separator: state map[/:0:3], panes map[a:{0 0 40 20} b:{41 0 39 20}]
+--- FAIL: TestKeyboardResizeSkipsAnUnnamedSeparator (0.00s)
+    resize_test.go:140: alt+shift+right on b: resize map[/1:0:1], want outer:0 moved by 1
+```
+
+`TestWindowResizeKeepsTheStoredLayout` passes there too: it guards
+behaviour `v0.1.0` already has, which the new `Resize` must keep.
+
+**Tests** (`workspace/resize_test.go`, `workspace/keys_test.go`, new):
+
+* holding resize right 50 times against a limit stores what was applied,
+  and one press left then moves the separator one cell;
+* a drag 100 cells past the limit stores what was applied, and a motion
+  back one cell moves the separator one cell;
+* after a window shrinks the applied delta below the stored one, a press
+  toward the limit stores nothing, and a press away moves at once;
+* shrinking the window and growing it again restores every pane's
+  rectangle, and the state is unchanged;
+* `Resize`, the keyboard and a drag leave an unnamed split's separator,
+  the state and the layout as they were;
+* the keyboard moves the named separator beside an unnamed one;
+* no default binding is alt and a sequence introducer.
+
+**Mutation proofs**, each on a scratch copy; none survived in the end:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| `Resize` stores the requested delta | `after a drag past the limit: stored 100, applied 11` |
+| `Resize` stores a press that moved nothing | `a press at the window's limit stored 6 over 12` |
+| `Resize` measures from the stored delta, not the shown one | `a press at the window's limit stored 6 over 12` |
+| keyboard resize picks an unnamed separator | `alt+shift+right on b: resize map[], want outer:0 moved by 1` |
+| a default is set to `alt+[` again | `default "alt+[" is alt and a sequence introducer` |
+
+Two of the PLAN's mutations survived the first run, and are recorded under
+rule 2:
+
+* **"`Resize` stores the requested delta"** survived, because `Resize`
+  measures from the shown delta: a key press stores exactly what moved,
+  and the drag back moved at once although the store held 100. The excess
+  showed only in `State()`. The drag test now also asserts that the store
+  is what was applied, which kills it.
+* **"A non-`Resizable` separator is resized"** survived, because the
+  explicit `Resizable` check it mutated in `Resize` was dead code: the
+  solver applies nothing to an unnamed split, and `Resize` stores only what
+  was applied. The check was removed. The mutation is replaced by "`Resize`
+  stores a press that moved nothing", and the keyboard's own `Resizable`
+  filter has its own test and mutation.
+
+**Checks.**
+
+* `make pre-add-check FILES=…` on the six Go files: `6 file(s) clean`,
+  govulncheck included.
+* `make lint`: `0 issues` for linux, darwin and windows.
+* `go test -race -count=1 ./...`, `LC_ALL=C go test -count=1 ./...` and
+  `go test -shuffle=on -count=2 ./...`: every package `ok`. No golden
+  file changed: none shows a focus key.
+* `go mod tidy -diff`: no output, exit 0. `go.mod` is unchanged.
+* `go fix -diff ./...`: no output, exit 0.
+* **The Windows test host:** `go vet`, `go test -race -count=1 ./...` and
+  `LC_ALL=C go test -count=1 ./...` exited 0, every package `ok`.
+* `docs/guides/building-workspaces.md` still names `alt+]` and `alt+[`.
+  Step 8 updates it with the other guide changes.

@@ -110,16 +110,21 @@ func press(s string) tea.KeyPressMsg {
 		return tea.KeyPressMsg{Code: tea.KeyEscape}
 	case "ctrl+c":
 		return tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}
-	case "alt+]":
-		return tea.KeyPressMsg{Code: ']', Mod: tea.ModAlt}
-	case "alt+[":
-		return tea.KeyPressMsg{Code: '[', Mod: tea.ModAlt}
 	case "alt+z":
 		return tea.KeyPressMsg{Code: 'z', Mod: tea.ModAlt}
 	case "alt+2":
 		return tea.KeyPressMsg{Code: '2', Mod: tea.ModAlt}
 	case "alt+shift+left":
 		return tea.KeyPressMsg{Code: tea.KeyLeft, Mod: tea.ModAlt | tea.ModShift}
+	case "alt+shift+right":
+		return tea.KeyPressMsg{Code: tea.KeyRight, Mod: tea.ModAlt | tea.ModShift}
+	case "alt+.":
+		return tea.KeyPressMsg{Code: '.', Mod: tea.ModAlt}
+	case "alt+,":
+		return tea.KeyPressMsg{Code: ',', Mod: tea.ModAlt}
+	}
+	if len(s) != 1 {
+		panic("press: no key named " + s)
 	}
 	return tea.KeyPressMsg{Code: rune(s[0]), Text: s}
 }
@@ -144,19 +149,19 @@ func TestFocusCycles(t *testing.T) {
 	var seen []layout.PaneID
 	for range 4 {
 		seen = append(seen, r.w.Focused())
-		r.w.Update(press("alt+]"))
+		r.w.Update(press("alt+."))
 	}
 	if !slices.Equal(seen, []layout.PaneID{"main", "side", "logs", "main"}) {
 		t.Fatalf("focus order %v (the footer is not focusable)", seen)
 	}
 	// Four moves left focus on side; one back is main.
-	r.w.Update(press("alt+["))
+	r.w.Update(press("alt+,"))
 	if r.w.Focused() != "main" || !r.main.focused || r.side.focused {
-		t.Fatalf("after alt+[: %s, main focused %v, side focused %v", r.w.Focused(), r.main.focused, r.side.focused)
+		t.Fatalf("after alt+,: %s, main focused %v, side focused %v", r.w.Focused(), r.main.focused, r.side.focused)
 	}
-	r.w.Update(press("alt+["))
+	r.w.Update(press("alt+,"))
 	if r.w.Focused() != "logs" {
-		t.Fatalf("alt+[ from main wrapped to %s, want logs", r.w.Focused())
+		t.Fatalf("alt+, from main wrapped to %s, want logs", r.w.Focused())
 	}
 	r.w.Update(press("alt+2"))
 	if r.w.Focused() != "side" {
@@ -198,7 +203,7 @@ func TestModalOverlayTrapsKeys(t *testing.T) {
 	dlg := &fake{id: "dialog"}
 	r.w.Push(Overlay{ID: "dialog", Pane: dlg, Width: 40, Height: 8, Modal: true})
 	r.w.Update(press("y"))
-	r.w.Update(press("alt+]"))
+	r.w.Update(press("alt+."))
 	if len(dlg.keys()) != 2 || len(r.main.keys()) != 0 || r.w.Focused() != "main" {
 		t.Fatalf("dialog keys %v, main keys %v, focus %s", dlg.keys(), r.main.keys(), r.w.Focused())
 	}
@@ -339,7 +344,7 @@ func TestCursorIsOffsetByThePane(t *testing.T) {
 	if r.w.Cursor() != nil {
 		t.Fatal("a nil cursor was shown")
 	}
-	r.w.Update(press("alt+]"))
+	r.w.Update(press("alt+."))
 	r.side.cursor = tea.NewCursor(0, 0)
 	r.w.Toggle("side")
 	if c := r.w.Cursor(); c != nil && r.w.Focused() == "side" {
@@ -444,23 +449,16 @@ func TestSendBroadcastAndTo(t *testing.T) {
 
 type tick struct{ n int }
 
-func TestCommandsRunConcurrently(t *testing.T) {
+// TestCommandsAreIndependent runs a broadcast's commands on goroutines, as
+// Bubble Tea does, and feeds their messages back to Update one at a time,
+// as Bubble Tea does too. Under -race, a command that touched the
+// workspace or a pane would fail it.
+func TestCommandsAreIndependent(t *testing.T) {
 	r := newRig(t, 120, 40)
 	for i, f := range []*fake{r.main, r.side, r.logs} {
-		n := i
-		f.cmd = func() tea.Msg { return tick{n} }
+		f.cmd = func() tea.Msg { return tick{i} }
 	}
-	cmd := r.w.Broadcast(struct{}{})
-	msgs := run(cmd)
-	var wg sync.WaitGroup
-	results := make(chan tea.Msg, 64)
-	for _, m := range msgs {
-		wg.Add(1)
-		go func() { defer wg.Done(); results <- m }()
-	}
-	wg.Wait()
-	close(results)
-	for m := range results {
+	for _, m := range run(r.w.Broadcast(struct{}{})) {
 		r.w.Update(m)
 		_ = r.w.Render()
 	}
@@ -469,7 +467,8 @@ func TestCommandsRunConcurrently(t *testing.T) {
 	}
 }
 
-// run executes cmd, and every command in a batch, concurrently.
+// run executes cmd, and every command in a batch, each on its own
+// goroutine.
 func run(cmd tea.Cmd) []tea.Msg {
 	if cmd == nil {
 		return nil
@@ -483,14 +482,12 @@ func run(cmd tea.Cmd) []tea.Msg {
 	var out []tea.Msg
 	var wg sync.WaitGroup
 	for _, c := range b {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			ms := run(c)
 			mu.Lock()
 			out = append(out, ms...)
 			mu.Unlock()
-		}()
+		})
 	}
 	wg.Wait()
 	return out
