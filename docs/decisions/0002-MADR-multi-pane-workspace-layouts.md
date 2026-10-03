@@ -561,6 +561,15 @@ deviation D4): testing `Wrap` against a real bubbles `textinput` makes
 record names it, as AGENTS.md requires of every required module; it is a
 dependency of bubbles, which 0001-MADR §3 already names.
 
+*Amended 2026-10-03*
+([0002-PLAN-harden-workspace-v0-1-1.md](0002-PLAN-harden-workspace-v0-1-1.md)
+deviation D5): the typed conformance scan also refuses `log/slog`'s
+package-level output functions and `slog.Default`. With the default
+handler they write to standard error. A program may also replace the
+default logger, which the program owns, so a package logs only through a
+`*slog.Logger` or handler its caller passes. The owner asked for this after
+Step 7 recorded the gap.
+
 **Owner questions for A1.**
 
 *Answered 2026-10-02* (picked from options): Q5 "alt+. and alt+,"; Q6

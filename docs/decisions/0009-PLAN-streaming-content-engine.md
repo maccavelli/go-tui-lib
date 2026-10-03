@@ -31,6 +31,12 @@ and for the tooling steps of
 [0010-PLAN-nested-adapter-modules.md](0010-PLAN-nested-adapter-modules.md)
 to be complete.
 
+*2026-10-03:* the owner accepted A2, and approved
+[0010-PLAN-nested-adapter-modules.md](0010-PLAN-nested-adapter-modules.md),
+whose Phases 2–6 run after `v0.1.3`. Nothing in this PLAN's steps
+changes. Step 7 still waits for 0010-PLAN's tooling phases. This PLAN
+stays proposed until the owner approves its execution.
+
 ## Goal
 
 Ship `safetext`, `frame`, `inputfilter`, `stream` and `stream/glamourmd`,

@@ -24,6 +24,12 @@ Rollout changed to match. Steps 10 and 11 wait for 0010's acceptance and
 for its Phases 2–5, and run only after the root release that contains
 Steps 1 to 9.
 
+**Revision, 2026-10-03.** The owner accepted MADR amendment A1, and
+approved [0010-PLAN-nested-adapter-modules.md](0010-PLAN-nested-adapter-modules.md),
+whose Phases 2–6 run after `v0.1.3`. Nothing in this PLAN's steps changes.
+Steps 10 and 11 still wait for 0010-PLAN's Phases 2–5. This PLAN stays
+`proposed`, because its execution is not yet approved.
+
 ## Goal
 
 Ship `when`, `command` and `command/cli`, and the workspace's built-in

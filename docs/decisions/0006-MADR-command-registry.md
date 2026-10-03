@@ -783,7 +783,7 @@ accepted.
 
 ### A1 (2026-10-02): native Cobra and Kong front ends as nested modules
 
-*Status: proposed.* Its steps are Steps 4, 10 and 11 of
+*Status: accepted (2026-10-03).* Its steps are Steps 4, 10 and 11 of
 [0006-PLAN-command-registry.md](0006-PLAN-command-registry.md).
 
 **Found.** On 2026-10-02 the owner asked whether the library is neutral

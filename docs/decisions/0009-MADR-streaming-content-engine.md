@@ -859,7 +859,7 @@ text above stands, and A1 is accepted.
 
 ### A2 (2026-10-02): the glamour adapter as a nested module
 
-*Status: proposed.* Its plan is Step 7 of
+*Status: accepted (2026-10-03).* Its plan is Step 7 of
 [0009-PLAN-streaming-content-engine.md](0009-PLAN-streaming-content-engine.md),
 as revised on 2026-10-02.
 

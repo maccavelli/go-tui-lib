@@ -42,6 +42,7 @@ both tag Steps 1–4.*
 | 5 | `workspace/focus.go` (new), `workspace/model.go` (new), `workspace/workspace.go`, `workspace/overlay.go` | 7: focus as messages, `Wrap` and `Model` |
 | 6 | `workspace/keys.go`, `workspace/workspace.go`, `workspace/render.go`, `workspace/*_test.go` | 8 in the workspace, 9, 12 and 13 |
 | 7 | `internal/conformance/`, `Makefile`, `.github/workflows/ci.yml` | 11, and a `go fix` gate |
+| 7a | `internal/conformance/` | deviation D5: `log/slog` in the scan |
 | 8 | `README.md`, `AGENTS.md`, `docs/` | documentation, release notes, close-out |
 
 *Step 6 also edits `workspace/render.go`: its one `go fix` suggestion
@@ -366,6 +367,35 @@ Added 2026-10-02 by deviation D2, for MADR amendment A2.
   * the scan stops resolving aliases;
   * `make modernize` drops `-diff`.
 
+### Step 7a: `log/slog` in the conformance scan
+
+*Added 2026-10-03 by deviation D5.* Runs after Step 7 and before Step 8.
+
+* **The rule.** Outside tests, the scan also fails on a use of these
+  `log/slog` functions:
+  * `Debug`, `DebugContext`, `Info`, `InfoContext`, `Warn`,
+    `WarnContext`, `Error`, `ErrorContext`, `Log` and `LogAttrs`, which
+    log through the default logger;
+  * `Default`, which hands that logger out, so that a method value on it
+    cannot hide a use.
+* **Not refused:**
+  * a `*slog.Logger`, `slog.Handler` or `io.Writer` the caller passes, and
+    `slog.New`;
+  * `SetDefault` and `NewLogLogger`, which write nothing. `SetDefault`
+    changes a global the program owns, as `log.SetOutput` does. Neither is
+    in the scan, and Step 7a does not add them.
+* **Tests:**
+  * a planted `slog.Info("x")` and `slog.Default().Info("x")` are each
+    found once;
+  * a planted renamed import of `log/slog` is found;
+  * a `*slog.Logger` parameter's `Info` and `slog.New(h)` with a handler
+    passed in are not found.
+* **Proofs.** A planted `slog.Info("x")` in `workspace/zz_plant.go` on a
+  scratch copy fails the scan. On a scratch copy of Step 7's scan
+  (`d13bd45`), the same plant passes; the record quotes both.
+* **Mutation:** the scan skips `log/slog`.
+* **Checks:** as rule 3, and `make lint` with `make modernize`.
+
 ### Step 8: documentation and close-out
 
 * **`docs/guides/building-workspaces.md`:**
@@ -376,7 +406,8 @@ Added 2026-10-02 by deviation D2, for MADR amendment A2.
     rules, and never starting with `/` (MADR A2).
 * **`AGENTS.md`:** the pre-add section says `-tuitest.update` or
   `TUITEST_UPDATE=1`, and names `make modernize`.
-* **`docs/architecture.md`:** the conformance scan and the gate.
+* **`docs/architecture.md`:** the conformance scan and the gate,
+  including `log/slog` (Step 7a).
 * **Release notes for `v0.1.3`** (deviation D3) in the execution
   record, which also say what `v0.1.1` and `v0.1.2` carry. They name the
   behaviour changes: the flag, the default keys, focus messages,
@@ -1181,3 +1212,21 @@ object and for the walk.
   `LC_ALL=C go test -count=1 ./...` exited 0, every package `ok`. The
   source importer loaded every dependency there. The conformance package
   takes 40 s under `-race` and 15 s without it.
+
+### Deviation D5 (2026-10-03): `log/slog` in the conformance scan
+
+* **Found.** Step 7 recorded, under "Not covered", that `log/slog`'s
+  package-level functions also write to standard error through the default
+  logger, and that the PLAN named `log` only.
+* **Evidence.** `go doc log/slog` on Go 1.27.1 lists the package-level
+  `Debug`, `DebugContext`, `Info`, `InfoContext`, `Warn`, `WarnContext`,
+  `Error`, `ErrorContext`, `Log` and `LogAttrs`. `slog.Default` returns
+  the default logger. Until a program calls `SetDefault`, that logger's
+  handler writes through package `log`'s standard logger, to standard
+  error.
+* **Decision** (the owner, 2026-10-03: "add slog to conformance"): the scan
+  refuses them, in a new Step 7a.
+* **Changed.** The Scope table gains Step 7a. Step 7a is written above.
+  Step 8's architecture bullet names it. MADR A1 carries a dated note.
+* **Unchanged.** Step 7's code and record, Steps 1–6 and 8, and the
+  `v0.1.3` release, which now also carries Step 7a.

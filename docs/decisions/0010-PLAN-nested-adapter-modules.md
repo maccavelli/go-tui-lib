@@ -1,6 +1,6 @@
 ---
-status: proposed
-date: 2026-10-02
+status: in-progress
+date: 2026-10-03
 associated-madr: "0010-MADR-nested-adapter-modules.md"
 ---
 # Implement the multi-module repository: go.work, per-module gates, and the release procedure
@@ -92,6 +92,11 @@ amend 0006-MADR A1 or 0009-MADR A2 to match before Phase 2.
 generates its own completions), both as recommended. The answers are
 recorded, the MADR is `accepted`, and 0006-MADR A1 states both. This
 PLAN stays `proposed` until the owner approves its execution.
+
+*2026-10-03: done.* The owner approved this PLAN, and accepted 0006-MADR
+A1 and 0009-MADR A2. This PLAN is `in-progress`. Phases 2–6 run after
+0002-PLAN-harden-workspace-v0-1-1.md is complete and `v0.1.3` is tagged,
+as Order says.
 
 ### Phase 2: `go.work`
 
@@ -235,4 +240,17 @@ PLAN stays `proposed` until the owner approves its execution.
 
 ## Execution Record
 
-None yet.
+### Phase 1: records (2026-10-03)
+
+* The owner approved this PLAN, picked from options: "Approve; run after
+  v0.1.3". The alternatives offered were to run it before 0002's Step 8,
+  or to revise it first.
+* The owner accepted 0006-MADR A1 and 0009-MADR A2 in the same message.
+  Each is marked `accepted (2026-10-03)`, and the PLANs of 0006 and 0009
+  carry a dated note. Neither PLAN's steps change.
+* The Q1 and Q2 answers were recorded on 2026-10-02 (Phase 1 above). No
+  answer changed the MADR, so neither amendment needed a change before
+  Phase 2.
+* `docs/README.md` shows this PLAN `in-progress`, and both amendments
+  `accepted`.
+* Phase 2 starts after `v0.1.3` is tagged.
