@@ -324,6 +324,42 @@ requirement, and no Go file changes.
    pair and the three documents together, when the owner authorizes the
    commit.
 
+### Phase 6: citations of go-selfupdate-lib in code and CI *(added 2026-10-03, proposed)*
+
+The owner asked to finish the outstanding rename items ("proceed to all
+currently outstanding items"). Phase 5 step 5 left these citations for a
+change of their own. This phase changes comments only. No command, target,
+step or test changes.
+
+1. **Citations.** In each of the following, "(go-core-lib
+   docs/decisions/…)" becomes "(go-selfupdate-lib docs/decisions/…)". The
+   file names are unchanged, because go-selfupdate-lib kept its records:
+   * `.github/workflows/ci.yml`, six citations;
+   * `Makefile`, one;
+   * `scripts/go-precheck.sh`, one, at the cross-target lint step;
+   * `scripts/go-fuzz.sh`, two;
+   * `scripts/go-fuzz_test.sh`, one.
+2. **Provenance lines** say where a file came from. They name the library
+   as go-selfupdate-lib, "then go-core-lib":
+   * `scripts/go-precheck.sh`'s "Taken from go-core-lib's
+     scripts/go-precheck.sh" paragraph;
+   * `scripts/go-fuzz.sh`'s "Taken from go-core-lib".
+3. **Checks:**
+   * `git grep -n go-core-lib` over the five files shows only the "then
+     go-core-lib" provenance mentions. The scan is seen to fail on a stray
+     citation planted in a scratch copy;
+   * `git diff` over the five files changes comment lines only, checked by
+     a script that fails on any changed line that is not a comment, and
+     seen to fail on a planted code change in a scratch copy;
+   * `shellcheck` on the three scripts, `bash -n` on each, and
+     `scripts/go-fuzz_test.sh`;
+   * actionlint on `ci.yml`;
+   * `make -n lint` resolves as before;
+   * the identifier scan of V7, and `git diff --check`.
+4. Record Phase 6, and commit the five files with this PLAN when the owner
+   authorizes the commit. Files other sessions have changed are not
+   staged.
+
 ## Verification
 
 * **V1. Provenance.** `cmp` passes on the eight verbatim files. `diff`
@@ -345,6 +381,9 @@ requirement, and no Go file changes.
 * **V9. The rename.** *(Phase 5)* `AGENTS.md`, `docs/architecture.md` and
   0001-MADR amendment A3 name `github.com/maccavelli/go-selfupdate-lib`;
   the marker scan passes, and fails on its planted input.
+* **V10. Citations.** *(Phase 6)* The five files cite go-selfupdate-lib's
+  records; only provenance lines name go-core-lib, as "then go-core-lib";
+  only comment lines changed.
 * **V7. Identifiers.** The committed tree contains none of these:
   * the local account name, the hostname, or a real-machine absolute path;
   * ocp-login's org-internal module host.
