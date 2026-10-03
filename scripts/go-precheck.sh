@@ -7,10 +7,11 @@
 # (~/.agents/hooks/lib/precommit-checks.sh), which prefers this script whenever
 # the repository ships one and Go files are staged.
 #
-# Taken from go-core-lib's scripts/go-precheck.sh under
-# docs/decisions/0001-MADR-scaffold-charm-tui-library.md §4, unchanged apart
-# from this comment and one citation that now names go-core-lib. go-core-lib
-# took it from go-llmprovider-sdk, which adapted magic-cli-remote's.
+# Taken from go-selfupdate-lib's (then go-core-lib's) scripts/go-precheck.sh
+# under docs/decisions/0001-MADR-scaffold-charm-tui-library.md §4, unchanged
+# apart from this comment and one citation that now names go-selfupdate-lib.
+# go-selfupdate-lib took it from go-llmprovider-sdk, which adapted
+# magic-cli-remote's.
 #
 # golangci-lint runs with this repository's .golangci.yml instead of golint.
 # golint is archived, and CI already runs golangci-lint; a gate weaker than CI
@@ -238,7 +239,7 @@ while IFS= read -r m; do
     # `make lint` runs, so a commit cannot pass a weaker check than CI applies.
     # It runs once per target the code builds for, with cgo off, because a
     # host-only run never sees a *_windows.go or *_unix.go file of another OS
-    # (go-core-lib docs/decisions/0002-MADR-rehome-selfupdate-from-mcplib.md §5).
+    # (go-selfupdate-lib docs/decisions/0002-MADR-rehome-selfupdate-from-mcplib.md §5).
     if [ "$have_lint" = 1 ]; then
       for goos in linux darwin windows; do
         if ! lint_out="$(CGO_ENABLED=0 GOOS="$goos" "$GOLANGCI" run -c "$REPO_ROOT/.golangci.yml" ./... 2>&1)"; then

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fuzz every fuzz target in one package, for a fixed time each. Taken from
-# go-core-lib under docs/decisions/0002-PLAN-multi-pane-workspace-layouts.md
-# Step 5 (go-core-lib docs/decisions/0004-PLAN-h2-fuzzing-and-manifest-differential.md
+# go-selfupdate-lib (then go-core-lib) under docs/decisions/0002-PLAN-multi-pane-workspace-layouts.md
+# Step 5 (go-selfupdate-lib docs/decisions/0004-PLAN-h2-fuzzing-and-manifest-differential.md
 # Step 4). go test -fuzz takes exactly one fuzz target per
 # run, so the targets run one after another.
 #
@@ -11,7 +11,7 @@
 #   -z MINIMIZETIME  the cap on minimizing one input, as go test
 #                    -fuzzminimizetime takes it (default 5s). Go's own
 #                    default, 60s, lets the minimizer pause fuzzing for most
-#                    of a short run (deviation D2 of go-core-lib
+#                    of a short run (deviation D2 of go-selfupdate-lib
 #                    docs/decisions/0004-PLAN-h2-fuzzing-and-manifest-differential.md)
 #   -m MIN           the fewest targets accepted (default 4, at least 1): a
 #                    loop that finds nothing must not pass

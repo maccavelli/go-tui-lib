@@ -324,7 +324,7 @@ requirement, and no Go file changes.
    pair and the three documents together, when the owner authorizes the
    commit.
 
-### Phase 6: citations of go-selfupdate-lib in code and CI *(added 2026-10-03, proposed)*
+### Phase 6: citations of go-selfupdate-lib in code and CI *(added 2026-10-03)*
 
 The owner asked to finish the outstanding rename items ("proceed to all
 currently outstanding items"). Phase 5 step 5 left these citations for a
@@ -659,3 +659,32 @@ step or test changes.
   `.github/workflows/ci.yml`, `Makefile`, `scripts/go-precheck.sh`,
   `scripts/go-fuzz.sh` and `scripts/go-fuzz_test.sh` still cite go-core-lib
   records by the former name. They wait for a change of their own.
+
+### Phase 6: citations of go-selfupdate-lib in code and CI (2026-10-03)
+
+* **Approval.** The owner approved the outstanding rename items
+  ("proceed"), and authorized a commit per phase to `main`. Another session
+  committed this phase's plan text as `78129ef`. Its own `32a2d74` then
+  moved the citations' line numbers, but did not change them.
+* **What was done.**
+  * Ten citations changed: six in `ci.yml`, and one each in the
+    `Makefile`, `scripts/go-precheck.sh`, `scripts/go-fuzz.sh` and
+    `scripts/go-fuzz_test.sh`. Each now reads "(go-selfupdate-lib
+    docs/decisions/…)".
+  * `go-fuzz.sh`'s deviation D2 citation names go-selfupdate-lib.
+  * The provenance lines name go-selfupdate-lib, "(then go-core-lib)" in
+    `go-fuzz.sh` and "(then go-core-lib's)" in `go-precheck.sh`.
+* **Checks.** The comment-only and marker checks are one scratch Python
+  script, which compares each file with `HEAD`.
+
+  | Check | Result |
+  | :--- | :--- |
+  | changed lines are comments only; go-core-lib appears only as "then go-core-lib" | 5 files, 0 failures |
+  | the same, with `FOO := bar` appended to a copy of the `Makefile` | `FAIL Makefile: non-comment line changed`, exit 1 |
+  | the same, with a stray citation appended to a copy of `scripts/go-fuzz.sh` | `FAIL scripts/go-fuzz.sh:78: unexpected go-core-lib mention`, exit 1 |
+  | `shellcheck` on the three scripts; `bash -n` on each | 0 |
+  | `scripts/go-fuzz_test.sh` | `12 passed, 0 failed` |
+  | actionlint v1.7.12 on `ci.yml` | 0; a planted `${{ nosuch.thing }}` step in a copy exits 1 |
+  | `make -n lint`, with this `Makefile` and with `HEAD`'s | identical output |
+  | identifier scan (V7) over the five files and this PLAN | none found |
+  | `git diff --check` | clean |

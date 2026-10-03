@@ -7,7 +7,7 @@ on:
 
 # One run per ref: a newer push, or a duplicate trigger for the same one,
 # cancels the older run
-# (go-core-lib docs/decisions/0003-MADR-remediate-debugging-pass-findings.md D11).
+# (go-selfupdate-lib docs/decisions/0003-MADR-remediate-debugging-pass-findings.md D11).
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -27,11 +27,11 @@ jobs:
       - run: go mod download
       - run: go test ./...
       # The race detector needs cgo, which the Linux and macOS runners have
-      # (go-core-lib docs/decisions/0003-MADR-remediate-debugging-pass-findings.md D9).
+      # (go-selfupdate-lib docs/decisions/0003-MADR-remediate-debugging-pass-findings.md D9).
       - name: go test -race
         if: runner.os != 'Windows'
         run: go test -race -count=1 ./...
-      # Order-dependent tests fail here (go-core-lib docs/decisions/0004-MADR-evolve-selfupdate-api-and-tui-support.md H7).
+      # Order-dependent tests fail here (go-selfupdate-lib docs/decisions/0004-MADR-evolve-selfupdate-api-and-tui-support.md H7).
       - name: go test -shuffle
         if: runner.os == 'Linux'
         run: go test -shuffle=on -count=2 ./...
@@ -59,7 +59,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
       # Targets the matrix does not run: a build-tag gap fails here
-      # (go-core-lib docs/decisions/0004-MADR-evolve-selfupdate-api-and-tui-support.md H7).
+      # (go-selfupdate-lib docs/decisions/0004-MADR-evolve-selfupdate-api-and-tui-support.md H7).
       - name: cross go vet
         if: runner.os == 'Linux'
         shell: bash
@@ -84,11 +84,11 @@ jobs:
           go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
           "$(go env GOPATH)/bin/govulncheck" ./...
       # Scripts, Markdown and workflows are checked as the pre-add gate and
-      # the records require (go-core-lib docs/decisions/0003-MADR-remediate-debugging-pass-findings.md D9).
+      # the records require (go-selfupdate-lib docs/decisions/0003-MADR-remediate-debugging-pass-findings.md D9).
       # shellcheck is pinned to the release the pre-add hosts use (the
       # latest), checksum-verified, and first on PATH so actionlint's
       # embedded checks use it too. The runner's distribution copy is older
-      # and reports differently (go-core-lib docs/decisions/0003-PLAN-remediate-debugging-pass-findings.md
+      # and reports differently (go-selfupdate-lib docs/decisions/0003-PLAN-remediate-debugging-pass-findings.md
       # deviation D5).
       - name: shellcheck, markdownlint, actionlint
         if: runner.os == 'Linux'

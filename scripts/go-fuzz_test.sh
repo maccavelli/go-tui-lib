@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Offline tests for go-fuzz.sh, on throwaway modules in a temporary directory
-# (go-core-lib docs/decisions/0004-PLAN-h2-fuzzing-and-manifest-differential.md
+# (go-selfupdate-lib docs/decisions/0004-PLAN-h2-fuzzing-and-manifest-differential.md
 # Step 4; here under docs/decisions/0002-PLAN-multi-pane-workspace-layouts.md
 # Step 5).
 #

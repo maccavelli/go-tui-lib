@@ -47,7 +47,7 @@ vet: ## Runs go vet, per module
 
 # Lint every target the code builds for, with cgo off so a cross-target run
 # never needs a C toolchain for that target
-# (go-core-lib docs/decisions/0002-MADR-rehome-selfupdate-from-mcplib.md §5).
+# (go-selfupdate-lib docs/decisions/0002-MADR-rehome-selfupdate-from-mcplib.md §5).
 LINT_GOOS := linux darwin windows
 
 lint: modernize ## Runs make modernize, then golangci-lint with fleet config for linux, darwin and windows, per module
