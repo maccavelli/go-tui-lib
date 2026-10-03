@@ -273,6 +273,57 @@ Phase 4 brings them here. It decides nothing new.
 6. Set this PLAN `status: complete`, record Phase 4, and commit the
    report, the amended pair and the two documents together.
 
+### Phase 5: go-core-lib is now go-selfupdate-lib *(added 2026-10-03)*
+
+The owner asked, after go-core-lib's rename: "update docs". go-selfupdate-lib
+`docs/decisions/0009-MADR-rename-to-go-selfupdate-lib.md` §8 names this
+repository's `AGENTS.md` and 0001-MADR §3 as needing the new path before
+`updatetea` is added. This phase changes documentation only. It adds no
+requirement, and no Go file changes.
+
+1. **MADR amendment A3** records the rename, and the new path in §3's
+   stack. It withdraws §1's "UI-free code belongs in go-core-lib", which
+   §1 strikes through *(the owner's choice, 2026-10-03: "A3, remove
+   reference")*.
+2. **`AGENTS.md`**, Dependencies: the stack ends with
+   `github.com/maccavelli/go-selfupdate-lib`, and the paragraph cites
+   amendment A3.
+3. **`docs/architecture.md`**, Dependencies: "Named but not yet required"
+   is `github.com/maccavelli/go-selfupdate-lib` (formerly `go-core-lib`),
+   for `updatetea`.
+4. **`docs/README.md`:**
+   * one sentence under Records: go-core-lib was renamed go-selfupdate-lib
+     at `v1.5.0`, and records name it as it was when they were written
+     (0001-MADR A3);
+   * the row "know how this scaffold differs from go-core-lib's" names
+     go-selfupdate-lib as well. Its link and anchor are unchanged;
+   * record titles stay as written.
+5. **Out of scope, and why.**
+   * **Records 0001–0010 and the reports.** They stay as written, as A3
+     says.
+   * **Comments in `.github/workflows/ci.yml`, `Makefile`,
+     `scripts/go-precheck.sh`, `scripts/go-fuzz.sh` and
+     `scripts/go-fuzz_test.sh`.** They cite go-core-lib records by the
+     repository's former name. They are code and CI rather than docs, and
+     changing them runs this repository's pre-add and CI gates. GitHub's
+     redirect still reaches the cited files. They are listed for a later
+     change of their own.
+6. **Checks:**
+   * markdownlint-cli2 over `AGENTS.md`, `docs/README.md` and
+     `docs/architecture.md`;
+   * every relative link in those three files and in 0001-MADR resolves,
+     proven again on a planted bad link in a scratch copy;
+   * **the marker scan:** `git grep -n go-core-lib` over `AGENTS.md`,
+     `docs/README.md` and `docs/architecture.md` shows only the
+     "formerly" and "now go-selfupdate-lib" mentions and the record
+     titles. It is seen to fail on a stray mention planted in a scratch
+     copy;
+   * the identifier scan of V7 over the changed files;
+   * `git diff --check`.
+7. Set this PLAN `status: complete`, record Phase 5, and commit the amended
+   pair and the three documents together, when the owner authorizes the
+   commit.
+
 ## Verification
 
 * **V1. Provenance.** `cmp` passes on the eight verbatim files. `diff`
@@ -291,6 +342,9 @@ Phase 4 brings them here. It decides nothing new.
 * **V8. Evidence.** *(Phase 4)* Every ocp-login claim in the report has a
   recorded check against `a0d1fc4`, and the report, the index and the
   architecture document pass V6.
+* **V9. The rename.** *(Phase 5)* `AGENTS.md`, `docs/architecture.md` and
+  0001-MADR amendment A3 name `github.com/maccavelli/go-selfupdate-lib`;
+  the marker scan passes, and fails on its planted input.
 * **V7. Identifiers.** The committed tree contains none of these:
   * the local account name, the hostname, or a real-machine absolute path;
   * ocp-login's org-internal module host.

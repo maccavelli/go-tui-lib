@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-01
+date: 2026-10-03
 decision-makers: go-tui-lib maintainers
 consulted: go-core-lib repository conventions; ocp-login (the working example for the Charm v2 stack)
 informed: fleet programs with a terminal UI (ocp-login, ocp-login-macos, mcp-server-magicdev, mcp-server-magictools, mcp-server-recall, mcp-server-socratic-thinker, pi-go)
@@ -145,7 +145,8 @@ Chosen option: "A", because:
 * **Scope:** reusable terminal-UI code on the Charm v2 stack, such as
   themes, layout, glyph tables, components, prompts, rendering primitives,
   test helpers, and adapters that bind a go-core-lib package to Bubble Tea
-  (`updatetea`). UI-free code belongs in go-core-lib.
+  (`updatetea`). ~~UI-free code belongs in go-core-lib.~~ *(Removed by
+  amendment A3.)*
 
 ### 2. Layout
 
@@ -419,6 +420,38 @@ to go-core-lib. The email is not repeated in this record.
   (0001-PLAN Phase 4).
 * **What did not change.** §6's six conventions, and every other
   decision, are unchanged. ocp-login's record numbers are still cited.
+
+### A3 (2026-10-03): go-core-lib is now go-selfupdate-lib
+
+* **What happened.** go-core-lib was renamed go-selfupdate-lib, both the
+  repository and the module path (go-selfupdate-lib
+  `docs/decisions/0009-MADR-rename-to-go-selfupdate-lib.md`).
+  * `github.com/maccavelli/go-core-lib` ends at `v1.4.1`, which `go`
+    reports as deprecated.
+  * `github.com/maccavelli/go-selfupdate-lib` starts at `v1.5.0`
+    (`6deaa52`), with `v1.4.1`'s API.
+  * Its scope is now self-update only: `selfupdate`, `selfupdate/cli`,
+    `selfupdate/selfupdatetest` and `buildinfo`.
+* **What changes in §3.** The stack's last entry is
+  `github.com/maccavelli/go-selfupdate-lib`, in place of
+  `github.com/maccavelli/go-core-lib`. It enters at its newest release
+  when `updatetea`'s first import lands, as §3 says of every entry, and
+  that is `v1.5.0` or later. The old path is not required: `go get
+  github.com/maccavelli/go-core-lib@latest` now fails with a path
+  mismatch (go-selfupdate-lib
+  `docs/decisions/0009-PLAN-rename-to-go-selfupdate-lib.md`, step 7).
+* **§1's last sentence is withdrawn.** "UI-free code belongs in
+  go-core-lib" held while go-core-lib was a general library.
+  go-selfupdate-lib takes self-update code only (its 0009-MADR §1). The
+  owner chose to remove the sentence rather than name another home
+  (2026-10-03), and §1 strikes it through. This record names no home for
+  UI-free code.
+* **What does not change.** `updatetea`'s place and purpose, and every
+  other decision.
+* **Apart from that sentence, the text above stays as written.** Its
+  go-core-lib mentions describe the module under the name it had then. This includes §4's files, taken at
+  `f200c51`, and the citations under More Information. GitHub redirects
+  the old repository name to the new one.
 
 ## More Information
 
