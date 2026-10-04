@@ -1,0 +1,19 @@
+ 26|complete               yes
+ 25|timed_out              no
+ 39|terminal               tmux 3.4 (query)
+ 35|mux                    tmux (query)
+ 31|remote                 no (env)
+ 26|attributes             1;2
+ 42|kitty_keyboard         unsupported (query)
+ 24|keyboard_flags         0
+ 42|sync_output            unsupported (query)
+ 42|grapheme_width         unsupported (query)
+ 42|color_scheme_reports   unsupported (query)
+ 42|in_band_resize         unsupported (query)
+ 40|focus_events           supported (query)
+ 42|desktop_notify         unsupported (query)
+ 42|kitty_graphics         unsupported (query)
+ 42|sixel                  unsupported (query)
+ 34|dark                   yes (query)
+ 30|background             #1e1e2e
+ 32|profile                TrueColor

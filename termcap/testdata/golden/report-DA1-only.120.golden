@@ -1,0 +1,21 @@
+ 26|complete               yes
+ 25|timed_out              no
+ 43|terminal               xterm-256color (env)
+ 33|mux                    none (env)
+ 31|remote                 no (env)
+ 24|attributes             1
+ 42|kitty_keyboard         unsupported (query)
+ 24|keyboard_flags         0
+113|sync_output            unknown (not-queried: tea asks only outside SSH and Apple Terminal, and not every terminal
+ 31|                       answers)
+113|grapheme_width         unknown (not-queried: tea asks only outside SSH and Apple Terminal, and not every terminal
+ 31|                       answers)
+ 42|color_scheme_reports   unsupported (query)
+ 42|in_band_resize         unsupported (query)
+ 42|focus_events           unsupported (query)
+ 42|desktop_notify         unsupported (query)
+ 42|kitty_graphics         unsupported (query)
+ 42|sixel                  unsupported (query)
+ 44|dark                   unknown (not-queried)
+ 24|background             -
+ 27|profile                ANSI

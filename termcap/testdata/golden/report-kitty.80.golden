@@ -1,0 +1,19 @@
+ 26|complete               yes
+ 25|timed_out              no
+ 44|terminal               kitty(0.39.1) (query)
+ 33|mux                    none (env)
+ 31|remote                 no (env)
+ 28|attributes             62;22
+ 40|kitty_keyboard         supported (query)
+ 24|keyboard_flags         0
+ 40|sync_output            supported (query)
+ 42|grapheme_width         unsupported (query)
+ 40|color_scheme_reports   supported (query)
+ 40|in_band_resize         supported (query)
+ 40|focus_events           supported (query)
+ 40|desktop_notify         supported (query)
+ 40|kitty_graphics         supported (query)
+ 42|sixel                  unsupported (query)
+ 34|dark                   yes (query)
+ 30|background             #1e1e2e
+ 32|profile                TrueColor

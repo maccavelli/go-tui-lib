@@ -1,0 +1,19 @@
+ 26|complete               yes
+ 25|timed_out              no
+ 43|terminal               xterm-256color (env)
+ 33|mux                    none (env)
+ 31|remote                 no (env)
+ 29|attributes             65;1;9
+ 42|kitty_keyboard         unsupported (query)
+ 24|keyboard_flags         0
+ 42|sync_output            unsupported (query)
+ 42|grapheme_width         unsupported (query)
+ 42|color_scheme_reports   unsupported (query)
+ 42|in_band_resize         unsupported (query)
+ 40|focus_events           supported (query)
+ 42|desktop_notify         unsupported (query)
+ 42|kitty_graphics         unsupported (query)
+ 42|sixel                  unsupported (query)
+ 33|dark                   no (query)
+ 30|background             #ffffff
+ 30|profile                ANSI256

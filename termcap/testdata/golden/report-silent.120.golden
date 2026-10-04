@@ -1,0 +1,21 @@
+ 25|complete               no
+ 26|timed_out              yes
+ 43|terminal               xterm-256color (env)
+ 33|mux                    none (env)
+ 31|remote                 no (env)
+ 24|attributes             -
+ 73|kitty_keyboard         unknown (not-queried: no reply before the timeout)
+ 24|keyboard_flags         0
+113|sync_output            unknown (not-queried: tea asks only outside SSH and Apple Terminal, and not every terminal
+ 63|                       answers; or no reply before the timeout)
+113|grapheme_width         unknown (not-queried: tea asks only outside SSH and Apple Terminal, and not every terminal
+ 63|                       answers; or no reply before the timeout)
+ 73|color_scheme_reports   unknown (not-queried: no reply before the timeout)
+ 73|in_band_resize         unknown (not-queried: no reply before the timeout)
+ 73|focus_events           unknown (not-queried: no reply before the timeout)
+109|desktop_notify         unknown (not-queried: asked only behind the heuristic; or no reply before the timeout)
+109|kitty_graphics         unknown (not-queried: asked only behind the heuristic; or no reply before the timeout)
+ 73|sixel                  unknown (not-queried: no reply before the timeout)
+ 73|dark                   unknown (not-queried: no reply before the timeout)
+ 24|background             -
+ 27|profile                ANSI

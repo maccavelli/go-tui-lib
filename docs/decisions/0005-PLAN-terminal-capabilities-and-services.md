@@ -849,3 +849,83 @@ its own DA1, in order. Whether real tmux delivers passthrough replies, and
 when, is still the MADR's open item for the real-terminal check in
 Verification: if they arrive after tmux's DA1, the facts are `Unsupported`
 in `CapsMsg` and corrected by the late reply, which Step 3 tests.
+
+### Step 5: `Report` (2026-10-04)
+
+The owner committed Step 4 (`bf5d4d2`) and said "proceed". No deviation.
+
+**What was built** (`termcap/report.go`).
+
+* `Report(w io.Writer, c Caps, o ...ReportOption) error`, `ReportOption`,
+  `WithReportWidth(w)` and `DefaultReportWidth` (80). MADR §4 names no
+  option; the width one follows from the PLAN's goldens at 80 and 120
+  columns and TUI rule 5. Zero or less does not wrap.
+* One line per `Caps` field, in field order, found by reflection, so a new
+  field is reported without a change here. Each line is the field's JSON
+  name (snake case of the Go name for the two fields JSON writes by hand),
+  padded to 22 cells, then the value, and for a `Fact` its origin in
+  brackets, as `Origin`'s text.
+* A fact still `NotQueried` with a zero value reads `unknown`, not "no" or
+  "none", which would state a fact. Its origin carries a reason where one
+  is known: tea's 2026 and 2027 ("tea asks only outside SSH and Apple
+  Terminal, and not every terminal answers"), the gated queries ("asked
+  only behind the heuristic"), and, when the probe timed out, "no reply
+  before the timeout". A1's reason tokens refine these in Step A1.3.
+* ASCII only: any byte outside printable ASCII becomes `?`, so a
+  terminal's own reply, such as its XTVERSION name, cannot put a control
+  sequence into a report. Long lines wrap with `ansi.Wrap` under the value
+  column. One write to `w`, whose error is returned.
+
+**Tests.** `report_test.go`: `TestReportNamesEveryField` (a reflection
+walk of `Caps`, independent of `Report`'s, over a zero and a full `Caps`),
+`TestReportIsASCII` (an OSC 52 sequence and CJK text planted in the
+terminal's name), `TestReportValuesAndOrigins`,
+`TestReportSaysWhyAFactWasNotQueried` (with and without a timeout),
+`TestReportWrapsUnderTheValueColumn` (60 columns),
+`TestReportReturnsTheWriteError`. `report_golden_test.go` (package
+`termcap_test`, so it can use `termcaptest`): `TestReportGolden` runs each
+profile, Kitty, xterm, tmux with and without passthrough, DA1-only and
+silent, through a real program and writes the report at 80 and 120
+columns with `tuitest.Text`, twelve files under `termcap/testdata/golden/`,
+each read before this record. The report has no colour and no glyphs, so
+the matrix reduces to its widths (MADR Confirmation). The Kitty flags in
+`CapsMsg` depend on whether tea's first render, which pushes them, reaches
+the terminal before the probe's own query; the golden test pins them to 0
+with `WithOverride`, so the files are stable. `-race -count=10` on the
+report tests passed.
+
+**One wording fix after reading the goldens.** The DA1-only golden first
+said tea's 2026 query was not asked "outside SSH and Apple Terminal",
+though tea did ask and the terminal did not answer. The reason now ends
+"and not every terminal answers", and the four affected files were
+rewritten and read again.
+
+**Mutations,** each on a scratch copy, all 6 killed:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| the reflection walk skips the last field | `TestReportNamesEveryField`: "18 lines for 19 fields" |
+| an origin is printed as its number | `TestReportValuesAndOrigins`: "report lacks \"terminal … WezTerm 20240203 (query)\"" |
+| control bytes and non-ASCII pass through | `TestReportIsASCII`: "byte 0x1b at 81 is not printable ASCII" |
+| a fact never queried reads as its zero value | `TestReportSaysWhyAFactWasNotQueried`: "report lacks \"terminal … unknown (not-queried)\"" |
+| continuation lines are not indented | `TestReportWrapsUnderTheValueColumn`, `TestReportGolden` |
+| the timeout is not given as a reason | `TestReportSaysWhyAFactWasNotQueried`, `TestReportGolden` |
+
+**Checks.**
+
+* `make lint`: 0 issues for linux, darwin and windows, after three
+  findings were fixed in the code: two unchecked type assertions
+  (`errcheck`'s `check-type-assertions`), now comma-ok, and `revive`'s
+  confusing-naming on a test helper `report` beside `Report`, renamed
+  `reportOf`. The mutations were rerun after.
+* `make pre-add-check FILES=…` (the three Go files): `3 file(s) clean in
+  1 module(s)`.
+* `go test -race -count=1 ./...`, `LC_ALL=C go test ./...`,
+  `go test -shuffle=on -count=2 ./...`, with `GOWORK=off`: pass.
+* `GOWORK=off go mod tidy -diff`: clean; `go.mod` unchanged.
+* Windows test host, on a copy (go1.27.1 windows/amd64): `make
+  pre-add-check` (`57 file(s) clean`), `make lint` (0 issues, three
+  targets), `make vuln` (none), and the `internal/termevent/...` and
+  `termcap/...` tests shuffled, three times, the goldens included: all
+  exit 0.
+* The identifier scan of the diff and the goldens finds nothing.
