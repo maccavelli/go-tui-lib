@@ -18,7 +18,7 @@ it was when they were written
 | 0003 | REPORT | [Agent TUI ecosystem research, an audit of `v0.1.0`, and a source pass over four agent TUIs](reports/0003-REPORT-agent-tui-ecosystem-research.md) | — |
 | 0004 | MADR | [Draw the workspace on an ultraviolet cell buffer, follow the terminal's width method and theme, and adopt Go 1.27 idioms in the public API](decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md) | accepted; A1, A2 accepted |
 | 0004 | PLAN | [Implement direct cell drawing, terminal-following width and theme, and Go 1.27 accessors (`v0.2.0`)](decisions/0004-PLAN-integrate-charm-v2-and-go-1-27.md) | complete |
-| 0005 | MADR | [Detect terminal capabilities with one sentinel-terminated probe that observes Bubble Tea's own queries, and offer notifications, clipboard, links and prompt marks as commands built from the result](decisions/0005-MADR-terminal-capabilities-and-services.md) | accepted; A1, A2 accepted |
+| 0005 | MADR | [Detect terminal capabilities with one sentinel-terminated probe that observes Bubble Tea's own queries, and offer notifications, clipboard, links and prompt marks as commands built from the result](decisions/0005-MADR-terminal-capabilities-and-services.md) | accepted; A1, A2, A3 accepted |
 | 0005 | PLAN | [Implement terminal capabilities and services (`termcap`, `termsvc`)](decisions/0005-PLAN-terminal-capabilities-and-services.md) | in-progress |
 | 0006 | MADR | [Make one command registry the source of every action, for keys, palette, slash commands, the shell and agents, on open standards](decisions/0006-MADR-command-registry.md) | accepted; A1 accepted |
 | 0006 | PLAN | [Implement the command registry (`command`, `when`, `command/cli`)](decisions/0006-PLAN-command-registry.md) | proposed |

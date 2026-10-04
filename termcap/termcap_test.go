@@ -11,7 +11,7 @@ import (
 )
 
 func TestOriginOrder(t *testing.T) {
-	want := []Origin{NotQueried, Heuristic, Environment, Query, Override}
+	want := []Origin{NotQueried, Heuristic, Environment, Queried, Override}
 	for i := 1; i < len(want); i++ {
 		if want[i-1] >= want[i] {
 			t.Fatalf("%v is not weaker than %v", want[i-1], want[i])
@@ -58,7 +58,7 @@ func TestEnumNames(t *testing.T) {
 		}
 	}
 	check("Support", []string{Unknown.String(), Unsupported.String(), Supported.String()}, "unknown,unsupported,supported")
-	check("Origin", []string{NotQueried.String(), Heuristic.String(), Environment.String(), Query.String(), Override.String()}, "not-queried,heuristic,env,query,override")
+	check("Origin", []string{NotQueried.String(), Heuristic.String(), Environment.String(), Queried.String(), Override.String()}, "not-queried,heuristic,env,query,override")
 	check("Mux", []string{NoMux.String(), Tmux.String(), Screen.String(), Zellij.String()}, "none,tmux,screen,zellij")
 	if s := Support(9).String(); s != "9" {
 		t.Errorf("an unnamed Support prints %q, want its number", s)
@@ -122,8 +122,8 @@ func TestEnvironmentFacts(t *testing.T) {
 
 func TestEnvironmentDoesNotReplaceAQuery(t *testing.T) {
 	var c Caps
-	c.Terminal.Set("kitty(0.39.1)", Query)
-	c.Mux.Set(Tmux, Query)
+	c.Terminal.Set("kitty(0.39.1)", Queried)
+	c.Mux.Set(Tmux, Queried)
 	c.setEnv(Env{"TERM=xterm-kitty"})
 	if c.Terminal.Value != "kitty(0.39.1)" || c.Mux.Value != Tmux {
 		t.Fatalf("the environment replaced a reply: %+v %+v", c.Terminal, c.Mux)
@@ -140,11 +140,11 @@ func TestZeroCapsMarshalsEmpty(t *testing.T) {
 // full is a Caps with every field set away from its zero value. The
 // reflection check below keeps it full as fields are added.
 func full() Caps {
-	q := func(s Support) Fact[Support] { return Fact[Support]{s, Query} }
+	q := func(s Support) Fact[Support] { return Fact[Support]{s, Queried} }
 	return Caps{
 		Complete:           true,
 		TimedOut:           true,
-		Terminal:           Fact[string]{"WezTerm 20240203", Query},
+		Terminal:           Fact[string]{"WezTerm 20240203", Queried},
 		Mux:                Fact[Mux]{Tmux, Environment},
 		Remote:             Fact[bool]{true, Environment},
 		Attributes:         []int{62, 4, 22},
@@ -158,7 +158,7 @@ func full() Caps {
 		DesktopNotify:      Fact[Support]{Unsupported, Override},
 		KittyGraphics:      Fact[Support]{Unknown, Heuristic},
 		Sixel:              q(Supported),
-		Dark:               Fact[bool]{true, Query},
+		Dark:               Fact[bool]{true, Queried},
 		Background:         color.RGBA{R: 0x1e, G: 0x1f, B: 0x29, A: 0xff},
 		Profile:            colorprofile.ANSI256,
 	}

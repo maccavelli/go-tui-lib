@@ -6,6 +6,9 @@
 // of equal or stronger origin, and an override always wins. The environment
 // comes from tea.EnvMsg as an Env, never from the process: under wish it is
 // the SSH session's.
+//
+// A Prober learns the facts from one batch of queries that ends with DA1,
+// and delivers them as a CapsMsg.
 package termcap
 
 import (
@@ -50,15 +53,15 @@ const (
 	Heuristic
 	// Environment is an environment variable, from tea.EnvMsg.
 	Environment
-	// Query is the terminal's reply to a query, or its silence before the
-	// probe's sentinel answered.
-	Query
+	// Queried is the terminal's reply to a query, or its silence before
+	// the probe's sentinel answered.
+	Queried
 	// Override is the program's own setting, from a flag or a file. It
 	// always wins.
 	Override
 )
 
-var originNames = []string{"not-queried", "heuristic", "env", "query", "override"}
+var originNames = []string{"not-queried", "heuristic", "env", "query", "override"} // stable text
 
 // String is the origin's name, as the report and JSON print it.
 func (o Origin) String() string { return name(originNames, o) }

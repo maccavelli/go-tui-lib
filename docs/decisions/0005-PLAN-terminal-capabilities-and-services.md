@@ -581,3 +581,161 @@ type arguments.
 
 `internal/conformance` scans both new packages with every other; it
 passes. Nothing is staged or committed: the owner commits Steps 1 and 2.
+
+### Step 3: `termcap` probe (2026-10-04)
+
+The owner committed and pushed Steps 1 and 2 and said "proceed".
+
+**Deviation D3 (2026-10-04): the batch waits for the environment.** Before
+any code, the agent read tea's start-up (`tea.go:1090-1135`): `tea.EnvMsg`
+is sent from a goroutine just before `Init` is called, unordered with
+`Init`'s command. MADR §3 has `Init` return the batch, but the batch needs
+the environment for Q1's gate and the tmux wrap. The agent stopped and
+asked. The owner picked "Batch on the first EnvMsg", the recommendation:
+`Init` returns the deadline, and `Update` sends the batch on the first
+`tea.EnvMsg`. MADR amendment A3 records it. Step 3's tests change with it:
+"`WithDisabled` makes `Init` return nil" stands, and the batch tests drive
+a `tea.EnvMsg` first.
+
+**Deviation D4 (2026-10-04): a second name.** The first build of
+`prober.go` failed: `termcap.go:55:2: Query redeclared in this block`.
+MADR §2's `Origin` constant `Query` and §3's type `Query` clash, as `Env`
+did in D2; the agent should have seen both at Step 2. It stopped and asked.
+The owner picked "Origin becomes Queried", the recommendation: the
+constant is `Queried`, its text stays `query`, and the type keeps its name.
+MADR A3 records it.
+
+**Deviation D5 (2026-10-04): the API test and `tea.Msg`.** With the prober
+in place, Step 2's `TestNoUltravioletInTheAPI` failed:
+`New.Init: github.com/charmbracelet/ultraviolet.Event`. Bubble Tea declares
+`type Msg = uv.Event` (`tea.go:50`), and the walk unaliased it, so the
+MADR's own `Update(msg tea.Msg)` could never pass. Step 2 did not see it,
+because `termcap` named no tea type then. The agent stopped and asked. The
+owner picked "Stop at other packages' aliases", the recommendation: the
+walk stops at an alias declared outside ultraviolet, and still fails on any
+name declared in ultraviolet. MADR A3 records it. The planted-leak mutation
+is rerun, and a second one plants an alias declared in ultraviolet.
+
+**Deviation D6 (2026-10-04): ultraviolet in `termcap`'s tests.** `make
+lint` failed: `termcap/prober_test.go:13:2: import
+'github.com/charmbracelet/ultraviolet' is not allowed from list
+'ultraviolet'` (`depguard`). The tests build ultraviolet's pass-through
+events to feed `Update`, as MADR Confirmation says, and the rule covers
+test files. The agent stopped and asked. The owner picked "A termeventtest
+helper", the recommendation: a test-support package,
+`internal/termevent/termeventtest`, inside the tree the rule allows, builds
+each event and returns it as a `tea.Msg`. `.golangci.yml` is unchanged.
+MADR A3 records it. Added to Step 3's paths: `internal/termevent/termeventtest/`.
+
+**What was built.**
+
+* **`termcap/prober.go`:** `Prober`, `New`, `Init`, `Update`, `Caps`,
+  `Restore`, `Quit`; `CapsMsg`, `ColorSchemeMsg`, `Reply`, `Query`,
+  `DefaultTimeout` (2 s); and the options `WithTimeout`, `WithQuery`,
+  `WithoutHeuristic`, `WithOverride`, `WithoutColorSchemeUpdates`,
+  `WithoutBackgroundRequest` and `WithDisabled`.
+  * `Init` returns the deadline (A3). The first `tea.EnvMsg` sets the
+    environment's facts and sends one `tea.Raw`: the Kitty keyboard
+    request; DECRQM 2031, 2048 and 1004; DSR 996; behind the heuristic,
+    XTVERSION, the OSC 99 `p=?` query and the Kitty graphics query, the
+    last two wrapped with `TmuxPassthrough` inside tmux; each added query;
+    DA1. `tea.RequestBackgroundColor` goes beside it unless declined.
+  * Built-in queries are `Query` values with an unexported "what silence
+    means". When DA1 answers, every query sent before it with no reply and
+    a fact of its own becomes `Unsupported` with origin `Queried`. A reply
+    after DA1 still sets its fact.
+  * Tea's own `ModeReportMsg` for 2026 and 2027 fills `SyncOutput` and
+    `GraphemeWidth`; with no report they stay `NotQueried`.
+  * `Dark` comes from DSR 997 when one arrived, else from OSC 11's
+    `IsDark`. After the probe each DSR 997 sends `ColorSchemeMsg`, then a
+    background request unless declined.
+  * Mode 2031 is set once it is `Supported`, unless declined; `Restore`
+    then returns its reset, and `Quit` sequences the reset before
+    `tea.Quit`.
+  * `WithDisabled`: `Init` is nil, nothing is written, and the first
+    `tea.EnvMsg` delivers a `CapsMsg` with the environment's facts only, so
+    a program that waits for one is not left waiting.
+  * Overrides run on the starting facts and on every copy handed out.
+  * The heuristic, `gatedAllowed(env)`: never Apple Terminal; locally,
+    always; over SSH only when `TERM` names kitty, Ghostty, WezTerm,
+    Alacritty, foot, Rio or Contour, or `LC_TERMINAL` is `iTerm2`.
+  * The OSC 99 reply is parsed from `Reply.Raw`, written from the Kitty
+    desktop-notifications specification: the metadata must carry `p=?` and
+    the prober's `i=termcap`. The keys after it are not read yet.
+* **`internal/termevent/termeventtest`** (D6): a constructor for each
+  event `Decode` reads, returning a `tea.Msg`.
+* **`termcap/source_test.go`:** fails on `os.Getenv`, `os.LookupEnv`,
+  `os.Environ`, `os.ExpandEnv`, `syscall.Getenv`, `syscall.Environ`, a
+  dot import of either package, or an import of `os/exec`, in the
+  package's own files, under any import name.
+* **`termcap/api_test.go`:** the alias rule of D5.
+* **`termcap/termcap.go`:** `Queried` (D4), and a package-doc sentence on
+  the prober.
+
+**Tests** (`prober_test.go`, decoded messages fed to `Update`):
+`TestBatchBytes` (exact bytes: local, inside tmux, an unknown SSH peer,
+the same with `WithoutHeuristic`, Apple Terminal; one background request
+each), `TestBatchNeverAsksWhatTeaAsks` (no DECRQM 2026 or 2027, no
+XTGETTCAP), `TestBatchGoesOutOnceOnTheFirstEnvironment`,
+`TestGatedAllowed`, `TestSentinelAloneMarksEveryQueryUnsupported`,
+`TestEveryReplySupports`, `TestRepliesThatSayNo`,
+`TestXTVersionOfTmuxIsAMux`, `TestReplyAfterTheSentinelStillCounts`,
+`TestTimeoutEndsTheProbe` (under `testing/synctest`: the default 2 s and
+a 50 ms timeout fire at exactly their length, with no wall-clock wait),
+`TestCapsMsgIsDeliveredOnce` (both orders, and a second DA1),
+`TestAnotherProbersTimeoutIsIgnored`, `TestTeasOwnModeReports`,
+`TestColorSchemeAfterTheProbe` (with and without the background request),
+`TestBackgroundSetsDarkWithoutDSR997`, `TestColorSchemeReportsSubscription`
+(supported, not recognised, declined; set at most once),
+`TestQuitRestoresFirst`, `TestDisabledSendsNothing`, `TestAddedQuery`,
+`TestOverrideBeatsAQuery`, `TestCapsIsACopy`; and
+`TestNoProcessEnvironmentOrProcesses`, `TestEveryEventDecodes`.
+
+**Mutations,** each on a scratch copy, all 17 killed:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| the batch includes DECRQM 2026 | `TestBatchBytes` (every environment) |
+| DA1 is sent first | `TestBatchBytes` |
+| a query with no reply stays `Unknown` after the sentinel | `TestSentinelAloneMarksEveryQueryUnsupported`: "ColorSchemeReports = {Value:unknown Origin:not-queried} after DA1 alone" |
+| `CapsMsg` is sent twice | `TestCapsMsgIsDeliveredOnce`: "timeout, then sentinel: 2 CapsMsg, want 1" |
+| `Restore` omits `ResetModeLightDark` | `TestColorSchemeReportsSubscription`, `TestQuitRestoresFirst` |
+| the default does not subscribe to 2031 | `TestColorSchemeReportsSubscription`: "default, supported: wrote \"\"" |
+| `Quit` orders `tea.Quit` before the restore | `TestQuitRestoresFirst`: "Quit() = [{} {[?2031l}]" |
+| the tmux wrap is skipped | `TestBatchBytes`: "inside tmux" |
+| the heuristic lets Apple Terminal through | `TestGatedAllowed`, `TestBatchBytes` |
+| a DSR 997 during the probe sends `ColorSchemeMsg` | `TestEveryReplySupports` |
+| `os.LookupEnv` planted | `TestNoProcessEnvironmentOrProcesses`: "reads the process environment with os.LookupEnv" |
+| `os.Getenv` planted through `goos "os"` | the same test: "with os.Getenv" |
+| `os/exec` planted | the same test: "imports os/exec" |
+| an ultraviolet type in the API (`func() uv.Event`) | `TestNoUltravioletInTheAPI`: "Leak: …ultraviolet.Event" |
+| an alias declared in ultraviolet (`uv.Rectangle`) | `TestNoUltravioletInTheAPI`: "Leak: …ultraviolet.Rectangle" |
+| an alias of ultraviolet declared in `termcap` | `TestNoUltravioletInTheAPI`: "Leak: …ultraviolet.Event" |
+| `termeventtest.LightColorScheme` builds a dark event | `TestEveryEventDecodes` |
+
+`depguard`, on scratch copies: ultraviolet planted in `termcap/planted.go`
+and in `termcap/planted_test.go` each fail `golangci-lint` with "import
+'github.com/charmbracelet/ultraviolet' is not allowed from list
+'ultraviolet'" (exit 1, one issue each).
+
+**Checks.**
+
+* `make lint`: 0 issues for linux, darwin and windows. Its first runs
+  failed twice: `depguard` on the test import (D6), and `make modernize`
+  on promoted-field composite literals in `prober.go`, which `GOWORK=off
+  go fix ./termcap/` applied. Every mutation was rerun after both.
+* `make pre-add-check FILES=…` (the eight Go files changed or added):
+  `8 file(s) clean in 1 module(s)`.
+* `go test -race -count=1 ./...`, `LC_ALL=C go test ./...` and
+  `go test -shuffle=on -count=2 ./...`, with `GOWORK=off`: pass.
+* `GOWORK=off go mod tidy -diff`: clean; `go.mod` unchanged; no
+  `go.work.sum`.
+* Windows test host, on a copy (go1.27.1 windows/amd64): `make
+  pre-add-check` (`52 file(s) clean`), `make lint` (0 issues, three
+  targets), `make vuln` (none), and the `internal/termevent/...` and
+  `termcap` tests shuffled twice: all exit 0.
+* The identifier scan of the diff finds nothing.
+
+**Not done here.** A1's facts, reasons and gates (Steps A1.1–A1.2) and
+A2's `IsReplyFragment`; the fake terminal and the background-query test
+of Q8 (Step 4). Nothing is staged or committed.

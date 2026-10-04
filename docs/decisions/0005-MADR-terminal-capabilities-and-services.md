@@ -277,7 +277,8 @@ type ColorSchemeMsg struct{ Dark bool }  // each DSR 997, after the probe
 
 *Amended 2026-10-04 (A2):* the `Origin` constant `Env` is `Environment`,
 because it and the type `Env` (§1) cannot share a name in one package. Its
-text form stays `env`.
+text form stays `env`. *(A3):* for the same reason, the `Origin` constant
+`Query` is `Queried`, beside §3's type `Query`; its text stays `query`.
 
 * **`Fact` is generic.** The provenance rule is written once, and an
   override (`Origin` `Override`) always wins. A program can force a fact,
@@ -294,7 +295,7 @@ text form stays `env`.
 type Prober struct{ /* caps, pending queries, options */ }
 
 func New(o ...Option) *Prober
-func (p *Prober) Init() tea.Cmd             // the batch, then the timeout
+func (p *Prober) Init() tea.Cmd             // the batch, then the timeout (A3: the timeout)
 func (p *Prober) Update(msg tea.Msg) tea.Cmd // observes; never consumes
 func (p *Prober) Caps() Caps
 func (p *Prober) Restore() string           // resets every mode it set
@@ -943,6 +944,65 @@ recommendation, so the text above stands, and A2 is accepted.
   * **Nobody else; the prober never asks.** The workspace's ungated query
     stands, and §3's background request is dropped. JetBrains stays
     painted until `workspace` changes.
+
+### A3 (2026-10-04): the batch goes out on the first `tea.EnvMsg`
+
+*Status: accepted (2026-10-04).* It is deviation D3 of
+[0005-PLAN-terminal-capabilities-and-services.md](0005-PLAN-terminal-capabilities-and-services.md),
+found at the start of Step 3.
+
+**Found.** Bubble Tea v2.0.10 sends the environment from a goroutine,
+`go p.Send(EnvMsg(p.environ))` (`tea.go:1105`), just before it calls
+`model.Init()` (`tea.go:1127`), and runs `Init`'s command on another. Nothing
+orders the two: when `Init` runs, the prober has not seen the environment,
+and the command `Init` returns may run before `Update` sees `tea.EnvMsg`.
+§3's batch depends on the environment twice: the gated queries go out only
+behind the heuristic (Q1), and inside tmux two queries are wrapped for
+passthrough.
+
+**Decision** (the owner, picked from options, 2026-10-04: "Batch on the
+first EnvMsg", the recommendation).
+
+* `Init` returns only the deadline: one timer of `WithTimeout`'s length,
+  started when the program starts.
+* `Update` sends the batch once, on the first `tea.EnvMsg`, after it has
+  read the environment's facts, with `tea.RequestBackgroundColor` beside it
+  unless `WithoutBackgroundRequest`.
+* If no `tea.EnvMsg` arrives, nothing is sent, and the deadline ends the
+  probe with `TimedOut`.
+* §3's "`Init() tea.Cmd // the batch, then the timeout`" now reads "the
+  timeout; the batch follows the first `tea.EnvMsg`". Everything else in
+  §3, the batch's order included, stands.
+
+**Also in A3: a second name** (the owner, picked from options,
+2026-10-04, "Origin becomes Queried", the recommendation). §2's `Origin`
+constant `Query` and §3's type `Query` cannot share a name in one package.
+The constant is `Queried`, which pairs with `NotQueried`; its text form in
+the report and in JSON stays `query`. `Query`, `WithQuery` and `Reply` keep
+their names.
+
+**Also in A3: what "a type from ultraviolet" means** (the owner, picked
+from options, 2026-10-04, "Stop at other packages' aliases", the
+recommendation). Bubble Tea declares `type Msg = uv.Event`
+(`tea.go:50`), an alias of ultraviolet's empty interface, so every
+`tea.Msg` and `tea.Cmd` in an API, `Update(msg tea.Msg)` among them,
+resolves to an ultraviolet type. Confirmation's `go/types` test therefore
+stops at an alias declared outside ultraviolet: it is that package's API
+and its promise. A name declared in ultraviolet, an alias there included,
+still fails the test.
+
+**Also in A3: how tests build ultraviolet events** (the owner, picked from
+options, 2026-10-04, "A termeventtest helper", the recommendation).
+Confirmation's unit tests feed ultraviolet's pass-through events into
+`Prober.Update`, but the `depguard` rule refuses ultraviolet outside
+`internal/cells` and `internal/termevent`, test files included.
+`internal/termevent/termeventtest` builds each event `Decode` reads and
+returns it as a `tea.Msg`, so the rule stays as §1 widened it, and every use
+of ultraviolet stays under `internal/termevent`.
+
+**Rejected.** Sending the batch from `Init` with no environment breaks Q1's
+gate and the tmux wrap. Taking the environment in `New` breaks the rule
+that it comes from `tea.EnvMsg`, which under wish is the session's.
 
 ## More Information
 

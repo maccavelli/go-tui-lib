@@ -15,6 +15,11 @@ const uvPath = "github.com/charmbracelet/ultraviolet"
 // parameters and results, and fails on any type from ultraviolet, which has
 // no tagged release and stays behind internal/termevent
 // (docs/decisions/0005-MADR-terminal-capabilities-and-services.md §1).
+//
+// The walk stops at an alias another package declares: tea.Msg is
+// uv.Event's alias, and it is tea's API and tea's promise (A3). An alias
+// declared in ultraviolet is ultraviolet's, and fails; one declared here is
+// followed.
 func TestNoUltravioletInTheAPI(t *testing.T) {
 	if testing.Short() {
 		t.Skip("type-checks from source")
@@ -55,7 +60,12 @@ func ultravioletIn(pkg *types.Package) []string {
 			}
 			walk(t.Underlying(), at)
 		case *types.Alias:
-			walk(types.Unalias(t), at)
+			switch p := t.Obj().Pkg(); {
+			case p == pkg:
+				walk(t.Rhs(), at)
+			case p != nil && strings.HasPrefix(p.Path(), uvPath):
+				leaks = append(leaks, at+": "+t.String())
+			}
 		case *types.Pointer:
 			walk(t.Elem(), at)
 		case *types.Slice:
