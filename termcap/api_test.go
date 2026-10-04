@@ -10,26 +10,31 @@ import (
 
 const uvPath = "github.com/charmbracelet/ultraviolet"
 
-// TestNoUltravioletInTheAPI walks every exported name of the package, and
-// every type reachable from one through exported fields, methods,
-// parameters and results, and fails on any type from ultraviolet, which has
-// no tagged release and stays behind internal/termevent
-// (docs/decisions/0005-MADR-terminal-capabilities-and-services.md §1).
+// TestNoUltravioletInTheAPI walks every exported name of termcap and
+// termsvc, and every type reachable from one through exported fields,
+// methods, parameters and results, and fails on any type from ultraviolet,
+// which has no tagged release and stays behind internal/termevent
+// (docs/decisions/0005-MADR-terminal-capabilities-and-services.md §1 and
+// Confirmation). termsvc imports termcap, so its walk lives here, where
+// the importer type-checks it from source without an import cycle.
 //
 // The walk stops at an alias another package declares: tea.Msg is
 // uv.Event's alias, and it is tea's API and tea's promise (A3). An alias
-// declared in ultraviolet is ultraviolet's, and fails; one declared here is
-// followed.
+// declared in ultraviolet is ultraviolet's, and fails; one declared in the
+// package walked is followed.
 func TestNoUltravioletInTheAPI(t *testing.T) {
 	if testing.Short() {
 		t.Skip("type-checks from source")
 	}
-	pkg, err := importer.ForCompiler(token.NewFileSet(), "source", nil).Import("github.com/maccavelli/go-tui-lib/termcap")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, leak := range ultravioletIn(pkg) {
-		t.Error(leak)
+	imp := importer.ForCompiler(token.NewFileSet(), "source", nil)
+	for _, path := range []string{"github.com/maccavelli/go-tui-lib/termcap", "github.com/maccavelli/go-tui-lib/termsvc"} {
+		pkg, err := imp.Import(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, leak := range ultravioletIn(pkg) {
+			t.Error(path + ": " + leak)
+		}
 	}
 }
 

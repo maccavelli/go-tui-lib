@@ -929,3 +929,103 @@ rewritten and read again.
   `termcap/...` tests shuffled, three times, the goldens included: all
   exit 0.
 * The identifier scan of the diff and the goldens finds nothing.
+
+### Step 6: `termsvc` (2026-10-04)
+
+The owner committed Step 5 (`38489a3`) and said "proceed". No deviation:
+every choice below fills in something MADR §5 leaves open, and none
+changes a decision.
+
+**What was built.**
+
+* **`termsvc/notify.go`:** `Notification`, `Urgency` (`Normal`, `Low`,
+  `Critical`), `Protocol` (`Auto`, `OSC99`, `OSC777`, `OSC9`, `Bell`,
+  `Off`), `Policy` (`WhenUnfocused`, `Always`, `Never`), `Backend`,
+  `Notifier`, `NewNotifier`, `Update`, `Notify`; the options
+  `WithProtocol`, `WithPolicy` and `WithBackend`, and `NotifyErrorMsg`,
+  which carries a backend's error back as a message.
+  * `Auto`: OSC 99 when `DesktopNotify` is `Supported`; otherwise by the
+    terminal's name in `Caps.Terminal`: OSC 777 for Ghostty, foot and VTE,
+    OSC 9 for iTerm2, WezTerm and Warp, else the bell. These are A1's
+    lists, read from the name until Step A1.3 reads them from `Brand`.
+  * OSC 99: the title, then the body, as two chunks tied by `i=` (`d=0` on
+    the first, `p=body` on the second); `u=0` or `u=2` for low or critical
+    urgency. An ID keeps only the characters the protocol allows; a
+    notification without one is numbered `n1`, `n2`, … per notifier.
+  * OSC 777: `;` in the text becomes `,`, since it separates the fields.
+    OSC 9: title and body as one message; one that starts with a number
+    and `;` gets a leading space, so it cannot read as an OSC 9
+    sub-command such as `9;4` progress.
+  * Inside tmux or screen the sequence is wrapped with `Wrap`; the bell is
+    not, since a multiplexer passes it on.
+  * `WhenUnfocused` sends only after a `tea.BlurMsg` with no `FocusMsg`
+    since; with no focus report it sends nothing. `Never` sends nothing.
+    A notification with no text left after cleaning is not sent.
+  * A backend is called with `context.Background()`; the library has no
+    context of the program's to pass.
+* **`termsvc/termsvc.go`:** `Wrap` (tmux passthrough; screen
+  passthrough in chunks of 768 bytes, screen's `MAXSTR`; else unchanged),
+  `Copy` (`tea.SetClipboard`, plus a tmux-wrapped OSC 52 inside tmux),
+  `Link` and `ErrScheme` (http, https, file and mailto only, the scheme
+  compared case-insensitively), and `PromptStart`, `CommandStart`,
+  `CommandExecuted` and `CommandFinished(exit)` (OSC 133 A to D).
+  * The cleaning, `strip`, removes C0, DEL and C1 controls, ESC among
+    them, and every byte that is not UTF-8, which covers C1 in its raw
+    8-bit form; it turns tab, CR and LF into spaces. MADR §5 asks for C0,
+    C1 and ESC; the invalid-UTF-8 rule was added when the first test run
+    showed a raw `0x9b` coming through as U+FFFD instead of being removed.
+    A1.3 adds collapsing runs and cutting by cells.
+* **`termsvc/source_test.go`:** Step 3's source test, as the PLAN says.
+* **`termcap/api_test.go`:** `TestNoUltravioletInTheAPI` now walks
+  `termsvc` as well, as MADR Confirmation asks; `termsvc` imports
+  `termcap`, and the source importer type-checks it from `termcap`'s test
+  without an import cycle.
+
+**Tests** (`termsvc_test.go`): `TestNotificationBytes` (OSC 99 with title
+and body, title only and critical, body only and low, a numbered ID, a
+cleaned ID; OSC 777; OSC 9 and its sub-command guard; the bell; off),
+`TestAutoPicksTheProtocol` (ten `Caps`), `TestNotificationsAreWrappedInsideAMultiplexer`
+(tmux, screen, an unwrapped bell), `TestWhenUnfocused`,
+`TestEmptyNotificationIsNotSent`, `TestBackend` (success, and an error
+returned as `NotifyErrorMsg`), `TestControlBytesAreStripped` (an OSC 52
+sequence, a raw `0x9b`, NUL and DEL in a title, a body, a link's URL, text
+and params; UTF-8 C1 controls), `TestLinkSchemes` (`javascript:`,
+`data:`, `vbscript:`, `ftp:` and a schemeless URL refused), `TestCopy`,
+`TestWrap`, `TestPromptMarks`; and `TestNoProcessEnvironmentOrProcesses`.
+
+**Mutations,** each on a scratch copy, all 11 killed. The first run had
+one survivor, "C1 controls survive the strip": the tests held only the
+raw byte `0x9b`, which the invalid-UTF-8 rule already removes, and never a
+C1 control encoded as UTF-8. The test gained `U+009B`, `U+0085`, `U+0080`
+and `U+009F`, and the mutation was then killed.
+
+| Mutation | Killed by |
+| :--- | :--- |
+| notifications ignore focus | `TestWhenUnfocused`: "sent with no focus report" |
+| the strip is skipped for the body | `TestEmptyNotificationIsNotSent` |
+| `Link` accepts any scheme | `TestLinkSchemes`: "Link(\"javascript:alert(1)\") … want ErrScheme" |
+| the tmux wrap is skipped for notifications | `TestNotificationsAreWrappedInsideAMultiplexer` |
+| invalid UTF-8 survives the strip | `TestEmptyNotificationIsNotSent` |
+| C1 controls survive the strip | `TestControlBytesAreStripped`: "strip left UTF-8 C1 controls" |
+| a backend's error is dropped | `TestBackend`: "came back as <nil>, want a NotifyErrorMsg" |
+| `Copy` skips the tmux passthrough | `TestCopy` |
+| `os.Getenv` planted in `termsvc` | `TestNoProcessEnvironmentOrProcesses` |
+| `os/exec` planted in `termsvc` | `TestNoProcessEnvironmentOrProcesses` |
+| an ultraviolet type in `termsvc`'s API | `TestNoUltravioletInTheAPI`: "termsvc: Leak: …ultraviolet.Event" |
+
+**Checks.**
+
+* `make lint`: 0 issues for linux, darwin and windows, after one
+  `gocritic` finding (`len(s) > 0` in `strip`) was fixed.
+* `make pre-add-check FILES=…` (the five Go files): `5 file(s) clean in
+  1 module(s)`.
+* `go test -race -count=1 ./...`, `LC_ALL=C go test ./...`,
+  `go test -shuffle=on -count=2 ./...`, with `GOWORK=off`: pass.
+* `GOWORK=off go mod tidy -diff`: clean; `go.mod` unchanged.
+* Windows test host, on a copy (go1.27.1 windows/amd64): `make
+  pre-add-check` (`61 file(s) clean`), `make lint` (0 issues, three
+  targets), `make vuln` (none), and the `internal/termevent/...`,
+  `termcap/...` and `termsvc` tests shuffled, three times: all exit 0.
+* The identifier scan of the diff finds nothing.
+
+**Next.** Steps A1.1 to A1.3 run before Step 7, as the PLAN orders.
