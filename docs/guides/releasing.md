@@ -107,7 +107,6 @@ module outside the repository, so that no `go.work` applies:
 ```bash
 cd "$(mktemp -d)"
 go mod init example.com/smoke
-go get github.com/maccavelli/go-tui-lib/command/kongcmd@vA.B.C
 cat >main.go <<'EOF'
 package main
 
@@ -115,11 +114,20 @@ import _ "github.com/maccavelli/go-tui-lib/command/kongcmd"
 
 func main() {}
 EOF
+go get github.com/maccavelli/go-tui-lib/command/kongcmd@vA.B.C
+go mod tidy
 go build ./...
 ```
 
+The program comes first and `go mod tidy` is not optional: `go get` of a
+module path records the module, not the `go.sum` entries of the packages
+the program imports, and without them `go build` fails with "missing
+go.sum entry".
+
 For the root, `go get github.com/maccavelli/go-tui-lib@vX.Y.Z` and import
-one of its packages, such as `glyph`, instead. If `go get` cannot find a
+one of its packages that has outside dependencies, such as `workspace`,
+instead. A package with none, such as `glyph`, builds even when those
+entries are missing, so it proves less. If `go get` cannot find a
 nested module's tag, check that the tag's prefix is the module's directory
 exactly. The Go module reference says: "Each tag name must be prefixed
 with the module subdirectory, followed by a slash" (0010-REPORT §1).

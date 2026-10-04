@@ -1,5 +1,5 @@
 ---
-status: complete
+status: in-progress
 date: 2026-10-04
 associated-madr: "0010-MADR-nested-adapter-modules.md"
 ---
@@ -847,3 +847,47 @@ as Phase 6's close-out did: see below.
   `test (., windows-2025)`, all `success`.
 * This PLAN is `complete` again. MADR A1's "for now" stands: revisit
   ignoring `go.work.sum` when the first adapter module lands.
+
+### Phase 8: the consumer smoke test, corrected (2026-10-04)
+
+**Deviation D2 (2026-10-04).** After the owner pushed the annotated tag
+`v0.2.0` on `0224d0e` (CI run 37185968146: `modules`, `gates` and `test`
+on ubuntu-24.04, macos-15 and windows-2025, all `success`), the agent ran
+the releasing guide's consumer smoke test against it, importing
+`workspace`. It failed at `go build ./...` with "missing go.sum entry".
+The guide ran `go get` before the program existed and never ran `go mod
+tidy`. Phase 6 proved the steps with `glyph`, which has no outside
+dependencies, so the check was too weak to see it. The tag is sound; the
+procedure was not. The owner answered "Amend commit and push", which
+approves MADR amendment A2 and this phase.
+
+**What changed.**
+
+* **`docs/guides/releasing.md`,** the consumer smoke test: `main.go` is
+  written before `go get`, and `go mod tidy` runs before `go build
+  ./...`, with a paragraph saying why. The root's variant imports a
+  package with outside dependencies, such as `workspace`, and says why
+  `glyph` proves less.
+* **0010-MADR:** §3's smoke-test bullet is annotated, and amendment A2
+  records the finding and the decision.
+* **`docs/README.md`:** the MADR row reads "A1, A2 accepted"; the PLAN row
+  reads `in-progress` until the close-out.
+
+**Proof,** against the published `v0.2.0`, in scratch modules outside the
+repository with `GOWORK=off`, each importing one package with a blank
+import:
+
+| Order | Package | `go build ./...` |
+| :--- | :--- | :--- |
+| old: `go get`, write `main.go`, build | `workspace` | exit 1, "missing go.sum entry for module providing package charm.land/bubbles/v2/help" (and `key`, bubbletea, colorprofile) |
+| old | `glyph` | exit 0; `go.mod` lists the root as `// indirect` |
+| new: write `main.go`, `go get`, `go mod tidy`, build | `workspace` | exit 0; `go.mod` has `require github.com/maccavelli/go-tui-lib v0.2.0` |
+| new, without `go mod tidy` | `workspace` | exit 1, the same "missing go.sum entry" |
+
+The last row shows that `go mod tidy` is required, not just the order.
+
+**Checks.** markdownlint: 0 issues. The link check over the four changed
+files: 0 broken. `make pre-add-check`: `40 file(s) clean in 1 module(s)`.
+`git diff --check`: clean. The identifier scan of the diff finds nothing.
+
+This PLAN returns to `complete` after the push and a green CI run.

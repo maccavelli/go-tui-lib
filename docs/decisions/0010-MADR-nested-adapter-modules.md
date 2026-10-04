@@ -161,7 +161,9 @@ use (
   github.com/maccavelli/go-tui-lib/command/kongcmd@v0.1.0`.
 * **After a tag, a consumer smoke test** runs in a scratch module outside
   the repository: `go get` the tagged module and `go build ./...`, which
-  proves that the proxy resolves the prefixed tag.
+  proves that the proxy resolves the prefixed tag. *Amended 2026-10-04
+  (A2): the program is written before `go get`, and `go mod tidy` runs
+  before `go build`.*
 
 ### 4. Gates, per module, without the workspace
 
@@ -370,6 +372,32 @@ would change for reasons no gate checks.
 
 **Unchanged.** `go.work` itself stays committed, and every other rule in §2
 and §4.
+
+### A2 (2026-10-04): the consumer smoke test imports before it gets, and tidies
+
+*Status: accepted (2026-10-04).* Its plan is Phase 8 of
+[0010-PLAN-nested-adapter-modules.md](0010-PLAN-nested-adapter-modules.md).
+
+**Found.** After the root's `v0.2.0` tag, the smoke test in
+[releasing.md](../guides/releasing.md), run as written against
+`workspace`, failed: `go get github.com/maccavelli/go-tui-lib@v0.2.0`
+exited 0, and `go build ./...` exited 1 with "missing go.sum entry for
+module providing package" for bubbles, bubbletea, colorprofile and the
+other modules `workspace` imports. `go get` of a module path records the
+module, not the checksums of the packages a program imports. The same steps
+pass for `glyph`, which has no outside dependencies; Phase 6 of the PLAN
+proved the steps with `glyph`, so it did not see the gap. §3's wording, "`go
+get` the tagged module and `go build ./...`", has the same gap.
+
+**Decision** (the owner, "Amend commit and push", 2026-10-04): the smoke
+test writes the program first, then runs `go get` of the tag, `go mod
+tidy` and `go build ./...`, and the root's test imports a package with
+outside dependencies, such as `workspace`. The proof is in Phase 8 of the
+PLAN.
+
+**Unchanged.** The test still runs in a scratch module outside the
+repository, after each tag, and still proves that the proxy resolves the
+tag. No released version is affected: `v0.2.0` builds for a consumer.
 
 ## More Information
 
