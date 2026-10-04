@@ -1,7 +1,9 @@
 # Architecture
 
-`go-tui-lib` is the Go module `github.com/maccavelli/go-tui-lib`: a library
-of terminal-UI packages on the Charm v2 stack. It has no binary.
+`go-tui-lib` is the repository of the Go module
+`github.com/maccavelli/go-tui-lib`: a library of terminal-UI packages on
+the Charm v2 stack. It has no binary. Nested adapter modules beside it are
+planned (Modules, below).
 
 ## What it is
 
@@ -40,6 +42,30 @@ of terminal-UI packages on the Charm v2 stack. It has no binary.
   `signal.Notify` or sets `AltScreen`; `internal/conformance` checks
   this by type (see Tooling).
 
+## Modules
+
+The root module is the only one today. 0010-MADR
+([0010-MADR-nested-adapter-modules.md](decisions/0010-MADR-nested-adapter-modules.md))
+plans three nested modules, each an adapter with one dependency the root
+must not carry:
+
+```text
+ command/cobracmd   (planned)   → root vX.Y.Z, published; Cobra, pflag
+ command/kongcmd    (planned)   → root vX.Y.Z, published; Kong
+ stream/glamourmd   (planned)   → root vX.Y.Z, published; glamour
+ .                  (root)      → the Charm v2 stack; never an adapter
+```
+
+- **The dependency runs one way.** An adapter requires a published root
+  version, with no `replace`; the root never requires an adapter. A
+  consumer of the root therefore never sees Cobra, Kong or glamour in its
+  `go.sum` or module graph (0010-REPORT §2).
+- **Each module has its own tags:** `vX.Y.Z` for the root,
+  `<dir>/vX.Y.Z` for an adapter. [guides/releasing.md](guides/releasing.md)
+  has the procedure.
+- **`go.work`** lists every module, for development. Every gate also runs
+  with `GOWORK=off` (Tooling).
+
 ## Tree
 
 ```text
@@ -47,7 +73,8 @@ README.md                   repository entry; links here
 LICENSE                     Apache License 2.0
 AGENTS.md                   rules for agents: dependencies, TUI conventions,
                             records, checks, identifiers, commits
-go.mod, go.sum              the module and its five requirements
+go.mod, go.sum              the root module and its requirements
+go.work                     the workspace: every module, for development
 Makefile                    development targets (below)
 .golangci.yml               golangci-lint configuration, with depguard
 .markdownlint-cli2.jsonc    Markdown lint configuration
@@ -56,7 +83,10 @@ Makefile                    development targets (below)
 .github/workflows/
   ci.yml                    CI
 scripts/
-  go-precheck.sh            the pre-add check
+  go-precheck.sh            the pre-add check, per module
+  go-modules.sh             lists the modules; --check compares go.work
+                            with the tracked go.mod files
+  go-modules_test.sh        its offline test
   go-fuzz.sh                fuzzes each fuzz target of a package in turn
   go-fuzz_test.sh           its offline test
 glyph/ theme/ layout/ workspace/ tuitest/
@@ -69,7 +99,7 @@ docs/
   architecture.md           this file
   decisions/                MADR and PLAN records
   reports/                  REPORT records
-  guides/                   how-to guides
+  guides/                   how-to guides: workspaces, releasing
 ```
 
 ## Dependencies
@@ -80,23 +110,36 @@ docs/
   `github.com/charmbracelet/x/ansi` v0.11.8.
 - **Named but not yet required:** `github.com/maccavelli/go-selfupdate-lib`
   (formerly `go-core-lib`), for `updatetea`.
-- **Refused by `depguard`,** in source and tests:
+- **Refused by `depguard`,** in source and tests, in every module:
   - the Charm v1 paths `github.com/charmbracelet/bubbletea`, `…/lipgloss`
     and `…/bubbles`;
   - `github.com/maccavelli/mcplib`;
   - `github.com/modelcontextprotocol/go-sdk`;
-  - `github.com/maccavelli/go-llmprovider-sdk`.
+  - `github.com/maccavelli/go-llmprovider-sdk`;
+  - fang: `charm.land/fang/v2` and `github.com/charmbracelet/fang`.
+- **Kept to one module by `depguard`:** `github.com/spf13/cobra` and
+  `github.com/spf13/pflag` to `command/cobracmd`,
+  `github.com/alecthomas/kong` to `command/kongcmd`, and
+  `charm.land/glamour/v2` to `stream/glamourmd`. Each rule covers `$all`
+  less `!**/<dir>/**`.
 
 ## Tooling
 
 - **`make` targets:** `test`, `test-sum`, `fmt`, `vet`, `lint`,
-  `modernize`, `tidy`, `vuln`, `fuzz`, `pre-add-check`, `help`.
+  `modernize`, `tidy`, `tidy-check`, `vuln`, `fuzz`, `pre-add-check`,
+  `release-check`, `help`.
+- **Per module.** `test`, `vet`, `lint`, `modernize`, `tidy-check` and
+  `vuln` run once in each module's directory with `GOWORK=off`, taking the
+  list from `scripts/go-modules.sh`; a failure to list the modules fails
+  the target.
 - **`make lint`** runs `make modernize`, then `golangci-lint run -c
-  .golangci.yml ./...` three times: `GOOS=linux`, `darwin` and `windows`,
-  each with `CGO_ENABLED=0`.
+  <root>/.golangci.yml ./...` three times per module: `GOOS=linux`,
+  `darwin` and `windows`, each with `CGO_ENABLED=0`.
 - **`make modernize`** runs `go fix -diff ./...` for the same three
   targets, with `CGO_ENABLED=0`, and fails on any suggestion: `go fix
   -diff` exits 1 when it prints a diff.
+- **`make release-check`** runs the pre-add check over every module and
+  file, before a tag.
 - **`internal/conformance`** is the terminal-ownership scan, run by
   `go test`.
   - It finds every module by its `go.mod`, and type-checks each module's
@@ -117,10 +160,15 @@ docs/
     operating systems cover the rest.
 - **`make fuzz`** fuzzes `layout`'s fuzz target for `FUZZTIME` (default
   20s).
-- **`scripts/go-precheck.sh`** runs `gofmt` on the given Go files, the same
-  three golangci-lint runs, `go vet` and `go test` on their packages, and
-  `govulncheck ./...`. `make pre-add-check` runs it, and so does the
-  machine-wide agent gate before an agent `git commit` that stages Go files.
+- **`scripts/go-precheck.sh`** runs, for each module that owns a given
+  file (every module when none is given), in the module's directory:
+  `gofmt` on its files; with `GOWORK=off`, the same three golangci-lint
+  runs, `go vet` and `go test` on their packages, `go mod tidy -diff` and
+  `govulncheck ./...`; `go test` again in workspace mode; and, for a
+  nested module, no `replace` and a release version of the root. It ends
+  with `scripts/go-modules.sh --check`. `make pre-add-check` runs it, and
+  so does the machine-wide agent gate before an agent `git commit` that
+  stages Go files.
 - **`.golangci.yml`:**
   - 21 linters, including `depguard`;
   - `revive`'s `exported`, `package-comments` and `var-naming` rules in
@@ -133,18 +181,24 @@ docs/
   `go test ./<pkg>/ -run <Test> -tuitest.update`, or with
   `TUITEST_UPDATE=1 go test ./...`, and read before they are committed. A
   test binary that defines its own boolean `-update` may use it instead.
-- **CI** (`.github/workflows/ci.yml`) runs on `ubuntu-24.04`, `macos-15` and
-  `windows-2025`, with the Go version read from `go.mod`.
-  - **Every OS:** `go test`.
-  - **Linux and macOS:** `go test -race`.
-  - **Linux also:**
-    - `go test -shuffle=on -count=2` and `LC_ALL=C go test`;
+- **CI** (`.github/workflows/ci.yml`) reads the Go version from `go.work`
+  and caches on every module's `go.sum`. It has three jobs:
+  - **`modules`** (Linux): the test of `go-modules.sh`, then
+    `go-modules.sh --check`, then the module list as the matrix's input.
+  - **`test (<module>, <os>)`** for each module on `ubuntu-24.04`,
+    `macos-15` and `windows-2025`, in the module's directory with
+    `GOWORK=off`:
+    - **every OS:** `go test`, and `go test` again in workspace mode;
+    - **Linux and macOS:** `go test -race`;
+    - **Linux:** `go test -shuffle=on -count=2` and `LC_ALL=C go test`.
+  - **`gates`** (Linux):
     - the fuzz script's test, then `make fuzz`, uploading the corpus as an
       artifact on failure;
-    - `go vet` for `freebsd/amd64`, `openbsd/amd64` and `linux/386`;
-    - `go vet`, `gofmt`, `go mod tidy -diff`, and `make lint` (with
+    - `go vet` for `freebsd/amd64`, `openbsd/amd64` and `linux/386`, per
+      module;
+    - `make vet`, `gofmt`, `make tidy-check`, and `make lint` (with
       `make modernize`) with golangci-lint v2.14.0;
-    - `govulncheck` v1.8.0;
+    - `make vuln` with govulncheck v1.8.0;
     - `shellcheck` v0.11.0 (pinned by SHA-256 and first on `PATH`),
       `markdownlint-cli2` 0.23.2 and `actionlint` v1.7.12.
   - One run per ref (`concurrency`, cancel in progress). Actions are pinned

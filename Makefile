@@ -2,8 +2,11 @@
 # (no binary packaging targets).
 #
 # Prefer the user's Go toolchain install (go install ...), then PATH.
-GOPATH_BIN    := $(shell go env GOPATH)/bin
-GOBIN         := $(shell go env GOBIN)
+# go env prints Windows paths with backslashes, which a recipe's shell
+# drops; forward slashes work on every host
+# (docs/decisions/0010-PLAN-nested-adapter-modules.md deviation D1).
+GOPATH_BIN    := $(subst \,/,$(shell go env GOPATH))/bin
+GOBIN         := $(subst \,/,$(shell go env GOBIN))
 GOLANGCI_LINT ?= $(GOPATH_BIN)/golangci-lint
 GOVULNCHECK   ?= $(or $(wildcard $(GOBIN)/govulncheck),$(GOPATH_BIN)/govulncheck,$(shell command -v govulncheck 2>/dev/null))
 GOTESTSUM     ?= $(or $(wildcard $(GOBIN)/gotestsum),$(GOPATH_BIN)/gotestsum,$(shell command -v gotestsum 2>/dev/null))
@@ -56,7 +59,7 @@ lint: modernize ## Runs make modernize, then golangci-lint with fleet config for
 		echo "Install: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest"; \
 		exit 1; \
 	fi
-	@mods="$$($(MODULES_CMD))" || exit 1; status=0; root="$$(pwd)"; \
+	@mods="$$($(MODULES_CMD))" || exit 1; status=0; root="$$(git rev-parse --show-toplevel)"; \
 	for m in $$mods; do for os in $(LINT_GOOS); do \
 		echo "golangci-lint (module $$m, GOOS=$$os)"; \
 		(cd "$$m" && CGO_ENABLED=0 GOOS=$$os GOWORK=off $(GOLANGCI_LINT) run -c "$$root/$(FLEET_LINT_CFG)" ./...) || { echo "golangci-lint failed for module $$m, GOOS=$$os"; status=1; }; \

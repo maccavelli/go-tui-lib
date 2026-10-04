@@ -16,7 +16,7 @@ stable API.
 
 ## Status
 
-- **Multi-pane workspaces, `v0.1.0`.** `layout` arranges panes: a main
+- **Multi-pane workspaces, `v0.1.6`.** `layout` arranges panes: a main
   pane with a sidebar on either side, a bottom pane, a footer, responsive
   folds and saved state. `workspace` hosts them in a Bubble Tea program,
   with focus, resize, zoom, overlays, mouse and cursor. `glyph`, `theme`
@@ -28,6 +28,9 @@ stable API.
   `github.com/charmbracelet/x/ansi`. The v1 `github.com/charmbracelet/…`
   paths are refused by lint.
 - **Go 1.27.1** is required.
+- **Adapters ship as their own modules.** The planned Cobra, Kong and
+  glamour adapters are nested modules with their own tags, so the root
+  module never requires them.
 
 ## Documentation
 
@@ -44,6 +47,7 @@ repository as it is now.
 | know which Charm version to use, and what may be imported | [AGENTS.md, Dependencies](AGENTS.md#dependencies) |
 | know the rules every TUI package follows | [AGENTS.md, TUI conventions](AGENTS.md#tui-conventions) |
 | contribute: checks, records and commit rules | [AGENTS.md](AGENTS.md) |
+| add a module, or release one | [the releasing guide](docs/guides/releasing.md) |
 
 ## License
 

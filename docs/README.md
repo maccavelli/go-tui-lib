@@ -71,5 +71,8 @@ it was when they were written
 | see how terminal capabilities will be detected | [0005-MADR](decisions/0005-MADR-terminal-capabilities-and-services.md) |
 | know why the workspace will draw with ultraviolet directly | [0004-MADR](decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md) |
 | know why Cobra, Kong and glamour are separate Go modules, and how they are released | [0010-MADR](decisions/0010-MADR-nested-adapter-modules.md) |
+| add a nested module to the repository | [guides/releasing.md](guides/releasing.md#add-a-module) |
+| release the root, an adapter, or a change that spans both | [guides/releasing.md](guides/releasing.md) |
+| know which gates run per module, and why with `GOWORK=off` | [AGENTS.md, Modules](../AGENTS.md#modules) |
 | use the command registry from Cobra or Kong | [0006-MADR, amendment A1](decisions/0006-MADR-command-registry.md#a1-2026-10-02-native-cobra-and-kong-front-ends-as-nested-modules) |
 | see what Cobra, fang, Kong and glamour do that the library's rules must answer | [0010-REPORT, §6–§10](reports/0010-REPORT-nested-modules-and-adapter-sources.md) |

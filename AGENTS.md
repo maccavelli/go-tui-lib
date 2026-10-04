@@ -13,8 +13,9 @@ helpers shared between packages live under `internal/`. Requires Go 1.27.1.
 ## Dependencies
 
 No module may be required without a MADR in this repository that names it.
+The root module's list is
 `docs/decisions/0001-MADR-scaffold-charm-tui-library.md` §3, with its
-amendment A3, names the stack: `charm.land/bubbletea/v2`,
+amendment A3, which names the stack: `charm.land/bubbletea/v2`,
 `charm.land/lipgloss/v2`, `charm.land/bubbles/v2`,
 `github.com/charmbracelet/colorprofile`, `github.com/charmbracelet/x/ansi` and
 `github.com/maccavelli/go-selfupdate-lib` (formerly `go-core-lib`). Any other
@@ -24,12 +25,51 @@ Never import the Charm v1 paths `github.com/charmbracelet/bubbletea`,
 `github.com/charmbracelet/lipgloss` or `github.com/charmbracelet/bubbles`;
 use the `charm.land/…/v2` path. Never import `github.com/maccavelli/mcplib`,
 the MCP go-sdk (`github.com/modelcontextprotocol/go-sdk`) or
-`github.com/maccavelli/go-llmprovider-sdk`. `depguard` in `.golangci.yml`
-refuses each of these, so `make lint`, the pre-add check and CI fail on them.
+`github.com/maccavelli/go-llmprovider-sdk`. Never import fang
+(`charm.land/fang/v2` or `github.com/charmbracelet/fang`), in any module.
+`depguard` in `.golangci.yml` refuses each of these, so `make lint`, the
+pre-add check and CI fail on them.
+
+Each nested module's list is
+`docs/decisions/0010-MADR-nested-adapter-modules.md` §5, and depguard keeps
+each dependency in its one module: `github.com/spf13/cobra` and
+`github.com/spf13/pflag` in `command/cobracmd` only,
+`github.com/alecthomas/kong` in `command/kongcmd` only, and
+`charm.land/glamour/v2` in `stream/glamourmd` only.
 
 `go.mod` and `go.sum` change with the code that needs them: a requirement is
 added in the commit that adds its first import, and removed in the commit that
-removes its last. `go mod tidy -diff` is clean at every commit.
+removes its last. `go mod tidy -diff` is clean at every commit, in every
+module.
+
+## Modules
+
+The repository holds more than one Go module
+(`docs/decisions/0010-MADR-nested-adapter-modules.md`). Each has its own
+`go.mod`, its own requirements and its own tags:
+
+| Module | Directory | Tags |
+| :--- | :--- | :--- |
+| `github.com/maccavelli/go-tui-lib` | `.` | `vX.Y.Z` |
+| `github.com/maccavelli/go-tui-lib/command/cobracmd` (planned) | `command/cobracmd` | `command/cobracmd/vX.Y.Z` |
+| `github.com/maccavelli/go-tui-lib/command/kongcmd` (planned) | `command/kongcmd` | `command/kongcmd/vX.Y.Z` |
+| `github.com/maccavelli/go-tui-lib/stream/glamourmd` (planned) | `stream/glamourmd` | `stream/glamourmd/vX.Y.Z` |
+
+- **`go.work` lists every module** and is committed. It is for development
+  only: it builds a root change and an adapter change together before
+  either is tagged. A module is added to it with `go work use ./<dir>` in
+  the commit that adds the module. `scripts/go-modules.sh --check` fails
+  when `go.work` and the tracked `go.mod` files disagree.
+- **Every gate runs per module with `GOWORK=off`,** in the module's
+  directory, so that each module builds from its own `go.mod` and published
+  versions only, as a consumer does. The tests run once more in workspace
+  mode. `./...` never crosses into a nested module.
+- **An adapter requires a published root version** (`vX.Y.Z`, never a
+  pseudo-version) and has no `replace`.
+- **A change that spans the root and an adapter is released in two
+  steps:** the root is tagged first, then the adapter's requirement moves
+  to that tag and the adapter is tagged. Tags are never moved or deleted.
+  [docs/guides/releasing.md](docs/guides/releasing.md) has the procedure.
 
 ## TUI conventions
 
@@ -140,13 +180,22 @@ make pre-add-check                 # every tracked Go file
 make pre-add-check FILES="a.go b.go"
 ```
 
-It runs `scripts/go-precheck.sh`: `gofmt` on the files;
-`golangci-lint run -c .golangci.yml ./...` once each for `GOOS=linux`,
-`darwin` and `windows` with `CGO_ENABLED=0`, the same runs as `make lint` and
-CI; `go vet` and `go test` on the packages the files belong to; and
-`govulncheck ./...` (`GO_PRECHECK_SKIP_VULN=1` skips it offline). `golint` is
-not used: its checks are `revive`'s `exported`, `package-comments` and
-`var-naming` rules in `.golangci.yml`. A file that fails is not committed.
+It runs `scripts/go-precheck.sh` once for each module that owns a file
+given, or for every module when none is, in the module's directory:
+
+- `gofmt` on the files;
+- with `GOWORK=off`: `golangci-lint run -c <root>/.golangci.yml ./...` once
+  each for `GOOS=linux`, `darwin` and `windows` with `CGO_ENABLED=0`, the
+  same runs as `make lint` and CI; `go vet` and `go test` on the packages
+  the files belong to; `go mod tidy -diff`; and `govulncheck ./...`
+  (`GO_PRECHECK_SKIP_VULN=1` skips it offline);
+- `go test` once more in workspace mode;
+- for a nested module, no `replace` and a release version of the root.
+
+It ends with `scripts/go-modules.sh --check`. `make release-check` runs it
+over every module and file, before a tag. `golint` is not used: its checks
+are `revive`'s `exported`, `package-comments` and `var-naming` rules in
+`.golangci.yml`. A file that fails is not committed.
 
 `internal/conformance` checks rules 1 and 2 of the TUI conventions on
 every package of every module. It type-checks each package and resolves
@@ -166,7 +215,8 @@ The machine-wide agent gate runs the same script before every agent
 is no `git add` hook on every host; do not rely on one.
 
 `make lint` and `make vuln` must be clean before a release-shaped change.
-`make lint` runs `make modernize` first, which fails on any `go fix -diff`
+`make test`, `vet`, `lint`, `modernize`, `tidy-check` and `vuln` each run
+once per module with `GOWORK=off`. `make lint` runs `make modernize` first, which fails on any `go fix -diff`
 suggestion for `GOOS=linux`, `darwin` and `windows`; `go fix ./...`
 applies them.
 

@@ -18,8 +18,13 @@
 # go command ignores is skipped: one under testdata, or under a directory
 # whose name starts with "." or "_".
 #
+# GO names the go command (default go); the tests inject one through it, as
+# scripts/go-fuzz_test.sh does for go-fuzz.sh.
+#
 # Exit codes: 0 ok · 1 check failed · 2 usage or tool error.
 set -uo pipefail
+
+GO="${GO:-go}"
 
 ROOT="$(git rev-parse --show-toplevel)" || exit 2
 cd "$ROOT" || exit 2
@@ -40,8 +45,11 @@ if [ ! -f go.work ]; then
   exit 2
 fi
 
-# The modules go.work lists, relative to the root.
-if ! dirs="$(GOWORK="$ROOT/go.work" go list -m -f '{{.Dir}}' 2>&1)"; then
+# The modules go.work lists, relative to the root. git turns each
+# directory into a path relative to the repository, whatever form the go
+# command gives it: on Windows `go list` prints C:\Users\..., where git's
+# own top level is C:/Users/... (0010-PLAN deviation D1).
+if ! dirs="$(GOWORK="$ROOT/go.work" "$GO" list -m -f '{{.Dir}}' 2>&1)"; then
   echo "go-modules: go list -m failed in workspace mode:" >&2
   printf '%s\n' "$dirs" | sed 's/^/  /' >&2
   [ "$mode" = check ] && exit 1
@@ -50,11 +58,13 @@ fi
 listed="$(
   while IFS= read -r d; do
     [ -z "$d" ] && continue
-    case "$d" in
-    "$ROOT") echo "." ;;
-    "$ROOT"/*) echo "${d#"$ROOT"/}" ;;
-    *) echo "$d" ;; # outside the repository; --check reports it
-    esac
+    if [ "$(git -C "$d" rev-parse --show-toplevel 2>/dev/null)" = "$ROOT" ]; then
+      prefix="$(git -C "$d" rev-parse --show-prefix)"
+      prefix="${prefix%/}"
+      echo "${prefix:-.}"
+    else
+      echo "$d" # outside the repository; --check reports it
+    fi
   done <<<"$dirs"
 )"
 

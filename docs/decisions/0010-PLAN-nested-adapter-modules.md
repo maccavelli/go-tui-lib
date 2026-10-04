@@ -40,7 +40,7 @@ MADR's Confirmation lists.
 | 3 | `scripts/go-modules.sh` (new), `scripts/go-modules_test.sh` (new), `scripts/go-precheck.sh`, `Makefile` | module discovery, and every gate per module |
 | 4 | `.golangci.yml` | depguard for the adapters' dependencies |
 | 5 | `.github/workflows/ci.yml` | the module matrix |
-| 6 | `AGENTS.md`, `docs/architecture.md`, `docs/guides/releasing.md` (new), `docs/README.md`, `README.md` | documentation, close-out |
+| 6 | `AGENTS.md`, `docs/architecture.md`, `docs/guides/releasing.md` (new), `docs/README.md`, `README.md`; by deviation D1, `scripts/go-modules.sh` and `Makefile` | documentation, close-out; D1's Windows path fixes |
 
 No module is added, and no `go.mod` changes. Until an adapter lands, the
 workspace holds the root module only, and every loop runs once.
@@ -514,7 +514,7 @@ linux, darwin and windows, each with the `cobra` list's message.
 * `AGENTS.md` names depguard's refusals under Dependencies. Phase 6 adds
   the adapters' rules there.
 
-### Phase 5: CI (2026-10-03, real-CI proof pending)
+### Phase 5: CI (2026-10-03)
 
 The owner committed Phase 4 (`f3ea608`) and approved Phase 5 ("proceed").
 `main` has no branch protection and no rulesets
@@ -574,10 +574,178 @@ every entry.
     and `govulncheck` exited 0, each reporting modules `.` and
     `scratchmod`.
 
-**Pending: the real-CI proof.** The owner chose a proof branch (picked
-from options, 2026-10-03). The workflow runs on pushes to `main`, on tags
-and on pull requests, so the branch is opened as a draft pull request. It
-carries the same `scratchmod/` module, and the run must show
-`test (scratchmod, …)` for all three operating systems. The pull request
-is then closed and the branch deleted, unmerged. The result is recorded
-here.
+**The real-CI proof.** The owner chose a proof branch (picked from
+options, 2026-10-03), committed and pushed Phase 5 (`ce884be`), and
+authorized the agent to run the branch steps as written, committing and
+pushing. The workflow runs on pushes to `main`, on tags and on pull
+requests, so the branch was opened as a draft pull request.
+
+* Branch `ci-proof-scratchmod`, commit `94b8602` on `ce884be`: the same
+  `scratchmod/` module, with its tidied `go.sum`, and `go.work` gaining
+  `./scratchmod`. The disclosure guard passed over the commit before the
+  push. Draft pull request #1, "CI proof: nested-module matrix (do not
+  merge)".
+* Run 37147134663: `completed success`. Jobs: `modules`, `gates`, and
+  `test (.|scratchmod, ubuntu-24.04|macos-15|windows-2025)`, all six
+  `success`.
+* From the run's log:
+  * the `modules` step printed `go-modules_test: 13 passed, 0 failed` and
+    `modules: [".","scratchmod"]`;
+  * `gates` ran `go vet (module scratchmod, freebsd/amd64)`, `openbsd/amd64`
+    and `linux/386`; `go fix -diff (module scratchmod, GOOS=…)` and
+    `golangci-lint (module scratchmod, GOOS=…)` for linux, darwin and
+    windows; and `make vet`, `make tidy-check` and `make vuln` each printed
+    `== module scratchmod`.
+* Cleanup, by the agent with the owner's approval: `gh pr close 1
+  --delete-branch` closed the pull request unmerged and deleted the branch
+  on GitHub and locally, so the separate `git branch -D` found nothing
+  to delete. `git ls-remote` shows no `ci-proof-scratchmod`, and
+  `main` never held `scratchmod/`.
+
+### Deviation D1 (2026-10-03): the gates on the Windows test host
+
+* **Found.** Phase 6's Verification runs `make pre-add-check`,
+  `make release-check`, `make lint` and `make vuln` on the Windows test
+  host. All four failed there. Phases 2–5 ran only `go vet` and `go test`
+  on that host, never the scripts or the `Makefile`.
+* **Evidence**, from a copy of the tree on the host, with account names
+  redacted:
+  * `git rev-parse --show-toplevel` gives
+    `C:/Users/<user>/AppData/Local/Temp/go-tui-lib-probe`, and
+    `go list -m -f '{{.Dir}}'` gives
+    `C:\Users\<user>\AppData\Local\Temp\go-tui-lib-probe`.
+    `scripts/go-modules.sh` strips the first from the second, which never
+    matches, so it lists the root by its absolute path. `--check` fails:
+    `go.work lists C:\Users\<user>\…, which has no tracked go.mod` and
+    `./go.mod is tracked, but go.work does not list .`.
+  * So `scripts/go-precheck.sh` owns no file to any listed module, and its
+    module loop checks nothing; only `--check` makes it fail. This defect
+    came with Phase 3.
+  * `make -p` shows `GOPATH_BIN := C:\Users\<user>\go/bin`. A recipe's
+    shell drops the backslashes: `C:Users<user>go/bin/golangci-lint: No
+    such file or directory`, and the same for `govulncheck`. This defect
+    predates this PLAN: the `Makefile` came from the 0001 scaffold, and CI
+    runs `make` on Linux only.
+  * `git -C "<the go list Dir>" rev-parse --show-prefix` prints an empty
+    prefix for the root on that host, whatever form the path takes.
+* **Resolutions offered:** fix both under this deviation (recommended);
+  fix `go-modules.sh` here and the `Makefile` under its own 0001 record,
+  with this Verification waiting; or stop Phase 6.
+* **Decision** (the owner, picked from options, 2026-10-03): fix both here.
+* **Changed.** Phase 6 also edits `scripts/go-modules.sh` (each module's
+  directory from `git -C <dir> rev-parse --show-prefix`) and the
+  `Makefile` (the Go tool paths with `\` turned to `/`, and the lint
+  loop's root path checked on the host). The Phase 3 tests and proofs that
+  cover `go-modules.sh` run again on macOS, and every `make` gate runs on
+  the Windows host, before the fix and after.
+
+### Phase 6: documentation and close-out (2026-10-03)
+
+The owner approved Phase 6 ("proceed"). The Phase 5 record's last update
+was not yet committed; it was saved as its own patch, so Phase 5 and
+Phase 6 can be committed apart.
+
+**Documentation.**
+
+* **`docs/guides/releasing.md` (new):** the rules (a tag names one
+  module; tags are never moved; an adapter requires a published root
+  version; `go.work` is for development); adding a module; releasing the
+  root alone, an adapter alone, and a change that spans both, in 0010-MADR
+  §3's two steps; and the consumer smoke test. The smoke test, as written,
+  was run against the root's `v0.1.6` in a scratch module outside the
+  repository: `go get … @v0.1.6` added it, and `go build ./...` exited 0.
+* **`AGENTS.md`:** Dependencies says the root's list is 0001-MADR §3's
+  and each nested module's is 0010-MADR §5's, names fang as refused
+  everywhere and where Cobra, pflag, Kong and glamour may be imported. A
+  new Modules section gives the module table, `go.work`, `GOWORK=off`,
+  `go work use`, the tags and the two-step release. Pre-add checks
+  describes the per-module precheck and `make release-check`.
+* **`docs/architecture.md`:** a Modules section with the dependency
+  direction; the tree gains `go.work`, `go-modules.sh` and its test, and
+  the releasing guide; depguard's refusals and per-module allowances; the
+  `make` targets, the per-module behaviour, the precheck and CI as Phases
+  2–5 left them.
+* **`README.md`:** the current release, `v0.1.6`; adapters as their own
+  modules; a row for adding or releasing a module.
+* **`docs/README.md`:** rows for adding a module, releasing, and the
+  per-module gates.
+* **Links.** A link check (relative links and `#` anchors) over the five
+  files found 0 broken. On a copy with a planted missing file and a
+  planted missing anchor, it reported both and exited 1.
+
+**Deviation D1, done.** On the Windows test host, before the fix:
+`make pre-add-check` and `make release-check` failed on
+`scripts/go-modules.sh --check`, having checked no module; `make lint` and
+`make vuln` could not find their tools. The fix:
+
+* `scripts/go-modules.sh` takes each module's directory relative to the
+  repository from `git -C <dir> rev-parse --show-prefix`, after checking
+  `git -C <dir> rev-parse --show-toplevel` is the repository's. It gains
+  `GO`, which names the go command, as `go-fuzz.sh` does, so a test can
+  inject one: this host's bash resets `PATH` in non-interactive shells, so
+  a `PATH` override did not reach the script.
+* `scripts/go-modules_test.sh` gains case 8: the go command spells the
+  module directories differently from git. Where the host's go already
+  does, as on Windows, the real go is used; elsewhere a go that reports
+  them through a symlink stands in. Its first check asserts the spellings
+  differ, so the case cannot pass vacuously.
+* `Makefile`: `GOPATH_BIN` and `GOBIN` turn `\` into `/`, and the lint
+  loop's root comes from `git rev-parse --show-toplevel` instead of `pwd`.
+
+Proofs:
+
+| Run | Result |
+| :--- | :--- |
+| macOS, `go-modules_test.sh`, fixed | `17 passed, 0 failed` |
+| macOS, with only D1's `go-modules.sh` change reverted | `15 passed, 2 failed`: `listing under another spelling prints the root and sub: want .,sub, got <tmp>,<tmp>`; `--check under another spelling passes: want 0, got 1` |
+| Windows, fixed | `17 passed, 0 failed` |
+| Windows, with D1 reverted | `11 passed, 6 failed`, among them `listing prints the root and sub: want .,sub, got C:\Users\<user>\…\two,C:\Users\<user>\…\two\sub` |
+| Windows, after the fix | `go-modules.sh` lists `.`; `--check` exit 0; `make pre-add-check`, `make release-check`, `make lint` and `make vuln` exit 0 |
+| Windows, planted `scratchmod/` | `go-modules.sh` lists `.,scratchmod`; the precheck on its file prints `go-precheck: module scratchmod (1 file(s))` and passes; with `layout.ErrBadSplitName`, which `v0.1.0` lacks, it fails: `undefined: layout.ErrBadSplitName` |
+
+The Phase 3 isolated proofs and the Phase 5 local run of the workflow were
+run again on macOS with the fixed scripts; every result matched its
+Phase 3 and Phase 5 record.
+
+**Verification.**
+
+* The proofs of Phases 2–4 failed on their scratch copies, and the
+  failures are quoted in their records.
+* **macOS:** `make pre-add-check`, `make release-check`, `make lint` and
+  `make vuln`: exit 0. `go test -race -count=1 ./...` and
+  `LC_ALL=C go test -count=1 ./...`: every package `ok`.
+* **Windows test host:** the four `make` targets: exit 0, as above.
+* `go list -m` in workspace mode prints `github.com/maccavelli/go-tui-lib`;
+  `scripts/go-modules.sh` prints `.`, and `--check` exits 0.
+* `GOWORK=off go mod tidy -diff`: exit 0. `go.mod` and `go.sum` are
+  unchanged from `ce884be`.
+* shellcheck over `scripts/*.sh`, actionlint v1.7.12 and markdownlint:
+  clean. `git diff --check`: clean.
+* The identifier scan finds nothing in the changed files.
+* **Pending:** CI on the owner's push.
+
+### Release notes
+
+This PLAN changes no API and no `go.mod`. It adds tooling and
+documentation only, so no tag is needed (Rollout). For a reader of the
+history:
+
+* **`go.work`** at the root lists every module, for development.
+* **Every gate runs per module with `GOWORK=off`:**
+  * `scripts/go-precheck.sh` runs per module, adds `go mod tidy -diff`, a
+    workspace-mode test, and, for a nested module, the `replace` and
+    release-version checks;
+  * the `Makefile` targets loop over the modules, with the new
+    `tidy-check` and `release-check`;
+  * `scripts/go-modules.sh` lists the modules and checks `go.work`
+    against the tracked `go.mod` files.
+* **depguard** keeps Cobra and pflag in `command/cobracmd`, Kong in
+  `command/kongcmd` and glamour in `stream/glamourmd`, and refuses fang
+  everywhere.
+* **CI** has a `modules` job, a `test (<module>, <os>)` matrix and a
+  `gates` job, and reads Go from `go.work`.
+* **Windows:** the `Makefile` and the module scripts now work on the
+  Windows test host (deviation D1); `make lint` and `make vuln` did not
+  before.
+* **Documentation:** the releasing guide, and the module rules in
+  `AGENTS.md` and `docs/architecture.md`.

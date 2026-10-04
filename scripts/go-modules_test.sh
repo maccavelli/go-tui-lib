@@ -42,11 +42,12 @@ nested() {
 }
 
 # run DIR ARGS...: the script's exit status, with output in $WORK/out.
+# RUN_GO, when set, is the go command the script runs.
 run() {
 	local dir="$1"
 	shift
 	set +e
-	(cd "$dir" && GOWORK=off "$MODULES" "$@") >"$WORK/out" 2>&1
+	(cd "$dir" && GO="${RUN_GO:-go}" GOWORK=off "$MODULES" "$@") >"$WORK/out" 2>&1
 	local rc=$?
 	set -e
 	echo "$rc"
@@ -103,6 +104,26 @@ check "no go.work fails listing" 2 "$(run "$WORK/nowork")"
 
 # 7. An unknown argument is a usage error.
 check "an unknown argument exits 2" 2 "$(run "$WORK/two" --bogus)"
+
+# 8. The go command spells the module directories differently from git, as
+#    on Windows, where go prints C:\Users\... and git C:/Users/...
+#    (docs/decisions/0010-PLAN-nested-adapter-modules.md deviation D1). On a
+#    host where go's spelling is already git's, a go that reports them
+#    through a symlink to the repository stands in for it. Either way the
+#    list and --check must not change.
+TOP="$(git -C "$WORK/two" rev-parse --show-toplevel)"
+SPELL=go
+if [ "$(GOWORK="$TOP/go.work" go list -m -f '{{.Dir}}' | head -1)" = "$TOP" ]; then
+	ln -s "$TOP" "$WORK/two-link"
+	SPELL="$WORK/spell-go"
+	printf '#!/usr/bin/env bash\n"%s" "$@" | sed "s#^%s#%s#"\n' \
+		"$(command -v go)" "$TOP" "$WORK/two-link" >"$SPELL"
+	chmod +x "$SPELL"
+fi
+check "go's spelling differs from git's" 0 "$(GOWORK="$TOP/go.work" "$SPELL" list -m -f '{{.Dir}}' | grep -cxF "$TOP" || true)"
+check "listing under another spelling exits 0" 0 "$(RUN_GO="$SPELL" run "$WORK/two")"
+check "listing under another spelling prints the root and sub" ".,sub" "$(sort "$WORK/out" | paste -sd, -)"
+check "--check under another spelling passes" 0 "$(RUN_GO="$SPELL" run "$WORK/two" --check)"
 
 echo "go-modules_test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
