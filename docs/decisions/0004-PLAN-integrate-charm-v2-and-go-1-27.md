@@ -771,3 +771,99 @@ is recorded here.
   `go test ./...` each wrote nothing. It was deleted again; `go doc` runs
   with `GOWORK=off` from here, and 0010-PLAN Phase 7 ignores the file.
 * **The Windows test host:** `make pre-add-check` and `make release-check` (`33 file(s) clean in 1 module(s)`, the width goldens and tests included), `make lint` (`0 issues` for linux, darwin and windows) and `make vuln` (`No vulnerabilities found.`) exited 0; `go-modules.sh --check` exited 0.
+
+### Step 5: the theme (2026-10-04)
+
+The owner committed Step 4 (`204c026`) and approved this step ("Proceed").
+
+**What changed.**
+
+* **`theme/theme.go`.**
+  * `FromDark(isDark) Background`.
+  * `LightDarkColor{Light, Dark, Unknown}` picks through
+    `lipgloss.LightDark`: Light on a light background, Dark on a dark one,
+    and on an Unknown background Unknown, or Dark when Unknown is nil.
+  * `ProfileColor{ANSI, ANSI256, TrueColor}` picks through
+    `lipgloss.Complete`, and the pick is used as it is.
+  * Both implement `color.Color` (the colour an Unknown background picks,
+    and the TrueColor colour or the next one given), so they fit any
+    `Palette` field and existing palettes keep working.
+  * `build` takes the background, and resolves each colour: a
+    `LightDarkColor` for the background first, then a `ProfileColor` for
+    the profile, unconverted; any other colour is converted to the profile
+    as before. A `LightDarkColor` may hold `ProfileColor`s.
+  * `WithPaletteFor(bg, p)` keeps a palette for one background, and wins
+    over `WithPalette`, which still means the palette for every background.
+* **`workspace/workspace.go`.**
+  * `ThemeBuilder` and `WithThemeBuilder(b)`, which turns following on. By
+    default the workspace follows the terminal: it starts with the theme it
+    had (ANSI256, an unknown background, Unicode glyphs) and, on
+    `tea.ColorProfileMsg` and `tea.BackgroundColorMsg`, rebuilds with the
+    builder, or with `theme.New` and the glyphs in use. A
+    `BackgroundColorMsg` with no colour is ignored, since `IsDark` needs
+    one. Both messages are still broadcast to the panes.
+  * `WithTheme(t)` fixes the theme: the messages change nothing, though the
+    workspace still records the profile and background they carry.
+  * `SetTheme(t)` replaces the theme, raises `themeGen` and marks the frame
+    dirty; every cached view then misses, because its key holds
+    `themeGen`. It returns `nil`, as MADR §4 gives it a `tea.Cmd` result.
+    It does not change whether the workspace follows: a following
+    workspace rebuilds over it at the next message. Its comment says so.
+  * `Init` adds `tea.RequestBackgroundColor` unless
+    `WithoutBackgroundQuery()` (owner question Q2). It is added whether
+    the theme follows or is fixed, so a pane with its own styles also gets
+    the reply.
+
+No golden file changed: the golden tests fix their theme with `WithTheme`.
+
+**Tests.**
+
+* `theme/adaptive_test.go` (new):
+  * `FromDark`;
+  * a `LightDarkColor` resolves to its light, dark and unknown colours on
+    each background, and to the dark colour when the unknown one is nil;
+    its `RGBA` is the Unknown background's pick;
+  * a `ProfileColor` whose three fields are all TrueColor values resolves,
+    unconverted, to the ANSI, ANSI256 and TrueColor field at each profile,
+    and the ASCII profile colours nothing;
+  * a `ProfileColor` inside a `LightDarkColor` resolves by background, then
+    by profile;
+  * `WithPaletteFor` keeps a palette per background, and wins over
+    `WithPalette`.
+* The unknown-palette contrast test, and the NO_COLOR and ASCII tests,
+  pass unchanged.
+* `workspace/theme_test.go` (new):
+  * a following workspace of unchanged `Changer`s restyles the next frame
+    on a TrueColor `ColorProfileMsg` and on a light `BackgroundColorMsg`,
+    and each time asks again for a view cached before the change;
+  * a fixed theme keeps its profile, background and generation through
+    both messages, and both messages reach a recording pane;
+  * `Init` yields `tea.RequestBackgroundColor()` by default, and not with
+    `WithoutBackgroundQuery()`;
+  * a builder with `theme.WithPaletteFor` for each background keeps the
+    program's palette across a dark and then a light background;
+  * `SetTheme` marks the frame dirty and redraws a cached view.
+
+**Mutation proofs**, each on a scratch copy; none survived:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| the cache key leaves out `themeGen` | `a view cached before the theme change was not drawn again`; `SetTheme did not redraw a cached view` |
+| the fixed theme follows `BackgroundColorMsg` | `a fixed theme changed: profile TrueColor, background 2, generation 0 → 1` |
+| `LightDarkColor` swaps light and dark | `background 2: {135 215 135 255}, want {215 0 0 255}`, and background 1 |
+| a `ProfileColor` is converted again after `Complete` | `profile ANSI: 6, want {18 52 86 255}, unconverted`, and ANSI256 |
+| `Init` leaves out the background query by default | `Init does not ask for the background by default` |
+| `WithoutBackgroundQuery` is ignored | `Init asks for the background with WithoutBackgroundQuery` |
+
+**Checks.**
+
+* `make pre-add-check FILES=…` on the four Go files: the first run failed
+  on gofmt, the comments of the new `Workspace` fields not aligned; after
+  `gofmt -w`, `4 file(s) clean in 1 module(s)`, govulncheck included.
+* `make lint` (with `make modernize`): `0 issues` for linux, darwin and
+  windows.
+* `go test -race -count=1 ./...`, `LC_ALL=C go test -count=1 ./...` and
+  `go test -shuffle=on -count=2 ./...`: every package `ok`.
+* `GOWORK=off go mod tidy -diff`: exit 0. No `go.work.sum` was written;
+  `go doc` ran with `GOWORK=off`.
+* **The Windows test host:** a first run, started before the gofmt fix, failed `make pre-add-check`, `make release-check` and `make lint` on the same `workspace\\workspace.go:148:1: File is not properly formatted (gofmt)`. After the fix: `make pre-add-check` and `make release-check` (`35 file(s) clean in 1 module(s)`), `make lint` (`0 issues` for linux, darwin and windows) and `make vuln` (`No vulnerabilities found.`) exited 0; `go-modules.sh --check` exited 0.
