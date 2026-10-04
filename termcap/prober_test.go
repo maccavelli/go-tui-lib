@@ -25,6 +25,11 @@ const (
 	osc99Q         = "\x1b]99;i=termcap:p=?;\x07"
 	kittyGraphicsQ = "\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\"
 	da1Q           = "\x1b[c"
+	osc10Q         = "\x1b]10;?\x07"
+	paletteQ       = "\x1b]4;0;?\x07\x1b]4;1;?\x07\x1b]4;2;?\x07\x1b]4;3;?\x07" +
+		"\x1b]4;4;?\x07\x1b]4;5;?\x07\x1b]4;6;?\x07\x1b]4;7;?\x07" +
+		"\x1b]4;8;?\x07\x1b]4;9;?\x07\x1b]4;10;?\x07\x1b]4;11;?\x07" +
+		"\x1b]4;12;?\x07\x1b]4;13;?\x07\x1b]4;14;?\x07\x1b]4;15;?\x07"
 )
 
 var local = Env{"TERM=xterm-kitty"}
@@ -120,15 +125,15 @@ func TestBatchBytes(t *testing.T) {
 		o    []Option
 		want string
 	}{
-		{"local", local, nil, safe + xtversionQ + osc99Q + kittyGraphicsQ + da1Q},
+		{"local", local, nil, safe + xtversionQ + osc99Q + kittyGraphicsQ + osc10Q + paletteQ + da1Q},
 		{"inside tmux", Env{"TERM=tmux-256color", "TMUX=/tmp/tmux-1/default,1,0"}, nil,
-			safe + xtversionQ + tmux(osc99Q) + tmux(kittyGraphicsQ) + da1Q},
+			safe + xtversionQ + tmux(osc99Q) + tmux(kittyGraphicsQ) + osc10Q + paletteQ + da1Q},
 		{"unknown SSH peer", Env{"TERM=xterm-256color", "SSH_TTY=/dev/pts/1"}, nil, safe + da1Q},
 		{"unknown SSH peer, no heuristic", Env{"TERM=xterm-256color", "SSH_TTY=/dev/pts/1"}, []Option{WithoutHeuristic()},
-			safe + xtversionQ + osc99Q + kittyGraphicsQ + da1Q},
+			safe + xtversionQ + osc99Q + kittyGraphicsQ + osc10Q + paletteQ + da1Q},
 		{"Apple Terminal", Env{"TERM=xterm-256color", "TERM_PROGRAM=Apple_Terminal"}, nil, safe + da1Q},
 		{"no background query", local, []Option{WithoutBackgroundRequest()},
-			kittyKeyboardQ + modesQ + dsr996Q + xtversionQ + osc99Q + kittyGraphicsQ + da1Q},
+			kittyKeyboardQ + modesQ + dsr996Q + xtversionQ + osc99Q + kittyGraphicsQ + osc10Q + paletteQ + da1Q},
 	}
 	for _, c := range cases {
 		_, msgs := start(c.env, c.o...)
@@ -199,7 +204,7 @@ func TestSentinelAloneMarksEveryQueryUnsupported(t *testing.T) {
 	if !c.Complete || c.TimedOut {
 		t.Fatalf("Complete %v, TimedOut %v; want true, false", c.Complete, c.TimedOut)
 	}
-	no := Fact[Support]{Unsupported, Queried}
+	no := Fact[Support]{Value: Unsupported, Origin: Queried}
 	for name, f := range map[string]Fact[Support]{
 		"KittyKeyboard": c.KittyKeyboard, "ColorSchemeReports": c.ColorSchemeReports,
 		"InBandResize": c.InBandResize, "FocusEvents": c.FocusEvents,
@@ -209,7 +214,7 @@ func TestSentinelAloneMarksEveryQueryUnsupported(t *testing.T) {
 			t.Errorf("%s = %+v after DA1 alone, want unsupported from a query", name, f)
 		}
 	}
-	if c.Terminal != (Fact[string]{"xterm-kitty", Environment}) || c.Dark.Origin != NotQueried {
+	if c.Terminal != (Fact[string]{Value: "xterm-kitty", Origin: Environment}) || c.Dark.Origin != NotQueried {
 		t.Errorf("silence changed facts no query owns: Terminal %+v, Dark %+v", c.Terminal, c.Dark)
 	}
 	if c.SyncOutput.Origin != NotQueried || c.GraphemeWidth.Origin != NotQueried {
@@ -235,7 +240,7 @@ func TestEveryReplySupports(t *testing.T) {
 		termeventtest.DeviceAttributes(62, 4, 22),
 	)
 	c := capsOf(t, msgs)
-	yes := Fact[Support]{Supported, Queried}
+	yes := Fact[Support]{Value: Supported, Origin: Queried}
 	for name, f := range map[string]Fact[Support]{
 		"KittyKeyboard": c.KittyKeyboard, "ColorSchemeReports": c.ColorSchemeReports,
 		"InBandResize": c.InBandResize, "FocusEvents": c.FocusEvents,
@@ -248,12 +253,12 @@ func TestEveryReplySupports(t *testing.T) {
 	if c.KeyboardFlags != 1 {
 		t.Errorf("KeyboardFlags = %d, want 1", c.KeyboardFlags)
 	}
-	if c.Terminal != (Fact[string]{"kitty(0.39.1)", Queried}) {
+	if c.Terminal != (Fact[string]{Value: "kitty(0.39.1)", Origin: Queried}) {
 		t.Errorf("Terminal = %+v, want the XTVERSION reply", c.Terminal)
 	}
 	// DSR 997 said dark; the light background that came after does not
 	// overrule it.
-	if c.Dark != (Fact[bool]{true, Queried}) {
+	if c.Dark != (Fact[bool]{Value: true, Origin: Queried}) {
 		t.Errorf("Dark = %+v, want the DSR 997 report", c.Dark)
 	}
 	if c.Background == nil {
@@ -273,7 +278,7 @@ func TestRepliesThatSayNo(t *testing.T) {
 		termeventtest.UnknownOsc("\x1b]99;i=someone-else:p=?;a=focus\x1b\\"),
 		termeventtest.DeviceAttributes(62),
 	))
-	no := Fact[Support]{Unsupported, Queried}
+	no := Fact[Support]{Value: Unsupported, Origin: Queried}
 	if c.ColorSchemeReports != no || c.FocusEvents != no || c.KittyGraphics != no || c.DesktopNotify != no {
 		t.Fatalf("got %+v %+v %+v %+v, want each unsupported", c.ColorSchemeReports, c.FocusEvents, c.KittyGraphics, c.DesktopNotify)
 	}
@@ -282,7 +287,7 @@ func TestRepliesThatSayNo(t *testing.T) {
 func TestXTVersionOfTmuxIsAMux(t *testing.T) {
 	p, _ := start(Env{"TERM=screen-256color"})
 	feed(p, tea.TerminalVersionMsg{Name: "tmux 3.4"})
-	if c := p.Caps(); c.Mux != (Fact[Mux]{Tmux, Queried}) {
+	if c := p.Caps(); c.Mux != (Fact[Mux]{Value: Tmux, Origin: Queried}) {
 		t.Fatalf("Mux = %+v, want tmux from the reply", c.Mux)
 	}
 }
@@ -291,7 +296,7 @@ func TestReplyAfterTheSentinelStillCounts(t *testing.T) {
 	p, _ := start(local)
 	feed(p, termeventtest.DeviceAttributes(62))
 	feed(p, termeventtest.UnknownOsc("\x1b]99;i=termcap:p=?;a=focus\x07"))
-	if c := p.Caps(); c.DesktopNotify != (Fact[Support]{Supported, Queried}) {
+	if c := p.Caps(); c.DesktopNotify != (Fact[Support]{Value: Supported, Origin: Queried}) {
 		t.Fatalf("DesktopNotify = %+v after a late reply, want supported", c.DesktopNotify)
 	}
 }
@@ -358,7 +363,7 @@ func TestTeasOwnModeReports(t *testing.T) {
 		tea.ModeReportMsg{Mode: ansi.ModeUnicodeCore, Value: ansi.ModeNotRecognized},
 	)
 	c := p.Caps()
-	if c.SyncOutput != (Fact[Support]{Supported, Queried}) || c.GraphemeWidth != (Fact[Support]{Unsupported, Queried}) {
+	if c.SyncOutput != (Fact[Support]{Value: Supported, Origin: Queried}) || c.GraphemeWidth != (Fact[Support]{Value: Unsupported, Origin: Queried}) {
 		t.Fatalf("SyncOutput %+v, GraphemeWidth %+v", c.SyncOutput, c.GraphemeWidth)
 	}
 }
@@ -384,7 +389,7 @@ func TestColorSchemeAfterTheProbe(t *testing.T) {
 		if n := backgroundRequests(msgs); n != want {
 			t.Errorf("options %d: %d background requests after DSR 997, want %d", len(o), n, want)
 		}
-		if c := p.Caps(); c.Dark != (Fact[bool]{false, Queried}) {
+		if c := p.Caps(); c.Dark != (Fact[bool]{Value: false, Origin: Queried}) {
 			t.Errorf("Dark = %+v, want light from DSR 997", c.Dark)
 		}
 	}
@@ -393,7 +398,7 @@ func TestColorSchemeAfterTheProbe(t *testing.T) {
 func TestBackgroundSetsDarkWithoutDSR997(t *testing.T) {
 	p, _ := start(local)
 	feed(p, tea.BackgroundColorMsg{Color: color.RGBA{A: 0xff}})
-	if c := p.Caps(); c.Dark != (Fact[bool]{true, Queried}) {
+	if c := p.Caps(); c.Dark != (Fact[bool]{Value: true, Origin: Queried}) {
 		t.Fatalf("Dark = %+v, want dark from OSC 11", c.Dark)
 	}
 }
@@ -451,7 +456,7 @@ func TestDisabledSendsNothing(t *testing.T) {
 		t.Fatalf("sent %v", msgs)
 	}
 	c := capsOf(t, msgs)
-	if c.Complete || c.TimedOut || c.Mux != (Fact[Mux]{Tmux, Environment}) {
+	if c.Complete || c.TimedOut || c.Mux != (Fact[Mux]{Value: Tmux, Origin: Environment}) {
 		t.Fatalf("Caps = %+v, want the environment's facts only", c)
 	}
 	if b := raw(feed(p, tea.ModeReportMsg{Mode: ansi.ModeLightDark, Value: ansi.ModeReset})); b != "" {
@@ -482,7 +487,7 @@ func TestAddedQuery(t *testing.T) {
 		t.Errorf("batch %q holds a gated query the heuristic refused", b)
 	}
 	feed(p, termeventtest.UnknownCsi("\x1b[0n"))
-	if c := p.Caps(); c.Terminal != (Fact[string]{"answered", Queried}) {
+	if c := p.Caps(); c.Terminal != (Fact[string]{Value: "answered", Origin: Queried}) {
 		t.Errorf("the added query's reply was not parsed: %+v", c.Terminal)
 	}
 }
@@ -497,7 +502,7 @@ func TestOverrideBeatsAQuery(t *testing.T) {
 		tea.KeyboardEnhancementsMsg{Flags: 31},
 		termeventtest.DeviceAttributes(62),
 	))
-	if c.DesktopNotify != (Fact[Support]{Unsupported, Override}) || c.KeyboardFlags != 0 {
+	if c.DesktopNotify != (Fact[Support]{Value: Unsupported, Origin: Override}) || c.KeyboardFlags != 0 {
 		t.Fatalf("DesktopNotify %+v, KeyboardFlags %d; want the override", c.DesktopNotify, c.KeyboardFlags)
 	}
 }

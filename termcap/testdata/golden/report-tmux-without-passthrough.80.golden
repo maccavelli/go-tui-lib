@@ -17,3 +17,12 @@
  34|dark                   yes (query)
  30|background             #1e1e2e
  32|profile                TrueColor
+ 36|brand                  unknown (env)
+ 36|env_brand              unknown (env)
+ 33|editor                 none (env)
+ 35|platform               native (env)
+ 31|legacy_console         no (env)
+ 24|tmux                   -
+ 24|foreground             -
+ 24|palette                -
+ 25|palette_known          no

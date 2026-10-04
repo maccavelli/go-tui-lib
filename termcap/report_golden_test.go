@@ -41,7 +41,8 @@ func TestReportGolden(t *testing.T) {
 		termcaptest.Kitty(), termcaptest.XTerm(), termcaptest.Tmux(true), termcaptest.Tmux(false),
 		termcaptest.DA1Only(), termcaptest.Silent(),
 	} {
-		c := termcaptest.Run(t, app{termcap.New(pin, termcap.WithTimeout(100*time.Millisecond))}, p)
+		// The identity is read for one OS, so the files match on every host.
+		c := termcaptest.Run(t, app{termcap.New(pin, termcap.WithGOOS("linux"), termcap.WithTimeout(100*time.Millisecond))}, p)
 		name := "report-" + strings.ReplaceAll(p.Name, " ", "-")
 		for _, w := range []int{80, 120} {
 			var b strings.Builder

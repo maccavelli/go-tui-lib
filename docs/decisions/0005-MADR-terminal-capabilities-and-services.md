@@ -1017,6 +1017,51 @@ leaves it out. The follow-up to a DSR 997 after the probe stays a
 gate and the tmux wrap. Taking the environment in `New` breaks the rule
 that it comes from `tea.EnvMsg`, which under wish is the session's.
 
+### A4 (2026-10-04): tea always asks for disambiguation
+
+*Status: accepted (2026-10-04).* It is deviation D8 of
+[0005-PLAN-terminal-capabilities-and-services.md](0005-PLAN-terminal-capabilities-and-services.md),
+found at the start of Step A1.1.
+
+**Found.** A1's kitty flag policy says `KeyboardFlags(c Caps) KittyFlags`
+returns "the flags a program should put in `View.KeyboardEnhancements`",
+and "no flags at all" on mintty, MSYS2 and WSL with VS Code. In Bubble Tea
+v2.0.10, `View.KeyboardEnhancements` is a `tea.KeyboardEnhancements`
+struct of extra features (`ReportEventTypes`, `ReportAlternateKeys`,
+`ReportAllKeysAsEscapeCodes`, `ReportAssociatedText`), and
+`keyboardEnhancementsFlags` starts from `flags := 1 // always enable basic
+key disambiguation` (`cursed_renderer.go:896`), pushed with
+`modifyOtherKeys` 2 on the first render whenever the program has input. A
+program cannot ask tea for no flags.
+
+**Decision** (the owner, picked from options, 2026-10-04,
+"tea.KeyboardEnhancements + reason", the recommendation).
+
+* `KeyboardFlags(c Caps) tea.KeyboardEnhancements` returns the struct a
+  `View` takes. `ReportEventTypes` is set only where A1's policy allows
+  event types. A1's other rules stand.
+* Where A1 says "no flags at all", it returns the zero struct, and
+  `Caps.Keyboard()` carries a reason token saying the terminal wants none
+  while tea still pushes disambiguation. Stopping that is the later
+  `termmode` record's, which owns terminal modes.
+* `Caps.Keyboard()` returns `KeyboardCaps`: the kitty fact, the
+  enhancements `KeyboardFlags` returns, the ledger of accepted flags, and
+  whether releases are reported, with the reason.
+* `Caps` gains `Platform`, a fact naming MSYS2 (`MSYSTEM`) or WSL
+  (`WSL_DISTRO_NAME`, `WSL_INTEROP`), which the policy reads and `Caps`
+  had no field for. `TERM_PROGRAM=mintty` is the `Mintty` brand.
+
+* **`WithGOOS(goos string)`** (the owner, picked from options,
+  2026-10-04, "Export WithGOOS", the recommendation, deviation D9). The
+  prober reads the identity for `runtime.GOOS` by default, which made its
+  facts, and the report goldens, differ on a Windows host. `WithGOOS`
+  names the operating system the identity is read for: a test pins it, and
+  a wish server, whose own `runtime.GOOS` is not the SSH client's, can set
+  it.
+
+**Unchanged.** A1's lists of terminals, the ledger, `ReleasesReported`,
+and every other part of A1.
+
 ## More Information
 
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md)

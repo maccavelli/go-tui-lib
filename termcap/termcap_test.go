@@ -107,14 +107,14 @@ func TestEnvironmentFacts(t *testing.T) {
 	}
 	for _, c := range cases {
 		var got Caps
-		got.setEnv(c.env)
-		if got.Terminal != (Fact[string]{c.terminal, Environment}) {
+		got.setEnv(c.env, "linux", "")
+		if got.Terminal != (Fact[string]{Value: c.terminal, Origin: Environment}) {
 			t.Errorf("%v: Terminal = %+v, want %q from env", c.env, got.Terminal, c.terminal)
 		}
-		if got.Mux != (Fact[Mux]{c.mux, Environment}) {
+		if got.Mux != (Fact[Mux]{Value: c.mux, Origin: Environment}) {
 			t.Errorf("%v: Mux = %+v, want %v from env", c.env, got.Mux, c.mux)
 		}
-		if got.Remote != (Fact[bool]{c.remote, Environment}) {
+		if got.Remote != (Fact[bool]{Value: c.remote, Origin: Environment}) {
 			t.Errorf("%v: Remote = %+v, want %v from env", c.env, got.Remote, c.remote)
 		}
 	}
@@ -124,7 +124,7 @@ func TestEnvironmentDoesNotReplaceAQuery(t *testing.T) {
 	var c Caps
 	c.Terminal.Set("kitty(0.39.1)", Queried)
 	c.Mux.Set(Tmux, Queried)
-	c.setEnv(Env{"TERM=xterm-kitty"})
+	c.setEnv(Env{"TERM=xterm-kitty"}, "linux", "")
 	if c.Terminal.Value != "kitty(0.39.1)" || c.Mux.Value != Tmux {
 		t.Fatalf("the environment replaced a reply: %+v %+v", c.Terminal, c.Mux)
 	}
@@ -140,13 +140,13 @@ func TestZeroCapsMarshalsEmpty(t *testing.T) {
 // full is a Caps with every field set away from its zero value. The
 // reflection check below keeps it full as fields are added.
 func full() Caps {
-	q := func(s Support) Fact[Support] { return Fact[Support]{s, Queried} }
+	q := func(s Support) Fact[Support] { return Fact[Support]{Value: s, Origin: Queried} }
 	return Caps{
 		Complete:           true,
 		TimedOut:           true,
-		Terminal:           Fact[string]{"WezTerm 20240203", Queried},
-		Mux:                Fact[Mux]{Tmux, Environment},
-		Remote:             Fact[bool]{true, Environment},
+		Terminal:           Fact[string]{Value: "WezTerm 20240203", Origin: Queried},
+		Mux:                Fact[Mux]{Value: Tmux, Origin: Environment},
+		Remote:             Fact[bool]{Value: true, Origin: Environment},
 		Attributes:         []int{62, 4, 22},
 		KittyKeyboard:      q(Supported),
 		KeyboardFlags:      1,
@@ -155,13 +155,31 @@ func full() Caps {
 		ColorSchemeReports: q(Supported),
 		InBandResize:       q(Unsupported),
 		FocusEvents:        q(Supported),
-		DesktopNotify:      Fact[Support]{Unsupported, Override},
-		KittyGraphics:      Fact[Support]{Unknown, Heuristic},
+		DesktopNotify:      Fact[Support]{Value: Unsupported, Origin: Override},
+		KittyGraphics:      Fact[Support]{Value: Unknown, Origin: Heuristic},
 		Sixel:              q(Supported),
-		Dark:               Fact[bool]{true, Queried},
+		Dark:               Fact[bool]{Value: true, Origin: Queried},
 		Background:         color.RGBA{R: 0x1e, G: 0x1f, B: 0x29, A: 0xff},
 		Profile:            colorprofile.ANSI256,
+		Brand:              Fact[Brand]{Value: BrandWezTerm, Origin: Queried},
+		EnvBrand:           Fact[Brand]{Value: BrandUnknown, Origin: Environment, Reason: ReasonUnknownTerminal},
+		Editor:             Fact[Editor]{Value: EditorNeovim, Origin: Environment},
+		Platform:           Fact[Platform]{Value: PlatformWSL, Origin: Environment},
+		LegacyConsole:      Fact[bool]{Value: false, Origin: Heuristic},
+		Tmux:               TmuxFacts{Known: true, Version: "3.4", ExtendedKeysFormat: "csi-u", Mouse: true, TermFeatures: []string{"RGB"}, ClientFlags: []string{"focus"}},
+		Foreground:         color.RGBA{R: 0xcd, G: 0xd6, B: 0xf4, A: 0xff},
+		Palette:            palette(),
+		PaletteKnown:       true,
 	}
+}
+
+// palette is 16 distinct colours.
+func palette() [16]color.Color {
+	var p [16]color.Color
+	for i := range p {
+		p[i] = color.RGBA{R: uint8(i * 16), G: uint8(255 - i*16), B: uint8(i), A: 0xff}
+	}
+	return p
 }
 
 func TestFullCapsSetsEveryField(t *testing.T) {

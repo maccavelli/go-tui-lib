@@ -37,6 +37,8 @@ type Profile struct {
 	KittyKeyboard bool                     // answers CSI ? u with the flags pushed
 	Dark, Light   bool                     // answers DSR 996 with DSR 997
 	Background    color.Color              // answers OSC 11
+	Foreground    color.Color              // answers OSC 10
+	Palette       []color.Color            // answers OSC 4 for each index it holds
 	Version       string                   // answers XTVERSION
 	Notifications bool                     // answers the OSC 99 p=? query
 	Graphics      bool                     // answers the Kitty graphics query with OK
@@ -61,10 +63,21 @@ func Kitty() Profile {
 		KittyKeyboard: true,
 		Dark:          true,
 		Background:    color.RGBA{R: 0x1e, G: 0x1e, B: 0x2e, A: 0xff},
+		Foreground:    color.RGBA{R: 0xcd, G: 0xd6, B: 0xf4, A: 0xff},
+		Palette:       kittyPalette(),
 		Version:       "kitty(0.39.1)",
 		Notifications: true,
 		Graphics:      true,
 	}
+}
+
+// kittyPalette is 16 colours, one per ANSI index.
+func kittyPalette() []color.Color {
+	p := make([]color.Color, 16)
+	for i := range p {
+		p[i] = color.RGBA{R: uint8(i * 17), G: uint8(255 - i*17), B: 0x80, A: 0xff}
+	}
+	return p
 }
 
 // XTerm answers DA1, DECRQM and OSC 11, and none of the newer queries.
@@ -347,11 +360,16 @@ func (t *Terminal) answer(p *Profile, seq string) string {
 		return "\x1bP>|" + p.Version + "\x1b\\"
 
 	case strings.HasPrefix(seq, "\x1b]11;?"):
-		if p.Background == nil {
+		return xColor("11", p.Background)
+	case strings.HasPrefix(seq, "\x1b]10;?"):
+		return xColor("10", p.Foreground)
+	case strings.HasPrefix(seq, "\x1b]4;"):
+		idx, _, _ := strings.Cut(strings.TrimPrefix(seq, "\x1b]4;"), ";")
+		i, err := strconv.Atoi(idx)
+		if err != nil || i < 0 || i >= len(p.Palette) {
 			return ""
 		}
-		r, g, b, _ := p.Background.RGBA()
-		return fmt.Sprintf("\x1b]11;rgb:%04x/%04x/%04x\x1b\\", r, g, b)
+		return xColor("4;"+idx, p.Palette[i])
 
 	case strings.HasPrefix(seq, "\x1b]99;"):
 		meta, _, _ := strings.Cut(strings.TrimPrefix(seq, "\x1b]99;"), ";")
@@ -381,6 +399,16 @@ func (t *Terminal) answer(p *Profile, seq string) string {
 		return t.answer(p.Outer, inner)
 	}
 	return ""
+}
+
+// xColor is an OSC colour reply, OSC code ; rgb:RRRR/GGGG/BBBB ST, or ""
+// for no colour.
+func xColor(code string, c color.Color) string {
+	if c == nil {
+		return ""
+	}
+	r, g, b, _ := c.RGBA()
+	return fmt.Sprintf("\x1b]%s;rgb:%04x/%04x/%04x\x1b\\", code, r, g, b)
 }
 
 func joinInts(v []int) string {

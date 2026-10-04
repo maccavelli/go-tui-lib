@@ -71,9 +71,11 @@ func fieldName(f reflect.StructField) string {
 	return b.String()
 }
 
-// describe is a field's value, and for a Fact, its origin.
+// describe is a field's value, and for a Fact, its origin and its reason:
+// the fact's reason token when it has one, else, for a fact never
+// queried, what may have kept it so.
 func describe(name string, v reflect.Value, timedOut bool) string {
-	if v.Kind() != reflect.Struct || v.NumField() != 2 {
+	if v.Kind() != reflect.Struct || v.NumField() != 3 {
 		return value(v)
 	}
 	origin, ok := v.Field(1).Interface().(Origin)
@@ -82,9 +84,11 @@ func describe(name string, v reflect.Value, timedOut bool) string {
 	}
 	why, val := origin.String(), value(v.Field(0))
 	if origin == NotQueried && v.Field(0).IsZero() {
-		val = "unknown" // not "no" or "none", which would be facts
+		val = Unknown.String() // not "no" or "none", which would be facts
 	}
-	if origin == NotQueried {
+	if token := v.Field(2).String(); token != "" {
+		why += ": " + printable(token)
+	} else if origin == NotQueried {
 		reason := notQueried[name]
 		switch {
 		case timedOut && reason != "":
@@ -124,8 +128,8 @@ func value(v reflect.Value) string {
 		return printable(v.String())
 	case reflect.Int:
 		return strconv.FormatInt(v.Int(), 10)
-	case reflect.Slice:
-		if v.Len() == 0 {
+	case reflect.Slice, reflect.Array:
+		if v.Len() == 0 || v.IsZero() {
 			return "-"
 		}
 		parts := make([]string, v.Len())
@@ -159,7 +163,7 @@ func line(name, text string, width int) string {
 	if width <= 0 || width <= len(head)+10 {
 		return head + text + "\n"
 	}
-	wrapped := strings.Split(ansi.Wrap(text, width-len(head), ""), "\n")
+	wrapped := strings.Split(ansi.Wrap(text, width-len(head), ";,"), "\n")
 	indent := strings.Repeat(" ", len(head))
 	var b strings.Builder
 	for i, l := range wrapped {

@@ -23,3 +23,12 @@
  73|dark                   unknown (not-queried: no reply before the timeout)
  24|background             -
  27|profile                ANSI
+ 36|brand                  unknown (env)
+ 36|env_brand              unknown (env)
+ 33|editor                 none (env)
+ 35|platform               native (env)
+ 31|legacy_console         no (env)
+ 24|tmux                   -
+ 24|foreground             -
+ 24|palette                -
+ 25|palette_known          no

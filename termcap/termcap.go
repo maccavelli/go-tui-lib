@@ -72,20 +72,26 @@ func (o Origin) MarshalText() ([]byte, error) { return marshal(originNames, "Ori
 // UnmarshalText reads a name MarshalText wrote.
 func (o *Origin) UnmarshalText(b []byte) error { return unmarshal(originNames, "Origin", b, o) }
 
-// Fact is a value with its provenance, so a report can say why.
+// Fact is a value with its provenance, so a report can say why. Reason is
+// a reason token, one of the Reason constants, that says why a fact is
+// unsupported, unknown or gated; "" when there is nothing to explain.
 type Fact[T any] struct {
 	Value  T      `json:"value,omitzero"`
 	Origin Origin `json:"origin,omitzero"`
+	Reason string `json:"reason,omitzero"`
 }
 
 // Set replaces the fact with v when o is at least as strong as the fact's
 // origin, and reports whether it did. An Override is replaced only by
-// another Override.
-func (f *Fact[T]) Set(v T, o Origin) bool {
+// another Override. A replaced fact has no reason.
+func (f *Fact[T]) Set(v T, o Origin) bool { return f.SetReason(v, o, "") }
+
+// SetReason is Set with a reason token.
+func (f *Fact[T]) SetReason(v T, o Origin, reason string) bool {
 	if o < f.Origin {
 		return false
 	}
-	f.Value, f.Origin = v, o
+	f.Value, f.Origin, f.Reason = v, o, reason
 	return true
 }
 

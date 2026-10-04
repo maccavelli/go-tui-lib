@@ -1029,3 +1029,26 @@ and `U+009F`, and the mutation was then killed.
 * The identifier scan of the diff finds nothing.
 
 **Next.** Steps A1.1 to A1.3 run before Step 7, as the PLAN orders.
+
+### Step A1.1: identity and new facts (2026-10-04)
+
+The owner committed Step 6 (`3fae853`) and said "proceed".
+
+**Deviation D8 (2026-10-04): tea's keyboard floor.** Before any code, the
+agent read how tea pushes Kitty flags: `keyboardEnhancementsFlags` always
+sets disambiguation (`cursed_renderer.go:896`), and `View.KeyboardEnhancements`
+is a struct of extra features, so A1's "no flags at all" cannot be asked
+of tea. The agent stopped and asked. The owner picked
+"tea.KeyboardEnhancements + reason", the recommendation. MADR amendment A4
+records it: `KeyboardFlags` returns `tea.KeyboardEnhancements`;
+`Caps.Keyboard()` carries the reason; `Caps` gains `Platform`.
+
+**Deviation D9 (2026-10-04): the goldens depended on the host's OS.** On
+the Windows test host, `TestReportGolden` failed on all twelve files, at
+the `brand` or `legacy_console` line: the prober read the identity for
+`runtime.GOOS`, so on Windows an unknown brand was refined to Windows
+Terminal and the legacy-console fact changed. A defect of this step; the
+macOS run could not show it. The agent stopped and asked. The owner picked
+"Export WithGOOS", the recommendation: `WithGOOS(goos string)` names the
+operating system, `runtime.GOOS` by default, and the golden test passes
+`WithGOOS("linux")`. MADR A4 records it.

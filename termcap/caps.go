@@ -37,32 +37,70 @@ type Caps struct {
 	KittyGraphics Fact[Support] `json:"kitty_graphics,omitzero"` // the APC G query
 	Sixel         Fact[Support] `json:"sixel,omitzero"`          // 4 in the DA1 reply
 
-	Dark       Fact[bool]           `json:"dark,omitzero"` // DSR 997, else OSC 11 luminance
+	Dark       Fact[bool]           `json:"dark,omitzero"` // the appearance chain (MADR A1)
 	Background color.Color          `json:"-"`             // OSC 11, when it replied
 	Profile    colorprofile.Profile `json:"-"`             // from tea.ColorProfileMsg
+
+	// Added by MADR A1 and A4.
+
+	Brand         Fact[Brand]    `json:"brand,omitzero"`          // EnvBrand refined, or an XTVERSION reply
+	EnvBrand      Fact[Brand]    `json:"env_brand,omitzero"`      // the brand the environment names, unrefined
+	Editor        Fact[Editor]   `json:"editor,omitzero"`         // an editor's embedded terminal
+	Platform      Fact[Platform] `json:"platform,omitzero"`       // MSYS2 or WSL
+	LegacyConsole Fact[bool]     `json:"legacy_console,omitzero"` // the classic Windows console host
+	Tmux          TmuxFacts      `json:"tmux,omitzero"`           // from the program's run of TmuxQuery
+
+	Foreground   color.Color     `json:"-"`                      // OSC 10, when it replied
+	Palette      [16]color.Color `json:"-"`                      // OSC 4, indexes 0-15, each when it replied
+	PaletteKnown bool            `json:"palette_known,omitzero"` // all 16 replied
 }
 
 // caps is Caps without its methods, so the JSON methods can embed it.
 type caps Caps
 
-// capsJSON adds the two fields whose types do not write themselves as text.
+// capsJSON adds the fields whose types do not write themselves as text.
 type capsJSON struct {
 	caps
-	Background string `json:"background,omitzero"`
-	Profile    string `json:"profile,omitzero"`
+	Background string   `json:"background,omitzero"`
+	Profile    string   `json:"profile,omitzero"`
+	Foreground string   `json:"foreground,omitzero"`
+	Palette    []string `json:"palette,omitzero"` // 16 entries, "" where unknown
 }
 
 // MarshalJSON writes c with every zero field left out.
 func (c Caps) MarshalJSON() ([]byte, error) {
-	j := capsJSON{caps: caps(c)}
-	if c.Background != nil {
-		r, g, b, _ := c.Background.RGBA()
-		j.Background = fmt.Sprintf("#%02x%02x%02x", r>>8, g>>8, b>>8)
-	}
+	j := capsJSON{caps: caps(c), Background: hex(c.Background), Foreground: hex(c.Foreground)}
 	if c.Profile != colorprofile.Unknown {
 		j.Profile = c.Profile.String()
 	}
+	if c.Palette != ([16]color.Color{}) {
+		j.Palette = make([]string, len(c.Palette))
+		for i, p := range c.Palette {
+			j.Palette[i] = hex(p)
+		}
+	}
 	return json.Marshal(j)
+}
+
+// hex is c as #rrggbb, or "" when c is nil.
+func hex(c color.Color) string {
+	if c == nil {
+		return ""
+	}
+	r, g, b, _ := c.RGBA()
+	return fmt.Sprintf("#%02x%02x%02x", r>>8, g>>8, b>>8)
+}
+
+// unhex reads what hex wrote; "" is nil.
+func unhex(what, s string) (color.Color, error) {
+	if s == "" {
+		return nil, nil
+	}
+	var r, g, b uint8
+	if _, err := fmt.Sscanf(s, "#%02x%02x%02x", &r, &g, &b); err != nil || len(s) != 7 {
+		return nil, fmt.Errorf("termcap: %s %q is not #rrggbb", what, s)
+	}
+	return color.RGBA{R: r, G: g, B: b, A: 0xff}, nil
 }
 
 // UnmarshalJSON reads what MarshalJSON wrote.
@@ -72,12 +110,22 @@ func (c *Caps) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	*c = Caps(j.caps)
-	if j.Background != "" {
-		var r, g, bl uint8
-		if _, err := fmt.Sscanf(j.Background, "#%02x%02x%02x", &r, &g, &bl); err != nil || len(j.Background) != 7 {
-			return fmt.Errorf("termcap: background %q is not #rrggbb", j.Background)
+	var err error
+	if c.Background, err = unhex("background", j.Background); err != nil {
+		return err
+	}
+	if c.Foreground, err = unhex("foreground", j.Foreground); err != nil {
+		return err
+	}
+	if j.Palette != nil {
+		if len(j.Palette) != len(c.Palette) {
+			return fmt.Errorf("termcap: palette of %d colours, want %d", len(j.Palette), len(c.Palette))
 		}
-		c.Background = color.RGBA{R: r, G: g, B: bl, A: 0xff}
+		for i, s := range j.Palette {
+			if c.Palette[i], err = unhex("palette colour", s); err != nil {
+				return err
+			}
+		}
 	}
 	if j.Profile != "" {
 		p, ok := parseProfile(j.Profile)

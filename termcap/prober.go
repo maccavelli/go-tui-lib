@@ -1,7 +1,12 @@
 package termcap
 
 import (
+	"fmt"
+	"image/color"
+	"math"
+	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -78,6 +83,34 @@ func WithoutBackgroundRequest() Option { return func(p *Prober) { p.noBackground
 // queries then, but the replies to the prober's would reach the shell.
 func WithDisabled() Option { return func(p *Prober) { p.disabled = true } }
 
+// WithGOOS reads the terminal's identity for goos instead of
+// runtime.GOOS: for a test, or for a wish server, whose own operating
+// system is not the SSH client's.
+func WithGOOS(goos string) Option { return func(p *Prober) { p.goos = goos } }
+
+// WithAppearanceEnv names an environment variable the program sets to
+// "dark" or "light", such as MYAPP_APPEARANCE. It is also read with an LC_
+// prefix, because a default sshd forwards LC_* variables. It outranks
+// COLORFGBG and the desktop hook, and a terminal's reply outranks it.
+func WithAppearanceEnv(name string) Option { return func(p *Prober) { p.appearanceEnv = name } }
+
+// WithAppearanceHook asks the desktop whether it is dark, through f: the
+// macOS appearance, the XDG portal or the Windows registry, which need a
+// process or an OS binding the library does not take. f runs once, as a
+// command, after the first tea.EnvMsg; it reports ok false when it cannot
+// tell. Its answer outranks COLORFGBG only.
+func WithAppearanceHook(f func() (dark, ok bool)) Option {
+	return func(p *Prober) { p.appearanceHook = f }
+}
+
+// WithConsoleHost asks, on Windows, whether the console is the classic
+// console host rather than ConPTY, through f, which a later Windows record
+// supplies. f runs once, as a command, after the first tea.EnvMsg; it
+// reports ok false when it cannot tell.
+func WithConsoleHost(f func() (classic, ok bool)) Option {
+	return func(p *Prober) { p.consoleHost = f }
+}
+
 // Prober learns the terminal's capabilities from one batch of queries that
 // ends with DA1. A program keeps one beside its workspace, returns its Init
 // from the program's Init, and passes every message to its Update. It
@@ -104,6 +137,11 @@ type Prober struct {
 	noBackground bool
 	disabled     bool
 
+	goos           string // runtime.GOOS, or WithGOOS
+	appearanceEnv  string
+	appearanceHook func() (dark, ok bool)
+	consoleHost    func() (classic, ok bool)
+
 	caps    Caps
 	sent    []*probe // the batch's queries, in order, once sent
 	started bool     // the first tea.EnvMsg arrived
@@ -122,9 +160,21 @@ type probe struct {
 // timeoutMsg is the deadline Init starts.
 type timeoutMsg struct{ p *Prober }
 
+// appearanceMsg is the appearance hook's answer.
+type appearanceMsg struct {
+	p        *Prober
+	dark, ok bool
+}
+
+// consoleMsg is the console-host hook's answer.
+type consoleMsg struct {
+	p           *Prober
+	classic, ok bool
+}
+
 // New returns a Prober.
 func New(o ...Option) *Prober {
-	p := &Prober{timeout: DefaultTimeout}
+	p := &Prober{timeout: DefaultTimeout, goos: runtime.GOOS}
 	for _, f := range o {
 		f(p)
 	}
@@ -182,6 +232,14 @@ func (p *Prober) Update(msg tea.Msg) tea.Cmd {
 			p.caps.TimedOut = true
 			cmds = append(cmds, p.deliver())
 		}
+	case appearanceMsg:
+		if m.p == p && m.ok {
+			p.caps.Dark.SetReason(m.dark, Heuristic, ReasonDesktopAppearance)
+		}
+	case consoleMsg:
+		if m.p == p && m.ok {
+			p.caps.LegacyConsole.Set(m.classic, Queried)
+		}
 	case tea.ColorProfileMsg:
 		p.caps.Profile = m.Profile
 	case tea.ModeReportMsg:
@@ -237,9 +295,10 @@ func (p *Prober) start(env Env) tea.Cmd {
 		return nil
 	}
 	p.started = true
-	p.caps.setEnv(env)
+	p.caps.setEnv(env, p.goos, p.appearanceEnv)
+	hooks := p.hooks()
 	if p.disabled {
-		return p.deliver()
+		return tea.Batch(append(hooks, p.deliver())...)
 	}
 	gated := p.ungated || gatedAllowed(env)
 	var b strings.Builder
@@ -255,7 +314,29 @@ func (p *Prober) start(env Env) tea.Cmd {
 		p.sent = append(p.sent, q)
 	}
 	b.WriteString(ansi.RequestPrimaryDeviceAttributes)
-	return tea.Raw(b.String())
+	return tea.Batch(append(hooks, tea.Raw(b.String()))...)
+}
+
+// SetTmux records what the program learned from running TmuxQuery.
+func (p *Prober) SetTmux(f TmuxFacts) { p.caps.Tmux = f }
+
+// hooks are the commands that run the program's appearance and console
+// hooks, once.
+func (p *Prober) hooks() []tea.Cmd {
+	var cmds []tea.Cmd
+	if f := p.appearanceHook; f != nil {
+		cmds = append(cmds, func() tea.Msg {
+			dark, ok := f()
+			return appearanceMsg{p: p, dark: dark, ok: ok}
+		})
+	}
+	if f := p.consoleHost; f != nil && p.goos == goosWindows {
+		cmds = append(cmds, func() tea.Msg {
+			classic, ok := f()
+			return consoleMsg{p: p, classic: classic, ok: ok}
+		})
+	}
+	return cmds
 }
 
 // sentinel ends the probe when DA1 answers the batch: every query sent
@@ -320,6 +401,8 @@ func (p *Prober) batch() []*probe {
 			silent: unsupported(func(c *Caps) *Fact[Support] { return &c.DesktopNotify })},
 		{Name: "kitty-graphics", Seq: wrapped(kittyGraphicsQuery), Gated: true, Parse: parseKittyGraphics,
 			silent: unsupported(func(c *Caps) *Fact[Support] { return &c.KittyGraphics })},
+		{Name: "foreground", Seq: fixed(ansi.RequestForegroundColor), Gated: true, Parse: parseForeground},
+		{Name: "palette", Seq: fixed(paletteQuery), Gated: true, Parse: parsePalette},
 	}
 	for _, q := range p.added {
 		qs = append(qs, &probe{Query: q})
@@ -408,7 +491,88 @@ func parseVersion(r Reply, c *Caps) bool {
 	if strings.HasPrefix(strings.ToLower(m.Name), "tmux") {
 		c.Mux.Set(Tmux, Queried)
 	}
+	if b := brandFromVersion(m.Name); b != BrandUnknown {
+		c.Brand.Set(b, Queried)
+	}
 	return true
+}
+
+func parseForeground(r Reply, c *Caps) bool {
+	m, ok := r.Msg.(tea.ForegroundColorMsg)
+	if !ok {
+		return false
+	}
+	c.Foreground = m.Color
+	return true
+}
+
+// paletteQuery asks for the 16 ANSI palette colours (OSC 4), so a later
+// theme record can build a theme from them.
+var paletteQuery = func() string {
+	var b strings.Builder
+	for i := range 16 {
+		fmt.Fprintf(&b, "\x1b]4;%d;?\x07", i)
+	}
+	return b.String()
+}()
+
+// parsePalette reads one OSC 4 reply, OSC 4 ; index ; colour ST, which
+// ultraviolet does not decode.
+func parsePalette(r Reply, c *Caps) bool {
+	body, ok := strings.CutPrefix(r.Raw, "\x1b]4;")
+	if !ok {
+		return false
+	}
+	body = strings.TrimSuffix(strings.TrimSuffix(body, "\x07"), "\x1b\\")
+	idx, spec, ok := strings.Cut(body, ";")
+	i, err := strconv.Atoi(idx)
+	if !ok || err != nil || i < 0 || i >= len(c.Palette) {
+		return false
+	}
+	col, ok := parseXColor(spec)
+	if !ok {
+		return false
+	}
+	c.Palette[i] = col
+	c.PaletteKnown = !slices.Contains(c.Palette[:], nil)
+	return true
+}
+
+// parseXColor reads an X11 colour, rgb:R/G/B with one to four hex digits
+// per component, or #rrggbb.
+func parseXColor(s string) (color.Color, bool) {
+	if h, ok := strings.CutPrefix(s, "#"); ok && len(h) == 6 {
+		var r, g, b uint8
+		if _, err := fmt.Sscanf(h, "%02x%02x%02x", &r, &g, &b); err != nil {
+			return nil, false
+		}
+		return color.RGBA{R: r, G: g, B: b, A: 0xff}, true
+	}
+	spec, ok := strings.CutPrefix(s, "rgb:")
+	if !ok {
+		return nil, false
+	}
+	parts := strings.Split(spec, "/")
+	if len(parts) != 3 {
+		return nil, false
+	}
+	var rgb [3]uint8
+	for i, p := range parts {
+		if p == "" || len(p) > 4 {
+			return nil, false
+		}
+		v, err := strconv.ParseUint(p, 16, 16)
+		if err != nil {
+			return nil, false
+		}
+		// Scale n hex digits to 8 bits.
+		scaled := v * 255 / (1<<(4*len(p)) - 1)
+		if scaled > math.MaxUint8 {
+			return nil, false
+		}
+		rgb[i] = uint8(scaled)
+	}
+	return color.RGBA{R: rgb[0], G: rgb[1], B: rgb[2], A: 0xff}, true
 }
 
 // osc99ID names the prober's OSC 99 query, so its reply is told apart.
@@ -467,8 +631,8 @@ func gatedAllowed(env Env) bool {
 		return true
 	}
 	term := env.Getenv("TERM")
-	for _, name := range []string{"kitty", "ghostty", "wezterm", "alacritty", "foot", "rio", "contour"} {
-		if strings.Contains(term, name) {
+	for _, b := range []Brand{BrandKitty, BrandGhostty, BrandWezTerm, BrandAlacritty, BrandFoot, BrandRio, BrandContour} {
+		if strings.Contains(term, b.String()) {
 			return true
 		}
 	}
