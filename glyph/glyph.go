@@ -23,8 +23,12 @@ type Set struct {
 	// Light, Rounded, Heavy and Double are the border styles.
 	Light, Rounded, Heavy, Double Border
 	// SeparatorVertical and SeparatorHorizontal divide panes that have no
-	// border; SeparatorCross is where two separators meet.
+	// border; SeparatorCross is where two separators cross.
 	SeparatorVertical, SeparatorHorizontal, SeparatorCross string
+	// SeparatorTeeDown, SeparatorTeeUp, SeparatorTeeRight and
+	// SeparatorTeeLeft are where one separator ends at another: a line
+	// running down, up, right or left from the separator it meets.
+	SeparatorTeeDown, SeparatorTeeUp, SeparatorTeeRight, SeparatorTeeLeft string
 	// Focus marks the focused pane's title, so focus is visible without
 	// colour (rule 4).
 	Focus string
@@ -64,6 +68,7 @@ func Unicode() Set {
 			MiddleLeft: "╠", MiddleRight: "╣", Middle: "╬", MiddleTop: "╦", MiddleBottom: "╩",
 		},
 		SeparatorVertical: "│", SeparatorHorizontal: "─", SeparatorCross: "┼",
+		SeparatorTeeDown: "┬", SeparatorTeeUp: "┴", SeparatorTeeRight: "├", SeparatorTeeLeft: "┤",
 		Focus:    "▸",
 		Ellipsis: "…",
 		ScrollUp: "▲", ScrollDown: "▼", ScrollThumb: "┃", ScrollTrack: "│",
@@ -86,6 +91,7 @@ func ASCII() Set {
 	return Set{
 		Light: box, Rounded: box, Heavy: box, Double: double,
 		SeparatorVertical: "|", SeparatorHorizontal: "-", SeparatorCross: "+",
+		SeparatorTeeDown: "+", SeparatorTeeUp: "+", SeparatorTeeRight: "+", SeparatorTeeLeft: "+",
 		Focus:    ">",
 		Ellipsis: "~",
 		ScrollUp: "^", ScrollDown: "v", ScrollThumb: "#", ScrollTrack: "|",

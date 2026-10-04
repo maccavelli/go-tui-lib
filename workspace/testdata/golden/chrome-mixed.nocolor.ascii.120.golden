@@ -1,0 +1,12 @@
+ 96|[1m> Session                                                                           [m|tokens 1200
+ 95|user: hello                                                                         |cost $0.01
+ 85|agent: hi there                                                                     |
+ 85|                                                                                    |
+ 85|                                                                                    |
+ 85|                                                                                    |
+ 85|                                                                                    |
+ 85|                                                                                    |
+ 85|                                                                                    |
+ 85|                                                                                    |
+ 85|                                                                                    |
+ 17|model x | ctx 12%

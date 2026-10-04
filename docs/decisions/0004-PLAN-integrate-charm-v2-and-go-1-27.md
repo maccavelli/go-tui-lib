@@ -118,7 +118,9 @@ Added for this PLAN:
 
 * **Goldens are a gate.** A step that changes any existing golden file at
   the default width method stops and is recorded as a deviation. New
-  golden files are read in full before they are committed.
+  golden files are read in full before they are committed. *(Deviation D1,
+  2026-10-04: Step 6's junction glyphs change one cell in four existing
+  files, as the owner accepted.)*
 
 ## Implementation Steps
 
@@ -330,7 +332,8 @@ Added for this PLAN:
   of the Step 1 baseline, by benchstat; `TestRenderAllocs` passes.
 * Every golden file from `v0.1.5` is unchanged. *(Amended 2026-10-04:
   from `v0.1.6`, which has the same 96 files under
-  `workspace/testdata/golden/`.)*
+  `workspace/testdata/golden/`. Deviation D1: except the junction cell in
+  the four `frame-separators` 160-column files.)*
 * On the macOS development host and the Windows test host, all pass:
   * `make pre-add-check`, `make lint` and `make vuln`; *(amended
     2026-10-04: and `make release-check`, each per module)*
@@ -867,3 +870,125 @@ No golden file changed: the golden tests fix their theme with `WithTheme`.
 * `GOWORK=off go mod tidy -diff`: exit 0. No `go.work.sum` was written;
   `go doc` ran with `GOWORK=off`.
 * **The Windows test host:** a first run, started before the gofmt fix, failed `make pre-add-check`, `make release-check` and `make lint` on the same `workspace\\workspace.go:148:1: File is not properly formatted (gofmt)`. After the fix: `make pre-add-check` and `make release-check` (`35 file(s) clean in 1 module(s)`), `make lint` (`0 issues` for linux, darwin and windows) and `make vuln` (`No vulnerabilities found.`) exited 0; `go-modules.sh --check` exited 0.
+
+### Deviation D1 (2026-10-04): junction glyphs change four existing goldens
+
+* **Found,** before Step 6's code was written, by reading the existing
+  goldens. In `frame-separators` at 160 columns, the vertical separator
+  between Session and Metrics (`│`, column 112, rows 0–15) meets the
+  horizontal separator above Logs (row 16). The meeting cell, (112, 16), is
+  drawn today as `─`, or `-` in the ASCII set. MADR §6's junction glyphs
+  draw it as `┴`, or `+` in ASCII.
+* **Scope.** Four existing files change, by that one cell each:
+  `frame-separators.{color,nocolor}.{utf8,ascii}.160.golden`. At 80
+  columns the sidebar folds under the main pane, so those files have no
+  vertical separator and do not change. No other existing golden has
+  separators that meet.
+* **Not a defect.** It is the feature §6 decided. The goldens gate, written
+  for Steps 3 and 4, where output had to stay identical, catches it.
+* **Resolutions offered:** accept the junction cell (recommended); make
+  junctions opt-in, amending §6 and adding an option; or stop Step 6.
+* **Decision** (the owner, picked from options, 2026-10-04): accept the
+  junction cell.
+* **Changed.** Step 6 rewrites those four files, and its record proves
+  each differs from `v0.1.6` by exactly the junction cell, with every other
+  golden byte for byte identical. The goldens rule and Verification carry a
+  D1 note. MADR amendment A2 records the exception to §Confirmation. The
+  `v0.2.0` release notes name the junction glyphs.
+
+### Step 6: help, view and chrome (2026-10-04)
+
+The owner committed Step 5's record (`2f5996c`) and approved this step
+("Proceed"). Deviation D1 was found, answered and recorded before any code
+was written.
+
+**What changed.**
+
+* **`glyph/glyph.go`.** `Set` gains `SeparatorTeeDown`, `SeparatorTeeUp`,
+  `SeparatorTeeRight` and `SeparatorTeeLeft`: `┬ ┴ ├ ┤` in the Unicode set,
+  `+` in the ASCII set.
+* **`workspace/help.go` (new).**
+  * `ShortHelp` gives the bindings of whoever has the keyboard, the top
+    modal overlay's pane or else the focused pane, when it is a
+    `KeyMapper`, then focus-next and zoom.
+  * `FullHelp` gives the four columns MADR §5 names: those bindings, focus
+    (next, previous and the nine pane keys), layout (zoom and the four
+    resizes), and overlays (close). Disabled bindings are left out, and so
+    is an empty column, such as the first for a pane with no bindings.
+  * A compile-time check that `*Workspace` is a `help.KeyMap`.
+  * `View()` returns `tea.NewView(w.Render())` with `Cursor` from
+    `w.Cursor()`, and sets nothing else.
+* **`workspace/render.go`.**
+  * A separator is drawn when a pane beside it, found from the plan's
+    rectangles, has `Separators` chrome (`drawnSeparators`, `beside`); one
+    between two `None` or two `Borders` panes stays blank.
+  * Junctions: the drawn separators' cells form a grid; a cell of a
+    horizontal line that a vertical line touches above or below, or a cell
+    of a vertical line that a horizontal line touches left or right, is a
+    junction. Four lines make the cross, three a tee; two, a corner, keep
+    the separator's own line, since `glyph.Set` has no corner glyphs.
+  * The internal `view` became `viewOf`: revive's `confusing-naming`
+    refused a method differing from `View` only by case.
+
+**Goldens.**
+
+* **Deviation D1, as accepted:** the four `frame-separators` 160-column
+  files were rewritten. Each differs from `HEAD` in one character, at line
+  17, column 112: `─` → `┴` in the UTF-8 files, `-` → `+` in the ASCII
+  files. A byte comparison of each whole file, SGR sequences included,
+  finds that one character and no other. No other existing file changed.
+* **Sixteen new files,** `chrome-mixed` and `chrome-junctions` across
+  {colour, no colour} × {UTF-8, ASCII} × {80, 120}, were written with
+  `-tuitest.update` and read before commit:
+  * the no-colour files were read in full. `chrome-mixed`, `None`
+    everywhere but `Separators` on the main pane, draws the one separator
+    beside the main pane. `chrome-junctions` shows `├` (row 3), `┼`
+    (row 6), `┤` (row 9), `┴` (row 12) and `┬` (row 15), each where its
+    lines meet, and `+` for each in the ASCII files;
+  * each colour file's text, with SGR stripped, equals its no-colour
+    twin's, and each carries colour (23 and 42 SGR sequences).
+
+**Tests.**
+
+* `workspace/chrome_test.go` (new):
+  * `help.New().View(w)`, styles stripped, lists the focused pane's
+    `ctrl+s save` before the workspace's `alt+. next pane`, and leaves out
+    the pane's disabled binding; `FullHelp` has the four columns; with a
+    modal overlay open the help starts with the overlay's binding and
+    leaves out the pane's; for a pane with no bindings `FullHelp` has
+    three columns;
+  * `View()` carries `Render()` and the cursor, and deep-equals a
+    `tea.View` with only those two fields set;
+  * the two golden frames above;
+  * the junction frame contains `┼`, `┬`, `┴`, `├` and `┤`;
+  * with `None` everywhere no separator is drawn, and with `Separators`
+    on the main pane the one beside it is.
+* `glyph/glyph_test.go`: the reflection tests cover the four new fields,
+  each one cell and one rune, and ASCII in the ASCII set; the walked-field
+  count guard rises from 64 to 68, "4 borders × 13 glyphs, plus 16 single
+  glyphs". The first run failed on that guard, as it is meant to.
+
+The first help test searched `help.Model`'s styled output for plain text;
+it now strips the styles. The order it checks was right in the first run.
+
+**Mutation proofs**, each on a scratch copy; none survived, before and
+after the `viewOf` rename:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| `ShortHelp` puts the workspace's keys first | `short help "alt+. next pane • alt+z zoom • ctrl+s save": want the pane's ctrl+s before the workspace's alt+.` |
+| a separator is drawn only by the global chrome | `tuitest: chrome-mixed color.utf8.80: line 1 differs`, and the other variants |
+| the cross is drawn as a vertical line | `tuitest: chrome-junctions color.utf8.80: line 6 differs`, and the other variants |
+| `View` sets `AltScreen` | `View set a field the program owns`; and the conformance scan: `workspace/help.go:76 sets AltScreen` |
+
+**Checks.**
+
+* `make pre-add-check FILES=…` on the five Go files: the first run failed
+  on revive's `confusing-naming` (`View` and `view`); after the rename,
+  `5 file(s) clean in 1 module(s)`, govulncheck included.
+* `make lint` (with `make modernize`): `0 issues` for linux, darwin and
+  windows.
+* `go test -race -count=1 ./...`, `LC_ALL=C go test -count=1 ./...` and
+  `go test -shuffle=on -count=2 ./...`: every package `ok`.
+* `GOWORK=off go mod tidy -diff`: exit 0. No `go.work.sum` was written.
+* **The Windows test host:** `make pre-add-check` and `make release-check` (`37 file(s) clean in 1 module(s)`, the golden tests included), `make lint` (`0 issues` for linux, darwin and windows) and `make vuln` (`No vulnerabilities found.`) exited 0; `go-modules.sh --check` exited 0.

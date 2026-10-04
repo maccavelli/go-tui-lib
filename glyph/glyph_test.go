@@ -38,9 +38,9 @@ func TestEveryGlyphIsOneCell(t *testing.T) {
 				t.Errorf("%s = %q is %d runes, want 1", path, s, utf8.RuneCountInString(s))
 			}
 		})
-		// 4 borders × 13 glyphs, plus 12 single glyphs.
-		if n != 64 {
-			t.Errorf("%s: walked %d glyphs, want 64", name, n)
+		// 4 borders × 13 glyphs, plus 16 single glyphs.
+		if n != 68 {
+			t.Errorf("%s: walked %d glyphs, want 68", name, n)
 		}
 	}
 }

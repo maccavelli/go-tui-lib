@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/maccavelli/go-tui-lib/glyph"
 	"github.com/maccavelli/go-tui-lib/internal/cells"
 	"github.com/maccavelli/go-tui-lib/layout"
 )
@@ -55,11 +56,13 @@ func (w *Workspace) Render() string {
 		w.frame.Draw(w.renderPane(id, r), r)
 		w.regions = append(w.regions, region{kind: paneRegion, id: string(id), rect: r, inner: w.content(id, r)})
 	}
+	drawn := w.drawnSeparators()
+	joints := junctions(drawn)
 	for _, s := range w.plan.Separators {
 		if s.Rect.Empty() {
 			continue
 		}
-		w.frame.Draw(w.renderSeparator(s), s.Rect)
+		w.frame.Draw(w.renderSeparator(s, slices.Contains(drawn, s), joints), s.Rect)
 		w.regions = append(w.regions, region{kind: sepRegion, id: s.ID, rect: s.Rect, inner: s.Rect})
 	}
 	for _, o := range w.overlays {
@@ -136,9 +139,9 @@ func placeCursor(p Pane, in layout.Rect) *tea.Cursor {
 	return &out
 }
 
-// view asks a pane for its view, unless it is a Changer reporting no change
+// viewOf asks a pane for its view, unless it is a Changer reporting no change
 // and its view is cached under the same size, focus, width method and theme.
-func (w *Workspace) view(kind viewKind, id string, p Pane, width, height int, focused bool) string {
+func (w *Workspace) viewOf(kind viewKind, id string, p Pane, width, height int, focused bool) string {
 	k := viewKey{kind: kind, id: id, width: width, height: height, focused: focused, method: w.method, themeGen: w.themeGen}
 	if c, ok := p.(Changer); ok && !c.Changed() {
 		if v, ok := w.cache[k]; ok {
@@ -202,9 +205,9 @@ func (w *Workspace) renderPane(id layout.PaneID, r layout.Rect) string {
 		if in.H == 0 {
 			return head
 		}
-		return head + "\n" + w.view(paneView, string(id), p, in.W, in.H, focused)
+		return head + "\n" + w.viewOf(paneView, string(id), p, in.W, in.H, focused)
 	}
-	return w.view(paneView, string(id), p, r.W, r.H, focused)
+	return w.viewOf(paneView, string(id), p, r.W, r.H, focused)
 }
 
 // title renders a pane's title line: the focus marker, the title and the
@@ -265,7 +268,7 @@ func (w *Workspace) renderBox(r layout.Rect, p Pane, kind viewKind, id string, f
 	if in.H > 0 {
 		// The edges are styled once per box, not once per row.
 		left, right := edge.Render(b.Left), edge.Render(b.Right)
-		body := w.view(kind, id, p, in.W, in.H, focused)
+		body := w.viewOf(kind, id, p, in.W, in.H, focused)
 		out.Grow(len(body) + in.H*(len(left)+len(right)+1))
 		for line := range strings.SplitSeq(body, "\n") {
 			out.WriteByte('\n')
@@ -278,20 +281,113 @@ func (w *Workspace) renderBox(r layout.Rect, p Pane, kind viewKind, id string, f
 	return out.String()
 }
 
-func (w *Workspace) renderSeparator(s layout.Separator) string {
-	g := w.theme.Glyphs
-	if w.chrome != Separators {
+// renderSeparator draws separator s, or blanks it when it is not drawn.
+// A cell where separators meet takes its junction glyph from joints.
+func (w *Workspace) renderSeparator(s layout.Separator, drawn bool, joints map[cell]junction) string {
+	if !drawn {
 		return clip(w.method, "", s.Rect.W, s.Rect.H)
 	}
-	cell := strings.Repeat(g.SeparatorHorizontal, s.Rect.W)
+	g := w.theme.Glyphs
+	line := g.SeparatorHorizontal
 	if s.Axis == layout.Horizontal { // a vertical line between side-by-side panes
-		cell = strings.Repeat(g.SeparatorVertical, s.Rect.W)
+		line = g.SeparatorVertical
 	}
-	rows := make([]string, s.Rect.H)
-	for i := range rows {
-		rows[i] = cell
+	var b strings.Builder
+	for y := s.Rect.Y; y < s.Rect.Y+s.Rect.H; y++ {
+		if y > s.Rect.Y {
+			b.WriteByte('\n')
+		}
+		for x := s.Rect.X; x < s.Rect.X+s.Rect.W; x++ {
+			b.WriteString(joints[cell{x, y}].glyph(g, line))
+		}
 	}
-	return w.theme.Styles.Border.Render(strings.Join(rows, "\n"))
+	return w.theme.Styles.Border.Render(b.String())
+}
+
+// drawnSeparators are the separators drawn as lines: those with a pane on
+// either side whose chrome is Separators
+// (docs/decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md §6). A
+// separator between two None or two Borders panes stays blank.
+func (w *Workspace) drawnSeparators() []layout.Separator {
+	var out []layout.Separator
+	for _, s := range w.plan.Separators {
+		if s.Rect.Empty() {
+			continue
+		}
+		for _, id := range w.plan.Order {
+			if w.chromeOf(id) == Separators && beside(w.plan.Panes[id], s) {
+				out = append(out, s)
+				break
+			}
+		}
+	}
+	return out
+}
+
+// beside reports whether rectangle r touches separator s along its length.
+func beside(r layout.Rect, s layout.Separator) bool {
+	g := s.Rect
+	if s.Axis == layout.Horizontal { // a vertical line: panes left and right of it
+		return (r.X+r.W == g.X || r.X == g.X+g.W) && r.Y < g.Y+g.H && g.Y < r.Y+r.H
+	}
+	return (r.Y+r.H == g.Y || r.Y == g.Y+g.H) && r.X < g.X+g.W && g.X < r.X+r.W
+}
+
+// cell is a screen cell.
+type cell struct{ x, y int }
+
+// junction is which ways lines leave a separator cell.
+type junction struct{ up, down, left, right bool }
+
+// glyph is the cell's glyph: a cross or a tee where three or four lines
+// meet, and otherwise line, the separator's own.
+func (j junction) glyph(g glyph.Set, line string) string {
+	switch {
+	case j.up && j.down && j.left && j.right:
+		return g.SeparatorCross
+	case j.left && j.right && j.down && !j.up:
+		return g.SeparatorTeeDown
+	case j.left && j.right && j.up && !j.down:
+		return g.SeparatorTeeUp
+	case j.up && j.down && j.right && !j.left:
+		return g.SeparatorTeeRight
+	case j.up && j.down && j.left && !j.right:
+		return g.SeparatorTeeLeft
+	}
+	return line
+}
+
+// junctions finds the cells of the drawn separators where a vertical and a
+// horizontal line meet. A cell of a horizontal line runs left and right
+// along its own line, and up or down where a vertical line touches it; a
+// cell of a vertical line the other way about.
+func junctions(drawn []layout.Separator) map[cell]junction {
+	const vertical, horizontal = 1, 2
+	grid := map[cell]int{}
+	for _, s := range drawn {
+		kind := horizontal
+		if s.Axis == layout.Horizontal {
+			kind = vertical
+		}
+		for y := s.Rect.Y; y < s.Rect.Y+s.Rect.H; y++ {
+			for x := s.Rect.X; x < s.Rect.X+s.Rect.W; x++ {
+				grid[cell{x, y}] = kind
+			}
+		}
+	}
+	out := map[cell]junction{}
+	for c, kind := range grid {
+		j := junction{
+			up:    grid[cell{c.x, c.y - 1}] == vertical,
+			down:  grid[cell{c.x, c.y + 1}] == vertical,
+			left:  grid[cell{c.x - 1, c.y}] == horizontal,
+			right: grid[cell{c.x + 1, c.y}] == horizontal,
+		}
+		if kind == horizontal && (j.up || j.down) || kind == vertical && (j.left || j.right) {
+			out[c] = j
+		}
+	}
+	return out
 }
 
 // mouseEvent routes a mouse event by what is under the pointer.
