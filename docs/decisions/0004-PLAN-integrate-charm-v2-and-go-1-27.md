@@ -674,3 +674,100 @@ The last three are added to the PLAN's five, for the eviction, the
   `go test -shuffle=on -count=2 ./...`: every package `ok`.
 * `GOWORK=off go mod tidy -diff`: exit 0. No `go.work.sum` was written.
 * **The Windows test host:** a first run, started before the gofmt fix, failed `make pre-add-check`, `make release-check` and `make lint` on the same `workspace\\workspace.go:676:1: File is not properly formatted (gofmt)`. After the fix: `make pre-add-check` and `make release-check` (`32 file(s) clean in 1 module(s)`), `make lint` (`0 issues` for linux, darwin and windows) and `make vuln` (`No vulnerabilities found.`) exited 0; `go-modules.sh --check` exited 0.
+
+### Step 4: the width method (2026-10-04)
+
+The owner committed Step 3 (`1553112`) and approved this step ("commit
+then proceed").
+
+**What changed.**
+
+* **`workspace/workspace.go`.**
+  * `method` defaults to `ansi.WcWidth`, what Bubble Tea's renderer starts
+    with; `pinned` records `WithWidthMethod`.
+  * `Update` passes a `tea.ModeReportMsg` to `followMode`, then broadcasts
+    it as before, so the panes still get it. `followMode` switches to
+    `ansi.GraphemeWidth` when the report is for `ansi.ModeUnicodeCore` with
+    `ModeReset`, `ModeSet` or `ModePermanentlySet`, bubbletea v2.0.10's rule
+    (`tea.go:802-805`), unless the method is pinned.
+  * `WithWidthMethod(m)` sets and pins the method; `WidthMethod()` reports
+    it. `setMethod` marks the frame dirty on a change; every cached view
+    then misses, because its key holds the method.
+* **`workspace/render.go`.** `clip` takes the method, and `title`,
+  `renderBox` and `renderSeparator` measure and truncate with `w.method`.
+  `Render` calls `Frame.SetMethod(w.method)` before drawing. No
+  `ansi.StringWidth`, `ansi.Truncate` or `lipgloss.Width` call is left in
+  `workspace`'s non-test files.
+* **`workspace/model.go`.** `Model.View` returns the hosted model's view
+  as it is. It used to clip it with `clip`, which now needs the
+  workspace's method, which a `Model` cannot know; the workspace clips
+  every view to its pane anyway, so frames do not change. Its doc comment
+  says so. This is a reading of the step, recorded here: the source scan
+  leaves no fixed-method clip for `Model` to call.
+
+**Goldens.** Every existing golden file passes unchanged at the new default
+method: none under `workspace/testdata/` changed, since the existing
+fixtures hold no character whose wcwidth and grapheme widths differ.
+Sixteen new files, `width-wcwidth` and `width-grapheme` across
+{colour, no colour} × {UTF-8, ASCII} × {80, 120}, were written with
+`-tuitest.update` and read before commit:
+
+* the no-colour files were read in full. At 80 columns the sidebar folds
+  under the main pane, so its long title fits; at 120 it is truncated,
+  "longer th…" at wcwidth and "longer t…" at grapheme widths, because the
+  heart is one cell in the first and two in the second;
+* each colour file's text, with its SGR sequences stripped, equals its
+  no-colour twin's, and each carries colour (88 SGR sequences at 80
+  columns, 139 at 120);
+* `tuitest` writes each line's width measured in graphemes, so the
+  wcwidth files show 76, 81 or 83 on lines that are exactly 80 cells in
+  wcwidth, which `TestEveryLineIsTheFrameWidth` asserts.
+
+**Tests** (`workspace/width_test.go`, new):
+
+* the golden frames above, with the zero-width-joiner family emoji and the
+  VS16 heart in titles and bodies;
+* at each method, at 80 and 120 columns, in both glyph sets, every line of
+  the frame is exactly the frame width measured with that method;
+* `ModeReportMsg` for mode 2027 with each of the five `ModeSetting` values
+  switches only on `ModeSet`, `ModeReset` and `ModePermanentlySet`, and
+  every report reaches the panes; a mode 2026 report switches nothing;
+* `WithWidthMethod` pins the method against a later report. A report only
+  ever switches to `GraphemeWidth`, so the PLAN's case, pinning
+  `GraphemeWidth`, cannot show the pin; the test pins `WcWidth` as well,
+  which can;
+* on unchanged `Changer`s, a method switch marks the frame dirty, and the
+  next frame's lines are exact at the new method, so no cached view or
+  frame kept the old one;
+* a source scan of the package's non-test files finds no call to
+  `ansi.StringWidth`, `ansi.Truncate` or `lipgloss.Width`.
+
+The test file's emoji constant was again written with literal joiner and
+selector characters, and was corrected to `\u` escapes before any run that
+is recorded here.
+
+**Mutation proofs**, each on a scratch copy; none survived:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| the switch also fires on `ModeNotRecognized` | `mode 2027 reported 0: method 1, want 0` |
+| the title truncation keeps `ansi.Truncate` | `tuitest: width-wcwidth nocolor.utf8.120: line 1 differs`, and the other three 120-column wcwidth files |
+| a method change does not invalidate the cache | `method 1, width 80: line 1 is 76 cells` |
+| `Frame.SetMethod` is not called | `method 1, width 80: line 0 is 76 cells` |
+
+**Checks.**
+
+* `make pre-add-check FILES=…` on the four Go files: `4 file(s) clean in
+  1 module(s)`, govulncheck included.
+* `make lint` (with `make modernize`): `0 issues` for linux, darwin and
+  windows.
+* `go test -race -count=1 ./...`, `LC_ALL=C go test -count=1 ./...` and
+  `go test -shuffle=on -count=2 ./...`: every package `ok`.
+* `GOWORK=off go mod tidy -diff`: exit 0.
+* **`go.work.sum`.** It appeared once during this step, with the same six
+  lines as in 0010-MADR A1. It came from `go doc` calls on dependency
+  packages in workspace mode, not from the build: after deleting it,
+  `go build ./...`, `go vet ./workspace/`, `go test ./workspace/` and
+  `go test ./...` each wrote nothing. It was deleted again; `go doc` runs
+  with `GOWORK=off` from here, and 0010-PLAN Phase 7 ignores the file.
+* **The Windows test host:** `make pre-add-check` and `make release-check` (`33 file(s) clean in 1 module(s)`, the width goldens and tests included), `make lint` (`0 issues` for linux, darwin and windows) and `make vuln` (`No vulnerabilities found.`) exited 0; `go-modules.sh --check` exited 0.

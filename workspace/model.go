@@ -93,9 +93,10 @@ func (p *Model[M]) Update(msg tea.Msg) (Pane, tea.Cmd) {
 	return p, cmd
 }
 
-// View is the hosted model's view, clipped to exactly width × height cells.
-func (p *Model[M]) View(width, height int) string {
-	return clip(p.M.View(), width, height)
+// View is the hosted model's view. The workspace clips it to the pane,
+// measuring with its own width method, which the model cannot know.
+func (p *Model[M]) View(int, int) string {
+	return p.M.View()
 }
 
 // Cursor is the hosted model's cursor, in the pane's own cells, or nil.

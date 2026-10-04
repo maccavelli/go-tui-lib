@@ -139,6 +139,7 @@ type Workspace struct {
 	ids      []layout.PaneID // every pane's ID, sorted, for Broadcast
 	frame    *cells.Frame    // the reused frame buffer
 	method   ansi.Method     // how the frame and its views measure
+	pinned   bool            // WithWidthMethod fixed method
 	themeGen uint64          // raised on every theme change
 	regions  []region        // the last frame's regions, top first, for hit testing
 	last     string          // the last frame
@@ -212,6 +213,16 @@ func WithState(s layout.State) Option { return func(w *Workspace) { w.state = s 
 // the program sets a mouse mode).
 func WithMouse(on bool) Option { return func(w *Workspace) { w.mouse = on } }
 
+// WithWidthMethod fixes how the workspace measures text, and stops it
+// following the terminal's mode 2027 report. By default it measures with
+// ansi.WcWidth, as Bubble Tea's renderer starts, and switches to
+// ansi.GraphemeWidth when the terminal reports grapheme clustering, as
+// Bubble Tea does (docs/decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md
+// §3). WithWidthMethod(ansi.GraphemeWidth) restores v0.1's measurement.
+func WithWidthMethod(m ansi.Method) Option {
+	return func(w *Workspace) { w.method, w.pinned = m, true }
+}
+
 // WithFocus sets the pane focused first (default: the first of the ring).
 func WithFocus(id layout.PaneID) Option { return func(w *Workspace) { w.focus = id } }
 
@@ -230,7 +241,7 @@ func New(root layout.Node, panes map[layout.PaneID]Pane, opts ...Option) *Worksp
 		sizes:  map[layout.PaneID]SizeMsg{},
 		osizes: map[string]SizeMsg{},
 		cache:  map[viewKey]string{},
-		method: ansi.GraphemeWidth,
+		method: ansi.WcWidth,
 		dirty:  true,
 	}
 	maps.Copy(w.panes, panes)
@@ -261,6 +272,32 @@ func (w *Workspace) Err() error { return w.err }
 
 // State returns the layout state, for the program to persist.
 func (w *Workspace) State() layout.State { return w.state }
+
+// WidthMethod is how the workspace measures text now, so a pane can
+// measure the same way.
+func (w *Workspace) WidthMethod() ansi.Method { return w.method }
+
+// setMethod changes how the workspace measures. Every cached view misses,
+// since its key holds the method, and the next frame is drawn anew.
+func (w *Workspace) setMethod(m ansi.Method) {
+	if m != w.method {
+		w.method = m
+		w.dirty = true
+	}
+}
+
+// followMode switches to grapheme widths on the terminal's mode 2027 report,
+// under the rule Bubble Tea's renderer follows (bubbletea v2.0.10
+// tea.go:802-805), unless WithWidthMethod pinned the method.
+func (w *Workspace) followMode(m tea.ModeReportMsg) {
+	if w.pinned || m.Mode != ansi.ModeUnicodeCore {
+		return
+	}
+	switch m.Value {
+	case ansi.ModeReset, ansi.ModeSet, ansi.ModePermanentlySet:
+		w.setMethod(ansi.GraphemeWidth)
+	}
+}
 
 // Focused returns the focused pane's ID.
 func (w *Workspace) Focused() layout.PaneID { return w.focus }
@@ -326,6 +363,8 @@ func (w *Workspace) Update(msg tea.Msg) tea.Cmd {
 			return nil
 		}
 		return w.mouseEvent(m)
+	case tea.ModeReportMsg:
+		w.followMode(m) // and the panes still get it
 	}
 	return w.Broadcast(msg)
 }

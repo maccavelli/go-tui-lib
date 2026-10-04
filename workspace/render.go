@@ -47,6 +47,7 @@ func (w *Workspace) Render() string {
 		w.frame = cells.NewFrame(w.width, w.height, w.method)
 	}
 	w.frame.Resize(w.width, w.height)
+	w.frame.SetMethod(w.method)
 	w.frame.Clear()
 	w.regions = w.regions[:0]
 	for _, id := range w.plan.Order {
@@ -144,15 +145,15 @@ func (w *Workspace) view(kind viewKind, id string, p Pane, width, height int, fo
 			return v
 		}
 	}
-	v := clip(p.View(width, height), width, height)
+	v := clip(w.method, p.View(width, height), width, height)
 	w.cache[k] = v
 	return v
 }
 
-// clip makes s exactly width × height cells: lines truncated, padded and
-// limited, so a pane can never paint outside its area. It writes one
-// builder, with no allocation per line.
-func clip(s string, width, height int) string {
+// clip makes s exactly width × height cells, measured with m: lines
+// truncated, padded and limited, so a pane can never paint outside its area.
+// It writes one builder, with no allocation per line.
+func clip(m ansi.Method, s string, width, height int) string {
 	var b strings.Builder
 	b.Grow(len(s) + height*(width+1))
 	n := 0
@@ -163,9 +164,9 @@ func clip(s string, width, height int) string {
 		if n > 0 {
 			b.WriteByte('\n')
 		}
-		line = ansi.Truncate(line, width, "")
+		line = m.Truncate(line, width, "")
 		b.WriteString(line)
-		pad(&b, width-ansi.StringWidth(line))
+		pad(&b, width-m.StringWidth(line))
 		n++
 	}
 	for ; n < height; n++ {
@@ -223,8 +224,8 @@ func (w *Workspace) title(p Pane, id string, focused bool, width int) string {
 	if b, ok := p.(Badged); ok && b.Badge() != "" {
 		label += " " + t.Glyphs.BadgeOpen + b.Badge() + t.Glyphs.BadgeClose
 	}
-	label = ansi.Truncate(label, width, t.Glyphs.Ellipsis)
-	if pad := width - ansi.StringWidth(label); pad > 0 {
+	label = w.method.Truncate(label, width, t.Glyphs.Ellipsis)
+	if pad := width - w.method.StringWidth(label); pad > 0 {
 		label += strings.Repeat(" ", pad)
 	}
 	return style.Render(label)
@@ -241,7 +242,7 @@ func (w *Workspace) renderBox(r layout.Rect, p Pane, kind viewKind, id string, f
 	}
 	in := insetBorder(r)
 	if in.W == 0 {
-		return clip("", r.W, r.H)
+		return clip(w.method, "", r.W, r.H)
 	}
 	name := id
 	if tp, ok := p.(Titled); ok {
@@ -257,8 +258,8 @@ func (w *Workspace) renderBox(r layout.Rect, p Pane, kind viewKind, id string, f
 		label += " " + t.Glyphs.BadgeOpen + bd.Badge() + t.Glyphs.BadgeClose
 	}
 	label += " "
-	label = ansi.Truncate(label, max(in.W-1, 0), t.Glyphs.Ellipsis)
-	fill := in.W - 1 - ansi.StringWidth(label)
+	label = w.method.Truncate(label, max(in.W-1, 0), t.Glyphs.Ellipsis)
+	fill := in.W - 1 - w.method.StringWidth(label)
 	var out strings.Builder
 	out.WriteString(edge.Render(b.TopLeft+b.Top) + tstyle.Render(label) + edge.Render(strings.Repeat(b.Top, max(fill, 0))+b.TopRight))
 	if in.H > 0 {
@@ -280,7 +281,7 @@ func (w *Workspace) renderBox(r layout.Rect, p Pane, kind viewKind, id string, f
 func (w *Workspace) renderSeparator(s layout.Separator) string {
 	g := w.theme.Glyphs
 	if w.chrome != Separators {
-		return clip("", s.Rect.W, s.Rect.H)
+		return clip(w.method, "", s.Rect.W, s.Rect.H)
 	}
 	cell := strings.Repeat(g.SeparatorHorizontal, s.Rect.W)
 	if s.Axis == layout.Horizontal { // a vertical line between side-by-side panes
