@@ -76,7 +76,8 @@ must not carry:
 - **Each module has its own tags:** `vX.Y.Z` for the root,
   `<dir>/vX.Y.Z` for an adapter. [guides/releasing.md](guides/releasing.md)
   has the procedure.
-- **`go.work`** lists every module, for development. Every gate also runs
+- **`go.work`** lists every module, for development, and is committed;
+  `go.work.sum` is ignored (0010-MADR A1). Every gate also runs
   with `GOWORK=off` (Tooling).
 
 ## Tree
@@ -88,6 +89,7 @@ AGENTS.md                   rules for agents: dependencies, TUI conventions,
                             records, checks, identifiers, commits
 go.mod, go.sum              the root module and its requirements
 go.work                     the workspace: every module, for development
+                            (go.work.sum is ignored)
 Makefile                    development targets (below)
 .golangci.yml               golangci-lint configuration, with depguard
 .markdownlint-cli2.jsonc    Markdown lint configuration

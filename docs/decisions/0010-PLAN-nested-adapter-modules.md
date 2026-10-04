@@ -797,3 +797,42 @@ history:
   `github.com/bits-and-blooms/bitset`, `github.com/charmbracelet/harmonica`,
   `github.com/clipperhouse/stringish`, `github.com/dustin/go-humanize` and
   `github.com/sahilm/fuzzy`.
+
+### Phase 7: `go.work.sum` is ignored (2026-10-04)
+
+The owner asked why the workspace exists and why `go.work.sum` would be
+ignored, was given the case for each way, and answered "Ignore it for
+now", which approves this phase. "For now": revisit the choice when the
+first adapter module lands, since a workspace then builds against the
+newest version any module requires, and CI's workspace-mode test may use
+checksums no single `go.sum` holds.
+
+**What changed.**
+
+* **`.gitignore`** gains `go.work.sum` (line 21), with a comment: `go.work`
+  is committed; `go.work.sum` is not, because ad-hoc workspace-mode
+  commands write it and no gate reads it, citing MADR A1.
+* **`AGENTS.md`,** Modules: the `go.work` bullet says `go.work.sum` is
+  ignored, not committed, and why.
+* **`docs/architecture.md`:** the Modules section and the tree say
+  `go.work` is committed and `go.work.sum` ignored.
+* **`docs/guides/releasing.md`:** the `go.work` rule says the same.
+
+**Proof, on a scratch copy** committed with `HEAD`'s `.gitignore`:
+
+* `go doc charm.land/bubbles/v2/help` in workspace mode exited 0 and wrote
+  `go.work.sum`;
+* with `HEAD`'s `.gitignore`, `git status --short` showed
+  `?? go.work.sum`;
+* with the new `.gitignore`, it showed only ` M .gitignore`, the change
+  itself, and `git check-ignore -v go.work.sum` printed
+  `.gitignore:21:go.work.sum	go.work.sum`.
+
+**Checks.** markdownlint: 0 issues. The link check over `AGENTS.md`,
+`docs/architecture.md` and `docs/guides/releasing.md`: 0 broken.
+`make pre-add-check`: `40 file(s) clean in 1 module(s)`. `git diff
+--check`: clean. The identifier scan of the changed files finds nothing.
+No `go.work.sum` exists in the repository.
+
+This PLAN returns to `complete` after the owner's push and a green CI run,
+as Phase 6's close-out did.

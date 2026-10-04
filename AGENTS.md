@@ -63,7 +63,10 @@ The repository holds more than one Go module
   only: it builds a root change and an adapter change together before
   either is tagged. A module is added to it with `go work use ./<dir>` in
   the commit that adds the module. `scripts/go-modules.sh --check` fails
-  when `go.work` and the tracked `go.mod` files disagree.
+  when `go.work` and the tracked `go.mod` files disagree. `go.work.sum` is
+  ignored, not committed: workspace-mode commands such as `go doc` on a
+  dependency write it, and no gate reads it
+  (`docs/decisions/0010-MADR-nested-adapter-modules.md` A1).
 - **Every gate runs per module with `GOWORK=off`,** in the module's
   directory, so that each module builds from its own `go.mod` and published
   versions only, as a consumer does. The tests run once more in workspace

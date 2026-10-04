@@ -20,8 +20,10 @@ Tags and pushes are the owner's. Nothing below runs without that.
 - **An adapter requires a published root version.** Its `go.mod` names a
   `vX.Y.Z` tag of the root, never a pseudo-version, and has no `replace`.
   `scripts/go-precheck.sh` fails otherwise.
-- **`go.work` is for development.** It lets a root change and an adapter
-  change be built and tested together before either is tagged. Every gate
+- **`go.work` is for development,** and is committed; `go.work.sum` is
+  ignored, since only ad-hoc workspace-mode commands write it. It lets a
+  root change and an adapter change be built and tested together
+  before either is tagged. Every gate
   also runs with `GOWORK=off`, which is what a consumer builds.
 
 ## Add a module

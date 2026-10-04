@@ -16,3 +16,6 @@ tmp/
 temp/
 __pycache__/
 *.py[cod]
+# go.work is committed; go.work.sum is not: ad-hoc workspace-mode commands
+# write it, and no gate reads it (docs/decisions/0010-MADR-nested-adapter-modules.md A1).
+go.work.sum
