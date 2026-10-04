@@ -69,7 +69,10 @@ it was when they were written
 | see the planned command palette and fuzzy matcher | [0008-MADR](decisions/0008-MADR-command-palette.md) |
 | see how streamed Markdown, frames and untrusted text will be handled | [0009-MADR](decisions/0009-MADR-streaming-content-engine.md) |
 | see how terminal capabilities will be detected | [0005-MADR](decisions/0005-MADR-terminal-capabilities-and-services.md) |
-| know why the workspace will draw with ultraviolet directly | [0004-MADR](decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md) |
+| know why the workspace draws with ultraviolet directly | [0004-MADR](decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md) |
+| make borders line up after emoji, or measure as the workspace does | [guides/building-workspaces.md](guides/building-workspaces.md#text-width) |
+| follow the terminal's light or dark theme, or keep my own colours | [guides/building-workspaces.md](guides/building-workspaces.md#chrome-and-theme) |
+| show a help footer for the workspace and the focused pane | [guides/building-workspaces.md](guides/building-workspaces.md#keys-and-the-mouse) |
 | know why Cobra, Kong and glamour are separate Go modules, and how they are released | [0010-MADR](decisions/0010-MADR-nested-adapter-modules.md) |
 | add a nested module to the repository | [guides/releasing.md](guides/releasing.md#add-a-module) |
 | release the root, an adapter, or a change that spans both | [guides/releasing.md](guides/releasing.md) |

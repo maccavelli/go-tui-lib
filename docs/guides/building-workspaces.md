@@ -33,17 +33,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() tea.View {
-    v := tea.NewView(m.ws.Render())
-    v.Cursor = m.ws.Cursor()             // the focused pane's cursor, on screen
-    v.AltScreen = true                   // your choice, never the workspace's
+    v := m.ws.View()                      // the frame, and the cursor on screen
+    v.AltScreen = true                    // your choice, never the workspace's
     v.MouseMode = tea.MouseModeCellMotion // turns the built-in mouse handling on
     return v
 }
 ```
 
-The workspace never sets the alternate screen, the mouse mode, focus
-reporting or keyboard enhancements, and never installs a signal handler. Its
-mouse handling is inert until you set a mouse mode.
+`ws.View()` is `tea.NewView(ws.Render())` with `Cursor` set from
+`ws.Cursor()`, and sets nothing else. The workspace never sets the alternate
+screen, the mouse mode, focus reporting or keyboard enhancements, and never
+installs a signal handler. Its mouse handling is inert until you set a mouse
+mode.
 
 ## Choose a layout
 
@@ -147,6 +148,26 @@ A `Workspace` is not safe for concurrent use. Call it from your model's
 `Update` and `View`, which Bubble Tea runs on one goroutine. Commands run
 elsewhere, and reach the workspace only as the messages they return.
 
+The workspace draws a frame only when something changed: its size, the
+layout or its state, focus, an overlay, the theme, the width method, or a
+message delivered to a pane. Otherwise `Render` returns the last frame, at
+no cost. So a pane's view changes through its `Update`, or, for a
+`Changer`, whenever `Changed` reports it. A pane changed some other way,
+such as by your program writing to a pointer pane directly, is drawn anew
+at the next of those changes; send it a message instead.
+
+To get a pane back as its own type, use `ws.PaneAs`, which also finds an
+open overlay's pane when no pane has the ID:
+
+```go
+if log, ok := ws.PaneAs[*logPane]("logs"); ok {
+    log.Clear()
+}
+```
+
+`ws.Panes()` walks the panes focus moves through, in that order, and
+`ws.Plan().All()` walks every placed pane with its rectangle.
+
 ## Focus
 
 One pane has the keyboard: the focused pane, or the top modal overlay while
@@ -238,6 +259,17 @@ default uses alt with them; avoid them when you rebind. (`v0.1.0` used
 Rebind any of them with `SetKeys`, remove one with `Unbind`, and pass the
 result with `WithKeyMap`.
 
+The workspace is a `help.KeyMap`, so a help footer is one call:
+
+```go
+footer := help.New().View(ws)
+```
+
+The short help lists the bindings of whoever has the keyboard, the top
+modal overlay's pane or else the focused pane, from its `KeyMapper`, then
+focus-next and zoom. The full help has four columns: those bindings, focus,
+layout and overlays. Disabled bindings are left out.
+
 With a mouse mode set:
 
 - a click focuses the pane under the pointer;
@@ -276,6 +308,23 @@ ws.Push(workspace.Overlay{ID: "permission", Pane: dialog, Width: 40, Height: 7, 
   overlay only; `ws.Send(id, msg)` tries a pane first, then an overlay.
 - **Closing.** `esc` or `ws.Pop()` closes it.
 
+## Text width
+
+Terminals disagree about how wide some characters are: an emoji joined with
+zero-width joiners, or a symbol with the VS16 selector, is one width under
+wcwidth and another under grapheme clustering. The workspace measures as
+Bubble Tea writes, so borders after such text line up:
+
+- it starts with `ansi.WcWidth`, as Bubble Tea's renderer does;
+- when the terminal reports grapheme clustering (mode 2027), it switches to
+  `ansi.GraphemeWidth`, under the same rule Bubble Tea follows; the report
+  still reaches your panes;
+- `WithWidthMethod(m)` fixes the method and stops it following.
+  `WithWidthMethod(ansi.GraphemeWidth)` measures as `v0.1` did.
+
+A pane that pads or truncates its own text can measure the same way with
+`ws.WidthMethod()`, such as `ws.WidthMethod().StringWidth(s)`.
+
 ## Persist the layout
 
 `ws.State()` returns what the user changed: separator moves, as applied,
@@ -294,6 +343,28 @@ version is refused.
   - `workspace.None` draws nothing.
   - `WithPaneChrome(id, chrome)` overrides one pane, such as `None` for a
     footer.
-- **Theme.** Pass `workspace.WithTheme(theme.New(profile, background,
-  glyph.For(utf8)))`. With no colour, the focused pane is still marked by
-  the focus glyph and a bold title.
+  - A separator is drawn when a pane beside it has `Separators` chrome;
+    one between two `None` or two `Borders` panes stays blank. Where
+    separators meet, three lines take a tee (`┬ ┴ ├ ┤`) and four the cross
+    (`┼`), or `+` in the ASCII glyph set.
+- **Theme.** By default the workspace follows the terminal. It starts with
+  ANSI256, an unknown background and Unicode glyphs, asks for the
+  background in `Init`, and rebuilds its theme on each
+  `tea.ColorProfileMsg` and `tea.BackgroundColorMsg`, which still reach
+  your panes.
+  - `WithTheme(theme.New(profile, background, glyph.For(utf8)))` fixes the
+    theme instead; the messages then change nothing.
+  - `WithThemeBuilder(b)` rebuilds with your own builder, such as one that
+    adds `theme.WithPaletteFor` for each background, so your colours
+    survive a background change.
+  - `WithoutBackgroundQuery()` leaves the query out of `Init`, for a
+    program that runs its own probe.
+  - `ws.SetTheme(t)` replaces the theme now; a following workspace builds
+    over it at the next message.
+  - A palette colour may itself depend on the background or the profile:
+    `theme.LightDarkColor{Light, Dark, Unknown}` and
+    `theme.ProfileColor{ANSI, ANSI256, TrueColor}` are picked when the
+    theme is built.
+
+  With no colour, the focused pane is still marked by the focus glyph and a
+  bold title.

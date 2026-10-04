@@ -5,8 +5,8 @@
 // (docs/decisions/0002-MADR-multi-pane-workspace-layouts.md §3).
 //
 // The program owns the program. A Workspace is not a tea.Model: the
-// program's Update calls Workspace.Update, and its View builds a tea.View
-// from Render and Cursor. The program, never the workspace, sets the
+// program's Update calls Workspace.Update, and its View returns
+// Workspace.View, or builds a tea.View from Render and Cursor. The program, never the workspace, sets the
 // alternate screen, the mouse mode, focus reporting and keyboard
 // enhancements, and ctrl+c is never bound here
 // (docs/decisions/0001-MADR-scaffold-charm-tui-library.md §6, rules 1 and 2).

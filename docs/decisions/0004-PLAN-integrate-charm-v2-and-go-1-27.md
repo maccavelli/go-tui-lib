@@ -1058,3 +1058,156 @@ The third is added to the PLAN's two.
 * `GOWORK=off go mod tidy -diff`: exit 0. No `go.work.sum` was written. No
   golden file changed.
 * **The Windows test host:** `make pre-add-check` and `make release-check` (`40 file(s) clean in 1 module(s)`, the example and the new tests included), `make lint` (`0 issues` for linux, darwin and windows) and `make vuln` (`No vulnerabilities found.`) exited 0; `go-modules.sh --check` exited 0.
+
+### Step 8: documentation and close-out (2026-10-04)
+
+The owner committed Step 7 (`519094d`) and approved this step ("Commit and
+proceed").
+
+**Documentation.**
+
+* **`docs/guides/building-workspaces.md`:**
+  * the program's `View` returns `ws.View()`, which is `Render` with the
+    cursor and sets nothing else;
+  * when a frame is redrawn, and that a pane's view changes through
+    `Update` or, for a `Changer`, `Changed`;
+  * `PaneAs`, `Panes` and `Plan().All()`;
+  * a help footer with `help.New().View(ws)`, and what the short and full
+    help list;
+  * a new section, "Text width": wcwidth by default, the mode 2027 switch,
+    `WithWidthMethod`, and `WidthMethod()` for a pane;
+  * per-pane separators and junction glyphs; following the theme,
+    `WithTheme`, `WithThemeBuilder` with `theme.WithPaletteFor`,
+    `WithoutBackgroundQuery`, `SetTheme`, `LightDarkColor` and
+    `ProfileColor`.
+
+  The guide's new Go samples were compiled and run as a test on a scratch
+  copy: `ws.View()` in a program's `View`, `PaneAs[*logPane]`,
+  `help.New().View(ws)`, `WidthMethod().StringWidth`, `Plan().All()` and
+  `Panes()`.
+* **Doc comments.** `internal/cells` says why it exists (Step 2). The
+  `workspace` package comment names `View`; each new or changed exported
+  name has its comment from its step.
+* **`docs/architecture.md`:** the `internal/cells` package and its
+  ultraviolet edge; the rendering path (the reused buffer, regions, the
+  dirty flag, the view cache's key); the width method; the package table;
+  ultraviolet among the required modules, and depguard keeping it to
+  `internal/cells`.
+* **`docs/README.md`:** rows for text width, following the theme and a help
+  footer; the ultraviolet row no longer says "will".
+* **`README.md`,** Status: what `main` holds for `v0.2.0`, and the way back
+  from the width change.
+* Markdown lint: 0 issues; the link check over the four files: 0 broken.
+
+**Verification.**
+
+* **Mutations.** Every step's mutations were killed: Step 2's 3, Step 3's
+  8, Step 4's 4, Step 5's 6, Step 6's 4 and Step 7's 3.
+* **The benchmark gate holds,** the Step 1 command against Step 1's
+  baseline, on the macOS development host:
+
+  ```text
+  goos: darwin
+  goarch: arm64
+  pkg: github.com/maccavelli/go-tui-lib/workspace
+  cpu: Apple M1 Pro
+    │ bench-base.txt │  bench-final.txt  │
+    │  sec/op  │  sec/op  vs base  │
+  Render/views-10  1638.8µ ± 1%  780.9µ ± 0%  -52.35% (p=0.000 n=10)
+  Render/changer-10  1596.5µ ± 2%  761.8µ ± 1%  -52.28% (p=0.000 n=10)
+  Render/truecolor-10  904.5µ ± 0%
+  geomean  1.618m  813.4µ  -52.32%
+
+    │ bench-base.txt │  bench-final.txt  │
+    │  B/op  │  B/op  vs base  │
+  Render/views-10  1702.3Ki ± 0%  147.4Ki ± 0%  -91.34% (p=0.000 n=10)
+  Render/changer-10  1663.9Ki ± 0%  133.6Ki ± 0%  -91.97% (p=0.000 n=10)
+  Render/truecolor-10  218.6Ki ± 0%
+  geomean  1.644Mi  162.7Ki  -91.66%
+
+    │ bench-base.txt │  bench-final.txt  │
+    │  allocs/op  │  allocs/op  vs base  │
+  Render/views-10  1078.0 ± 0%  441.0 ± 0%  -59.09% (p=0.000 n=10)
+  Render/changer-10  925.0 ± 0%  438.0 ± 0%  -52.65% (p=0.000 n=10)
+  Render/truecolor-10  1.742k ± 0%
+  geomean  998.6  695.5  -55.99%
+  ```
+
+  `views` 780.9 µs, 47.6% of 1.639 ms (at most 60%), and 147.4 KiB, 8.7%
+  of 1.662 MiB (at most 20%). `TestRenderAllocs`: 441 allocations for a
+  full frame (at most 650), 0 for a clean one (at most 2).
+* **Goldens.** Against `v0.1.6`, under every `testdata/`: 4 files modified,
+  the four `frame-separators` 160-column files of deviation D1, each by the
+  one junction character; 32 added, Step 4's 16 and Step 6's 16. No other
+  file changed.
+* **macOS:** `make pre-add-check` and `make release-check` (`40 file(s)
+  clean in 1 module(s)`), `make lint` (with `make modernize`), `make vuln`
+  and `make fuzz` exited 0; `go test -race -count=1 ./...`,
+  `go test -shuffle=on -count=2 ./...` and `LC_ALL=C go test -count=1
+  ./...`: every package `ok`.
+* **The Windows test host:** `make pre-add-check` and `make release-check` (`40 file(s) clean in 1 module(s)`), `make lint` (`0 issues` for linux, darwin and windows), `make vuln` (`No vulnerabilities found.`) and `make fuzz` (`1 fuzz targets ran clean in ./layout`) exited 0; `go vet ./...`, `go test -race -count=1 ./...`, `LC_ALL=C go test -count=1 ./...` and `go test -shuffle=on -count=2 ./...` exited 0, all eight packages `ok`, `internal/cells` included.
+* `GOWORK=off go mod tidy -diff`: exit 0. `go.mod` requires the five
+  modules of 0001-MADR §3 that are in use, plus ultraviolet at
+  `v0.0.0-20260811164956-006e29f97886`, the version the graph selects.
+* **depguard** refuses ultraviolet outside `internal/cells` (Step 2's
+  proof) and the Charm v1 paths everywhere.
+* **`internal/conformance`** passes: no `os.Stdout`, `os.Stderr`,
+  `AltScreen` write, `signal.Notify`, `fmt.Print*`, standard or default
+  logger, or print builtin in non-test code; Step 6's `View` mutation
+  showed it catching an `AltScreen` write.
+* **Identifiers.** A scan of `git diff v0.1.6` for the local account name,
+  the hostname and real-machine paths finds only the `<user>` placeholders
+  in 0010-PLAN deviation D1's record and the comments of
+  `scripts/go-modules.sh` and its test.
+* **Pending:** CI on the owner's push. This PLAN is set `complete` after
+  it is green, and the owner tags `v0.2.0`.
+
+### Release notes: `v0.2.0`
+
+`v0.2.0` integrates the workspace with the Charm v2 stack and Go 1.27
+(0004-MADR). It adds API, and changes the default width method, so it is
+a minor release.
+
+**Changes a caller can see:**
+
+* **The default width method is now `ansi.WcWidth`,** what Bubble Tea's
+  renderer writes with, and it switches to `ansi.GraphemeWidth` when the
+  terminal reports mode 2027. On a terminal without mode 2027, text with
+  zero-width-joiner emoji or VS16 symbols now truncates and pads as Bubble
+  Tea draws it, so borders line up. **The way back:**
+  `WithWidthMethod(ansi.GraphemeWidth)` measures as `v0.1` did.
+* **Frames are drawn only when something changed.** A pane that is not a
+  `Changer` is redrawn after a message reaches it, not on every `Render`.
+  A program that writes to a pointer pane directly, outside its `Update`,
+  sees the change at the next message or layout change; send it a message
+  instead. A `Changer` that reports a change is still redrawn at once.
+* **The theme follows the terminal by default.** A workspace without
+  `WithTheme` rebuilds its theme on `tea.ColorProfileMsg` and
+  `tea.BackgroundColorMsg`, and `Init` asks for the background color.
+  `WithTheme` fixes the theme as before; `WithoutBackgroundQuery()` leaves
+  the query out.
+* **Separators follow per-pane chrome,** and where separators meet they
+  draw a tee or a cross. A separator between `Separators` panes looks as
+  before, except at junctions; one between two `None` or two `Borders`
+  panes, under a global `Separators` chrome, is now blank.
+* **`Wrap`'s `Model.View`** returns the model's view unclipped; the
+  workspace still clips it to the pane.
+
+**New API:** `Workspace.View`, `ShortHelp` and `FullHelp` (the workspace
+is a `help.KeyMap`), `WithWidthMethod` and `WidthMethod`, `SetTheme`,
+`ThemeBuilder`, `WithThemeBuilder`, `WithoutBackgroundQuery`, `Panes`,
+`PaneAs`; `layout.Plan.All`; `theme.FromDark`, `LightDarkColor`,
+`ProfileColor` and `WithPaletteFor`; `glyph.Set`'s `SeparatorTeeDown`,
+`SeparatorTeeUp`, `SeparatorTeeRight` and `SeparatorTeeLeft`.
+
+**Performance:** a full 200 × 60 frame takes about 48% of `v0.1.6`'s time,
+9% of its memory and 41% of its allocations; an unchanged frame costs no
+allocation.
+
+**Dependencies:** `github.com/charmbracelet/ultraviolet` becomes a direct
+requirement, at the version lipgloss already selected; only
+`internal/cells` imports it. No other requirement changes.
+
+**Everything public in `v0.1.6` still compiles.** One exception: a `glyph.Set` built
+with an unkeyed composite literal, since `Set` gains four fields; keyed
+literals and the `Unicode`, `ASCII` and `For` constructors are unaffected.

@@ -11,13 +11,15 @@ planned (Modules, below).
   package named after it. There is no root package. Helpers shared between
   packages go under `internal/`.
 - **Go 1.27.1**, with no `toolchain` line.
-- **Five packages,** for multi-pane terminal workspaces and the foundations
+- **Five packages,** and one internal one, for multi-pane terminal
+  workspaces and the foundations
   every package uses.
 
 ## Packages
 
 ```text
- workspace     Bubble Tea pane host       → layout, theme, glyph; bubbletea, lipgloss, bubbles/key
+ workspace     Bubble Tea pane host       → layout, theme, glyph, internal/cells; bubbletea, lipgloss, bubbles/key, bubbles/help
+ internal/cells  the reused frame buffer  → layout; ultraviolet, x/ansi (its only importer)
  theme         palettes, roles, styles    → glyph; lipgloss, colorprofile
  glyph         Unicode and ASCII glyphs   → standard library
  layout        geometry and state         → standard library
@@ -26,16 +28,27 @@ planned (Modules, below).
 
 | Package | What it holds |
 | :--- | :--- |
-| `glyph` | `Set` (4 border styles, separators, focus marker, ellipsis, scroll, bullet, badge brackets), `Unicode()`, `ASCII()`, `For(utf8)`; every glyph one cell |
-| `theme` | `Palette` for dark, light and unknown backgrounds; `Styles`; `New(profile, background, glyphs)`; `Border(style)` |
+| `glyph` | `Set` (4 border styles, separators with a cross and four tees, focus marker, ellipsis, scroll, bullet, badge brackets), `Unicode()`, `ASCII()`, `For(utf8)`; every glyph one cell |
+| `theme` | `Palette` for dark, light and unknown backgrounds; `LightDarkColor` and `ProfileColor`; `Styles`; `New(profile, background, glyphs)` with `WithPalette` and `WithPaletteFor`; `FromDark`; `Border(style)` |
 | `layout` | `Rect`, `Size` (fixed, percent, ratio, fill; min, max, shrink order), `Node` (`Pane`, `Split`, `Responsive`, or a custom node), `Solve` → `Plan`; `State` (JSON); the sidebar presets |
-| `workspace` | `Pane` and its optional interfaces; `Workspace` (routing, focus, chrome, resize, zoom, hide, overlays, cursor); `KeyMap` |
+| `workspace` | `Pane` and its optional interfaces; `Workspace` (routing, focus, chrome, resize, zoom, hide, overlays, cursor, `View`, `help.KeyMap`, the width method, a following theme, `Panes`, `PaneAs`); `Wrap`; `KeyMap` |
+| `internal/cells` | `Frame`: a reused cell buffer that draws strings into rectangles with a chosen width method |
 | `tuitest` | `Golden` across {colour, no colour} × {UTF-8, ASCII} × widths; `Text` for a single file; `Annotate` |
 
 - **`layout` has no Charm import,** so its solver can serve any front end.
-- **`workspace` composes the frame on a Lip Gloss canvas.** Each pane is a
-  layer clipped to its rectangle; separators sit at Z 1 and overlays at Z 10
-  and up. The same compositor answers mouse hit tests.
+- **`workspace` draws each frame into one reused buffer,**
+  `internal/cells.Frame`: the panes, then the separators, then the overlays,
+  each into its rectangle. It records those rectangles, top first, and a
+  mouse event takes the first that contains it. A frame is drawn only when
+  something changed since the last; otherwise the last one is returned.
+  The view cache is keyed on a pane's kind, ID, size, focus, width method
+  and theme generation
+  ([0004-MADR](decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md) §2).
+- **The workspace measures as Bubble Tea writes:** `ansi.WcWidth` by
+  default, switching to `ansi.GraphemeWidth` on the terminal's mode 2027
+  report, unless `WithWidthMethod` fixes it (§3).
+- **`internal/cells` is the only importer of ultraviolet,** which has no
+  tagged release, so an upstream change is one package's fix (§1).
 - **Nothing writes to the terminal.** No package writes to `os.Stdout` or
   `os.Stderr`, prints with `fmt.Print*` or the `print` builtins, logs
   through `log`'s standard logger or `log/slog`'s default logger, calls
@@ -91,6 +104,7 @@ scripts/
   go-fuzz_test.sh           its offline test
 glyph/ theme/ layout/ workspace/ tuitest/
                             the packages; goldens under each testdata/golden/
+internal/cells/             the reused frame buffer, the only ultraviolet importer
 internal/conformance/       the terminal-ownership scan (tests only)
 .claude/ .grok/ .opencode/  per-agent pointers to AGENTS.md
 opencode.json
@@ -106,8 +120,12 @@ docs/
 
 - **Required:** `charm.land/bubbletea/v2` v2.0.10, `charm.land/lipgloss/v2`
   v2.0.6, `charm.land/bubbles/v2` v2.2.1,
-  `github.com/charmbracelet/colorprofile` v0.4.3 and
-  `github.com/charmbracelet/x/ansi` v0.11.8.
+  `github.com/charmbracelet/colorprofile` v0.4.3,
+  `github.com/charmbracelet/x/ansi` v0.11.8, and
+  `github.com/charmbracelet/ultraviolet` at
+  `v0.0.0-20260811164956-006e29f97886`, the pseudo-version lipgloss's
+  requirement selects; it has no tagged release
+  ([0004-MADR](decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md) §1).
 - **Named but not yet required:** `github.com/maccavelli/go-selfupdate-lib`
   (formerly `go-core-lib`), for `updatetea`.
 - **Refused by `depguard`,** in source and tests, in every module:
@@ -122,6 +140,8 @@ docs/
   `github.com/alecthomas/kong` to `command/kongcmd`, and
   `charm.land/glamour/v2` to `stream/glamourmd`. Each rule covers `$all`
   less `!**/<dir>/**`.
+- **Kept to one package by `depguard`:** `github.com/charmbracelet/ultraviolet`
+  to `internal/cells`.
 
 ## Tooling
 

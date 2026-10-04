@@ -22,6 +22,12 @@ stable API.
   with focus, resize, zoom, overlays, mouse and cursor. `glyph`, `theme`
   and `tuitest` are the foundations every package uses. pi-go's agent
   session is the first consumer. `v0` means the API may still change.
+- **On `main`, for `v0.2.0`:** the workspace draws into one reused cell
+  buffer and only when something changed; it measures text as Bubble Tea
+  writes it; its theme follows the terminal's profile and background; it is
+  a `help.KeyMap` with a `View()`; and it adds `PaneAs`, `Panes` and
+  `Plan.All`. The default width method changes to wcwidth, and
+  `WithWidthMethod(ansi.GraphemeWidth)` keeps `v0.1`'s.
 - **The stack is Charm v2:** `charm.land/bubbletea/v2`,
   `charm.land/lipgloss/v2` and `charm.land/bubbles/v2`, with
   `github.com/charmbracelet/colorprofile` and
