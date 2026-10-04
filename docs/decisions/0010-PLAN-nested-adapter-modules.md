@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-10-04
 associated-madr: "0010-MADR-nested-adapter-modules.md"
 ---
@@ -890,4 +890,15 @@ The last row shows that `go mod tidy` is required, not just the order.
 files: 0 broken. `make pre-add-check`: `40 file(s) clean in 1 module(s)`.
 `git diff --check`: clean. The identifier scan of the diff finds nothing.
 
-This PLAN returns to `complete` after the push and a green CI run.
+This PLAN returns to `complete` after the push and a green CI run: see
+below.
+
+### Close-out, after Phase 8 (2026-10-04)
+
+* At the owner's request ("Amend commit and push"), the agent committed
+  Phase 8 as `8d0c7c6` and pushed `main` (`0224d0e..8d0c7c6`), after the
+  disclosure guard passed.
+* CI run 37187570846 on `8d0c7c6`: `success`. Jobs: `modules`, `gates`,
+  and `test (., ubuntu-24.04)`, `test (., macos-15)` and
+  `test (., windows-2025)`, all `success`.
+* This PLAN is `complete` again.
