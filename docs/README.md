@@ -29,7 +29,7 @@ it was when they were written
 | 0009 | MADR | [Stream agent output through a stable-prefix Markdown engine, a frame scheduler, an input filter and a safe-text sanitizer](decisions/0009-MADR-streaming-content-engine.md) | accepted; A1, A2 accepted |
 | 0009 | PLAN | [Implement the streaming content engine](decisions/0009-PLAN-streaming-content-engine.md) | proposed |
 | 0010 | MADR | [Ship the Cobra, Kong and glamour adapters as nested Go modules, released apart from the root and developed through a committed go.work, with every gate run per module and without the workspace](decisions/0010-MADR-nested-adapter-modules.md) | accepted; A1 accepted |
-| 0010 | PLAN | [Implement the multi-module repository: go.work, per-module gates, and the release procedure](decisions/0010-PLAN-nested-adapter-modules.md) | in-progress |
+| 0010 | PLAN | [Implement the multi-module repository: go.work, per-module gates, and the release procedure](decisions/0010-PLAN-nested-adapter-modules.md) | complete |
 | 0010 | REPORT | [Nested modules, a committed go.work, and the adapters' upstream sources](reports/0010-REPORT-nested-modules-and-adapter-sources.md) | — |
 
 ## I want to…

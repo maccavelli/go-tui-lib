@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-10-04
 associated-madr: "0010-MADR-nested-adapter-modules.md"
 ---
@@ -835,4 +835,15 @@ checksums no single `go.sum` holds.
 No `go.work.sum` exists in the repository.
 
 This PLAN returns to `complete` after the owner's push and a green CI run,
-as Phase 6's close-out did.
+as Phase 6's close-out did: see below.
+
+### Close-out, after Phase 7 (2026-10-04)
+
+* At the owner's request ("Commit and push"), the agent committed Phase 7
+  as `2fe6123` and pushed `main` (`edcf882..2fe6123`), after the
+  disclosure guard passed.
+* CI run 37184935565 on `2fe6123`: `completed success`. Jobs: `modules`,
+  `gates`, and `test (., ubuntu-24.04)`, `test (., macos-15)` and
+  `test (., windows-2025)`, all `success`.
+* This PLAN is `complete` again. MADR A1's "for now" stands: revisit
+  ignoring `go.work.sum` when the first adapter module lands.
