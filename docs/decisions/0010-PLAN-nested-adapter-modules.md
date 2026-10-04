@@ -1,6 +1,6 @@
 ---
-status: in-progress
-date: 2026-10-03
+status: complete
+date: 2026-10-04
 associated-madr: "0010-MADR-nested-adapter-modules.md"
 ---
 # Implement the multi-module repository: go.work, per-module gates, and the release procedure
@@ -722,7 +722,7 @@ Phase 3 and Phase 5 record.
 * shellcheck over `scripts/*.sh`, actionlint v1.7.12 and markdownlint:
   clean. `git diff --check`: clean.
 * The identifier scan finds nothing in the changed files.
-* **Pending:** CI on the owner's push.
+* CI on the owner's push: see Close-out below.
 
 ### Release notes
 
@@ -749,3 +749,20 @@ history:
   before.
 * **Documentation:** the releasing guide, and the module rules in
   `AGENTS.md` and `docs/architecture.md`.
+
+### Close-out (2026-10-04)
+
+* The owner committed Phase 5's last record and Phase 6 together as
+  `28da8ac`, and pushed it.
+* CI run 37163726696 on `28da8ac`: `completed success`. Jobs: `modules`,
+  `gates`, and `test (., ubuntu-24.04)`, `test (., macos-15)` and
+  `test (., windows-2025)`, all `success`. The nested-module matrix itself
+  was proven by Phase 5's run 37147134663.
+* Every item under Verification holds, per the Phase 6 record, and CI is
+  green on the pushed tree. No tag was needed (Rollout). This PLAN is
+  `complete`.
+* The adapter modules land through their own plans:
+  [0006-PLAN-command-registry.md](0006-PLAN-command-registry.md) Steps 10
+  and 11, and
+  [0009-PLAN-streaming-content-engine.md](0009-PLAN-streaming-content-engine.md)
+  Step 7, each with this PLAN's gates.
