@@ -86,16 +86,18 @@ linters:
           deny:
             - pkg: charm.land/glamour/v2
               desc: "glamour only in the stream/glamourmd module (docs/decisions/0010-MADR-nested-adapter-modules.md §5)"
-        # ultraviolet has no tagged release, so one package holds every use
-        # of it (docs/decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md §1).
+        # ultraviolet has no tagged release, so two internal packages hold
+        # every use of it (docs/decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md §1;
+        # docs/decisions/0005-MADR-terminal-capabilities-and-services.md §1).
         ultraviolet:
           list-mode: lax
           files:
             - $all
             - "!**/internal/cells/**"
+            - "!**/internal/termevent/**"
           deny:
             - pkg: github.com/charmbracelet/ultraviolet
-              desc: "ultraviolet only in internal/cells (docs/decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md §1)"
+              desc: "ultraviolet only in internal/cells and internal/termevent (docs/decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md §1, docs/decisions/0005-MADR-terminal-capabilities-and-services.md §1)"
     errcheck:
       check-type-assertions: true
       check-blank: true

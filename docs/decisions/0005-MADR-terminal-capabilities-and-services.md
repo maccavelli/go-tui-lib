@@ -275,6 +275,10 @@ type CapsMsg struct{ Caps Caps }         // once, when the probe ends
 type ColorSchemeMsg struct{ Dark bool }  // each DSR 997, after the probe
 ```
 
+*Amended 2026-10-04 (A2):* the `Origin` constant `Env` is `Environment`,
+because it and the type `Env` (§1) cannot share a name in one package. Its
+text form stays `env`.
+
 * **`Fact` is generic.** The provenance rule is written once, and an
   override (`Origin` `Override`) always wins. A program can force a fact,
   from a flag or a config file.
@@ -911,6 +915,11 @@ the pipe.
   OSC 11 query, and none under the JetBrains profile.
 * **`termcaptest`** sets `tea.WithColorProfile` from the profile, so the
   `Profile` fact is deterministic.
+* **§2's `Origin` constant `Env` is named `Environment`** (the owner,
+  picked from options, 2026-10-04, during Step 2). Go cannot declare the
+  constant and §1's type `Env` in one package. The type, and A1's
+  `FromEnv(env Env, goos string)`, keep their names; the origin's text form
+  in the report and in JSON stays `env`.
 
 **What does not change.** Option A, the observer rule, DA1 as the
 sentinel, the timeout, the containment of ultraviolet in

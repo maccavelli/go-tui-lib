@@ -1,6 +1,6 @@
 ---
-status: proposed
-date: 2026-10-02
+status: in-progress
+date: 2026-10-04
 associated-madr: "0005-MADR-terminal-capabilities-and-services.md"
 ---
 # Implement terminal capabilities and services (`termcap`, `termsvc`)
@@ -491,3 +491,93 @@ the recommendation, on 2026-10-04, and A2 is accepted. In scope, therefore:
   query.
 
 This PLAN stays `proposed` until Step 2 starts, as Step 1 says.
+
+### Step 2: the event decoder and `termcap` facts (2026-10-04)
+
+The owner said "proceed". This PLAN is `in-progress`, and its
+`docs/README.md` row with it.
+
+**Deviation D2 (2026-10-04): a name.** MADR §2 names the `Origin` constant
+`Env`, and §1 names the type `Env`; one package cannot declare both. The
+agent stopped and asked. The owner picked "Origin becomes Environment",
+the recommendation: the constant is `Environment`, its text stays `env`,
+and the type and A1's `FromEnv` keep their names. MADR A2 records it, with
+a note under §2's code.
+
+**What was built.**
+
+* **`internal/termevent`:** `Kind`, `Event` and `Decode`, as MADR §1 with
+  A2's two kinds: `ColorScheme` (DSR 997, dark and light),
+  `DeviceAttributes` (DA1), `SecondaryDeviceAttributes` (DA2),
+  `KittyGraphics` (its payload in `Raw`), `PixelSize`, and `Unknown` for
+  `uv.UnknownCsiEvent`, `UnknownOscEvent`, `UnknownDcsEvent`,
+  `UnknownApcEvent` and the generic `uv.UnknownEvent`. `Attrs` is a copy,
+  not the event's array.
+* **`.golangci.yml`:** the ultraviolet `depguard` rule allows
+  `internal/cells` and `internal/termevent`, and its message cites both
+  records.
+* **`termcap`:**
+  * `termcap.go`: `Support`, `Origin` (in strength order, `NotQueried` to
+    `Override`), `Fact[T]` with `Set`, the merge rule (an equal or stronger
+    origin replaces; so an override is replaced only by an override), and
+    `Mux`. Each enumeration has `String`, `MarshalText` and `UnmarshalText`
+    by name.
+  * `caps.go`: `Caps`, the fields of MADR §2, with `omitzero` JSON tags in
+    snake case. `Background` (`color.Color`) and `Profile`
+    (`colorprofile.Profile`) do not write themselves as text, so
+    `MarshalJSON` and `UnmarshalJSON` add them, as `#rrggbb` and the
+    profile's name, around the struct's own encoding.
+  * `env.go`: `Env` with `LookupEnv` (the last entry wins, as in tea's
+    environment) and `Getenv`, and the unexported `setEnv`, which fills
+    `Terminal` (`TERM_PROGRAM`, else `TERM`), `Mux` (`TMUX`, `STY`,
+    `ZELLIJ`) and `Remote` (`SSH_TTY` or `SSH_CONNECTION`) with origin
+    `Environment`. The prober (Step 3) calls it; nothing else needs it, so
+    it is not exported.
+
+**Tests.** `TestDecode` (a row for each event, the split-reply shape from
+the spike among them), `TestDecodeRefusesEverythingElse`,
+`TestDecodeCopiesAttributes`; `TestOriginOrder`,
+`TestSetOverEveryPairOfOrigins` (all 25 pairs), `TestOverrideIsNeverReplaced`,
+`TestEnumNames`, `TestEnvLookup`, `TestEnvironmentFacts` (one row per
+variable), `TestEnvironmentDoesNotReplaceAQuery`,
+`TestZeroCapsMarshalsEmpty`, `TestFullCapsSetsEveryField` (a reflection
+check that keeps the round trip's input full as fields are added),
+`TestCapsJSONRoundTrip`, `TestCapsJSONRefusesBadValues`; and
+`TestNoUltravioletInTheAPI`, which type-checks `termcap` from source and
+walks every exported name through fields, methods, parameters, results and
+type arguments.
+
+**Mutations,** each on a scratch copy, all killed:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| `termcap` imports ultraviolet | `depguard`: "import 'github.com/charmbracelet/ultraviolet' is not allowed from list 'ultraviolet'" (exit 1; one issue, so `internal/termevent` is allowed) |
+| `Decode` drops `LightColorSchemeEvent` | `TestDecode`: "light: … false; want … true" |
+| `Decode` drops DA2 (A2) | `TestDecode`: "DA2: … false" |
+| `Decode` drops `uv.UnknownEvent` (A2) | `TestDecode`: "split reply: … false" |
+| a weaker origin replaces a stronger one (`o+1 < f.Origin`) | `TestSetOverEveryPairOfOrigins`: "Set from not-queried over heuristic reported true" |
+| `STY` is ignored | `TestEnvironmentFacts`: "Mux = {Value:none …}, want screen" |
+| `omitzero` dropped from `sixel` | `TestZeroCapsMarshalsEmpty`: `zero Caps = {"sixel":{}}` |
+| an ultraviolet type in `termcap`'s API | `TestNoUltravioletInTheAPI`: "Leak: github.com/charmbracelet/ultraviolet.Event" |
+
+**Checks.**
+
+* `make pre-add-check FILES=…` (the seven new files): `7 file(s) clean in
+  1 module(s)`.
+* `make lint`: 0 issues for linux, darwin and windows. Its first run
+  failed in `make modernize` on two `go fix` suggestions (`slices.Backward`
+  in `LookupEnv`, a range over an integer in a test), applied by hand; the
+  planted-leak mutation's anchor moved with the import, and every mutation
+  was rerun after.
+* `go test -race -count=1 ./...`, `LC_ALL=C go test ./...` and
+  `go test -shuffle=on -count=2 ./...`, all with `GOWORK=off`: pass.
+* `GOWORK=off go mod tidy -diff`: clean. `go.mod` is unchanged; no
+  `go.work.sum` exists.
+* Windows test host, on a copy (go1.27.1 windows/amd64): `make
+  pre-add-check` (`47 file(s) clean`), `make lint` (0 issues, three
+  targets), `make vuln` (no vulnerabilities), and the two packages' tests
+  shuffled twice: all exit 0.
+* The identifier scan of the diff finds nothing.
+
+`internal/conformance` scans both new packages with every other; it
+passes. Nothing is staged or committed: the owner commits Steps 1 and 2.
