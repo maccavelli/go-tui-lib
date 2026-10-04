@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-10-04
 associated-madr: "0004-MADR-integrate-charm-v2-and-go-1-27.md"
 ---
@@ -1159,8 +1159,7 @@ proceed").
   the hostname and real-machine paths finds only the `<user>` placeholders
   in 0010-PLAN deviation D1's record and the comments of
   `scripts/go-modules.sh` and its test.
-* **Pending:** CI on the owner's push. This PLAN is set `complete` after
-  it is green, and the owner tags `v0.2.0`.
+* CI on the push: see Close-out below.
 
 ### Release notes: `v0.2.0`
 
@@ -1211,3 +1210,15 @@ requirement, at the version lipgloss already selected; only
 **Everything public in `v0.1.6` still compiles.** One exception: a `glyph.Set` built
 with an unkeyed composite literal, since `Set` gains four fields; keyed
 literals and the `Unicode`, `ASCII` and `For` constructors are unaffected.
+
+### Close-out (2026-10-04)
+
+* The agent committed Step 8 (`edcf882`) and, at the owner's request
+  ("Commit and push"), pushed `main` (`ed2b945..edcf882`), after the
+  disclosure guard passed over the outgoing commits.
+* CI run 37184187593 on `edcf882`: `completed success`. Jobs: `modules`,
+  `gates`, and `test (., ubuntu-24.04)`, `test (., macos-15)` and
+  `test (., windows-2025)`, all `success`.
+* Every item under Verification holds, per the Step 8 record, and CI is
+  green on the pushed tree. This PLAN is `complete`. The owner tags
+  `v0.2.0` on `edcf882`, or on the commit that carries this close-out.
