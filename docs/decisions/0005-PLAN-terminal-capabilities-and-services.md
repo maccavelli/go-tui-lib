@@ -446,4 +446,48 @@ above, mutation proofs included.
 
 ## Execution Record
 
-None yet.
+### Step 1: records and the spike (2026-10-04)
+
+The owner said "proceed to 0005". Step 1 ran: the audit of the records
+against the tree that 0002, 0010 and 0004 left, and the spike, on a scratch
+module outside the repository. Nothing in the repository changed apart
+from these records.
+
+**Prerequisites.**
+[0004-PLAN-integrate-charm-v2-and-go-1-27.md](0004-PLAN-integrate-charm-v2-and-go-1-27.md)
+and
+[0002-PLAN-harden-workspace-v0-1-1.md](0002-PLAN-harden-workspace-v0-1-1.md)
+are `complete`, and `v0.2.0` is tagged on `0224d0e`. `go.mod` requires
+ultraviolet directly, and `.golangci.yml`'s ultraviolet rule allows only
+`internal/cells`.
+
+**The spike's questions**, answered in MADR amendment A2, items 1–7:
+
+| Question | Answer |
+| :--- | :--- |
+| non-terminal input and output; renderer options | work as is; tea reports `NoTTY`, so `termcaptest` sets `tea.WithColorProfile` |
+| order of tea's queries and the `Init` batch | one write: DECRQM 2026 and 2027, then the batch with DA1 last; the Kitty push and request follow in the first render |
+| pass-through events | `DarkColorSchemeEvent`, `LightColorSchemeEvent`, `PrimaryDeviceAttributesEvent`, `UnknownOscEvent` arrive as themselves |
+| `tea.Sequence(tea.Raw(seq), tea.Quit)` | `seq` is the last write before `Run` returns, after tea's teardown |
+| A1: DA2 | `uv.SecondaryDeviceAttributesEvent` `[1 95 0]`, not an unknown CSI |
+| A1: split and late replies | the first part, after ultraviolet's 50 ms escape timeout, is a `uv.UnknownEvent`; the rest are `tea.KeyPressMsg`; a late reply arrives normally |
+
+**Deviation D1 (2026-10-04): the PLAN stops for MADR amendment A2.** Item
+6 contradicts A1's description of `IsReplyFragment`, and the audit found
+that 0004's workspace already sends the background query that §3 puts in
+the prober's batch (A2 item 8). Step 1 says a finding that contradicts the
+MADR's evidence stops the PLAN for an amendment. A2 was written
+`proposed`, with owner question Q8. The owner answered Q8 "The prober",
+the recommendation, on 2026-10-04, and A2 is accepted. In scope, therefore:
+
+* Step 2's `Decode` gains the DA2 and generic-unknown kinds, with a test
+  row each, and a mutation that drops DA2;
+* Step A1.2's `IsReplyFragment` becomes a `Prober` method with A2's
+  definition; its test drives the spike's shape (an unknown event, then key
+  presses up to the final byte) and an ordinary `alt+[`;
+* Step 4 sets `tea.WithColorProfile` from each profile, and adds Q8's test
+  of one background query;
+* Step 7's guide says how a program with a workspace gets one background
+  query.
+
+This PLAN stays `proposed` until Step 2 starts, as Step 1 says.

@@ -825,6 +825,116 @@ accepted.
   Not verified here; the PLAN's real-terminal check covers it when a
   JetBrains terminal is available.
 
+### A2 (2026-10-04): the Step 1 spike, and the background query after 0004
+
+*Status: accepted (2026-10-04).* It is Step 1's finding in
+[0005-PLAN-terminal-capabilities-and-services.md](0005-PLAN-terminal-capabilities-and-services.md),
+whose deviation D1 carries it into Steps 2, 4, A1.2 and 7.
+
+**Found by the spike** (2026-10-04). A real `tea.Program`, Bubble Tea
+v2.0.10 with the ultraviolet version `go.mod` pins, ran with
+`tea.WithInput` (an `io.Pipe`), `tea.WithOutput` (a recording writer),
+`tea.WithEnvironment([TERM=xterm-256color])` and `tea.WithWindowSize`, in a
+scratch module. Nothing was committed. Its `Init` returned one `tea.Raw`
+batch of DECRQM 2031, DSR 996, DA2 and DA1, and a script wrote replies into
+the pipe.
+
+1. **A non-terminal input and output work** with no other option. Tea
+   reports `tea.ColorProfileMsg` `NoTTY`, so a fake terminal that needs a
+   profile sets it with `tea.WithColorProfile`.
+2. **Order of the output.** The first write held tea's DECRQM 2026 and
+   2027, then the `Init` batch, DA1 last. The Kitty keyboard push and
+   request (`CSI > 1 u`, `CSI ? u`) went out in the second write, the first
+   render, after DA1. §3's reason for asking for the Kitty flags in the
+   batch holds.
+3. **Pass-through holds,** and DA2 is decoded. `uv.DarkColorSchemeEvent`,
+   `uv.LightColorSchemeEvent`, `uv.PrimaryDeviceAttributesEvent`,
+   `uv.UnknownOscEvent` (the OSC 99 reply) and
+   `uv.SecondaryDeviceAttributesEvent` (DA2, `[1 95 0]`) reached `Update` as
+   themselves. DA2 is not an unknown CSI, so §1's `Decode` needs a kind for
+   it. Tea's `ModeReportMsg` carried the 2031 reply.
+4. **`tea.RawMsg` reaches `Update`.** The prober sees its own batch as a
+   message, after `EnvMsg`.
+5. **The restore is written before `Run` returns.**
+   `tea.Sequence(tea.Raw(restore), tea.Quit)` wrote `restore` as the last
+   bytes, after tea's own teardown (the Kitty pop, the cursor shown,
+   bracketed paste off). The claim in §3 and the `Quit` design hold.
+6. **A split reply is not a key message, at first.** DA1 written as
+   `ESC [ ? 62 ;`, then, after a pause longer than ultraviolet's 50 ms
+   `DefaultEscTimeout` (`terminal_reader.go:27`), `4c`, reached `Update` as
+   a `uv.UnknownEvent` holding the first part, then `tea.KeyPressMsg` `4`
+   and `tea.KeyPressMsg` `c`. A1's `IsReplyFragment`, "a key message that
+   matches the start of a reply", does not describe the first part, and
+   §1's `Decode` does not list `uv.UnknownEvent`.
+7. **A late reply is delivered normally.** A DSR 997 written after DA1
+   arrived as `uv.LightColorSchemeEvent`.
+
+**Found by the audit after 0004** (2026-10-04, read-only):
+
+8. **The workspace already asks for the background.** `Workspace.Init`
+   includes `tea.RequestBackgroundColor` unless `WithoutBackgroundQuery()`
+   (`workspace/workspace.go`, `Init`), as
+   [0004-MADR-integrate-charm-v2-and-go-1-27.md](0004-MADR-integrate-charm-v2-and-go-1-27.md)
+   §2 decided. That record says that once `termcap` exists the query
+   "follows 0005's gates". §3 above also puts the request in the prober's
+   batch, and the PLAN puts any change to `workspace` out of scope. A
+   program that embeds both sends the query twice, and the workspace's copy
+   ignores the JetBrains gate.
+9. **The rest of the evidence still holds.** `go.mod` requires Bubble Tea
+   v2.0.10, x/ansi v0.11.8 and the pinned ultraviolet; `.golangci.yml`'s
+   ultraviolet rule allows only `internal/cells`; tea's
+   `shouldQuerySynchronizedOutput` (`tea.go:980`) and
+   `translateInputEvent` (`input.go:8`, unknown events returned as
+   themselves) are as the evidence says.
+
+**What changes in the decision.**
+
+* **§1, `Decode`'s kinds** gain `SecondaryDeviceAttributes` (from
+  `uv.SecondaryDeviceAttributesEvent`, in `Attrs`) and the generic unknown
+  event (`uv.UnknownEvent`, in `Raw`) beside the four unknown-sequence
+  events.
+* **A1's `IsReplyFragment` is restated** as a `Prober` method, since it
+  depends on what the probe still awaits:
+  `(*Prober).IsReplyFragment(msg tea.Msg) bool` is true for a
+  `uv.UnknownEvent` (seen through `Decode`) whose bytes begin a reply the
+  probe awaits, and for each `tea.KeyPressMsg` after it until the byte that
+  ends that reply (a CSI final byte, or BEL or ST for an OSC), within A1's
+  1 KiB cap. The prober still never hides a message. The input filter of
+  [0009-MADR-streaming-content-engine.md](0009-MADR-streaming-content-engine.md)
+  calls it, as A1 says.
+* **One background query** (owner question Q8). Recommended: a program
+  that embeds a `Prober` beside a workspace passes
+  `workspace.WithoutBackgroundQuery()`, and the prober's request, behind
+  its gates, is the only one. That meets 0004-MADR §2's "follows 0005's
+  gates" with no change to `workspace`. The guide says so, and a
+  `termcaptest` test runs a program built that way and sees exactly one
+  OSC 11 query, and none under the JetBrains profile.
+* **`termcaptest`** sets `tea.WithColorProfile` from the profile, so the
+  `Profile` fact is deterministic.
+
+**What does not change.** Option A, the observer rule, DA1 as the
+sentinel, the timeout, the containment of ultraviolet in
+`internal/termevent`, the restore discipline, and every answer to Q1–Q7.
+
+**Owner question for A2.**
+
+*Answered 2026-10-04* (picked from options): Q8 "The prober". It is the
+recommendation, so the text above stands, and A2 is accepted.
+
+* **Q8. Who asks for the background when a workspace and a prober run
+  together?**
+  * **The prober; the program turns the workspace's query off**
+    (recommended). No `workspace` change; the guide and a test carry the
+    rule. A program that forgets sends the query twice, which is harmless
+    on most terminals and painted on JetBrains.
+  * **The workspace, gated by `Caps`.** The workspace waits for `CapsMsg`
+    before asking, or gains an option that takes the prober's gate. That
+    changes `workspace`, which needs 0004's records amended and widens this
+    PLAN's scope.
+  * **Nobody else; the prober never asks.** The workspace's ungated query
+    stands, and §3's background request is dropped. JetBrains stays
+    painted until `workspace` changes.
+
 ## More Information
 
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md)
