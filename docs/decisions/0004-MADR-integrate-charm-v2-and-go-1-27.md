@@ -401,7 +401,8 @@ Chosen option: **"A"**, because:
     * at most 2 for a frame where nothing is dirty.
   * A new `BenchmarkRender/truecolor` keeps the TrueColor case visible.
 * **Output.** Every existing golden file is unchanged, byte for byte, at the
-  default method.
+  default method. *(Amended 2026-10-04, A2: except the junction cell that
+  §6 adds, in four files.)*
 * **Width method.** Golden frames include an emoji fixture with a zero-width
   joiner and a VS16 selector in a title and in a body, at both methods. A
   test sends `ModeReportMsg` for mode 2027 with each value and checks the
@@ -579,6 +580,20 @@ Step 3 carries both:
 
 * **Q5. The cache key.** Recommended: `{kind, id}`, with method and theme
   in the entry's check. The alternative is §2's wider key.
+
+### A2 (2026-10-04): junction glyphs change four goldens
+
+*Status: accepted (2026-10-04).* It is
+[0004-PLAN-integrate-charm-v2-and-go-1-27.md](0004-PLAN-integrate-charm-v2-and-go-1-27.md)
+deviation D1.
+
+§6 draws a junction glyph where a vertical and a horizontal separator
+meet. §Confirmation also says every existing golden file stays unchanged.
+The two meet in `frame-separators` at 160 columns: its one meeting cell,
+drawn as `─` (ASCII `-`) up to `v0.1.6`, becomes `┴` (ASCII `+`). The
+owner accepted that change (picked from options, 2026-10-04). §6 stands,
+and §Confirmation's rule holds for every other cell of every existing
+golden file.
 
 ## More Information
 
