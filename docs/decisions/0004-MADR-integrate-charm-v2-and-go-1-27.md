@@ -22,7 +22,8 @@ findings into a report then follow recommendations and proceed." The
 recommendation put integration with the Charm v2 stack and Go 1.27 first,
 ahead of the five expansions. The audit's confirmed defects are fixed in
 [0002-PLAN-harden-workspace-v0-1-1.md](0002-PLAN-harden-workspace-v0-1-1.md),
-which ships across `v0.1.1` to `v0.1.5` (its deviations D3 and D6). This record
+which ships across `v0.1.1` to `v0.1.5` (its deviations D3 and D6). *Amended
+2026-10-04 (A1): `v0.1.6` completes it (that PLAN's deviation D7).* This record
 decides what comes next: the changes that alter how `workspace` draws,
 measures and styles, and the API they add.
 The owner's standing direction also applies: build speculative API when it
@@ -211,7 +212,9 @@ Chosen option: **"A"**, because:
   box, not per row. Lines are walked with `strings.SplitSeq`.
 * **A struct cache key.** The view cache's key is
   `{kind, id, width, height, focused, method, themeGen}`, with no
-  `fmt.Sprintf`. `themeGen` rises on every theme change (§4). The 0002
+  `fmt.Sprintf`. *2026-10-04 (A1, Q5): the owner kept this key, in place
+  of the hardening's `{kind, id}`; dropping a pane's or an overlay's view
+  drops every entry with its kind and ID.* `themeGen` rises on every theme change (§4). The 0002
   hardening rules stay: overlays and panes have separate kinds, and entries
   are dropped on `SetPane` and `Pop`.
 * **An unchanged frame is returned as is.** The workspace keeps a dirty
@@ -354,6 +357,7 @@ Chosen option: **"A"**, because:
   method from grapheme to wcwidth, which a caller can see.
 * Everything public in `v0.1.5` still compiles. The release notes name the
   width change and `WithWidthMethod(ansi.GraphemeWidth)` as the way back.
+  *Amended 2026-10-04 (A1): `v0.1.6`, which has the same public API.*
 
 ### Consequences
 
@@ -480,6 +484,101 @@ opt-in. §4, Consequences and Confirmation were revised to match.
   misaligned on terminals without mode 2027.
 * **Q4. The version.** Recommended: `v0.2.0`, because the default width
   method changes. The alternative is `v0.1.2`.
+
+## Amendments
+
+### A1 (2026-10-04): the pre-execution audit
+
+*Status: accepted (2026-10-04).* The owner asked, before execution, for "the audit to
+ensure state is known and factual". Every claim in this record was checked
+against the tree at `5f514fb` and against the pinned upstream sources.
+
+**Confirmed, unchanged:**
+
+* Every upstream reference holds at the pinned versions: lipgloss v2.0.6
+  `canvas.go:27` (`c.scr.Method = ansi.GraphemeWidth`), `canvas.go:87-89`
+  and `layer.go:153-156`; bubbletea v2.0.10 `cursed_renderer.go:48`,
+  `tea.go:784-791`, `802-805`, `880`, `980-994`, `1098` and `1118-1123`;
+  ultraviolet `buffer.go:614-618` (`Method: ansi.WcWidth`).
+* Every API this record uses exists at those versions: `lipgloss.LightDark`
+  and `lipgloss.Complete`; bubbles `help.KeyMap`; `tea.ModeReportMsg{Mode,
+  Value}`, `tea.RequestBackgroundColor` and `BackgroundColorMsg.IsDark`;
+  `ansi.Method`'s `StringWidth` and `Truncate` methods; ultraviolet's
+  `ScreenBuffer`, `NewStyledString` with `Draw`, and `TrimSpace`.
+* ultraviolet is still indirect at
+  `v0.0.0-20260811164956-006e29f97886`, and `go list -m -versions` still
+  lists no tag. bubbles v2.2.1, as well as bubbletea v2.0.10, requires the
+  older `v0.0.0-20260703014108-f5a850f9c2b7`; minimum version selection
+  takes lipgloss's.
+* In `workspace` today: the canvas is still built every frame
+  (`render.go:41`); edge glyphs are still styled once per row
+  (`render.go:192`); `renderSeparator` still reads only the workspace's
+  chrome (`render.go:201`); `SeparatorCross` is never drawn; `KeyMapper`
+  is never read; `Broadcast` still sorts on every message; no
+  `lipgloss.Width` call is left; `Plan.All`, `View`, `Panes`, `PaneAs`,
+  `ShortHelp`, `FullHelp`, `SetTheme` and `WidthMethod` do not exist.
+* **The cost is where the audit found it.** `BenchmarkRender`, ten runs on
+  the macOS development host (Apple M1 Pro), `views`: 1.588 ms ± 1%,
+  1.662 MiB (1.74 MB) and 1,078 allocations per frame; `changer`:
+  1.534 ms, 1.624 MiB and 925. The audit measured 1.55 ms, 1.74 MB and
+  1,091, so the §Confirmation thresholds, relative to the PLAN's Step 1
+  baseline, still mean what they meant.
+
+**Changed since this record was written:**
+
+* **Releases.** `v0.1.6`, not `v0.1.5`, completes the hardening
+  ([0002-PLAN-harden-workspace-v0-1-1.md](0002-PLAN-harden-workspace-v0-1-1.md)
+  deviation D7). No Go file changed after `v0.1.4`.
+* **Two of §2's items are already done,** by that PLAN's Steps 4 and 6:
+  the view cache has a struct key, `viewKey{kind, id}` with an entry
+  `cached{width, height, focused, view}`, and `fmt.Sprintf` is gone; and
+  `renderBox` walks lines with `strings.SplitSeq`. `clip` still uses
+  `strings.Split`.
+* **What the hardening added that §2's dirty flag must cover:**
+  * focus moves through one path, which a modal overlay's push or pop also
+    takes, and panes get `PaneFocusMsg` and `PaneBlurMsg`;
+  * `SendOverlay` delivers to an overlay, so "a message delivered to a pane
+    that is not a `Changer`" includes an overlay's pane;
+  * `Push` of an open ID replaces that overlay and drops its cached view, as
+    `SetPane` and `Pop` do.
+* **`Wrap`'s `Model`** implements `Cursor` and `Keys`, so §5's help lists a
+  wrapped bubbles component's bindings with no further work.
+* **The default focus keys** are `alt+.` and `alt+,`.
+* **The gates** ([0010-PLAN-nested-adapter-modules.md](0010-PLAN-nested-adapter-modules.md)):
+  every gate runs per module with `GOWORK=off`; `make release-check` runs
+  before a tag; depguard's per-directory rules take the form `$all` plus
+  `!**/<dir>/**`, and §1's ultraviolet rule takes it too; the conformance
+  scan type-checks every package, and refuses more than §5 names.
+
+**The cache key, put to the owner.** §2 widened the cache's key to
+`{kind, id, width, height, focused, method, themeGen}`. With width and
+height in the key, the map gains an entry at every size a pane is drawn at,
+and nothing evicts the old ones. The hardening's shape keeps one entry per
+pane or overlay: the key is `{kind, id}`, and the entry records what it was
+drawn under.
+
+* **Recommended (Q5):** keep the key `{kind, id}`, and add `method` and
+  `themeGen` to the entry's check beside width, height and focus. A method
+  or theme change then misses every entry, as §3 and §4 require, and the
+  map stays one entry per pane.
+* **The alternative** is §2 as written. It works, and the map grows with
+  every resize until a pane is replaced.
+
+**Owner question for A1.**
+
+*Answered 2026-10-04* (picked from options): Q5 "The MADR's wider key".
+That is not the recommendation. §2 stands as written: the key is
+`{kind, id, width, height, focused, method, themeGen}`, replacing the
+hardening's `viewKey{kind, id}`. Two consequences follow, and the PLAN's
+Step 3 carries both:
+
+* `SetPane`, `Pop` and a replacing `Push` drop every entry with the pane's
+  or overlay's kind and ID, so the hardening's eviction tests keep holding;
+* entries for sizes no longer drawn stay until their pane or overlay is
+  dropped, which the owner accepted.
+
+* **Q5. The cache key.** Recommended: `{kind, id}`, with method and theme
+  in the entry's check. The alternative is §2's wider key.
 
 ## More Information
 

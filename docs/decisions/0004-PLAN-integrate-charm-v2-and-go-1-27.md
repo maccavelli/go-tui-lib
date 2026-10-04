@@ -1,6 +1,6 @@
 ---
-status: proposed
-date: 2026-10-02
+status: in-progress
+date: 2026-10-04
 associated-madr: "0004-MADR-integrate-charm-v2-and-go-1-27.md"
 ---
 # Implement direct cell drawing, terminal-following width and theme, and Go 1.27 accessors (`v0.2.0`)
@@ -12,6 +12,28 @@ MADR is `accepted`. Q2 departs from the recommendation: `Init` asks for the
 background by default, and `WithoutBackgroundQuery()` replaces
 `WithBackgroundQuery()`. Step 1 and Step 5 changed to match. This PLAN is
 still `proposed`, because execution is not yet approved.
+
+**Revision, 2026-10-04: the pre-execution audit.** The owner asked for an
+audit "to ensure state is known and factual" before execution. Its findings
+are MADR amendment A1 (proposed), with owner question Q5 on the cache key.
+This PLAN changed to match, and each change is annotated in place:
+
+* `v0.1.6`, not `v0.1.5`, is the tree this work starts from and compares
+  against (the hardening PLAN's deviation D7);
+* Step 3's struct cache key and `strings.SplitSeq` in `renderBox` are
+  already done; the step keeps the hardening's `{kind, id}` key and adds
+  `method` and `themeGen` to the entry's check (A1, Q5);
+* Step 3's dirty cases name what the hardening added: overlay messages
+  through `SendOverlay`, and a replacing `Push`;
+* Step 2's depguard rule takes the form 0010's rules use;
+* Verification names the typed conformance scan and `make release-check`.
+
+A measurement taken during the audit (A1) puts the baseline within 2.5% of
+the audit's. Step 1 still records its own.
+
+*Later on 2026-10-04:* the owner accepted A1, answered Q5 with "The MADR's
+wider key" (not the recommendation), and approved this PLAN. Step 3's cache
+bullet follows that answer. This PLAN is `in-progress`.
 
 ## Goal
 
@@ -28,7 +50,9 @@ tree, and the owner can tag `v0.2.0`.
 
 **Precondition.** [0002-PLAN-harden-workspace-v0-1-1.md](0002-PLAN-harden-workspace-v0-1-1.md)
 is `complete`, so this work starts from the `v0.1.5` tree, with its cache
-and focus fixes in place. (That PLAN's deviation D3: `v0.1.1` and
+and focus fixes in place. *Amended 2026-10-04: the `v0.1.6` tree, which
+completes it (its deviation D7) and has the same Go code as `v0.1.4` and
+`v0.1.5`.* (That PLAN's deviation D3: `v0.1.1` and
 `v0.1.2` tag only its Steps 1–4. Its deviation D6: `v0.1.4` tags Steps
 5–7a, and there is no `v0.1.3`.)
 
@@ -103,7 +127,8 @@ Added for this PLAN:
 * The owner accepted the MADR on 2026-10-02, answering Q1–Q4, and the
   answers are recorded in it. When execution is approved, set this PLAN
   `in-progress` and update `docs/README.md`.
-* **Baseline.** On the `v0.1.5` tree, on the macOS development host:
+* **Baseline.** On the `v0.1.5` tree, on the macOS development host
+  *(amended 2026-10-04: the `v0.1.6` tree)*:
 
   ```bash
   go test -run '^$' -bench BenchmarkRender -benchmem -count=10 ./workspace \
@@ -122,7 +147,9 @@ Added for this PLAN:
 * `go.mod`: ultraviolet becomes a direct requirement, at the same version.
 * `.golangci.yml`: a `depguard` rule denies
   `github.com/charmbracelet/ultraviolet` in every file outside
-  `internal/cells/`. AGENTS.md's Dependencies list names it, and this
+  `internal/cells/`. *Amended 2026-10-04: a rule named `ultraviolet`, with
+  `files` `$all` and `!**/internal/cells/**`, the form of 0010's `cobra`,
+  `kong` and `glamour` rules; it covers every module.* AGENTS.md's Dependencies list names it, and this
   record.
 * **Tests:**
   * a drawn string is clipped to its rectangle, and the cells outside it
@@ -132,7 +159,7 @@ Added for this PLAN:
     size;
   * the same string drawn at `WcWidth` and at `GraphemeWidth` differs in
     width exactly for the emoji fixture;
-  * `Render` of a frame drawn like the v0.1.5 canvas equals
+  * `Render` of a frame drawn like the v0.1.5 *(amended: v0.1.6)* canvas equals
     `lipgloss.Canvas.Render` for the same layers, byte for byte.
 * **Mutations:**
   * `Draw` does not clear;
@@ -149,11 +176,18 @@ Added for this PLAN:
   * regions `{kind, id, rect, inner}` are recorded top first, and
     `mouseEvent` hit-tests them;
   * edge glyphs are styled once per box, and lines are walked with
-    `strings.SplitSeq`;
+    `strings.SplitSeq`; *(amended 2026-10-04: `renderBox` already does,
+    since the hardening's Step 6)*
   * the cache key is a struct, `{kind, id, width, height, focused, method,
-    themeGen}`;
+    themeGen}`; *(2026-10-04, MADR A1, Q5 "The MADR's wider key": this key
+    replaces the hardening's `viewKey{kind, id}`; `SetPane`, `Pop` and a
+    replacing `Push` drop every entry with that kind and ID, so
+    `TestSetPaneDropsTheCachedView`, `TestPopEvictsTheOverlay` and
+    `TestPushReplacesAnOpenID` keep passing)*
   * a dirty flag, set by every case in MADR §2, lets `Render` return the
-    last frame;
+    last frame; *(amended 2026-10-04: the cases include a message
+    `SendOverlay` delivers to an overlay's pane, and a `Push` that replaces
+    an open overlay)*
   * `Broadcast` uses a sorted ID slice kept by `New`, `SetPane` and
     `SetLayout`.
 * **Tests:**
@@ -165,6 +199,8 @@ Added for this PLAN:
   * a frame with nothing dirty is returned without any pane's `View` being
     called, and each dirty case (size, layout, state, focus, overlay push
     and pop, theme, method, a message to a non-`Changer` pane) redraws;
+    *(amended 2026-10-04: and a replacing `Push`, and a message to a
+    non-`Changer` overlay)*
   * `TestRenderAllocs`: at most 650 allocations for a full frame, and at
     most 2 for a clean one.
 * **Benchmark.** Re-run the Step 1 command, and compare with benchstat:
@@ -292,9 +328,12 @@ Added for this PLAN:
 * Every step's mutations are killed.
 * The benchmark gate holds: `views` time at most 60% and bytes at most 20%
   of the Step 1 baseline, by benchstat; `TestRenderAllocs` passes.
-* Every golden file from `v0.1.5` is unchanged.
+* Every golden file from `v0.1.5` is unchanged. *(Amended 2026-10-04:
+  from `v0.1.6`, which has the same 96 files under
+  `workspace/testdata/golden/`.)*
 * On the macOS development host and the Windows test host, all pass:
-  * `make pre-add-check`, `make lint` and `make vuln`;
+  * `make pre-add-check`, `make lint` and `make vuln`; *(amended
+    2026-10-04: and `make release-check`, each per module)*
   * `go test -race -count=1 ./...`, `go test -shuffle=on -count=2 ./...`
     and `LC_ALL=C go test ./...`;
   * `make fuzz`.
@@ -304,7 +343,9 @@ Added for this PLAN:
 * `depguard` refuses ultraviolet outside `internal/cells`, and the Charm v1
   paths everywhere.
 * `internal/conformance` finds no `os.Stdout`, `os.Stderr`, `AltScreen` or
-  `signal.Notify` in non-test code.
+  `signal.Notify` in non-test code. *(Amended 2026-10-04: the scan is typed,
+  and also refuses `fmt.Print*`, `log`'s standard logger, `log/slog`'s
+  default logger and the print builtins; `internal/cells` must pass it.)*
 * The identifier scan of 0001-PLAN V7 finds nothing.
 * After the owner's push, CI is green on all three operating systems.
 
@@ -320,4 +361,52 @@ Added for this PLAN:
 
 ## Execution Record
 
-None yet.
+### Step 1: records and the baseline (2026-10-04)
+
+* **Records.** Before approval, the owner asked for an audit "to ensure
+  state is known and factual". It became MADR amendment A1 and this PLAN's
+  revision of 2026-10-04. The owner then accepted A1, answered Q5 ("The
+  MADR's wider key") and approved this PLAN. The PLAN is `in-progress`,
+  and `docs/README.md` shows the MADR `accepted; A1 accepted` and this
+  PLAN `in-progress`.
+* **The tree.** `5f514fb`, whose Go files, `go.mod` and `go.sum` are
+  identical to `v0.1.6`'s (`git diff --quiet v0.1.6 HEAD -- '*.go' go.mod
+  go.sum` exits 0).
+* **Baseline,** the command above, on the macOS development host:
+
+  ```text
+  goos: darwin
+  goarch: arm64
+  pkg: github.com/maccavelli/go-tui-lib/workspace
+  cpu: Apple M1 Pro
+  BenchmarkRender/views-10         	     705	   1653368 ns/op	 1741347 B/op	    1078 allocs/op
+  BenchmarkRender/views-10         	     742	   1635968 ns/op	 1743034 B/op	    1078 allocs/op
+  BenchmarkRender/views-10         	     722	   1641657 ns/op	 1739155 B/op	    1078 allocs/op
+  BenchmarkRender/views-10         	     720	   1632069 ns/op	 1742717 B/op	    1078 allocs/op
+  BenchmarkRender/views-10         	     735	   1653700 ns/op	 1743275 B/op	    1078 allocs/op
+  BenchmarkRender/views-10         	     748	   1606328 ns/op	 1742876 B/op	    1078 allocs/op
+  BenchmarkRender/views-10         	     745	   1648186 ns/op	 1743563 B/op	    1078 allocs/op
+  BenchmarkRender/views-10         	     754	   1623907 ns/op	 1745691 B/op	    1078 allocs/op
+  BenchmarkRender/views-10         	     697	   1698785 ns/op	 1744373 B/op	    1078 allocs/op
+  BenchmarkRender/views-10         	     745	   1635191 ns/op	 1745190 B/op	    1078 allocs/op
+  BenchmarkRender/changer-10       	     762	   1606571 ns/op	 1702143 B/op	     925 allocs/op
+  BenchmarkRender/changer-10       	     775	   1623113 ns/op	 1704798 B/op	     925 allocs/op
+  BenchmarkRender/changer-10       	     752	   1604682 ns/op	 1703843 B/op	     925 allocs/op
+  BenchmarkRender/changer-10       	     748	   1574700 ns/op	 1703825 B/op	     925 allocs/op
+  BenchmarkRender/changer-10       	     774	   1588347 ns/op	 1704319 B/op	     925 allocs/op
+  BenchmarkRender/changer-10       	     768	   1563810 ns/op	 1705675 B/op	     925 allocs/op
+  BenchmarkRender/changer-10       	     768	   1574254 ns/op	 1703463 B/op	     925 allocs/op
+  BenchmarkRender/changer-10       	     782	   1553411 ns/op	 1703775 B/op	     925 allocs/op
+  BenchmarkRender/changer-10       	     746	   1630598 ns/op	 1703943 B/op	     925 allocs/op
+  BenchmarkRender/changer-10       	     720	   2141358 ns/op	 1699786 B/op	     924 allocs/op
+  PASS
+  ok  	github.com/maccavelli/go-tui-lib/workspace	24.828s
+  ```
+
+  benchstat: `views` 1.639 ms ± 1%, 1.662 MiB ± 0% (1.74 MB) and 1,078
+  allocations; `changer` 1.597 ms ± 2%, 1.625 MiB and 925. The `views`
+  median is 5.7% above the audit's 1.55 ms, inside the 25% band, so no
+  explanation is needed. The last `changer` run, 2.14 ms, is an outlier
+  that benchstat's median absorbs. Step 3's gate is therefore at most
+  0.983 ms (60%) and 0.332 MiB (20%) for `views`.
+* The benchmark wrote no `go.work.sum`.
