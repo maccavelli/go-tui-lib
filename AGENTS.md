@@ -18,8 +18,12 @@ The root module's list is
 amendment A3, which names the stack: `charm.land/bubbletea/v2`,
 `charm.land/lipgloss/v2`, `charm.land/bubbles/v2`,
 `github.com/charmbracelet/colorprofile`, `github.com/charmbracelet/x/ansi` and
-`github.com/maccavelli/go-selfupdate-lib` (formerly `go-core-lib`). Any other
-module needs its own MADR.
+`github.com/maccavelli/go-selfupdate-lib` (formerly `go-core-lib`).
+`docs/decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md` §1 adds
+`github.com/charmbracelet/ultraviolet`, which has no tagged release: only
+`internal/cells` may import it, at the version lipgloss's requirement
+selects, and depguard refuses it everywhere else. Any other module needs
+its own MADR.
 
 Never import the Charm v1 paths `github.com/charmbracelet/bubbletea`,
 `github.com/charmbracelet/lipgloss` or `github.com/charmbracelet/bubbles`;

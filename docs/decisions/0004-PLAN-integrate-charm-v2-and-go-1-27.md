@@ -410,3 +410,77 @@ Added for this PLAN:
   that benchstat's median absorbs. Step 3's gate is therefore at most
   0.983 ms (60%) and 0.332 MiB (20%) for `views`.
 * The benchmark wrote no `go.work.sum`.
+
+### Step 2: `internal/cells` (2026-10-04)
+
+The owner committed Step 1 (`506a0fc`) and the 0010 records (`db18f09`),
+and approved this step ("Proceed to 0004").
+
+**What changed.**
+
+* **`internal/cells/cells.go` (new).** `Frame` over a `uv.ScreenBuffer`:
+  `NewFrame(w, h, m)`, `Resize` (a no-op at the same size; a negative size
+  is 0), `Width`, `Height`, `SetMethod`, `Method`, `Clear`, `Draw(s, r)` and
+  `Render`. `Draw` is `uv.NewStyledString(s).Draw` into `uv.Rect(r)`, which
+  clears the rectangle and prints the string clipped to it; `Render` is
+  `uv.TrimSpace` of the buffer's render, as lipgloss's `Canvas.Render` is.
+  `Width` and `Height` are additions to MADR §1's list, which the tests and
+  Step 3 need. The package comment says why the package exists.
+* **`go.mod`.** `go mod tidy` moved
+  `github.com/charmbracelet/ultraviolet v0.0.0-20260811164956-006e29f97886`
+  from the indirect block to the direct one. The version is unchanged, and
+  `go.sum` did not change.
+* **`.golangci.yml`.** A depguard rule, `ultraviolet`, with `files` `$all`
+  and `!**/internal/cells/**`, denies the module everywhere else, in every
+  module, in the form of 0010's rules.
+* **`AGENTS.md`,** Dependencies: names ultraviolet, this record's §1, and
+  that only `internal/cells` may import it.
+
+**Tests** (`internal/cells/cells_test.go`, new):
+
+* a string drawn into a 4 × 1 rectangle of a frame filled with `x` is
+  clipped to it, and every other cell keeps its `x`;
+* drawing `ab` over `abcdef` in the same rectangle leaves no tail;
+* `Resize` to the same size keeps the contents, `Clear` empties the frame,
+  and a new or a negative size takes effect;
+* the zero-width-joiner family emoji and the VS16 heart push a following
+  `|` by exactly `m.StringWidth` of the fixture at each method, and the
+  two methods differ for both emoji but not for ASCII;
+* four layers like the workspace's (two bordered, coloured boxes with the
+  emoji and Japanese text, a bold separator column, and a background-filled
+  overlay across both) render byte for byte as lipgloss's
+  `NewCanvas` and `NewCompositor` render them, at `GraphemeWidth`, the
+  method lipgloss's canvas fixes; and no rendered row ends in a space.
+
+The first run of the method test failed on its own fixture: `ab` contains
+a `b`, so the gap was measured from the wrong one. It now measures from
+the last `b`; only spaces lie between that and the `|`. The test file's
+emoji constant had been written with literal joiner and selector
+characters, which staticcheck's ST1018 reported; it now uses `\u`
+escapes, with the same code points.
+
+**Mutation proofs**, each on a scratch copy; none survived:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| `Draw` does not clear (it copies only the drawn string's non-empty cells) | `after a shorter draw: "xxabcdefxx", want "xxab    xx"` |
+| `SetMethod` is ignored | `Method() is 0 after SetMethod(1)` |
+| `Render` does not trim | `Render differs from lipgloss's canvas` |
+
+**depguard proof,** on a scratch copy with `import uv
+"github.com/charmbracelet/ultraviolet"` planted in `workspace/zz_uv.go`
+and in `internal/cells/zz_uv.go`: golangci-lint on `./workspace/` exits 1
+with `import 'github.com/charmbracelet/ultraviolet' is not allowed from
+list 'ultraviolet': ultraviolet only in internal/cells (…§1) (depguard)`;
+on `./internal/cells/` it exits 0, with no depguard report.
+
+**Checks.**
+
+* `make pre-add-check FILES=…` on the two new files: `2 file(s) clean in
+  1 module(s)`, govulncheck included.
+* `make lint` (with `make modernize`): `0 issues` for linux, darwin and
+  windows.
+* `go test -race -count=1 ./...` and `LC_ALL=C go test -count=1 ./...`:
+  every package `ok`; the conformance scan type-checks `internal/cells`.
+* `GOWORK=off go mod tidy -diff`: exit 0. No `go.work.sum` was written.
+* **The Windows test host:** `make pre-add-check` and `make release-check` (`31 file(s) clean in 1 module(s)`, tests and govulncheck included), `make lint` (`0 issues` for linux, darwin and windows) and `make vuln` (`No vulnerabilities found.`) exited 0; `go-modules.sh --check` exited 0.
