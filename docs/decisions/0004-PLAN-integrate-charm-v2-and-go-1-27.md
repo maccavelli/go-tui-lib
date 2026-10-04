@@ -992,3 +992,69 @@ after the `viewOf` rename:
   `go test -shuffle=on -count=2 ./...`: every package `ok`.
 * `GOWORK=off go mod tidy -diff`: exit 0. No `go.work.sum` was written.
 * **The Windows test host:** `make pre-add-check` and `make release-check` (`37 file(s) clean in 1 module(s)`, the golden tests included), `make lint` (`0 issues` for linux, darwin and windows) and `make vuln` (`No vulnerabilities found.`) exited 0; `go-modules.sh --check` exited 0.
+
+### Step 7: Go 1.27 accessors (2026-10-04)
+
+The owner committed D1's records (`9054190`) and Step 6 (`736070a`), and
+approved this step ("Proceed").
+
+**What changed.**
+
+* **`layout/layout.go`.** `Plan.All() iter.Seq2[PaneID, Rect]` yields each
+  placed pane and its rectangle in `Order`, and stops when the loop
+  breaks.
+* **`workspace/workspace.go`.**
+  * `Panes() iter.Seq2[layout.PaneID, Pane]` yields the panes of the focus
+    ring, in its order: `WithFocusRing`'s, or else the tree's. Reading of
+    the MADR's "hosted panes in focus-ring order", recorded here: it is the
+    ring, the panes focus moves through, so an unfocusable footer is not
+    yielded. A program that wants every placed pane walks `Plan().All()`.
+  * `PaneAs[T Pane](id) (T, bool)`, a generic method: pane `id` as `T`,
+    or, when no pane has that ID, the open overlay's pane, the order `Send`
+    uses; false when neither is there or it is not a `T`.
+  * The focus ring walks `Plan.All` when no ring was set; `resolve` walks
+    `Plan.All`.
+* **`workspace/render.go`.** `Render` draws the panes from `Plan.All`. The
+  clean-frame `Changer` poll keeps its slice loop.
+* `TestRenderAllocs`: a full frame is 441 allocations (440 before; at most
+  650), a clean one 0.
+
+**Tests.**
+
+* `layout/all_test.go` (new): `All` yields every placed pane with its
+  rectangle, in `Order`, and a loop that breaks after two panes runs
+  twice.
+* `workspace/accessors_test.go` (new):
+  * `Panes` yields the hosted panes of the focus ring, `main`, `side`,
+    `logs`, without the unfocusable footer; with `WithFocusRing("logs",
+    "main")` a loop that breaks at once gets `logs`;
+  * `PaneAs` returns a pane and an overlay's pane as their concrete types,
+    false for the wrong type and for an absent ID, and finds the pane first
+    when an overlay shares its ID.
+* `workspace/example_paneas_test.go` (new): `ExampleWorkspace_PaneAs`
+  counts two messages through `PaneAs[*counter]`, and prints
+  `count: 2` and `missing: false`, which its `// Output:` checks.
+
+**Mutation proofs**, each on a scratch copy; none survived:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| `All` ignores the `yield` result | `panic: runtime error: range function continued iteration after function for loop body returned false`, at `all_test.go:25` |
+| `PaneAs` returns true for the wrong type | `PaneAs[*stable](main) = <nil>, true; want false for the wrong type` |
+| `Panes` ignores the `yield` result | the same panic, at `accessors_test.go:24` |
+
+The third is added to the PLAN's two.
+
+**Checks.**
+
+* `make pre-add-check FILES=…` on the six Go files: `6 file(s) clean in
+  1 module(s)`, govulncheck included. golangci-lint v2.14.0 and govulncheck
+  v1.8.0 accept the generic method, as the MADR's probe found.
+* `make lint` (with `make modernize`): `0 issues` for linux, darwin and
+  windows.
+* `go test -race -count=1 ./...`, `LC_ALL=C go test -count=1 ./...` and
+  `go test -shuffle=on -count=2 ./...`: every package `ok`. `make fuzz`:
+  `1 fuzz targets ran clean in ./layout`.
+* `GOWORK=off go mod tidy -diff`: exit 0. No `go.work.sum` was written. No
+  golden file changed.
+* **The Windows test host:** `make pre-add-check` and `make release-check` (`40 file(s) clean in 1 module(s)`, the example and the new tests included), `make lint` (`0 issues` for linux, darwin and windows) and `make vuln` (`No vulnerabilities found.`) exited 0; `go-modules.sh --check` exited 0.

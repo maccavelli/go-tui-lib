@@ -51,8 +51,7 @@ func (w *Workspace) Render() string {
 	w.frame.SetMethod(w.method)
 	w.frame.Clear()
 	w.regions = w.regions[:0]
-	for _, id := range w.plan.Order {
-		r := w.plan.Panes[id]
+	for id, r := range w.plan.All() {
 		w.frame.Draw(w.renderPane(id, r), r)
 		w.regions = append(w.regions, region{kind: paneRegion, id: string(id), rect: r, inner: w.content(id, r)})
 	}

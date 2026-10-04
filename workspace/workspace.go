@@ -19,6 +19,7 @@
 package workspace
 
 import (
+	"iter"
 	"maps"
 	"slices"
 
@@ -552,17 +553,51 @@ func (w *Workspace) cycle(step int) tea.Cmd {
 }
 
 func (w *Workspace) focusRing() []layout.PaneID {
-	order := w.plan.Order
+	var out []layout.PaneID
 	if len(w.ring) > 0 {
-		order = w.ring
+		for _, id := range w.ring {
+			if w.focusable(id) {
+				out = append(out, id)
+			}
+		}
+		return out
 	}
-	out := make([]layout.PaneID, 0, len(order))
-	for _, id := range order {
+	for id := range w.plan.All() {
 		if w.focusable(id) {
 			out = append(out, id)
 		}
 	}
 	return out
+}
+
+// Panes yields the panes of the focus ring, the panes focus moves through,
+// in its order: WithFocusRing's, or else the tree's
+// (docs/decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md §6).
+func (w *Workspace) Panes() iter.Seq2[layout.PaneID, Pane] {
+	return func(yield func(layout.PaneID, Pane) bool) {
+		for _, id := range w.focusRing() {
+			if !yield(id, w.panes[id]) {
+				return
+			}
+		}
+	}
+}
+
+// PaneAs returns pane id as T, or, when no pane has that ID, the open
+// overlay id's pane, as Send finds them. It returns false when neither is
+// there or it is not a T. It is a generic method, which Go 1.27 allows.
+func (w *Workspace) PaneAs[T Pane](id layout.PaneID) (T, bool) {
+	p, ok := w.panes[id]
+	if !ok {
+		i := w.overlayIndex(string(id))
+		if i < 0 {
+			var zero T
+			return zero, false
+		}
+		p = w.overlays[i].Pane
+	}
+	t, ok := p.(T)
+	return t, ok
 }
 
 func (w *Workspace) focusable(id layout.PaneID) bool {
@@ -673,8 +708,8 @@ func (w *Workspace) resolve() tea.Cmd {
 	w.dirty = true
 	w.solve()
 	var cmds []tea.Cmd
-	for _, id := range w.plan.Order {
-		in := w.content(id, w.plan.Panes[id])
+	for id, r := range w.plan.All() {
+		in := w.content(id, r)
 		sz := SizeMsg{Width: in.W, Height: in.H}
 		if old, ok := w.sizes[id]; ok && old == sz {
 			continue

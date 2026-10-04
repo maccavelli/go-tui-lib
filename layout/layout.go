@@ -20,6 +20,7 @@ package layout
 import (
 	"errors"
 	"fmt"
+	"iter"
 	"slices"
 	"strings"
 )
@@ -241,6 +242,18 @@ type Plan struct {
 	// a limit leaves no dead zone to work back through. A separator with
 	// nothing applied is absent, and Resize is nil when none is present.
 	Resize map[string]int
+}
+
+// All yields each placed pane and its rectangle, in Order, the tree's
+// order (docs/decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md §6).
+func (p Plan) All() iter.Seq2[PaneID, Rect] {
+	return func(yield func(PaneID, Rect) bool) {
+		for _, id := range p.Order {
+			if !yield(id, p.Panes[id]) {
+				return
+			}
+		}
+	}
 }
 
 // Context carries the state and collects the plan while a tree is
