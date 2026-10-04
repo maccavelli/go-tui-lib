@@ -1,5 +1,5 @@
 ---
-status: complete
+status: in-progress
 date: 2026-10-04
 associated-madr: "0010-MADR-nested-adapter-modules.md"
 ---
@@ -41,6 +41,7 @@ MADR's Confirmation lists.
 | 4 | `.golangci.yml` | depguard for the adapters' dependencies |
 | 5 | `.github/workflows/ci.yml` | the module matrix |
 | 6 | `AGENTS.md`, `docs/architecture.md`, `docs/guides/releasing.md` (new), `docs/README.md`, `README.md`; by deviation D1, `scripts/go-modules.sh` and `Makefile` | documentation, close-out; D1's Windows path fixes |
+| 7 | `.gitignore`, `AGENTS.md`, `docs/architecture.md`, `docs/guides/releasing.md` | MADR A1: `go.work.sum` is ignored (added 2026-10-04) |
 
 No module is added, and no `go.mod` changes. Until an adapter lands, the
 workspace holds the root module only, and every loop runs once.
@@ -103,7 +104,8 @@ as Order says (that PLAN's deviation D6 replaced `v0.1.3`).
 * `go work init .` at the root, giving `go 1.27.1` and `use .`. No
   `toolchain`, `godebug` or `replace` line.
 * `.gitignore` gains nothing for `go.work`; the file is committed. If the
-  `go` command writes `go.work.sum`, it is committed too.
+  `go` command writes `go.work.sum`, it is committed too. *Superseded
+  2026-10-04 by MADR A1: `go.work.sum` is ignored (Phase 7).*
 * **Checks:**
   * `go env GOWORK` names the file; `go list -m` prints the root module
     only;
@@ -215,6 +217,23 @@ as Order says (that PLAN's deviation D6 replaced `v0.1.3`).
   adding a module and releasing one.
 * **Release notes** in the execution record. The root release that carries
   this PLAN changes no API.
+
+### Phase 7: `go.work.sum` is ignored
+
+*Added 2026-10-04 by MADR A1.* The PLAN was `complete`; it is
+`in-progress` again until this phase is done.
+
+* `.gitignore` gains `go.work.sum`, with a comment citing MADR A1.
+* `AGENTS.md`'s Modules section, `docs/architecture.md`'s tree and
+  Modules section, and `docs/guides/releasing.md`'s rules say that
+  `go.work` is committed and `go.work.sum` is ignored, and why.
+* **Proof, on a scratch copy:** a workspace-mode `go doc` of a dependency
+  package (`charm.land/bubbles/v2/help`) writes `go.work.sum`;
+  `git status --short` then shows nothing, and
+  `git check-ignore -v go.work.sum` names the `.gitignore` line. Before
+  the change, on the same copy, `git status` shows `?? go.work.sum`.
+* **Checks:** markdownlint, the link check over the changed documents,
+  `make pre-add-check`, and the identifier scan.
 
 ## Verification
 
@@ -766,3 +785,15 @@ history:
   and 11, and
   [0009-PLAN-streaming-content-engine.md](0009-PLAN-streaming-content-engine.md)
   Step 7, each with this PLAN's gates.
+
+### Amendment A1 (2026-10-04): reopened for Phase 7
+
+* MADR A1 was accepted after the close-out above, so this PLAN is
+  `in-progress` again for Phase 7, which waits for the owner's approval.
+* The `go.work.sum` that the 0004 audit's `go doc` calls wrote was deleted,
+  with the owner's approval. It was untracked: `git ls-files
+  --error-unmatch go.work.sum` exited 1. Its six lines were `/go.mod`
+  checksums of `github.com/MakeNowJust/heredoc`,
+  `github.com/bits-and-blooms/bitset`, `github.com/charmbracelet/harmonica`,
+  `github.com/clipperhouse/stringish`, `github.com/dustin/go-humanize` and
+  `github.com/sahilm/fuzzy`.

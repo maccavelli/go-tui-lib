@@ -129,7 +129,8 @@ use (
 ```
 
 * **Committed at the root,** with `go.work.sum` when the `go` command
-  writes one. Until a module exists, its `use` line is absent: each module's
+  writes one. *Amended 2026-10-04 (A1): `go.work.sum` is ignored, not
+  committed.* Until a module exists, its `use` line is absent: each module's
   first commit adds its directory with `go work use`.
 * **The `go` line equals the root's** `go 1.27.1`. The documentation
   requires it to be at least every module's (REPORT §3), and the root's is
@@ -341,6 +342,34 @@ as decided. The module layout, the glamour module and the committed
   Kong module generates completion scripts itself from the registry, for
   bash, zsh, fish and PowerShell, so it needs no other module. The
   alternative is to require `kong-completion`, which needs its own record.
+
+## Amendments
+
+### A1 (2026-10-04): `go.work.sum` is ignored
+
+*Status: accepted (2026-10-04).* Its plan is Phase 7 of
+[0010-PLAN-nested-adapter-modules.md](0010-PLAN-nested-adapter-modules.md).
+
+**Found.** During the pre-execution audit of
+[0004-MADR-integrate-charm-v2-and-go-1-27.md](0004-MADR-integrate-charm-v2-and-go-1-27.md)
+(its amendment A1), `go doc` on dependency packages, such as bubbles'
+`help`, ran in workspace mode because `go.work` is committed. The `go`
+command then wrote a `go.work.sum` at the root, holding six `/go.mod`
+checksums of bubbles' dependencies that no module's `go.sum` lists. The
+file "keeps track of hashes used by the workspace that are not in
+collective workspace modules' go.sum files" (0010-REPORT §3,
+`ref/mod.md:1282-1283`). No build or gate needed it: every gate runs with
+`GOWORK=off`, and `go build`, `go test` and `go mod tidy -diff` in
+workspace mode wrote nothing (Phase 2 of the PLAN; the 0004 baseline run).
+
+**Decision** (the owner, picked from options, 2026-10-04): delete that file,
+and ignore `go.work.sum` rather than commit it. §2's "with `go.work.sum`
+when the `go` command writes one" is superseded. Committing it would
+record whatever ad-hoc command a developer last ran in workspace mode, and
+would change for reasons no gate checks.
+
+**Unchanged.** `go.work` itself stays committed, and every other rule in §2
+and §4.
 
 ## More Information
 

@@ -16,8 +16,8 @@ it was when they were written
 | 0002 | PLAN | [Implement multi-pane workspaces (`v0.1.0`)](decisions/0002-PLAN-multi-pane-workspace-layouts.md) | complete |
 | 0002 | PLAN | [Harden multi-pane workspaces (`v0.1.1`)](decisions/0002-PLAN-harden-workspace-v0-1-1.md) | complete |
 | 0003 | REPORT | [Agent TUI ecosystem research, an audit of `v0.1.0`, and a source pass over four agent TUIs](reports/0003-REPORT-agent-tui-ecosystem-research.md) | — |
-| 0004 | MADR | [Draw the workspace on an ultraviolet cell buffer, follow the terminal's width method and theme, and adopt Go 1.27 idioms in the public API](decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md) | accepted |
-| 0004 | PLAN | [Implement direct cell drawing, terminal-following width and theme, and Go 1.27 accessors (`v0.2.0`)](decisions/0004-PLAN-integrate-charm-v2-and-go-1-27.md) | proposed |
+| 0004 | MADR | [Draw the workspace on an ultraviolet cell buffer, follow the terminal's width method and theme, and adopt Go 1.27 idioms in the public API](decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md) | accepted; A1 accepted |
+| 0004 | PLAN | [Implement direct cell drawing, terminal-following width and theme, and Go 1.27 accessors (`v0.2.0`)](decisions/0004-PLAN-integrate-charm-v2-and-go-1-27.md) | in-progress |
 | 0005 | MADR | [Detect terminal capabilities with one sentinel-terminated probe that observes Bubble Tea's own queries, and offer notifications, clipboard, links and prompt marks as commands built from the result](decisions/0005-MADR-terminal-capabilities-and-services.md) | accepted; A1 accepted |
 | 0005 | PLAN | [Implement terminal capabilities and services (`termcap`, `termsvc`)](decisions/0005-PLAN-terminal-capabilities-and-services.md) | proposed |
 | 0006 | MADR | [Make one command registry the source of every action, for keys, palette, slash commands, the shell and agents, on open standards](decisions/0006-MADR-command-registry.md) | accepted; A1 accepted |
@@ -28,8 +28,8 @@ it was when they were written
 | 0008 | PLAN | [Implement the command palette and the fuzzy matcher](decisions/0008-PLAN-command-palette.md) | proposed |
 | 0009 | MADR | [Stream agent output through a stable-prefix Markdown engine, a frame scheduler, an input filter and a safe-text sanitizer](decisions/0009-MADR-streaming-content-engine.md) | accepted; A1, A2 accepted |
 | 0009 | PLAN | [Implement the streaming content engine](decisions/0009-PLAN-streaming-content-engine.md) | proposed |
-| 0010 | MADR | [Ship the Cobra, Kong and glamour adapters as nested Go modules, released apart from the root and developed through a committed go.work, with every gate run per module and without the workspace](decisions/0010-MADR-nested-adapter-modules.md) | accepted |
-| 0010 | PLAN | [Implement the multi-module repository: go.work, per-module gates, and the release procedure](decisions/0010-PLAN-nested-adapter-modules.md) | complete |
+| 0010 | MADR | [Ship the Cobra, Kong and glamour adapters as nested Go modules, released apart from the root and developed through a committed go.work, with every gate run per module and without the workspace](decisions/0010-MADR-nested-adapter-modules.md) | accepted; A1 accepted |
+| 0010 | PLAN | [Implement the multi-module repository: go.work, per-module gates, and the release procedure](decisions/0010-PLAN-nested-adapter-modules.md) | in-progress |
 | 0010 | REPORT | [Nested modules, a committed go.work, and the adapters' upstream sources](reports/0010-REPORT-nested-modules-and-adapter-sources.md) | — |
 
 ## I want to…
