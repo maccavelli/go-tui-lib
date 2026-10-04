@@ -67,8 +67,9 @@ func WithOverride(f func(*Caps)) Option {
 // sends no DSR 997 reports after the probe, and Restore is always empty.
 func WithoutColorSchemeUpdates() Option { return func(p *Prober) { p.noScheme = true } }
 
-// WithoutBackgroundRequest leaves tea.RequestBackgroundColor out of the
-// batch, and out of the follow-up to each DSR 997 report.
+// WithoutBackgroundRequest leaves the OSC 11 background query out of the
+// batch, and tea.RequestBackgroundColor out of the follow-up to each DSR 997
+// report.
 func WithoutBackgroundRequest() Option { return func(p *Prober) { p.noBackground = true } }
 
 // WithDisabled sends nothing. Init returns nil, and the first tea.EnvMsg
@@ -254,11 +255,7 @@ func (p *Prober) start(env Env) tea.Cmd {
 		p.sent = append(p.sent, q)
 	}
 	b.WriteString(ansi.RequestPrimaryDeviceAttributes)
-	cmds := []tea.Cmd{tea.Raw(b.String())}
-	if !p.noBackground {
-		cmds = append(cmds, tea.RequestBackgroundColor)
-	}
-	return tea.Batch(cmds...)
+	return tea.Raw(b.String())
 }
 
 // sentinel ends the probe when DA1 answers the batch: every query sent
@@ -298,8 +295,11 @@ func (p *Prober) schemeChanged(dark bool) tea.Cmd {
 }
 
 // batch is every query in the batch's order, before the sentinel: the
-// Kitty keyboard request, the DECRQM set and DSR 996, the gated queries,
-// then each added query.
+// Kitty keyboard request, the DECRQM set and DSR 996, the OSC 11 background
+// query unless declined, the gated queries, then each added query. The
+// background query is written here rather than sent as
+// tea.RequestBackgroundColor, which tea.Batch could run after the sentinel
+// (docs/decisions/0005-MADR-terminal-capabilities-and-services.md A3).
 func (p *Prober) batch() []*probe {
 	unsupported := func(f func(*Caps) *Fact[Support]) func(*Caps) {
 		return func(c *Caps) { f(c).Set(Unsupported, Queried) }
@@ -314,6 +314,7 @@ func (p *Prober) batch() []*probe {
 		modeProbe("focus-events", ansi.ModeFocusEvent, ansi.RequestModeFocusEvent,
 			func(c *Caps) *Fact[Support] { return &c.FocusEvents }),
 		{Name: "color-scheme", Seq: fixed(ansi.RequestLightDarkReport), Parse: parseColorScheme},
+		{Name: "background", Seq: p.background, Parse: parseBackground},
 		{Name: "terminal-version", Seq: fixed(ansi.RequestNameVersion), Gated: true, Parse: parseVersion},
 		{Name: "desktop-notify", Seq: wrapped(osc99Query), Gated: true, Parse: parseOSC99,
 			silent: unsupported(func(c *Caps) *Fact[Support] { return &c.DesktopNotify })},
@@ -324,6 +325,20 @@ func (p *Prober) batch() []*probe {
 		qs = append(qs, &probe{Query: q})
 	}
 	return qs
+}
+
+// background is the OSC 11 query, unless WithoutBackgroundRequest.
+func (p *Prober) background(Env, Mux) string {
+	if p.noBackground {
+		return ""
+	}
+	return ansi.RequestBackgroundColor
+}
+
+// parseBackground answers OSC 11. Update records the colour itself.
+func parseBackground(r Reply, _ *Caps) bool {
+	_, ok := r.Msg.(tea.BackgroundColorMsg)
+	return ok
 }
 
 // fixed is a query's bytes that do not depend on the environment.

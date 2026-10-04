@@ -739,3 +739,113 @@ and in `termcap/planted_test.go` each fail `golangci-lint` with "import
 **Not done here.** A1's facts, reasons and gates (Steps A1.1–A1.2) and
 A2's `IsReplyFragment`; the fake terminal and the background-query test
 of Q8 (Step 4). Nothing is staged or committed.
+
+### Step 4: `termcaptest` (2026-10-04)
+
+The owner committed Step 3 (`45ead16`) and said "proceed".
+
+**Deviation D7 (2026-10-04): the background query overtook DA1.** The
+first `-race -count=3` run of the new fake-terminal tests failed once:
+`tmux: Dark = {Value:false Origin:not-queried}, want true`. Step 3's
+prober returned `tea.Batch(tea.Raw(batch), tea.RequestBackgroundColor)`,
+and `tea.Batch` runs its commands concurrently, so tea may write the OSC 11
+query after the batch's DA1; its reply then arrives after the sentinel,
+and `CapsMsg` goes out without it. The tmux profile has no DSR 997 to fall
+back on. A defect in Step 3's code, found by Step 4's integration test.
+The agent stopped and asked. The owner picked "OSC 11 in the batch, before
+DA1", the recommendation: the prober writes `ansi.RequestBackgroundColor`
+inside its `tea.Raw`, after DSR 996 and before the gated queries. MADR A3
+records it. Added to Step 4's paths: `termcap/prober.go` and
+`termcap/prober_test.go`, whose batch tests now expect the OSC 11 bytes in
+the batch and no separate background command.
+
+**What was built.**
+
+* **`termcap/termcaptest`:**
+  * `Profile`: how a fake terminal answers, field by field (DA1, DECRQM
+    per mode, the Kitty keyboard query with the flags tea pushed, DSR 996,
+    OSC 11, XTVERSION, OSC 99 `p=?`, the Kitty graphics query), the
+    program's environment and colour profile (A2), and for a multiplexer
+    its `Outer` terminal and whether `Passthrough` reaches it.
+  * Profiles: `Kitty()` (every reply), `XTerm()` (DA1, DECRQM, OSC 11),
+    `Tmux(passthrough bool)` (tmux's own DA1, XTVERSION, DECRQM 1004 and
+    OSC 11; the OSC 99 and graphics queries reach a `Kitty()` outer
+    terminal only through allowed passthrough), `DA1Only()`, `Silent()`.
+  * `Terminal`: `NewTerminal`, `Write` (the program's output: it splits
+    the stream into escape sequences, holding a sequence split across
+    writes, and answers each complete query in order), `Send`, `Output`,
+    `Sequences`, and `Run`.
+  * `Run(tb, model, profile)` and `(*Terminal).Run(tb, model)`: run the
+    model as a real `tea.Program` with `WithInput` (a pipe),
+    `WithOutput` (the terminal), `WithEnvironment`, `WithColorProfile`,
+    `WithWindowSize(80, 24)` and `WithoutSignalHandler`; wait for the
+    first `CapsMsg`; send `StopMsg`, on which the model must quit through
+    its prober's `Quit`; wait for the exit; return the `Caps`. Each wait is
+    bounded by `RunTimeout` (10 s) and fails the test.
+* **`termcap/prober.go`** (D7): the OSC 11 query is a built-in query in
+  the batch, after DSR 996, unless `WithoutBackgroundRequest`.
+
+**Tests** (`termcaptest_test.go`):
+
+* `TestEachProfile`: Kitty, xterm, tmux with and without passthrough and
+  DA1-only each yield their expected `Complete`, `Terminal`, `Mux`,
+  `Profile`, `Dark`, and the six support facts the batch asks, and tea's
+  `SyncOutput`.
+* `TestSilentEndsByTimeout`, with `WithTimeout(100 ms)`: `TimedOut`, not
+  `Complete`, unanswered facts unknown. The timeout logic itself is proven
+  under `synctest` in Step 3; this proves the wiring.
+* `TestOnlyTeaAsksForModes2026And2027`: in Kitty, xterm and tmux, the
+  program's whole output holds each of DECRQM 2026 and 2027 once, tea's.
+* `TestColorSchemeReportMidRun`: once mode 2031 is set, a DSR 997 written
+  into the input reaches the model as `ColorSchemeMsg{Dark: false}`.
+* `TestResetBeforeExit`: in Kitty, mode 2031 is set after the probe and
+  reset before exit, the reset being the program's last sequence; with
+  `WithoutColorSchemeUpdates`, neither.
+* `TestOneBackgroundQueryBesideAWorkspace` (Q8): a program that embeds a
+  prober beside a workspace built with `workspace.WithoutBackgroundQuery()`
+  writes exactly one OSC 11 query; without that option, two. The JetBrains
+  half of Q8's test ("none under the JetBrains profile") needs A1.2's
+  JetBrains gate and painting profile, and lands with Step A1.2.
+* `TestSeqLen`, `TestSequenceSplitAcrossWrites`: the stream splitter on
+  each sequence kind, ESC-doubling inside a tmux passthrough, and a DA1
+  split over three writes.
+
+**Mutations,** each on a scratch copy, all 7 killed:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| the fake terminal answers DA1 ahead of the rest (others 200 ms late) | `TestEachProfile`: "kitty: … ColorSchemeReports = {Value:unsupported …}, want … supported" |
+| tmux forwards queries without passthrough | `TestEachProfile`: "tmux without passthrough: DesktopNotify = {Value:supported …}" |
+| the test program quits with `tea.Quit`, not `Quit()` | `TestResetBeforeExit`: "mode 2031: set, want set after the probe and reset before exit" |
+| the workspace ignores `WithoutBackgroundQuery` | `TestOneBackgroundQueryBesideAWorkspace`: "2 OSC 11 queries, want 1" |
+| a sequence split across writes is dropped | `TestSequenceSplitAcrossWrites`: "sequences [], want one DA1" |
+| D7 reverted: the background query a separate command again | `TestBatchBytes`: "local: batch … want" |
+| `WithoutBackgroundRequest` ignored | `TestBatchBytes`: "no background query: batch … want" |
+
+Step 3's 17 mutations were rerun after D7, all killed; one anchor ("DA1
+is sent first") moved with the code and was updated first.
+
+**Checks.**
+
+* `make lint`: 0 issues for linux, darwin and windows, after two
+  findings were fixed in the code: `errcheck` on the pipe's `Close`
+  (`check-blank` refuses `_ =`; the errors now fail the test), and
+  `goconst` on the xterm environment string, now `xtermEnv`.
+* `make pre-add-check FILES=…` (the four Go files): `4 file(s) clean in
+  1 module(s)`.
+* `go test -race -count=1 ./...`, `LC_ALL=C go test ./...`,
+  `go test -shuffle=on -count=2 ./...`, and `go test -race -count=10
+  ./termcap/...`, with `GOWORK=off`: pass. Before D7, the third of three
+  race runs failed (above).
+* `GOWORK=off go mod tidy -diff`: clean; `go.mod` unchanged.
+* Windows test host, on a copy (go1.27.1 windows/amd64): `make
+  pre-add-check` (`54 file(s) clean`), `make lint` (0 issues, three
+  targets), `make vuln` (none), and the `internal/termevent/...` and
+  `termcap/...` tests shuffled, three times: all exit 0.
+* The identifier scan of the diff finds nothing.
+
+**Not settled here.** The fake tmux answers a passthrough query before
+its own DA1, in order. Whether real tmux delivers passthrough replies, and
+when, is still the MADR's open item for the real-terminal check in
+Verification: if they arrive after tmux's DA1, the facts are `Unsupported`
+in `CapsMsg` and corrected by the late reply, which Step 3 tests.

@@ -20,6 +20,7 @@ const (
 	kittyKeyboardQ = "\x1b[?u"
 	modesQ         = "\x1b[?2031$p\x1b[?2048$p\x1b[?1004$p"
 	dsr996Q        = "\x1b[?996n"
+	osc11Q         = "\x1b]11;?\x07"
 	xtversionQ     = "\x1b[>q"
 	osc99Q         = "\x1b]99;i=termcap:p=?;\x07"
 	kittyGraphicsQ = "\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\"
@@ -112,7 +113,7 @@ func TestBatchBytes(t *testing.T) {
 	tmux := func(seq string) string {
 		return "\x1bPtmux;" + strings.ReplaceAll(seq, "\x1b", "\x1b\x1b") + "\x1b\\"
 	}
-	safe := kittyKeyboardQ + modesQ + dsr996Q
+	safe := kittyKeyboardQ + modesQ + dsr996Q + osc11Q
 	cases := []struct {
 		name string
 		env  Env
@@ -126,14 +127,18 @@ func TestBatchBytes(t *testing.T) {
 		{"unknown SSH peer, no heuristic", Env{"TERM=xterm-256color", "SSH_TTY=/dev/pts/1"}, []Option{WithoutHeuristic()},
 			safe + xtversionQ + osc99Q + kittyGraphicsQ + da1Q},
 		{"Apple Terminal", Env{"TERM=xterm-256color", "TERM_PROGRAM=Apple_Terminal"}, nil, safe + da1Q},
+		{"no background query", local, []Option{WithoutBackgroundRequest()},
+			kittyKeyboardQ + modesQ + dsr996Q + xtversionQ + osc99Q + kittyGraphicsQ + da1Q},
 	}
 	for _, c := range cases {
 		_, msgs := start(c.env, c.o...)
 		if got := raw(msgs); got != c.want {
 			t.Errorf("%s: batch\n %q\nwant\n %q", c.name, got, c.want)
 		}
-		if n := backgroundRequests(msgs); n != 1 {
-			t.Errorf("%s: %d background requests beside the batch, want 1", c.name, n)
+		// The OSC 11 query is in the batch, before DA1; a separate command
+		// could be written after it (MADR A3).
+		if n := backgroundRequests(msgs); n != 0 {
+			t.Errorf("%s: %d background commands beside the batch, want 0", c.name, n)
 		}
 	}
 }
@@ -470,7 +475,7 @@ func TestAddedQuery(t *testing.T) {
 	gated := Query{Name: "gated", Seq: fixed("\x1b[?6n"), Gated: true, Parse: func(Reply, *Caps) bool { return false }}
 	p, msgs := start(Env{"TERM=xterm", "SSH_TTY=x"}, WithQuery(q), WithQuery(gated))
 	b := raw(msgs)
-	if !strings.HasSuffix(b, dsr996Q+seq+da1Q) {
+	if !strings.HasSuffix(b, osc11Q+seq+da1Q) {
 		t.Errorf("batch %q: want the added query after the built-in ones and before DA1", b)
 	}
 	if strings.Contains(b, "\x1b[?6n") {

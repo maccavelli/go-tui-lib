@@ -1000,6 +1000,19 @@ Confirmation's unit tests feed ultraviolet's pass-through events into
 returns it as a `tea.Msg`, so the rule stays as §1 widened it, and every use
 of ultraviolet stays under `internal/termevent`.
 
+**Also in A3: the background query goes inside the batch** (the owner,
+picked from options, 2026-10-04, "OSC 11 in the batch, before DA1", the
+recommendation). §3 put `tea.RequestBackgroundColor` beside the batch as
+its own command. `tea.Batch` runs commands concurrently, so tea could write
+that query after the batch's DA1, and its reply then arrived after the
+sentinel: under `-race`, a tmux profile's `CapsMsg` lacked `Dark`
+(`0005-PLAN`, Step 4, D7). The prober now writes the OSC 11 query
+(`ansi.RequestBackgroundColor`) inside its one `tea.Raw`, after DSR 996
+and before the gated queries, so DA1 covers it. Tea decodes the reply as
+`tea.BackgroundColorMsg` whoever asked. `WithoutBackgroundRequest` still
+leaves it out. The follow-up to a DSR 997 after the probe stays a
+`tea.RequestBackgroundColor` command: no sentinel waits for it.
+
 **Rejected.** Sending the batch from `Init` with no environment breaks Q1's
 gate and the tmux wrap. Taking the environment in `New` breaks the rule
 that it comes from `tea.EnvMsg`, which under wish is the session's.
