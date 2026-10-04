@@ -377,7 +377,13 @@ func TestChangerSkipsTheView(t *testing.T) {
 func TestPanesAreClipped(t *testing.T) {
 	r := newRig(t, 120, 40, WithChrome(None))
 	r.main.body = strings.Repeat(strings.Repeat("M", 300)+"\n", 100)
+	// A pane's view changes through Update (see Pane): the message makes the
+	// workspace draw the new body.
+	r.w.Send("main", struct{}{})
 	frame := strings.Split(r.w.Render(), "\n")
+	if !strings.Contains(frame[0], "MMMM") {
+		t.Fatalf("the new body was not drawn: %q", frame[0])
+	}
 	if len(frame) > 40 {
 		t.Fatalf("%d rows", len(frame))
 	}
@@ -493,25 +499,41 @@ func run(cmd tea.Cmd) []tea.Msg {
 	return out
 }
 
-func BenchmarkRender(b *testing.B) {
-	for _, withChanger := range []bool{false, true} {
-		name := "views"
+// benchWorkspace is BenchmarkRender's 200 × 60 workspace of four panes.
+func benchWorkspace(withChanger bool, th theme.Theme) *Workspace {
+	panes := map[layout.PaneID]Pane{}
+	for _, id := range []string{"main", "side", "logs", "footer"} {
+		f := &fake{id: id, body: strings.Repeat(id+" line\n", 60)}
 		if withChanger {
-			name = "changer"
+			panes[layout.PaneID(id)] = &stable{fake: f}
+		} else {
+			panes[layout.PaneID(id)] = f
 		}
-		b.Run(name, func(b *testing.B) {
-			panes := map[layout.PaneID]Pane{}
-			for _, id := range []string{"main", "side", "logs", "footer"} {
-				f := &fake{id: id, body: strings.Repeat(id+" line\n", 60)}
-				if withChanger {
-					panes[layout.PaneID(id)] = &stable{fake: f}
-				} else {
-					panes[layout.PaneID(id)] = f
-				}
-			}
-			w := New(layout.SidebarRightBottom("main", "side", "logs", layout.Footer("footer", 1), layout.Gap(0)), panes, WithTheme(asciiTheme))
-			w.Update(tea.WindowSizeMsg{Width: 200, Height: 60})
+	}
+	w := New(layout.SidebarRightBottom("main", "side", "logs", layout.Footer("footer", 1), layout.Gap(0)), panes, WithTheme(th))
+	w.Update(tea.WindowSizeMsg{Width: 200, Height: 60})
+	return w
+}
+
+// BenchmarkRender measures a full frame: each iteration marks the frame
+// dirty, so it is drawn as v0.1.6 drew every frame. An unchanged frame,
+// which Render returns as it is, is TestRenderAllocs's clean case
+// (docs/decisions/0004-PLAN-integrate-charm-v2-and-go-1-27.md Step 3).
+func BenchmarkRender(b *testing.B) {
+	cases := []struct {
+		name        string
+		withChanger bool
+		th          theme.Theme
+	}{
+		{"views", false, asciiTheme},
+		{"changer", true, asciiTheme},
+		{"truecolor", false, theme.New(colorprofile.TrueColor, theme.Dark, glyph.Unicode())},
+	}
+	for _, c := range cases {
+		b.Run(c.name, func(b *testing.B) {
+			w := benchWorkspace(c.withChanger, c.th)
 			for b.Loop() {
+				w.dirty = true
 				_ = w.Render()
 			}
 		})

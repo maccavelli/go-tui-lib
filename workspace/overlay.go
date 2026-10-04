@@ -67,6 +67,7 @@ func (w *Workspace) Push(o Overlay) tea.Cmd {
 		w.removeOverlay(i)
 	}
 	w.overlays = append(w.overlays, o)
+	w.dirty = true
 	sz := w.overlayContent(o)
 	w.osizes[o.ID] = sz
 	cmds = append(cmds, w.updateOverlay(len(w.overlays)-1, sz), w.moveFocus(was))
@@ -95,13 +96,14 @@ func (w *Workspace) closeOverlay(i int) tea.Cmd {
 	return tea.Batch(cmd, w.moveFocus(was))
 }
 
-// removeOverlay removes overlay i and forgets its size and its cached view.
-// It sends no message.
+// removeOverlay removes overlay i and forgets its size and its cached
+// views. It sends no message.
 func (w *Workspace) removeOverlay(i int) {
 	id := w.overlays[i].ID
 	w.overlays = slices.Delete(w.overlays, i, i+1)
 	delete(w.osizes, id)
-	delete(w.cache, viewKey{overlayView, id})
+	w.forget(overlayView, id)
+	w.dirty = true
 }
 
 // overlayIndex is the position of the open overlay with id, or -1.
@@ -139,6 +141,7 @@ func (w *Workspace) updateOverlay(i int, msg tea.Msg) tea.Cmd {
 	if next != nil {
 		w.overlays[i].Pane = next
 	}
+	w.touched(w.overlays[i].Pane)
 	return cmd
 }
 

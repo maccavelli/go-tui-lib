@@ -64,7 +64,7 @@ completes it (its deviation D7) and has the same Go code as `v0.1.4` and
 | :--- | :--- | :--- |
 | 1 | `docs/decisions/0004-*`, `docs/README.md` | accept the records; record the benchmark baseline |
 | 2 | `internal/cells/`; `go.mod`; `.golangci.yml` (`depguard`); `AGENTS.md` (Dependencies) | the contained ultraviolet wrapper |
-| 3 | `workspace/render.go`, `workspace/workspace.go`, `workspace/*_test.go` | direct drawing, region hit test, struct key, dirty flag, sorted broadcast |
+| 3 | `workspace/render.go`, `workspace/workspace.go`, `workspace/*_test.go`; also `workspace/overlay.go` (recorded in Step 3) | direct drawing, region hit test, struct key, dirty flag, sorted broadcast |
 | 4 | `workspace/`, `workspace/testdata/golden/` | the width method |
 | 5 | `theme/`, `workspace/` | adaptive colours, `SetTheme`, the theme builder |
 | 6 | `workspace/`, `glyph/` | `help.KeyMap`, `View`, per-pane separators, junction glyphs |
@@ -484,3 +484,193 @@ on `./internal/cells/` it exits 0, with no depguard report.
   every package `ok`; the conformance scan type-checks `internal/cells`.
 * `GOWORK=off go mod tidy -diff`: exit 0. No `go.work.sum` was written.
 * **The Windows test host:** `make pre-add-check` and `make release-check` (`31 file(s) clean in 1 module(s)`, tests and govulncheck included), `make lint` (`0 issues` for linux, darwin and windows) and `make vuln` (`No vulnerabilities found.`) exited 0; `go-modules.sh --check` exited 0.
+
+### Step 3: direct drawing (2026-10-04)
+
+The owner committed Step 2 (`e5dc9d0`) and approved this step ("Proceed").
+
+**What changed.**
+
+* **`workspace/render.go`.**
+  * `Render` draws into one reused `cells.Frame`: it resizes it only when
+    the size changes, clears it, and draws each pane, then each separator,
+    then each overlay into its rectangle with `Frame.Draw`.
+    `lipgloss.Layer`, `lipgloss.Compositor` and `lipgloss.NewCanvas` are
+    gone from `workspace`.
+  * Each rectangle drawn is recorded as a region `{kind, id, rect,
+    inner}`; the list is reversed so the top comes first, and `mouseEvent`
+    takes the first region containing the pointer (`hit`). Region kinds are
+    a typed constant, and `layerID`, `splitLayerID`, `w.hits` and `w.inner`
+    are gone.
+  * When nothing is dirty and no shown `Changer` reports a change,
+    `Render` returns the last frame without drawing.
+  * `view` keys the cache on `viewKey{kind, id, width, height, focused,
+    method, themeGen}` (MADR A1, Q5). `method` is `ansi.GraphemeWidth`
+    and `themeGen` 0 until Steps 4 and 5 make them move.
+  * `renderBox` styles the left and right edges once per box, and writes
+    each row's pieces into one pre-sized builder. `clip` walks lines with
+    `strings.SplitSeq` into one pre-sized builder and pads from a constant
+    run of spaces, with no allocation per line. Both were needed for the
+    allocation gate (below).
+* **`workspace/workspace.go`.** The new fields (`frame`, `method`,
+  `themeGen`, `regions`, `last`, `dirty`, `ids`); `forget(kind, id)`,
+  which drops every cached view of a pane or an overlay at every size;
+  `touched(p)`, which marks the frame dirty after a message reaches a pane
+  that is not a `Changer`; the dirty flag set by `New`, `resolve` (size,
+  layout, state, zoom, hide, resize, `SetPane`) and `Focus`; `Broadcast`
+  walking `ids`, kept sorted by `New` and `SetPane` (`SetLayout` adds no
+  pane, so it keeps none). `Pane`'s comment says that a pane's view changes
+  through its `Update`, or, for a `Changer`, when `Changed` says so.
+* **`workspace/overlay.go`.** `Push` marks the frame dirty;
+  `removeOverlay`, which `Pop` and a replacing `Push` use, calls `forget`
+  and marks it dirty; `updateOverlay` calls `touched`. This file was not
+  in Step 3's paths, but the step's own text requires it: `Pop` and a
+  replacing `Push` drop every cached entry (Q5), and an overlay message
+  and push are dirty cases. The Scope table is annotated.
+
+**Two behaviours, recorded for the release notes.**
+
+* A pane that is not a `Changer` is redrawn after a message reaches it,
+  not on every `Render`. A program that writes to a pointer pane directly,
+  outside its `Update`, sees the change at the next message or layout
+  change. MADR §2 decided this; `Pane`'s comment now says it.
+  `TestPanesAreClipped` changed a pane's body directly and then rendered,
+  so it now delivers a message after the change, and asserts that the new
+  body was drawn: without that assertion it passed against the old frame.
+* A `Changer` reporting a change is redrawn even with no message, because
+  `Render` asks each shown `Changer`, as `TestChangerSkipsTheView`
+  requires. MADR §2 named only messages; asking costs no allocation.
+
+**Tests.**
+
+* Every existing workspace and agent golden file passes unchanged: no file
+  under `workspace/testdata/` changed. Every existing mouse test passes.
+* `workspace/render_test.go` (new):
+  * a clean frame equals the last one and asks no pane for its view;
+  * on a workspace of unchanged `Changer`s, each case marks the frame
+    dirty: size, layout, state, focus, overlay push, overlay pop, a
+    replacing push, a message to a non-`Changer` pane, a message to a
+    non-`Changer` overlay; a message to an unchanged `Changer` marks
+    nothing and asks for no view. Theme and method are Steps 5 and 4;
+  * hiding every pane leaves an empty frame;
+  * a click inside an overlay over `main` reaches the overlay at (0, 0)
+    and not `main`; a click on the overlay's border reaches neither, and
+    focus stays;
+  * `TestRenderAllocs`: a full 200 × 60 frame takes 440 allocations (at
+    most 650), and an unchanged one 0 (at most 2).
+* `BenchmarkRender` marks the frame dirty each iteration, so it measures a
+  full frame as `v0.1.6` drew every frame; without that it would measure
+  the returned last frame and compare nothing with the baseline. It gains
+  `truecolor`, a TrueColor theme with Unicode glyphs.
+
+The first allocation run measured 702 for a full frame. A profile put 93
+allocations per frame in `renderBox`'s per-row concatenation and 93 in
+`clip`'s per-line padding and join; writing both into one builder took it
+to 440.
+
+**Benchmark,** the Step 1 command, on the macOS development host:
+
+  ```text
+  goos: darwin
+  goarch: arm64
+  pkg: github.com/maccavelli/go-tui-lib/workspace
+  cpu: Apple M1 Pro
+  BenchmarkRender/views-10         	    1492	    863537 ns/op	  151131 B/op	     440 allocs/op
+  BenchmarkRender/views-10         	    1465	    860938 ns/op	  150884 B/op	     440 allocs/op
+  BenchmarkRender/views-10         	    1401	    867234 ns/op	  150520 B/op	     440 allocs/op
+  BenchmarkRender/views-10         	    1515	    850384 ns/op	  151365 B/op	     440 allocs/op
+  BenchmarkRender/views-10         	    1404	    866753 ns/op	  151563 B/op	     440 allocs/op
+  BenchmarkRender/views-10         	    1495	    850089 ns/op	  150924 B/op	     440 allocs/op
+  BenchmarkRender/views-10         	    1417	    881236 ns/op	  151211 B/op	     440 allocs/op
+  BenchmarkRender/views-10         	    1440	    847756 ns/op	  150585 B/op	     440 allocs/op
+  BenchmarkRender/views-10         	    1366	    861917 ns/op	  151726 B/op	     440 allocs/op
+  BenchmarkRender/views-10         	    1458	    815736 ns/op	  150912 B/op	     440 allocs/op
+  BenchmarkRender/changer-10       	    1521	    794889 ns/op	  136810 B/op	     437 allocs/op
+  BenchmarkRender/changer-10       	    1508	    797043 ns/op	  137039 B/op	     437 allocs/op
+  BenchmarkRender/changer-10       	    1485	   1244691 ns/op	  136787 B/op	     437 allocs/op
+  BenchmarkRender/changer-10       	    1195	   2278979 ns/op	  137254 B/op	     437 allocs/op
+  BenchmarkRender/changer-10       	    1225	   1237002 ns/op	  137063 B/op	     437 allocs/op
+  BenchmarkRender/changer-10       	    1191	   1329663 ns/op	  137205 B/op	     437 allocs/op
+  BenchmarkRender/changer-10       	    1381	   1860360 ns/op	  137206 B/op	     437 allocs/op
+  BenchmarkRender/changer-10       	     337	   3317503 ns/op	  141447 B/op	     437 allocs/op
+  BenchmarkRender/changer-10       	     810	   1287729 ns/op	  137661 B/op	     437 allocs/op
+  BenchmarkRender/changer-10       	    1148	   1599780 ns/op	  137533 B/op	     437 allocs/op
+  BenchmarkRender/truecolor-10     	     883	   1222004 ns/op	  224990 B/op	    1741 allocs/op
+  BenchmarkRender/truecolor-10     	     820	   1356163 ns/op	  224819 B/op	    1741 allocs/op
+  BenchmarkRender/truecolor-10     	    1249	    981110 ns/op	  224248 B/op	    1741 allocs/op
+  BenchmarkRender/truecolor-10     	    1143	    991677 ns/op	  225125 B/op	    1741 allocs/op
+  BenchmarkRender/truecolor-10     	    1215	    980015 ns/op	  223952 B/op	    1741 allocs/op
+  BenchmarkRender/truecolor-10     	    1225	    984352 ns/op	  224522 B/op	    1741 allocs/op
+  BenchmarkRender/truecolor-10     	    1221	    994156 ns/op	  224668 B/op	    1741 allocs/op
+  BenchmarkRender/truecolor-10     	    1221	    977211 ns/op	  224723 B/op	    1741 allocs/op
+  BenchmarkRender/truecolor-10     	    1239	    980048 ns/op	  225110 B/op	    1741 allocs/op
+  BenchmarkRender/truecolor-10     	    1242	   1054055 ns/op	  224689 B/op	    1741 allocs/op
+  PASS
+  ok  	github.com/maccavelli/go-tui-lib/workspace	41.272s
+  ```
+
+  benchstat against Step 1's baseline:
+
+  ```text
+  goos: darwin
+  goarch: arm64
+  pkg: github.com/maccavelli/go-tui-lib/workspace
+  cpu: Apple M1 Pro
+    │ bench-base.txt │  bench-step3.txt  │
+    │  sec/op  │  sec/op  vs base  │
+  Render/views-10  1638.8µ ± 1%  861.4µ ±  2%  -47.44% (p=0.000 n=10)
+  Render/changer-10  1.597m ± 2%  1.309m ± 74%  ~ (p=0.247 n=10)
+  Render/truecolor-10  988.0µ ± 24%
+  geomean  1.618m  1.037m  -34.36%
+
+    │ bench-base.txt │  bench-step3.txt  │
+    │  B/op  │  B/op  vs base  │
+  Render/views-10  1702.3Ki ± 0%  147.5Ki ± 0%  -91.34% (p=0.000 n=10)
+  Render/changer-10  1663.9Ki ± 0%  134.0Ki ± 0%  -91.95% (p=0.000 n=10)
+  Render/truecolor-10  219.4Ki ± 0%
+  geomean  1.644Mi  163.1Ki  -91.65%
+
+    │ bench-base.txt │  bench-step3.txt  │
+    │  allocs/op  │  allocs/op  vs base  │
+  Render/views-10  1078.0 ± 0%  440.0 ± 0%  -59.18% (p=0.000 n=10)
+  Render/changer-10  925.0 ± 0%  437.0 ± 0%  -52.76% (p=0.000 n=10)
+  Render/truecolor-10  1.741k ± 0%
+  geomean  998.6  694.3  -56.09%
+  ```
+
+* **The gate holds:** `views` 861.4 µs, 52.6% of 1.639 ms (at most 60%),
+  and 147.5 KiB, 8.7% of 1.662 MiB (at most 20%); 440 allocations from
+  1,078.
+* `changer` is noisy (± 74%, runs from 0.79 ms to 3.32 ms) while its bytes
+  and allocations are steady; the host was busy during part of the run.
+  It is not gated. `truecolor`, new, is 0.988 ms, 219.4 KiB and 1,741
+  allocations: TrueColor styles produce more SGR sequences per cell.
+
+**Mutation proofs**, each on a scratch copy; none survived:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| the frame is not cleared between renders | `with every pane hidden the frame still shows "+- > main ---…"` |
+| the hit test takes the bottom region first | `a click inside the overlay: overlay got [], main got [left]` |
+| the dirty flag is not set on a focus change | `TestEachDirtyCaseRedraws/focus: focus did not mark the frame dirty` |
+| the dirty flag is not set when a non-`Changer` pane gets a message | the pane and overlay message cases; `TestPanesAreClipped: the new body was not drawn` |
+| edge glyphs are styled from the wrong style when focused | `TestFramesGolden: frame-focus-main color.utf8.80: line 2 differs`, and the other colour variants |
+| `forget` drops no cached view | `TestSetPaneDropsTheCachedView`; `TestPopEvictsTheOverlay: after Pop the cache still holds {1 qqpopped 28 4 true 1 0}` |
+| `Render` does not ask `Changer`s | `TestChangerSkipsTheView: a changed Changer was viewed 1 times` |
+| `Render` leaves the frame dirty | `TestCleanFrameSkipsEveryView: an unchanged frame asked for 3 views`; `TestRenderAllocs: an unchanged frame: 440 allocations` |
+
+The last three are added to the PLAN's five, for the eviction, the
+`Changer` poll and the flag's reset.
+
+**Checks.**
+
+* `make pre-add-check FILES=…` on the five Go files: the first run failed
+  on gofmt, a blank line left at the end of `workspace.go` where
+  `layerID` and `splitLayerID` were removed; after `gofmt -w`,
+  `5 file(s) clean in 1 module(s)`, govulncheck included.
+* `make lint` (with `make modernize`): `0 issues` for linux, darwin and
+  windows.
+* `go test -race -count=1 ./...`, `LC_ALL=C go test -count=1 ./...` and
+  `go test -shuffle=on -count=2 ./...`: every package `ok`.
+* `GOWORK=off go mod tidy -diff`: exit 0. No `go.work.sum` was written.
+* **The Windows test host:** a first run, started before the gofmt fix, failed `make pre-add-check`, `make release-check` and `make lint` on the same `workspace\\workspace.go:676:1: File is not properly formatted (gofmt)`. After the fix: `make pre-add-check` and `make release-check` (`32 file(s) clean in 1 module(s)`), `make lint` (`0 issues` for linux, darwin and windows) and `make vuln` (`No vulnerabilities found.`) exited 0; `go-modules.sh --check` exited 0.

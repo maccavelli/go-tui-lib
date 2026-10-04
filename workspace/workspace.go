@@ -21,20 +21,27 @@ package workspace
 import (
 	"maps"
 	"slices"
-	"strings"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/colorprofile"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/maccavelli/go-tui-lib/glyph"
+	"github.com/maccavelli/go-tui-lib/internal/cells"
 	"github.com/maccavelli/go-tui-lib/layout"
 	"github.com/maccavelli/go-tui-lib/theme"
 )
 
 // Pane is a component the workspace hosts. View renders it into exactly
 // width × height cells; anything larger is clipped.
+//
+// The workspace redraws a frame only when something changed: its size,
+// layout, state, focus or overlays, or a message delivered to a pane. A
+// pane's view therefore changes through its Update, or, for a Changer, when
+// Changed reports it. A pane changed some other way, such as by the program
+// writing to a pointer pane directly, is drawn anew at the next of those
+// (docs/decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md §2).
 type Pane interface {
 	Update(msg tea.Msg) (Pane, tea.Cmd)
 	View(width, height int) string
@@ -128,9 +135,14 @@ type Workspace struct {
 	overlays []Overlay
 	sizes    map[layout.PaneID]SizeMsg
 	osizes   map[string]SizeMsg // each open overlay's last content size
-	cache    map[viewKey]cached
-	hits     *lipgloss.Compositor
-	inner    map[string]layout.Rect // content area by layer ID, from the last Render
+	cache    map[viewKey]string
+	ids      []layout.PaneID // every pane's ID, sorted, for Broadcast
+	frame    *cells.Frame    // the reused frame buffer
+	method   ansi.Method     // how the frame and its views measure
+	themeGen uint64          // raised on every theme change
+	regions  []region        // the last frame's regions, top first, for hit testing
+	last     string          // the last frame
+	dirty    bool            // something changed since the last frame
 	drag     *drag
 }
 
@@ -143,17 +155,16 @@ const (
 	overlayView
 )
 
-// viewKey names a cached view.
+// viewKey names a cached view: whose it is, and everything it was drawn
+// under (docs/decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md §2 and
+// amendment A1, Q5).
 type viewKey struct {
-	kind viewKind
-	id   string
-}
-
-// cached is a view, with the size and focus it was drawn at.
-type cached struct {
+	kind          viewKind
+	id            string
 	width, height int
 	focused       bool
-	view          string
+	method        ansi.Method
+	themeGen      uint64
 }
 
 type drag struct {
@@ -218,9 +229,12 @@ func New(root layout.Node, panes map[layout.PaneID]Pane, opts ...Option) *Worksp
 		height: fallbackHeight,
 		sizes:  map[layout.PaneID]SizeMsg{},
 		osizes: map[string]SizeMsg{},
-		cache:  map[viewKey]cached{},
+		cache:  map[viewKey]string{},
+		method: ansi.GraphemeWidth,
+		dirty:  true,
 	}
 	maps.Copy(w.panes, panes)
+	w.ids = slices.Sorted(maps.Keys(w.panes))
 	for _, o := range opts {
 		o(w)
 	}
@@ -269,10 +283,20 @@ func (w *Workspace) SetLayout(root layout.Node) tea.Cmd {
 // SetPane adds or replaces a pane. A replaced pane's cached view is dropped,
 // and the new pane is told its size.
 func (w *Workspace) SetPane(id layout.PaneID, p Pane) tea.Cmd {
+	if _, ok := w.panes[id]; !ok {
+		i, _ := slices.BinarySearch(w.ids, id)
+		w.ids = slices.Insert(w.ids, i, id)
+	}
 	w.panes[id] = p
 	delete(w.sizes, id)
-	delete(w.cache, viewKey{paneView, string(id)})
+	w.forget(paneView, string(id))
 	return w.resolve()
+}
+
+// forget drops every cached view of the pane or overlay id, at every size
+// it was drawn at.
+func (w *Workspace) forget(kind viewKind, id string) {
+	maps.DeleteFunc(w.cache, func(k viewKey, _ string) bool { return k.kind == kind && k.id == id })
 }
 
 // SetState replaces the layout state.
@@ -324,20 +348,25 @@ func (w *Workspace) Send(id layout.PaneID, msg tea.Msg) tea.Cmd {
 	next, cmd := p.Update(msg)
 	if next != nil {
 		w.panes[id] = next
+		p = next
 	}
+	w.touched(p)
 	return cmd
+}
+
+// touched marks the frame dirty after a message reached p, unless p is a
+// Changer, which Render asks instead.
+func (w *Workspace) touched(p Pane) {
+	if _, ok := p.(Changer); !ok {
+		w.dirty = true
+	}
 }
 
 // Broadcast delivers msg to every pane and overlay, and batches their
 // commands.
 func (w *Workspace) Broadcast(msg tea.Msg) tea.Cmd {
-	ids := make([]layout.PaneID, 0, len(w.panes))
-	for id := range w.panes {
-		ids = append(ids, id)
-	}
-	slices.Sort(ids)
 	var cmds []tea.Cmd
-	for _, id := range ids {
+	for _, id := range w.ids {
 		cmds = append(cmds, w.Send(id, msg))
 	}
 	for i := range w.overlays {
@@ -396,6 +425,7 @@ func (w *Workspace) Focus(id layout.PaneID) tea.Cmd {
 	}
 	was := w.focusTarget()
 	w.focus = id
+	w.dirty = true
 	return w.moveFocus(was)
 }
 
@@ -536,6 +566,7 @@ func (w *Workspace) solve() {
 // resolve re-solves the layout, tells each pane and each open overlay whose
 // content size changed, and moves focus off a pane that is no longer shown.
 func (w *Workspace) resolve() tea.Cmd {
+	w.dirty = true
 	w.solve()
 	var cmds []tea.Cmd
 	for _, id := range w.plan.Order {
@@ -641,12 +672,4 @@ func (w *Workspace) withMinimums(n layout.Node) layout.Node {
 		return out
 	}
 	return n
-}
-
-// layerID names a pane, overlay or separator layer for hit testing.
-func layerID(kind, id string) string { return kind + ":" + id }
-
-func splitLayerID(s string) (kind, id string) {
-	kind, id, _ = strings.Cut(s, ":")
-	return kind, id
 }

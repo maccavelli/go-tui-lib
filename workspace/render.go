@@ -1,46 +1,101 @@
 package workspace
 
 import (
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/maccavelli/go-tui-lib/internal/cells"
 	"github.com/maccavelli/go-tui-lib/layout"
 )
+
+// regionKind is what a region of the frame shows.
+type regionKind uint8
+
+const (
+	paneRegion regionKind = iota
+	sepRegion
+	overlayRegion
+)
+
+// region is a rectangle of the last frame, for hit testing: what it shows,
+// where, and its content area inside any chrome.
+type region struct {
+	kind  regionKind
+	id    string
+	rect  layout.Rect
+	inner layout.Rect
+}
 
 // Render composes the frame: every placed pane in its rectangle with its
 // chrome, the separators, and the overlays on top. Each pane is clipped to
 // its rectangle. The program puts the result in its tea.View.
+//
+// The frame is drawn into one reused buffer, and only when something changed
+// since the last one; otherwise the last frame is returned as it is (see
+// Pane).
 func (w *Workspace) Render() string {
 	if w.width <= 0 || w.height <= 0 {
 		return ""
 	}
-	var layers []*lipgloss.Layer
-	w.inner = map[string]layout.Rect{}
+	if !w.dirty && !w.changersChanged() {
+		return w.last
+	}
+	if w.frame == nil {
+		w.frame = cells.NewFrame(w.width, w.height, w.method)
+	}
+	w.frame.Resize(w.width, w.height)
+	w.frame.Clear()
+	w.regions = w.regions[:0]
 	for _, id := range w.plan.Order {
 		r := w.plan.Panes[id]
-		lid := layerID("pane", string(id))
-		w.inner[lid] = w.content(id, r)
-		layers = append(layers, lipgloss.NewLayer(w.renderPane(id, r)).X(r.X).Y(r.Y).ID(lid))
+		w.frame.Draw(w.renderPane(id, r), r)
+		w.regions = append(w.regions, region{kind: paneRegion, id: string(id), rect: r, inner: w.content(id, r)})
 	}
 	for _, s := range w.plan.Separators {
 		if s.Rect.Empty() {
 			continue
 		}
-		layers = append(layers, lipgloss.NewLayer(w.renderSeparator(s)).X(s.Rect.X).Y(s.Rect.Y).Z(1).ID(layerID("sep", s.ID)))
+		w.frame.Draw(w.renderSeparator(s), s.Rect)
+		w.regions = append(w.regions, region{kind: sepRegion, id: s.ID, rect: s.Rect, inner: s.Rect})
 	}
-	for i, o := range w.overlays {
+	for _, o := range w.overlays {
 		r := w.overlayRect(o)
-		lid := layerID("overlay", o.ID)
-		w.inner[lid] = insetBorder(r)
-		layers = append(layers, lipgloss.NewLayer(w.renderBox(r, o.Pane, viewKey{overlayView, o.ID}, true)).X(r.X).Y(r.Y).Z(10+i).ID(lid))
+		w.frame.Draw(w.renderBox(r, o.Pane, overlayView, o.ID, true), r)
+		w.regions = append(w.regions, region{kind: overlayRegion, id: o.ID, rect: r, inner: insetBorder(r)})
 	}
-	w.hits = lipgloss.NewCompositor(layers...)
-	canvas := lipgloss.NewCanvas(w.width, w.height)
-	canvas.Compose(w.hits)
-	return canvas.Render()
+	slices.Reverse(w.regions) // top first: the last overlay, then separators, then panes
+	w.last = w.frame.Render()
+	w.dirty = false
+	return w.last
+}
+
+// changersChanged reports whether a shown pane or an open overlay that is a
+// Changer reports a change.
+func (w *Workspace) changersChanged() bool {
+	for _, id := range w.plan.Order {
+		if c, ok := w.panes[id].(Changer); ok && c.Changed() {
+			return true
+		}
+	}
+	for _, o := range w.overlays {
+		if c, ok := o.Pane.(Changer); ok && c.Changed() {
+			return true
+		}
+	}
+	return false
+}
+
+// hit is the top region of the last frame under (x, y).
+func (w *Workspace) hit(x, y int) (region, bool) {
+	for _, r := range w.regions {
+		if r.rect.Contains(x, y) {
+			return r, true
+		}
+	}
+	return region{}, false
 }
 
 // Cursor returns the terminal cursor for the focused pane, or for the top
@@ -81,54 +136,74 @@ func placeCursor(p Pane, in layout.Rect) *tea.Cursor {
 }
 
 // view asks a pane for its view, unless it is a Changer reporting no change
-// at the same size and focus as its cached view under k.
-func (w *Workspace) view(k viewKey, p Pane, width, height int, focused bool) string {
+// and its view is cached under the same size, focus, width method and theme.
+func (w *Workspace) view(kind viewKind, id string, p Pane, width, height int, focused bool) string {
+	k := viewKey{kind: kind, id: id, width: width, height: height, focused: focused, method: w.method, themeGen: w.themeGen}
 	if c, ok := p.(Changer); ok && !c.Changed() {
-		if hit, ok := w.cache[k]; ok && hit.width == width && hit.height == height && hit.focused == focused {
-			return hit.view
+		if v, ok := w.cache[k]; ok {
+			return v
 		}
 	}
 	v := clip(p.View(width, height), width, height)
-	w.cache[k] = cached{width: width, height: height, focused: focused, view: v}
+	w.cache[k] = v
 	return v
 }
 
 // clip makes s exactly width × height cells: lines truncated, padded and
-// limited, so a pane can never paint outside its area.
+// limited, so a pane can never paint outside its area. It writes one
+// builder, with no allocation per line.
 func clip(s string, width, height int) string {
-	lines := strings.Split(s, "\n")
-	if len(lines) > height {
-		lines = lines[:height]
-	}
-	for len(lines) < height {
-		lines = append(lines, "")
-	}
-	for i, l := range lines {
-		l = ansi.Truncate(l, width, "")
-		if pad := width - ansi.StringWidth(l); pad > 0 {
-			l += strings.Repeat(" ", pad)
+	var b strings.Builder
+	b.Grow(len(s) + height*(width+1))
+	n := 0
+	for line := range strings.SplitSeq(s, "\n") {
+		if n == height {
+			break
 		}
-		lines[i] = l
+		if n > 0 {
+			b.WriteByte('\n')
+		}
+		line = ansi.Truncate(line, width, "")
+		b.WriteString(line)
+		pad(&b, width-ansi.StringWidth(line))
+		n++
 	}
-	return strings.Join(lines, "\n")
+	for ; n < height; n++ {
+		if n > 0 {
+			b.WriteByte('\n')
+		}
+		pad(&b, width)
+	}
+	return b.String()
+}
+
+// spaces is the run pad writes from.
+const spaces = "                                                                "
+
+// pad writes n spaces to b.
+func pad(b *strings.Builder, n int) {
+	for n > 0 {
+		k := min(n, len(spaces))
+		b.WriteString(spaces[:k])
+		n -= k
+	}
 }
 
 func (w *Workspace) renderPane(id layout.PaneID, r layout.Rect) string {
 	p := w.panes[id]
-	k := viewKey{paneView, string(id)}
 	focused := id == w.focus && w.modal() == nil
 	switch w.chromeOf(id) {
 	case Borders:
-		return w.renderBox(r, p, k, focused)
+		return w.renderBox(r, p, paneView, string(id), focused)
 	case Separators:
 		in := w.content(id, r)
 		head := w.title(p, string(id), focused, r.W)
 		if in.H == 0 {
 			return head
 		}
-		return head + "\n" + w.view(k, p, in.W, in.H, focused)
+		return head + "\n" + w.view(paneView, string(id), p, in.W, in.H, focused)
 	}
-	return w.view(k, p, r.W, r.H, focused)
+	return w.view(paneView, string(id), p, r.W, r.H, focused)
 }
 
 // title renders a pane's title line: the focus marker, the title and the
@@ -155,9 +230,9 @@ func (w *Workspace) title(p Pane, id string, focused bool, width int) string {
 	return style.Render(label)
 }
 
-// renderBox draws p in r with a border, its title in the top edge. k names
-// its cached view, and k.id is the title when p has none of its own.
-func (w *Workspace) renderBox(r layout.Rect, p Pane, k viewKey, focused bool) string {
+// renderBox draws p in r with a border, its title in the top edge. kind and
+// id name its cached view, and id is the title when p has none of its own.
+func (w *Workspace) renderBox(r layout.Rect, p Pane, kind viewKind, id string, focused bool) string {
 	t := w.theme
 	b := t.Border(w.border)
 	edge := t.Styles.Border
@@ -168,7 +243,7 @@ func (w *Workspace) renderBox(r layout.Rect, p Pane, k viewKey, focused bool) st
 	if in.W == 0 {
 		return clip("", r.W, r.H)
 	}
-	name := k.id
+	name := id
 	if tp, ok := p.(Titled); ok {
 		name = tp.Title()
 	}
@@ -187,9 +262,15 @@ func (w *Workspace) renderBox(r layout.Rect, p Pane, k viewKey, focused bool) st
 	var out strings.Builder
 	out.WriteString(edge.Render(b.TopLeft+b.Top) + tstyle.Render(label) + edge.Render(strings.Repeat(b.Top, max(fill, 0))+b.TopRight))
 	if in.H > 0 {
-		body := w.view(k, p, in.W, in.H, focused)
+		// The edges are styled once per box, not once per row.
+		left, right := edge.Render(b.Left), edge.Render(b.Right)
+		body := w.view(kind, id, p, in.W, in.H, focused)
+		out.Grow(len(body) + in.H*(len(left)+len(right)+1))
 		for line := range strings.SplitSeq(body, "\n") {
-			out.WriteString("\n" + edge.Render(b.Left) + line + edge.Render(b.Right))
+			out.WriteByte('\n')
+			out.WriteString(left)
+			out.WriteString(line)
+			out.WriteString(right)
 		}
 	}
 	out.WriteString("\n" + edge.Render(b.BottomLeft+strings.Repeat(b.Bottom, in.W)+b.BottomRight))
@@ -233,15 +314,16 @@ func (w *Workspace) mouseEvent(msg tea.MouseMsg) tea.Cmd {
 			return nil
 		}
 	}
-	if w.hits == nil {
-		return nil
-	}
-	kind, id := splitLayerID(w.hits.Hit(m.X, m.Y).ID())
-	if o := w.modal(); o != nil && (kind != "overlay" || id != o.ID) {
+	reg, ok := w.hit(m.X, m.Y)
+	if o := w.modal(); o != nil && (!ok || reg.kind != overlayRegion || reg.id != o.ID) {
 		return nil // a modal overlay takes the mouse; nothing beneath it is reached
 	}
-	switch kind {
-	case "sep":
+	if !ok {
+		return nil
+	}
+	id := reg.id
+	switch reg.kind {
+	case sepRegion:
 		if _, ok := msg.(tea.MouseClickMsg); ok {
 			for _, s := range w.plan.Separators {
 				if s.ID == id {
@@ -254,22 +336,22 @@ func (w *Workspace) mouseEvent(msg tea.MouseMsg) tea.Cmd {
 			}
 		}
 		return nil
-	case "overlay":
+	case overlayRegion:
 		for i, o := range w.overlays {
 			if o.ID == id {
-				if lm, ok := local(msg, w.inner[layerID("overlay", id)]); ok {
+				if lm, ok := local(msg, reg.inner); ok {
 					return w.updateOverlay(i, lm)
 				}
 			}
 		}
 		return nil
-	case "pane":
+	case paneRegion:
 		pid := layout.PaneID(id)
 		var cmds []tea.Cmd
 		if _, ok := msg.(tea.MouseClickMsg); ok {
 			cmds = append(cmds, w.Focus(pid))
 		}
-		if lm, ok := local(msg, w.inner[layerID("pane", id)]); ok {
+		if lm, ok := local(msg, reg.inner); ok {
 			cmds = append(cmds, w.Send(pid, lm))
 		}
 		return tea.Batch(cmds...)
