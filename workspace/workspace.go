@@ -141,9 +141,14 @@ type Workspace struct {
 	method   ansi.Method     // how the frame and its views measure
 	pinned   bool            // WithWidthMethod fixed method
 	themeGen uint64          // raised on every theme change
-	regions  []region        // the last frame's regions, top first, for hit testing
-	last     string          // the last frame
-	dirty    bool            // something changed since the last frame
+	follow   bool            // rebuild the theme on profile and background messages
+	builder  ThemeBuilder    // how to rebuild it; nil is theme.New with the glyphs in use
+	profile  colorprofile.Profile
+	bg       theme.Background
+	noQuery  bool     // WithoutBackgroundQuery
+	regions  []region // the last frame's regions, top first, for hit testing
+	last     string   // the last frame
+	dirty    bool     // something changed since the last frame
 	drag     *drag
 }
 
@@ -176,9 +181,32 @@ type drag struct {
 // Option configures a Workspace.
 type Option func(*Workspace)
 
-// WithTheme sets the theme (default: ANSI256, unknown background, Unicode
-// glyphs).
-func WithTheme(t theme.Theme) Option { return func(w *Workspace) { w.theme = t } }
+// ThemeBuilder makes the theme for a colour profile and a background.
+type ThemeBuilder func(p colorprofile.Profile, bg theme.Background) theme.Theme
+
+// WithTheme fixes the theme: profile and background messages do not change
+// it, though they still reach the panes. Without it, the workspace follows
+// the terminal: it starts with ANSI256, an unknown background and Unicode
+// glyphs, and rebuilds the theme on each tea.ColorProfileMsg and
+// tea.BackgroundColorMsg (docs/decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md
+// §4).
+func WithTheme(t theme.Theme) Option {
+	return func(w *Workspace) { w.theme, w.follow = t, false }
+}
+
+// WithThemeBuilder makes the workspace follow the terminal, rebuilding its
+// theme with b on each profile and background message. The default builder
+// is theme.New with the glyphs in use; a program with its own palettes
+// passes one that adds them, such as with theme.WithPaletteFor.
+func WithThemeBuilder(b ThemeBuilder) Option {
+	return func(w *Workspace) { w.builder, w.follow = b, true }
+}
+
+// WithoutBackgroundQuery leaves tea.RequestBackgroundColor out of Init, for
+// a program that runs its own probe or must send nothing unasked. By default
+// Init asks, so a following theme learns whether the background is light or
+// dark.
+func WithoutBackgroundQuery() Option { return func(w *Workspace) { w.noQuery = true } }
 
 // WithKeyMap replaces the workspace's bindings.
 func WithKeyMap(k KeyMap) Option { return func(w *Workspace) { w.keys = k } }
@@ -243,12 +271,14 @@ func New(root layout.Node, panes map[layout.PaneID]Pane, opts ...Option) *Worksp
 		cache:  map[viewKey]string{},
 		method: ansi.WcWidth,
 		dirty:  true,
+		follow: true,
 	}
 	maps.Copy(w.panes, panes)
 	w.ids = slices.Sorted(maps.Keys(w.panes))
 	for _, o := range opts {
 		o(w)
 	}
+	w.profile, w.bg = w.theme.Profile, w.theme.Background
 	w.solve()
 	if !w.focusable(w.focus) {
 		w.focus = ""
@@ -263,7 +293,34 @@ func New(root layout.Node, panes map[layout.PaneID]Pane, opts ...Option) *Worksp
 // placed pane's first SizeMsg, and PaneFocusMsg to the pane with the
 // keyboard.
 func (w *Workspace) Init() tea.Cmd {
-	return tea.Batch(w.resolve(), w.gain(w.focusTarget()))
+	cmds := []tea.Cmd{w.resolve(), w.gain(w.focusTarget())}
+	if !w.noQuery {
+		cmds = append(cmds, tea.RequestBackgroundColor)
+	}
+	return tea.Batch(cmds...)
+}
+
+// SetTheme replaces the theme. Every cached view misses, since its key holds
+// the theme's generation, and the next frame is drawn anew. A following
+// workspace rebuilds over it at the next profile or background message.
+func (w *Workspace) SetTheme(t theme.Theme) tea.Cmd {
+	w.theme = t
+	w.themeGen++
+	w.dirty = true
+	return nil
+}
+
+// rebuildTheme makes the theme again for the current profile and
+// background, when the workspace follows the terminal.
+func (w *Workspace) rebuildTheme() {
+	if !w.follow {
+		return
+	}
+	if w.builder != nil {
+		w.SetTheme(w.builder(w.profile, w.bg))
+		return
+	}
+	w.SetTheme(theme.New(w.profile, w.bg, w.theme.Glyphs))
 }
 
 // Err returns the error of the last layout, if any. The workspace keeps the
@@ -365,6 +422,14 @@ func (w *Workspace) Update(msg tea.Msg) tea.Cmd {
 		return w.mouseEvent(m)
 	case tea.ModeReportMsg:
 		w.followMode(m) // and the panes still get it
+	case tea.ColorProfileMsg:
+		w.profile = m.Profile
+		w.rebuildTheme()
+	case tea.BackgroundColorMsg:
+		if m.Color != nil {
+			w.bg = theme.FromDark(m.IsDark())
+			w.rebuildTheme()
+		}
 	}
 	return w.Broadcast(msg)
 }

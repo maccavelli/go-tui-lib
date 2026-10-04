@@ -14,6 +14,11 @@
 //   - with an unknown background, the Unknown palette is used, whose
 //     coloured roles clear 4.5:1 against both black and white.
 //
+// A palette colour may also depend on the background or the profile:
+// LightDarkColor and ProfileColor are resolved when the theme is built, so a
+// theme rebuilt for a new background or profile picks again
+// (docs/decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md §4).
+//
 // Colour never carries meaning alone: the focused pane's title is bold and
 // marked with glyph.Set.Focus as well as coloured.
 package theme
@@ -38,6 +43,60 @@ const (
 	// Light is a light background.
 	Light
 )
+
+// FromDark is the background a terminal reports as dark or light, as
+// tea.BackgroundColorMsg.IsDark answers.
+func FromDark(isDark bool) Background {
+	if isDark {
+		return Dark
+	}
+	return Light
+}
+
+// LightDarkColor is a colour that depends on the background. A theme picks
+// it through lipgloss.LightDark: Light on a light background and Dark on a
+// dark one. On an Unknown background it uses Unknown, or Dark when Unknown
+// is nil. A nil pick means the terminal's own foreground.
+type LightDarkColor struct{ Light, Dark, Unknown color.Color }
+
+// RGBA implements color.Color with the colour an Unknown background picks,
+// so a LightDarkColor fits any Palette field.
+func (c LightDarkColor) RGBA() (r, g, b, a uint32) { return rgba(c.pick(Unknown)) }
+
+func (c LightDarkColor) pick(bg Background) color.Color {
+	switch bg {
+	case Dark, Light:
+		return lipgloss.LightDark(bg == Dark)(c.Light, c.Dark)
+	}
+	if c.Unknown != nil {
+		return c.Unknown
+	}
+	return c.Dark
+}
+
+// ProfileColor is a colour that depends on the colour profile. A theme picks
+// it through lipgloss.Complete: ANSI, ANSI256 or TrueColor, as the profile
+// is, and uses the pick as it is, without converting it again.
+type ProfileColor struct{ ANSI, ANSI256, TrueColor color.Color }
+
+// RGBA implements color.Color with the TrueColor colour, or the next one
+// given, so a ProfileColor fits any Palette field.
+func (c ProfileColor) RGBA() (r, g, b, a uint32) {
+	for _, x := range []color.Color{c.TrueColor, c.ANSI256, c.ANSI} {
+		if x != nil {
+			return x.RGBA()
+		}
+	}
+	return 0, 0, 0, 0
+}
+
+// rgba is c's RGBA, or zero for a nil colour.
+func rgba(c color.Color) (r, g, b, a uint32) {
+	if c == nil {
+		return 0, 0, 0, 0
+	}
+	return c.RGBA()
+}
 
 // Palette holds a raw colour for each semantic role. A nil colour means the
 // terminal's own foreground.
@@ -147,11 +206,24 @@ type Option func(*options)
 
 type options struct {
 	palette *Palette
+	byBG    map[Background]Palette
 }
 
-// WithPalette replaces the built-in palette for the theme's background.
+// WithPalette replaces the built-in palette, for every background.
 func WithPalette(p Palette) Option {
 	return func(o *options) { o.palette = &p }
+}
+
+// WithPaletteFor replaces the built-in palette for background bg only. A
+// program that passes one for each background keeps its colours when the
+// theme is rebuilt for a new background. It wins over WithPalette for bg.
+func WithPaletteFor(bg Background, p Palette) Option {
+	return func(o *options) {
+		if o.byBG == nil {
+			o.byBG = map[Background]Palette{}
+		}
+		o.byBG[bg] = p
+	}
 }
 
 // New builds a theme for profile p, background bg and glyph set g.
@@ -164,13 +236,32 @@ func New(p colorprofile.Profile, bg Background, g glyph.Set, opts ...Option) The
 	if o.palette != nil {
 		pal = *o.palette
 	}
-	return Theme{Profile: p, Background: bg, Glyphs: g, Palette: pal, Styles: build(p, pal)}
+	if bp, ok := o.byBG[bg]; ok {
+		pal = bp
+	}
+	return Theme{Profile: p, Background: bg, Glyphs: g, Palette: pal, Styles: build(p, bg, pal)}
 }
 
-// build makes the styles for profile p. NoTTY and below get plain styles;
-// ASCII gets attributes and no colour; ANSI and above get colours converted
-// to the profile.
-func build(p colorprofile.Profile, pal Palette) Styles {
+// resolve is the colour c stands for on background bg and profile p: a
+// LightDarkColor picked for bg, then a ProfileColor picked for p and kept as
+// it is, and any other colour converted to p.
+func resolve(c color.Color, p colorprofile.Profile, bg Background) color.Color {
+	if ld, ok := c.(LightDarkColor); ok {
+		c = ld.pick(bg)
+	}
+	switch v := c.(type) {
+	case nil:
+		return nil
+	case ProfileColor:
+		return lipgloss.Complete(p)(v.ANSI, v.ANSI256, v.TrueColor)
+	}
+	return p.Convert(c)
+}
+
+// build makes the styles for profile p and background bg. NoTTY and below
+// get plain styles; ASCII gets attributes and no colour; ANSI and above get
+// colours resolved for the background and the profile.
+func build(p colorprofile.Profile, bg Background, pal Palette) Styles {
 	attrs := p >= colorprofile.ASCII
 	colours := p >= colorprofile.ANSI
 	style := func(c color.Color, bold bool) lipgloss.Style {
@@ -178,8 +269,10 @@ func build(p colorprofile.Profile, pal Palette) Styles {
 		if attrs && bold {
 			s = s.Bold(true)
 		}
-		if colours && c != nil {
-			s = s.Foreground(p.Convert(c))
+		if colours {
+			if rc := resolve(c, p, bg); rc != nil {
+				s = s.Foreground(rc)
+			}
 		}
 		return s
 	}
