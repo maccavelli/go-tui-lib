@@ -22,6 +22,7 @@ type app struct {
 	schemes   []termcap.ColorSchemeMsg
 	waitFor   int // ColorSchemeMsg to see before quitting
 	stopped   bool
+	quitting  bool // Quit was returned; it is returned once
 }
 
 func newApp(o ...termcap.Option) *app { return &app{p: termcap.New(o...)} }
@@ -36,7 +37,8 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case StopMsg:
 		a.stopped = true
 	}
-	if a.stopped && len(a.schemes) >= a.waitFor {
+	if a.stopped && !a.quitting && len(a.schemes) >= a.waitFor {
+		a.quitting = true
 		if a.plainQuit {
 			return a, tea.Batch(cmd, tea.Quit)
 		}
@@ -256,5 +258,57 @@ func TestSequenceSplitAcrossWrites(t *testing.T) {
 	}
 	if r := <-term.input; r != "\x1b[?1c" {
 		t.Fatalf("reply %q, want the DA1 answer", r)
+	}
+}
+
+func TestAppleTerminalOverSSH(t *testing.T) {
+	got := Run(t, newApp(), AppleTerminalSSH())
+	if got.Brand != (termcap.Fact[termcap.Brand]{Value: termcap.BrandAppleTerminal, Origin: termcap.Queried}) {
+		t.Errorf("Brand %+v, want Apple Terminal from DA1 and DA2", got.Brand)
+	}
+	if got.EnvBrand.Value != termcap.BrandUnknown || !got.Remote.Value {
+		t.Errorf("EnvBrand %+v, Remote %+v: the environment should name nothing", got.EnvBrand, got.Remote)
+	}
+}
+
+// proberQueries are queries only the prober sends; tea sends the others a
+// JetBrains terminal may paint (DECRQM 2026 and 2027, the Kitty keyboard
+// query), which the later termmode record owns.
+var proberQueries = []string{
+	ansi.RequestPrimaryDeviceAttributes, ansi.RequestSecondaryDeviceAttributes, ansi.RequestLightDarkReport,
+	ansi.RequestModeLightDark, ansi.RequestModeInBandResize, ansi.RequestModeFocusEvent,
+	ansi.RequestBackgroundColor, ansi.RequestForegroundColor, ansi.RequestNameVersion,
+}
+
+func TestJetBrainsIsLeftUntouched(t *testing.T) {
+	term := NewTerminal(JetBrains())
+	got := term.Run(t, newApp(termcap.WithoutHeuristic()))
+	for _, q := range term.Painted() {
+		for _, mine := range proberQueries {
+			if q == mine {
+				t.Errorf("the prober's query %q was painted", q)
+			}
+		}
+	}
+	if got.Complete || got.KittyKeyboard.Reason != termcap.ReasonJetBrainsPaints {
+		t.Errorf("Complete %v, KittyKeyboard %+v; want no probe, and the reason", got.Complete, got.KittyKeyboard)
+	}
+}
+
+func TestNoBackgroundQueryUnderJetBrains(t *testing.T) {
+	term := NewTerminal(JetBrains())
+	term.Run(t, newProgram(workspace.WithoutBackgroundQuery()))
+	if n := strings.Count(term.Output(), "\x1b]11;?"); n != 0 {
+		t.Errorf("%d OSC 11 queries under JetBrains, want none (MADR A2, Q8)", n)
+	}
+}
+
+func TestPaintingTerminal(t *testing.T) {
+	term := NewTerminal(JetBrains())
+	if _, err := term.Write([]byte("\x1b[c\x1b[?25l\x1b]11;?\x07text")); err != nil {
+		t.Fatal(err)
+	}
+	if got := term.Painted(); len(got) != 2 || got[0] != "\x1b[c" || got[1] != "\x1b]11;?\x07" {
+		t.Fatalf("painted %q, want the two queries and not the cursor mode", got)
 	}
 }

@@ -1,26 +1,26 @@
- 26|complete               yes
+ 25|complete               no
  25|timed_out              no
  43|terminal               xterm-256color (env)
  33|mux                    none (env)
  31|remote                 no (env)
- 24|attributes             1
- 42|kitty_keyboard         unsupported (query)
+ 24|attributes             -
+ 79|kitty_keyboard         unknown (not-queried: terminal.jetbrains-paints-queries)
  24|keyboard_flags         0
  80|sync_output            unknown (not-queried: tea asks only outside SSH and Apple
  64|                       Terminal, and not every terminal answers)
  80|grapheme_width         unknown (not-queried: tea asks only outside SSH and Apple
  64|                       Terminal, and not every terminal answers)
- 42|color_scheme_reports   unsupported (query)
- 42|in_band_resize         unsupported (query)
- 42|focus_events           unsupported (query)
- 42|desktop_notify         unsupported (query)
- 42|kitty_graphics         unsupported (query)
- 42|sixel                  unsupported (query)
+ 79|color_scheme_reports   unknown (not-queried: terminal.jetbrains-paints-queries)
+ 79|in_band_resize         unknown (not-queried: terminal.jetbrains-paints-queries)
+ 79|focus_events           unknown (not-queried: terminal.jetbrains-paints-queries)
+ 79|desktop_notify         unknown (not-queried: terminal.jetbrains-paints-queries)
+ 79|kitty_graphics         unknown (not-queried: terminal.jetbrains-paints-queries)
+ 79|sixel                  unknown (not-queried: terminal.jetbrains-paints-queries)
  44|dark                   unknown (not-queried)
  24|background             -
- 27|profile                ANSI
- 36|brand                  unknown (env)
- 36|env_brand              unknown (env)
+ 32|profile                TrueColor
+ 38|brand                  jetbrains (env)
+ 38|env_brand              jetbrains (env)
  33|editor                 none (env)
  35|platform               native (env)
  31|legacy_console         no (env)

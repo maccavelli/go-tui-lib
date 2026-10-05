@@ -33,6 +33,7 @@ type Profile struct {
 	ColorProfile colorprofile.Profile // tea.WithColorProfile
 
 	DA1           []int                    // the DA1 reply; nil answers nothing
+	DA2           []int                    // the DA2 reply; nil answers nothing
 	Modes         map[int]ansi.ModeSetting // DECRQM replies; nil answers none, a missing mode is not recognised
 	KittyKeyboard bool                     // answers CSI ? u with the flags pushed
 	Dark, Light   bool                     // answers DSR 996 with DSR 997
@@ -42,6 +43,10 @@ type Profile struct {
 	Version       string                   // answers XTVERSION
 	Notifications bool                     // answers the OSC 99 p=? query
 	Graphics      bool                     // answers the Kitty graphics query with OK
+
+	// Paints shows each query it does not answer as text, as JetBrains
+	// terminals do; Terminal.Painted lists them.
+	Paints bool
 
 	// Outer is the terminal a multiplexer runs in. Passthrough says whether
 	// a tmux passthrough sequence reaches it (tmux's allow-passthrough).
@@ -59,6 +64,7 @@ func Kitty() Profile {
 		Env:           []string{"TERM=xterm-kitty"},
 		ColorProfile:  colorprofile.TrueColor,
 		DA1:           []int{62, 22},
+		DA2:           []int{1, 4000, 39},
 		Modes:         map[int]ansi.ModeSetting{1004: ansi.ModeReset, 2026: ansi.ModeReset, 2031: ansi.ModeReset, 2048: ansi.ModeReset},
 		KittyKeyboard: true,
 		Dark:          true,
@@ -87,6 +93,7 @@ func XTerm() Profile {
 		Env:          []string{xtermEnv},
 		ColorProfile: colorprofile.ANSI256,
 		DA1:          []int{65, 1, 9},
+		DA2:          []int{41, 388, 0},
 		Modes:        map[int]ansi.ModeSetting{1004: ansi.ModeReset},
 		Background:   color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff},
 	}
@@ -106,6 +113,7 @@ func Tmux(passthrough bool) Profile {
 		Env:          []string{"TERM=tmux-256color", "TERM_PROGRAM=tmux", "TMUX=/tmp/tmux-1000/default,1,0"},
 		ColorProfile: colorprofile.TrueColor,
 		DA1:          []int{1, 2},
+		DA2:          []int{84, 0, 0},
 		Modes:        map[int]ansi.ModeSetting{1004: ansi.ModeReset},
 		Background:   outer.Background,
 		Version:      "tmux 3.4",
@@ -117,6 +125,31 @@ func Tmux(passthrough bool) Profile {
 // DA1Only answers DA1 and nothing else.
 func DA1Only() Profile {
 	return Profile{Name: "DA1 only", Env: []string{xtermEnv}, ColorProfile: colorprofile.ANSI, DA1: []int{1}}
+}
+
+// AppleTerminalSSH is Apple Terminal reached over SSH, where nothing in
+// the environment names it: only DA1 1;2 with DA2 1;95;0 does.
+func AppleTerminalSSH() Profile {
+	return Profile{
+		Name:         "Apple Terminal over SSH",
+		Env:          []string{xtermEnv, "SSH_TTY=/dev/pts/1"},
+		ColorProfile: colorprofile.ANSI256,
+		DA1:          []int{1, 2},
+		DA2:          []int{1, 95, 0},
+		Modes:        map[int]ansi.ModeSetting{1004: ansi.ModeReset},
+		Background:   color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff},
+	}
+}
+
+// JetBrains is a JetBrains terminal, which paints every query as text and
+// answers none.
+func JetBrains() Profile {
+	return Profile{
+		Name:         "JetBrains",
+		Env:          []string{xtermEnv, "TERMINAL_EMULATOR=JetBrains-JediTerm", "TERM_SESSION_ID=1F2E3D4C"},
+		ColorProfile: colorprofile.TrueColor,
+		Paints:       true,
+	}
 }
 
 // Silent answers nothing, so a probe ends by its timeout.
@@ -141,6 +174,7 @@ type Terminal struct {
 	out     strings.Builder // everything the program wrote
 	pending string          // the start of a sequence not yet complete
 	seqs    []string        // every escape sequence, in order
+	painted []string        // the queries painted as text
 	flags   []int           // the Kitty keyboard flag stack
 	input   chan string     // replies, in order
 }
@@ -242,6 +276,30 @@ func (t *Terminal) Sequences() []string {
 	return append([]string(nil), t.seqs...)
 }
 
+// Painted is every query the terminal showed as text, in order: under a
+// Paints profile, each query it did not answer.
+func (t *Terminal) Painted() []string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return append([]string(nil), t.painted...)
+}
+
+// isQuery reports whether seq asks the terminal for a reply.
+func isQuery(seq string) bool {
+	switch {
+	case seq == ansi.RequestPrimaryDeviceAttributes, seq == ansi.RequestSecondaryDeviceAttributes,
+		seq == ansi.RequestNameVersion, seq == ansi.RequestKittyKeyboard:
+		return true
+	case strings.HasPrefix(seq, "\x1b[?") && (strings.HasSuffix(seq, "$p") || strings.HasSuffix(seq, "n")):
+		return true
+	case strings.HasPrefix(seq, "\x1b]") && strings.Contains(seq, "?"):
+		return true
+	case strings.HasPrefix(seq, "\x1b_G") && strings.Contains(seq, "a=q"), strings.HasPrefix(seq, "\x1bPtmux;"):
+		return true
+	}
+	return false
+}
+
 // Write takes the program's output, and answers each complete query in it.
 func (t *Terminal) Write(b []byte) (int, error) {
 	t.mu.Lock()
@@ -264,6 +322,8 @@ func (t *Terminal) Write(b []byte) (int, error) {
 		t.seqs = append(t.seqs, seq)
 		if r := t.answer(&t.profile, seq); r != "" {
 			t.input <- r
+		} else if t.profile.Paints && isQuery(seq) {
+			t.painted = append(t.painted, seq)
 		}
 	}
 	t.pending = s
@@ -310,12 +370,27 @@ func seqLen(s string) int {
 
 // answer is p's reply to seq, or "".
 func (t *Terminal) answer(p *Profile, seq string) string {
+	if strings.HasPrefix(seq, "\x1b[") {
+		return t.answerCSI(p, seq)
+	}
+	return t.answerString(p, seq)
+}
+
+// answerCSI is p's reply to a CSI query, or "". It also follows the Kitty
+// keyboard flags tea pushes and pops.
+func (t *Terminal) answerCSI(p *Profile, seq string) string {
 	switch {
 	case seq == ansi.RequestPrimaryDeviceAttributes:
 		if p.DA1 == nil {
 			return ""
 		}
 		return "\x1b[?" + joinInts(p.DA1) + "c"
+
+	case seq == ansi.RequestSecondaryDeviceAttributes:
+		if p.DA2 == nil {
+			return ""
+		}
+		return "\x1b[>" + joinInts(p.DA2) + "c"
 
 	case strings.HasPrefix(seq, "\x1b[?") && strings.HasSuffix(seq, "$p"):
 		mode, err := strconv.Atoi(seq[3 : len(seq)-2])
@@ -358,7 +433,13 @@ func (t *Terminal) answer(p *Profile, seq string) string {
 			return ""
 		}
 		return "\x1bP>|" + p.Version + "\x1b\\"
+	}
+	return ""
+}
 
+// answerString is p's reply to an OSC, APC or DCS query, or "".
+func (t *Terminal) answerString(p *Profile, seq string) string {
+	switch {
 	case strings.HasPrefix(seq, "\x1b]11;?"):
 		return xColor("11", p.Background)
 	case strings.HasPrefix(seq, "\x1b]10;?"):

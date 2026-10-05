@@ -55,14 +55,20 @@ func keyboardReason(c Caps) string {
 		return ReasonKittyUnknown
 	case brand == BrandITerm2 || brand == BrandGhostty:
 		return ReasonLeaksReleases
-	case brand == BrandAlacritty:
-		// Until DA2 says the version (Step A1.2), every Alacritty is taken
-		// for 0.14 or older.
+	case brand == BrandAlacritty && !alacrittyAfter014(c):
 		return ReasonAlacrittyRelease
 	case c.Mux.Value == Tmux && c.Tmux.ExtendedKeysFormat != "csi-u":
 		return ReasonTmuxExtendedKeys
 	}
 	return ""
+}
+
+// alacrittyAfter014 reports whether DA2 says Alacritty is newer than
+// 0.14. Alacritty's DA2 is taken to carry its version packed as
+// major*10000 + minor*100 + patch in the second field; without a DA2, it
+// fails closed.
+func alacrittyAfter014(c Caps) bool {
+	return len(c.SecondaryAttributes) >= 2 && c.SecondaryAttributes[1] >= 1500
 }
 
 // LinkCaps is hyperlinks, as a program should use them.

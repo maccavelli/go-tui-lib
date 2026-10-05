@@ -146,8 +146,14 @@ type Prober struct {
 	sent    []*probe // the batch's queries, in order, once sent
 	started bool     // the first tea.EnvMsg arrived
 	done    bool     // CapsMsg was delivered
+	pending bool     // CapsMsg is due, and waits for the colour profile
+	profile bool     // tea.ColorProfileMsg arrived
 	dsr997  bool     // Dark came from a DSR 997 report
 	set2031 bool     // the prober subscribed to mode 2031
+
+	frag    byte // the kind of split reply IsReplyFragment is inside, or 0
+	fragLen int  // its length so far
+	fragEsc bool // its last byte was ESC
 }
 
 // probe is a query in the batch.
@@ -155,7 +161,16 @@ type probe struct {
 	Query
 	silent   func(c *Caps) // what no reply before the sentinel means; nil for nothing
 	answered bool
+
+	// prefix starts the raw reply this query gets, and fact is the fact a
+	// reply over maxReply marks; both only for the built-in queries whose
+	// replies ultraviolet does not decode.
+	prefix string
+	fact   func(*Caps) *Fact[Support]
 }
+
+// maxReply is the longest raw reply the prober parses.
+const maxReply = 1024
 
 // timeoutMsg is the deadline Init starts.
 type timeoutMsg struct{ p *Prober }
@@ -242,6 +257,10 @@ func (p *Prober) Update(msg tea.Msg) tea.Cmd {
 		}
 	case tea.ColorProfileMsg:
 		p.caps.Profile = m.Profile
+		p.profile = true
+		if p.pending {
+			cmds = append(cmds, p.deliver())
+		}
 	case tea.ModeReportMsg:
 		switch m.Mode {
 		case ansi.ModeSynchronizedOutput:
@@ -261,9 +280,13 @@ func (p *Prober) Update(msg tea.Msg) tea.Cmd {
 	if decoded && ev.Kind == termevent.Unknown {
 		r.Raw = ev.Raw
 	}
-	for _, q := range p.sent {
-		if q.Parse(r, &p.caps) {
-			q.answered = true
+	if len(r.Raw) > maxReply {
+		p.tooLong(r.Raw)
+	} else {
+		for _, q := range p.sent {
+			if q.Parse(r, &p.caps) {
+				q.answered = true
+			}
 		}
 	}
 
@@ -278,6 +301,7 @@ func (p *Prober) Update(msg tea.Msg) tea.Cmd {
 		case termevent.DeviceAttributes:
 			p.caps.Attributes = ev.Attrs
 			p.caps.Sixel.Set(supportIf(slices.Contains(ev.Attrs, 4)), Queried)
+			appleFingerprint(&p.caps)
 			cmds = append(cmds, p.sentinel())
 		}
 	}
@@ -300,7 +324,22 @@ func (p *Prober) start(env Env) tea.Cmd {
 	if p.disabled {
 		return tea.Batch(append(hooks, p.deliver())...)
 	}
-	gated := p.ungated || gatedAllowed(env)
+	// JetBrains paints a query as text: send nothing, and say why each
+	// fact a query would have set is unknown (MADR A1, Q7).
+	if p.caps.EnvBrand.Value == BrandJetBrains {
+		for _, f := range queryFacts(&p.caps) {
+			f.SetReason(Unknown, NotQueried, ReasonJetBrainsPaints)
+		}
+		return tea.Batch(append(hooks, p.deliver())...)
+	}
+	// An editor's terminal answers for the editor, so the gated queries,
+	// which would describe the user's terminal, are skipped there.
+	inEditor := p.caps.Editor.Value != EditorNone
+	gated := p.ungated || gatedAllowed(env) && !inEditor
+	if inEditor && !gated {
+		p.caps.DesktopNotify.SetReason(Unknown, NotQueried, ReasonEditorTerminal)
+		p.caps.KittyGraphics.SetReason(Unknown, NotQueried, ReasonEditorTerminal)
+	}
 	var b strings.Builder
 	for _, q := range p.batch() {
 		if q.Gated && !gated {
@@ -315,6 +354,120 @@ func (p *Prober) start(env Env) tea.Cmd {
 	}
 	b.WriteString(ansi.RequestPrimaryDeviceAttributes)
 	return tea.Batch(append(hooks, tea.Raw(b.String()))...)
+}
+
+// queryFacts are the support facts the batch's queries set.
+func queryFacts(c *Caps) []*Fact[Support] {
+	return []*Fact[Support]{
+		&c.KittyKeyboard, &c.ColorSchemeReports, &c.InBandResize, &c.FocusEvents,
+		&c.DesktopNotify, &c.KittyGraphics, &c.Sixel,
+	}
+}
+
+// tooLong handles a raw reply over maxReply: it is not parsed, and the
+// built-in query it would answer is marked with the reason.
+func (p *Prober) tooLong(raw string) {
+	for _, q := range p.sent {
+		if q.prefix == "" || !strings.HasPrefix(raw, q.prefix) {
+			continue
+		}
+		q.answered = true
+		if q.fact != nil {
+			q.fact(&p.caps).SetReason(Unknown, Queried, ReasonReplyTooLong)
+		}
+	}
+}
+
+// Kinds of split reply.
+const (
+	fragCSI    = 'c' // ends with a final byte, 0x40-0x7e
+	fragString = 's' // OSC, DCS or APC: ends with BEL or ST
+)
+
+// IsReplyFragment reports whether msg is part of a reply to the probe that
+// arrived split across reads: an unknown event, which is what the reader
+// gives up on at its escape timeout, whose bytes begin a reply the probe
+// is still waiting for, and each key press after it up to the byte that
+// ends that reply, within 1 KiB (docs/decisions/0005-MADR-terminal-capabilities-and-services.md
+// A2). An input filter, such as one passed to tea.WithFilter, calls it once
+// for each message, in order, to drop the fragments. The prober never
+// hides a message itself.
+func (p *Prober) IsReplyFragment(msg tea.Msg) bool {
+	if p.frag != 0 {
+		b, ok := keyByte(msg)
+		if !ok || p.fragLen >= maxReply {
+			p.frag = 0
+			return false
+		}
+		p.fragLen++
+		switch {
+		case p.frag == fragCSI && b >= 0x40 && b <= 0x7e,
+			p.frag == fragString && b == ansi.BEL,
+			p.frag == fragString && p.fragEsc && b == '\\':
+			p.frag = 0
+		}
+		p.fragEsc = b == ansi.ESC
+		return true
+	}
+	if !p.awaiting() {
+		return false
+	}
+	ev, ok := termevent.Decode(msg)
+	if !ok || ev.Kind != termevent.Unknown {
+		return false
+	}
+	if p.frag = fragKind(ev.Raw); p.frag == 0 {
+		return false
+	}
+	p.fragLen, p.fragEsc = len(ev.Raw), strings.HasSuffix(ev.Raw, "\x1b")
+	return true
+}
+
+// awaiting reports whether the probe may still get a reply: it sent its
+// batch, and the sentinel or a query is unanswered.
+func (p *Prober) awaiting() bool {
+	if len(p.sent) == 0 {
+		return false
+	}
+	if !p.caps.Complete {
+		return true
+	}
+	return slices.ContainsFunc(p.sent, func(q *probe) bool { return !q.answered })
+}
+
+// fragKind is the kind of reply raw begins and does not finish, or 0.
+func fragKind(raw string) byte {
+	switch {
+	case strings.HasPrefix(raw, "\x1b[?"), strings.HasPrefix(raw, "\x1b[>"):
+		if last := raw[len(raw)-1]; last >= 0x40 && last <= 0x7e {
+			return 0
+		}
+		return fragCSI
+	case strings.HasPrefix(raw, "\x1b]"), strings.HasPrefix(raw, "\x1bP>|"), strings.HasPrefix(raw, "\x1b_G"):
+		if strings.HasSuffix(raw, "\x07") || strings.HasSuffix(raw, "\x1b\\") {
+			return 0
+		}
+		return fragString
+	}
+	return 0
+}
+
+// keyByte is the byte a key press stands for in a split reply: its text,
+// ESC, or BEL as ctrl+g.
+func keyByte(msg tea.Msg) (byte, bool) {
+	k, ok := msg.(tea.KeyPressMsg)
+	if !ok {
+		return 0, false
+	}
+	switch {
+	case len(k.Text) == 1:
+		return k.Text[0], true
+	case k.Code == tea.KeyEscape && k.Mod == 0:
+		return ansi.ESC, true
+	case k.Code == 'g' && k.Mod == tea.ModCtrl:
+		return ansi.BEL, true
+	}
+	return 0, false
 }
 
 // SetTmux records what the program learned from running TmuxQuery.
@@ -355,9 +508,14 @@ func (p *Prober) sentinel() tea.Cmd {
 	return p.deliver()
 }
 
-// deliver sends CapsMsg, once.
+// deliver sends CapsMsg, once, when tea's colour profile has arrived: tea
+// sends it unordered with tea.EnvMsg. The deadline delivers regardless.
 func (p *Prober) deliver() tea.Cmd {
 	if p.done {
+		return nil
+	}
+	if !p.profile && !p.caps.TimedOut {
+		p.pending = true
 		return nil
 	}
 	p.done = true
@@ -396,13 +554,15 @@ func (p *Prober) batch() []*probe {
 			func(c *Caps) *Fact[Support] { return &c.FocusEvents }),
 		{Name: "color-scheme", Seq: fixed(ansi.RequestLightDarkReport), Parse: parseColorScheme},
 		{Name: "background", Seq: p.background, Parse: parseBackground},
+		{Name: "secondary-attributes", Seq: fixed(ansi.RequestSecondaryDeviceAttributes), Parse: parseDA2},
 		{Name: "terminal-version", Seq: fixed(ansi.RequestNameVersion), Gated: true, Parse: parseVersion},
 		{Name: "desktop-notify", Seq: wrapped(osc99Query), Gated: true, Parse: parseOSC99,
-			silent: unsupported(func(c *Caps) *Fact[Support] { return &c.DesktopNotify })},
+			silent: unsupported(func(c *Caps) *Fact[Support] { return &c.DesktopNotify }),
+			prefix: "\x1b]99;", fact: func(c *Caps) *Fact[Support] { return &c.DesktopNotify }},
 		{Name: "kitty-graphics", Seq: wrapped(kittyGraphicsQuery), Gated: true, Parse: parseKittyGraphics,
 			silent: unsupported(func(c *Caps) *Fact[Support] { return &c.KittyGraphics })},
 		{Name: "foreground", Seq: fixed(ansi.RequestForegroundColor), Gated: true, Parse: parseForeground},
-		{Name: "palette", Seq: fixed(paletteQuery), Gated: true, Parse: parsePalette},
+		{Name: "palette", Seq: fixed(paletteQuery), Gated: true, Parse: parsePalette, prefix: "\x1b]4;"},
 	}
 	for _, q := range p.added {
 		qs = append(qs, &probe{Query: q})
@@ -495,6 +655,26 @@ func parseVersion(r Reply, c *Caps) bool {
 		c.Brand.Set(b, Queried)
 	}
 	return true
+}
+
+// parseDA2 reads the secondary device attributes, which name Alacritty's
+// version and, with DA1, Apple Terminal over SSH.
+func parseDA2(r Reply, c *Caps) bool {
+	e, ok := termevent.Decode(r.Msg)
+	if !ok || e.Kind != termevent.SecondaryDeviceAttributes {
+		return false
+	}
+	c.SecondaryAttributes = e.Attrs
+	appleFingerprint(c)
+	return true
+}
+
+// appleFingerprint names Apple Terminal from DA1 1;2 with DA2 1;95;0,
+// which over SSH is the only sign of it.
+func appleFingerprint(c *Caps) {
+	if slices.Equal(c.Attributes, []int{1, 2}) && slices.Equal(c.SecondaryAttributes, []int{1, 95, 0}) {
+		c.Brand.Set(BrandAppleTerminal, Queried)
+	}
 }
 
 func parseForeground(r Reply, c *Caps) bool {

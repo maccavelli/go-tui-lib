@@ -10,6 +10,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/maccavelli/go-tui-lib/internal/termevent/termeventtest"
@@ -25,6 +26,7 @@ const (
 	osc99Q         = "\x1b]99;i=termcap:p=?;\x07"
 	kittyGraphicsQ = "\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\"
 	da1Q           = "\x1b[c"
+	da2Q           = "\x1b[>c"
 	osc10Q         = "\x1b]10;?\x07"
 	paletteQ       = "\x1b]4;0;?\x07\x1b]4;1;?\x07\x1b]4;2;?\x07\x1b]4;3;?\x07" +
 		"\x1b]4;4;?\x07\x1b]4;5;?\x07\x1b]4;6;?\x07\x1b]4;7;?\x07" +
@@ -99,9 +101,11 @@ func capsOf(t *testing.T, msgs []tea.Msg) Caps {
 	return got[0]
 }
 
-// start returns a prober that has seen env, and what it sent.
+// start returns a prober that has seen tea's colour profile, then env, as
+// a program does, and what it sent on env.
 func start(env Env, o ...Option) (*Prober, []tea.Msg) {
 	p := New(o...)
+	run(p.Update(tea.ColorProfileMsg{Profile: colorprofile.TrueColor}))
 	return p, run(p.Update(tea.EnvMsg(env)))
 }
 
@@ -118,7 +122,7 @@ func TestBatchBytes(t *testing.T) {
 	tmux := func(seq string) string {
 		return "\x1bPtmux;" + strings.ReplaceAll(seq, "\x1b", "\x1b\x1b") + "\x1b\\"
 	}
-	safe := kittyKeyboardQ + modesQ + dsr996Q + osc11Q
+	safe := kittyKeyboardQ + modesQ + dsr996Q + osc11Q + da2Q
 	cases := []struct {
 		name string
 		env  Env
@@ -133,7 +137,7 @@ func TestBatchBytes(t *testing.T) {
 			safe + xtversionQ + osc99Q + kittyGraphicsQ + osc10Q + paletteQ + da1Q},
 		{"Apple Terminal", Env{"TERM=xterm-256color", "TERM_PROGRAM=Apple_Terminal"}, nil, safe + da1Q},
 		{"no background query", local, []Option{WithoutBackgroundRequest()},
-			kittyKeyboardQ + modesQ + dsr996Q + xtversionQ + osc99Q + kittyGraphicsQ + osc10Q + paletteQ + da1Q},
+			kittyKeyboardQ + modesQ + dsr996Q + da2Q + xtversionQ + osc99Q + kittyGraphicsQ + osc10Q + paletteQ + da1Q},
 	}
 	for _, c := range cases {
 		_, msgs := start(c.env, c.o...)
@@ -451,7 +455,7 @@ func TestDisabledSendsNothing(t *testing.T) {
 	if p.Init() != nil {
 		t.Fatal("Init returned a command")
 	}
-	msgs := feed(p, tea.EnvMsg(Env{"TERM=xterm", "TMUX=x"}))
+	msgs := feed(p, tea.ColorProfileMsg{Profile: colorprofile.ANSI}, tea.EnvMsg(Env{"TERM=xterm", "TMUX=x"}))
 	if raw(msgs) != "" || backgroundRequests(msgs) != 0 {
 		t.Fatalf("sent %v", msgs)
 	}
@@ -480,7 +484,7 @@ func TestAddedQuery(t *testing.T) {
 	gated := Query{Name: "gated", Seq: fixed("\x1b[?6n"), Gated: true, Parse: func(Reply, *Caps) bool { return false }}
 	p, msgs := start(Env{"TERM=xterm", "SSH_TTY=x"}, WithQuery(q), WithQuery(gated))
 	b := raw(msgs)
-	if !strings.HasSuffix(b, osc11Q+seq+da1Q) {
+	if !strings.HasSuffix(b, osc11Q+da2Q+seq+da1Q) {
 		t.Errorf("batch %q: want the added query after the built-in ones and before DA1", b)
 	}
 	if strings.Contains(b, "\x1b[?6n") {

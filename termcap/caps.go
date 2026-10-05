@@ -53,6 +53,8 @@ type Caps struct {
 	Foreground   color.Color     `json:"-"`                      // OSC 10, when it replied
 	Palette      [16]color.Color `json:"-"`                      // OSC 4, indexes 0-15, each when it replied
 	PaletteKnown bool            `json:"palette_known,omitzero"` // all 16 replied
+
+	SecondaryAttributes []int `json:"secondary_attributes,omitzero"` // the DA2 reply
 }
 
 // caps is Caps without its methods, so the JSON methods can embed it.

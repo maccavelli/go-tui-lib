@@ -1013,6 +1013,16 @@ and before the gated queries, so DA1 covers it. Tea decodes the reply as
 leaves it out. The follow-up to a DSR 997 after the probe stays a
 `tea.RequestBackgroundColor` command: no sentinel waits for it.
 
+**Also in A3: `CapsMsg` waits for the colour profile** (the owner, picked
+from options, 2026-10-04, "Wait for ColorProfileMsg", the recommendation;
+`0005-PLAN`, Step A1.2, D10). Tea sends `tea.ColorProfileMsg` and
+`tea.EnvMsg` from separate goroutines (`tea.go:1098`, `tea.go:1105`), so a
+`CapsMsg` delivered on `tea.EnvMsg`, under JetBrains or `WithDisabled`,
+could miss `Profile`; on the probe's path the DA1 round trip only made it
+unlikely. The prober delivers `CapsMsg` once it has seen
+`tea.ColorProfileMsg` as well as the sentinel, or the shortcut; the
+deadline delivers regardless.
+
 **Rejected.** Sending the batch from `Init` with no environment breaks Q1's
 gate and the tmux wrap. Taking the environment in `New` breaks the rule
 that it comes from `tea.EnvMsg`, which under wish is the session's.

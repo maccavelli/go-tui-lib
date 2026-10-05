@@ -28,3 +28,4 @@
  79|                       #778880;#887780;#996680;#aa5580;#bb4480;#cc3380;#dd2280;
  38|                       #ee1180;#ff0080
  26|palette_known          yes
+ 32|secondary_attributes   1;4000;39

@@ -53,6 +53,17 @@ const (
 	// for Windows Terminal, whose default-terminal hand-off omits
 	// WT_SESSION.
 	ReasonWindowsTerminalGuess = "terminal.windows-terminal-guess"
+
+	// ReasonJetBrainsPaints: JetBrains terminals paint a query as text, so
+	// the prober sends none there, and every fact comes from the
+	// environment.
+	ReasonJetBrainsPaints = "terminal.jetbrains-paints-queries"
+	// ReasonEditorTerminal: inside an editor's terminal, which answers for
+	// the editor rather than the user's terminal, the gated queries are not
+	// sent.
+	ReasonEditorTerminal = "editor.terminal-gated"
+	// ReasonReplyTooLong: a reply longer than 1 KiB was not parsed.
+	ReasonReplyTooLong = "probe.reply-too-long"
 )
 
 // reasons is every token, for the tests that keep them unique and the
@@ -63,4 +74,5 @@ var reasons = []string{
 	ReasonAppleNoOSC8, ReasonWarpNoOSC8, ReasonTmuxLinks, ReasonUnknownTerminal, ReasonZellijNoForwarding,
 	ReasonColorFGBGGuess, ReasonDesktopAppearance,
 	ReasonLegacyConsoleGuess, ReasonWindowsTerminalGuess,
+	ReasonJetBrainsPaints, ReasonEditorTerminal, ReasonReplyTooLong,
 }

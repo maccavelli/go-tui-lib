@@ -27,3 +27,4 @@
 119|palette                #00ff80;#11ee80;#22dd80;#33cc80;#44bb80;#55aa80;#669980;#778880;#887780;#996680;#aa5580;#bb4480;
  54|                       #cc3380;#dd2280;#ee1180;#ff0080
  26|palette_known          yes
+ 32|secondary_attributes   1;4000;39

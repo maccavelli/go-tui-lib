@@ -1052,3 +1052,161 @@ macOS run could not show it. The agent stopped and asked. The owner picked
 "Export WithGOOS", the recommendation: `WithGOOS(goos string)` names the
 operating system, `runtime.GOOS` by default, and the golden test passes
 `WithGOOS("linux")`. MADR A4 records it.
+
+**What was built.**
+
+* **`termcap/identity.go`:** `Brand` (22 brands, `BrandUnknown` first),
+  `Editor`, `Platform` (native, MSYS, WSL), each with text forms;
+  `Identity`; `FromEnv(env Env, goos string) Identity` in the report's
+  order: Cursor's and the VS Code family's markers; `TERM_PROGRAM`
+  (tmux's and screen's own value names no terminal and is skipped);
+  `TERMINAL_EMULATOR` for JetBrains before `TERM_SESSION_ID` (iTerm2's
+  `wNtNpN:` form, else Apple Terminal); `LC_TERMINAL`; `TERM` and the
+  variables its terminals set (`KITTY_WINDOW_ID`, `GHOSTTY_RESOURCES_DIR`,
+  `WEZTERM_PANE`, `ALACRITTY_WINDOW_ID`); `TERMINATOR_UUID` before
+  `VTE_VERSION`, then `KONSOLE_VERSION`; `WT_SESSION` last. A version is
+  kept only from the variable that named the brand. On Windows an unknown
+  brand is refined to Windows Terminal; `EnvBrand` keeps the raw one. An
+  XTVERSION reply names the brand too (origin `Queried`), which over SSH is
+  often the only name.
+* **`termcap/reason.go`:** sixteen reason tokens as exported constants,
+  dotted kebab case, and the list the tests check them against.
+* **`termcap/termcap.go`:** `Fact[T].Reason` and `SetReason`; `Set`
+  clears the reason it replaces.
+* **`termcap/caps.go`:** `Caps` gains `Brand`, `EnvBrand`, `Editor`,
+  `Platform` (A4), `LegacyConsole`, `Tmux`, `Foreground`, `Palette` and
+  `PaletteKnown`, at the end, as §2 asks. JSON writes the colours as
+  `#rrggbb` and the palette as 16 strings.
+* **`termcap/views.go`:** `Caps.Keyboard() KeyboardCaps`,
+  `KeyboardFlags(c) tea.KeyboardEnhancements` (A4) and
+  `Caps.ReleasesReported()`; `Caps.Links() LinkCaps` (OSC 8 by brand;
+  Apple Terminal and Warp unsupported; tmux before 3.4 unsupported, its
+  version from `TmuxFacts` or an XTVERSION of tmux; an unknown brand
+  fails closed); `Caps.Notifications() NotifyCaps` (OSC 99 and focus from
+  their queries; OSC 777 and OSC 9 from A1's brand lists; Zellij none).
+  Each carries a reason token where it says no. `termsvc`'s `Auto` still
+  reads the terminal's name until Step A1.3 moves it onto this view.
+* **The kitty flag policy** (`keyboardReason`): none on mintty or MSYS2;
+  none under WSL in VS Code or with an unknown terminal; none without the
+  protocol; no event types on iTerm2 and Ghostty, on Alacritty (taken for
+  0.14 or older until Step A1.2 reads DA2), or in tmux unless its
+  `extended-keys-format` is `csi-u`; event types otherwise.
+* **The appearance chain** (`env.go`, `prober.go`): `COLORFGBG` with Vim's
+  heuristic (`Heuristic`, reason `appearance.colorfgbg-guess`), then the
+  `WithAppearanceHook` answer (`Heuristic`, `appearance.desktop`), then
+  `WithAppearanceEnv`'s variable and its `LC_` form (`Environment`), then
+  DSR 997 or OSC 11 (`Queried`), then an override. The hooks run once, as
+  commands, after the first `tea.EnvMsg`.
+* **Palette** (`prober.go`, Q5): the OSC 10 query and the sixteen OSC 4
+  queries join the gated set, after the Kitty graphics query.
+  `tea.ForegroundColorMsg` sets `Foreground`; each OSC 4 reply, which
+  ultraviolet does not decode, is read from `Reply.Raw` (`rgb:` with one
+  to four hex digits per component, or `#rrggbb`); `PaletteKnown` once all
+  sixteen arrived.
+* **tmux** (`tmux.go`): `TmuxFacts`, `TmuxQuery()` (one
+  `tmux display-message -p` for the version, `extended-keys-format`,
+  `mouse`, `client_termfeatures` and `client_flags`, returned as an argv
+  and never run), `ParseTmux`, and `Prober.SetTmux`.
+* **The legacy console:** `LegacyConsole` is a `Heuristic` guess on
+  Windows with no terminal named (reason `console.no-terminal-variables`);
+  `WithConsoleHost`'s answer, asked only on Windows, is `Queried`.
+* **`WithGOOS`** (D9), and the report prints a fact's reason token after
+  its origin, and an array (the palette) like a slice, wrapping at `;` and
+  `,`.
+* **`termcap/termcaptest`:** `Profile` gains `Foreground` and `Palette`
+  answers, and `Kitty()` has both.
+
+**Tests** (`identity_test.go`): `TestFromEnvBrands` (24 rows in the
+detection order, with the traps: JetBrains with `TERM_SESSION_ID`, tmux's
+own `TERM_PROGRAM`, an editor fork over SSH, Terminator with
+`VTE_VERSION`, `WT_SESSION` behind `TERM_PROGRAM`),
+`TestFromEnvRefinesOnWindowsOnly`, `TestFromEnvVersionNeedsItsBrand`,
+`TestFromEnvOtherFacts`, `TestWithGOOS`, `TestLegacyConsole`,
+`TestKeyboardFlags` (14 terminals and platforms), `TestReleasesReported`,
+`TestColorFGBG` (`0;15`, `15;0`, `default;default`, out of range and
+malformed among nine), `TestAppearanceChain` (each link and its origin, in
+order, and an override), `TestHooksAreNotCalledWhenNotSet`,
+`TestConsoleHost`, `TestParseTmux` (real-shaped, empty, a missing field),
+`TestAtLeast`, `TestLinks` (tmux 3.3 and 3.4), `TestNotifications`,
+`TestPaletteAndForeground`, `TestParseXColor`, `TestBrandFromXTVersion`,
+`TestReasonTokens` (every `Reason` constant in the list, unique, dotted),
+`TestReportShowsReasons`. The batch test gains the palette queries; the
+JSON round trip covers every new field. The goldens were rewritten for the
+new fields and read: Kitty shows its brand from XTVERSION, foreground and
+palette; the others `unknown`, `-` or `no`.
+
+Two tests first failed for a test-harness reason: the hooks run as
+commands, and the helpers did not feed their answers back, as tea does.
+The two tests now feed them back.
+
+**Mutations,** each on a scratch copy, all 17 killed:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| `TERMINAL_EMULATOR` read after `TERM_SESSION_ID` | `TestFromEnvBrands`: "JetBrains, which also sets TERM_SESSION_ID: Brand apple-terminal" |
+| Ghostty given event types | `TestKeyboardFlags`: "Ghostty: event types true" |
+| `LC_` + name not read | `TestAppearanceChain`: "its LC_ form crosses SSH" |
+| `COLORFGBG` `default` read as dark | `TestColorFGBG`: "COLORFGBG=\"default;default\": true, true" |
+| two reason constants share a string | `TestReasonTokens`: "token \"terminal.apple-no-osc8\" is used twice" |
+| a `Reason` constant left out of the list | `TestReasonTokens`: "16 Reason constants, 15 in reasons" |
+| the Windows refinement on every OS | `TestFromEnvRefinesOnWindowsOnly` |
+| a version kept without its brand | `TestFromEnvVersionNeedsItsBrand`: "tmux's version kept for kitty" |
+| tmux links allowed from 3.3 | `TestLinks`: "tmux 3.3: {Value:supported …}" |
+| `PaletteKnown` before all 16 | `TestPaletteAndForeground` |
+| `ParseTmux` known with a field missing | `TestParseTmux` |
+| XTVERSION does not name the brand | `TestBrandFromXTVersion` |
+| Alacritty given event types | `TestKeyboardFlags` |
+| the report omits the reason token | `TestReportShowsReasons` |
+| the console host asked off Windows | `TestConsoleHost` |
+| the palette queries ungated | `TestBatchBytes`: "unknown SSH peer" |
+| `WithGOOS` ignored (D9) | `TestWithGOOS`, `TestConsoleHost` |
+
+Every earlier step's mutation set was rerun after this step's changes:
+Step 2's 7, Step 3's 17, Step 4's 7, Step 5's 6 and Step 6's 11, all
+killed. Six anchors moved with the code (`STY` now read in `identity.go`;
+the batch's last line; two import blocks; the `"windows"` constant) and
+were updated before the rerun.
+
+**Checks.**
+
+* `make lint`: 0 issues for linux, darwin and windows, after the first run's
+  findings were fixed in the code: `goconst` (`"windows"` is
+  `goosWindows`; the TERM and XTVERSION tables and the heuristic's list use
+  the brands' own names; the report's `unknown` is `Unknown.String()`),
+  `gosec` G115 (the two narrowing conversions in `parseXColor`, now
+  `Sscanf` into `uint8` and a bound against `math.MaxUint8`), `errcheck`
+  (`atLeast`'s second `Atoi`), and `gosec` G101, which read the constant
+  name `ReasonZellijNoPassthrough` as a credential: it is
+  `ReasonZellijNoForwarding`, and its token is unchanged.
+* `make pre-add-check FILES=…`: `13 file(s) clean`, and after D9 `3
+  file(s) clean`.
+* `go test -race -count=1 ./...`, `LC_ALL=C go test ./...`,
+  `go test -shuffle=on -count=2 ./...` and `go test -race -count=5
+  ./termcap/...`, with `GOWORK=off`: pass.
+* `GOWORK=off go mod tidy -diff`: clean; `go.mod` unchanged.
+* Windows test host, on a copy (go1.27.1 windows/amd64): before D9 the
+  goldens failed (above); after it, `make pre-add-check` (`66 file(s)
+  clean`), `make lint` (0 issues, three targets), `make vuln` (none), and
+  the four packages' tests shuffled three times: all exit 0.
+* The identifier scan of the diff finds nothing.
+
+**Not done here.** DA2 and Alacritty's version, the reply cap,
+`IsReplyFragment` and the JetBrains and editor gates are Step A1.2;
+`Findings`, the clipboard plans, link display, notification results and
+`termsvc`'s brand-based `Auto` are Step A1.3.
+
+### Step A1.2: probe discipline (2026-10-04)
+
+The owner committed Step A1.1 (`ac11222`) and said "proceed".
+
+**Deviation D10 (2026-10-04): `CapsMsg` before the colour profile.** The
+full `-race` run failed once, on the JetBrains report golden's `profile`
+line: under JetBrains the prober delivers `CapsMsg` on `tea.EnvMsg`, and
+tea sends `tea.ColorProfileMsg` unordered with it, so `Profile` was
+sometimes `Unknown`. The same race is latent on the probe's path, hidden
+by the DA1 round trip, and under `WithDisabled`. A defect of Step 3's
+delivery, exposed by this step's shortcut. The agent stopped and asked.
+The owner picked "Wait for ColorProfileMsg", the recommendation:
+`CapsMsg` waits for `tea.ColorProfileMsg` too, and the deadline delivers
+regardless. MADR A3 records it. The unit tests' `start` helper feeds
+`tea.ColorProfileMsg` first, as tea does.

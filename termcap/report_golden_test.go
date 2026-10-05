@@ -39,7 +39,7 @@ func TestReportGolden(t *testing.T) {
 	pin := termcap.WithOverride(func(c *termcap.Caps) { c.KeyboardFlags = 0 })
 	for _, p := range []termcaptest.Profile{
 		termcaptest.Kitty(), termcaptest.XTerm(), termcaptest.Tmux(true), termcaptest.Tmux(false),
-		termcaptest.DA1Only(), termcaptest.Silent(),
+		termcaptest.DA1Only(), termcaptest.Silent(), termcaptest.AppleTerminalSSH(), termcaptest.JetBrains(),
 	} {
 		// The identity is read for one OS, so the files match on every host.
 		c := termcaptest.Run(t, app{termcap.New(pin, termcap.WithGOOS("linux"), termcap.WithTimeout(100*time.Millisecond))}, p)
