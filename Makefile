@@ -87,11 +87,13 @@ vuln: ## Runs govulncheck (opt-in; requires govulncheck on PATH/GOBIN)
 	fi
 	$(call each_module,$(GOVULNCHECK) ./...)
 
-# Fuzz each layout fuzz target for FUZZTIME; go test -fuzz takes one target
-# per run (docs/decisions/0002-PLAN-multi-pane-workspace-layouts.md Step 5).
+# Fuzz each fuzz target for FUZZTIME; go test -fuzz takes one target per run
+# (docs/decisions/0002-PLAN-multi-pane-workspace-layouts.md Step 5,
+# docs/decisions/0006-PLAN-command-registry.md Step 2).
 FUZZTIME ?= 20s
-fuzz: ## Fuzzes every layout fuzz target for FUZZTIME each (default 20s)
+fuzz: ## Fuzzes every layout and when fuzz target for FUZZTIME each (default 20s)
 	@./scripts/go-fuzz.sh -t $(FUZZTIME) -m 1 ./layout
+	@./scripts/go-fuzz.sh -t $(FUZZTIME) -m 1 ./when
 
 # The pre-add rule (AGENTS.md). scripts/go-precheck.sh is the one
 # implementation; the agent gate at `git commit` runs the same file.

@@ -546,6 +546,8 @@ func (k Key[T]) Get(c Context) (T, bool)
   not, and accepts every expression VS Code accepts.
 * **Limits.** At most 4 KiB of source and 64 levels of nesting. Beyond that
   `Parse` returns an error, so a user file cannot overflow the stack.
+  (*A3: and at most 4 KiB of canonical form, so every expression `Parse`
+  accepts round-trips.*)
 * **Typed keys** document themselves. The workspace publishes:
   * `workspace.focusedPane`, `workspace.zoomed`, `workspace.hiddenPanes`;
   * `workspace.overlay` (the top overlay's ID) and `workspace.modal`;
@@ -679,7 +681,8 @@ func Run(ctx context.Context, r *command.Registry, args []string,
 * `when`:
   * table tests for every operator and the precedence examples from the VS
     Code documentation;
-  * `String()` round-trips: parsing the canonical form gives the same form;
+  * `String()` round-trips: parsing the canonical form gives the same form
+    (*A3: for every expression `Parse` accepts*);
   * `FuzzParse` finds no panic, no non-round-tripping canonical form and
     no evaluation panic on random contexts;
   * the size and depth limits are errors, not crashes.
@@ -1157,6 +1160,33 @@ recommendation.
 * **Q6.** Which MCP revision the exporters target. Recommended:
   2026-07-28. The alternative was to keep 2025-11-25, which a 2026-07-28
   client still reads, treating a result without `resultType` as complete.
+
+### A3 (2026-10-05): the canonical form is bounded too
+
+*Status: accepted (2026-10-05).* Found while executing Step 2 of
+[0006-PLAN-command-registry.md](0006-PLAN-command-registry.md), recorded
+there as deviation D1.
+
+**Found.** §8 says `String()` round-trips and limits the source to 4 KiB;
+together they are false. The canonical form can be longer than the source
+it came from: it adds spaces around operators (`a==1` prints `a == 1`),
+and it quotes a bareword and doubles each backslash in it. `FuzzParse`
+found a source under 4 KiB whose canonical form is 6718 bytes, which
+`Parse` then refuses.
+
+**Decided.** `Parse` refuses an expression whose canonical form is longer
+than `MaxSource`, as it refuses a source that is. The error names the
+canonical form's length. Every expression `Parse` accepts then
+round-trips, because a canonical form prints as itself. The cost is one
+`String()` per `Parse`, at load time.
+
+**Changed.** §8's limits and §Confirmation's round-trip item, annotated
+in place.
+
+**Owner question for A3.** *Answered 2026-10-05* (picked from options):
+"Bound the canonical form too", the recommendation. The alternative was to
+limit the source only, and to have the round-trip property, and
+`FuzzParse`, hold only for an expression whose canonical form fits.
 
 ## More Information
 

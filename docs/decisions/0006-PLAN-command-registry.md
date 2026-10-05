@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in-progress
 date: 2026-10-05
 associated-madr: "0006-MADR-command-registry.md"
 ---
@@ -171,7 +171,9 @@ root already requires. The root `go.mod` never names Cobra or Kong.
 **Files:** `when/when.go` (package documentation, `Expr`, `Parse`,
 `MustParse`, `Check`), `when/lex.go`, `when/parse.go`, `when/eval.go`,
 `when/value.go`, `when/key.go`; tests `when/when_test.go`,
-`when/fuzz_test.go`, `when/bench_test.go`; `Makefile`.
+`when/fuzz_test.go`, `when/bench_test.go`; `Makefile`. (*D1: and the
+regression input `when/testdata/fuzz/FuzzParse/01e90e822ccb8b53`. D3: and
+`.github/workflows/ci.yml`.*)
 
 **Exported names** (MADR §8):
 
@@ -228,14 +230,16 @@ quotes.
 | `TestNoSpacesNeeded` | `a==1&&b!=2` parses as `a == 1 && b != 2` |
 | `TestLayered` | the first context that holds a key wins |
 | `TestCheck` | an unknown key, and a number compared with a string, are reported |
-| `TestLimits` | 4097 bytes of source, and 65 nested parentheses, are errors, not panics |
+| `TestLimits` | 4097 bytes of source, and 65 nested parentheses, are errors, not panics (*D1: and a source within 4096 bytes whose canonical form is longer*) |
 | `TestRegexIsRE2` | `=~ /(a+)+$/` evaluates in linear time on a long input; a bad regex is a parse error |
-| `TestStringRoundTrip` | `Parse(e.String()).String() == e.String()` over the operator table |
+| `TestStringRoundTrip` | `Parse(e.String()).String() == e.String()` over the operator table (*D2: and the two evaluate alike on every assignment of `true` and `false` to the keys*) |
 | `TestTypedKeys` | `Key[T].Set` and `Get` for each `T`; `Get` of the wrong kind is false |
 
 `FuzzParse` (`when/fuzz_test.go`): no panic; for every parsed input,
-`Parse(e.String())` succeeds and gives the same `String()`; `Eval` on a
-`Map` built from the fuzz input does not panic. Seeds: the operator
+`Parse(e.String())` succeeds and gives the same `String()` (*D1: true
+once `Parse` bounds the canonical form, MADR A3*); `Eval` on a
+`Map` built from the fuzz input does not panic (*D2: and gives the same
+result for the expression and its canonical form*). Seeds: the operator
 table. Benchmarks `BenchmarkParse` and `BenchmarkEval` on a five-clause
 expression.
 
@@ -253,6 +257,7 @@ names `when`.
 | `Layered` takes the last match | `TestLayered` |
 | `String` drops needed parentheses | `TestStringRoundTrip` |
 | `not in` is evaluated as `in` | `TestIn` |
+| *D1:* the canonical form's length is not checked | `TestLimits` |
 
 **Done when:** the checks of Rule 3 are clean, `make fuzz` covers `when`,
 and every mutation is killed.
@@ -796,4 +801,117 @@ mutation is killed.
 
 ## Execution Record
 
-None yet.
+### Step 2: `when`
+
+#### Deviations
+
+* **D1 (2026-10-05): the canonical form can outgrow the source limit.**
+  `go test -run '^$' -fuzz=FuzzParse -fuzztime=30s ./when` failed: a
+  minimized source under 4096 bytes, `A<000\…` with thousands of
+  backslashes in a bareword, prints `A < '000\\…'`, "which does not
+  parse: when: source of 6718 bytes, more than 4096". The canonical form
+  quotes a bareword, doubles its backslashes and adds spaces around
+  operators, so the PLAN's fuzz property and MADR §8's round trip were
+  false at the limit. Options given: bound the canonical form too
+  (recommended), or limit the source only and weaken the property to
+  canonical forms that fit. **The owner picked "Bound the canonical form
+  too".** `Parse` now refuses an expression whose canonical form is longer
+  than `MaxSource`; recorded as MADR amendment A3. Added to the step:
+  a `TestLimits` case, a seventh mutation, and the failing input as a
+  regression seed in `when/testdata/fuzz/FuzzParse/`.
+* **D2 (2026-10-05): a mutation survived.** "`String` drops needed
+  parentheses" (`wrap`'s `n.prec() < need` made `n.prec() < need-10`)
+  passed `TestStringRoundTrip`, which checked only that the canonical text
+  reprints unchanged: `a && (b || !c)` printed `a && b || !c`, which is
+  stable and means something else. Under Rule 4 the test was
+  strengthened: `TestStringRoundTrip` also evaluates the expression and
+  its re-parsed canonical form on every assignment of `true` and `false`
+  to its keys, over three more sources that need parentheses; and
+  `FuzzParse` fails when the two evaluate differently on its contexts.
+  Seen to fail: the set below, and the same mutation fuzzed on a scratch
+  copy (`-fuzz '^FuzzParse$' -fuzztime 20s`) failed on a seed in 0.07 s:
+  `fuzz_test.go:51: "a && (b || !c)" prints "a && b || !c", which
+  evaluates differently`.
+* **D3 (2026-10-05): CI's fuzz step named only `layout`.** `make fuzz`
+  runs in CI, so CI fuzzed `when` with no change; but the step's comment
+  said only `layout` had fuzz targets, and on a failure it uploaded only
+  `layout/testdata/fuzz/`, so a failing `when` input would be lost.
+  `.github/workflows/ci.yml` was not in the step's files. Options given:
+  add it to Step 2 (recommended), or leave it as a known gap. **The owner
+  picked "Add ci.yml to Step 2".** The comment names both packages, and
+  the artifact's `path` lists `layout/testdata/fuzz/` and
+  `when/testdata/fuzz/`. `actionlint` is not installed here; the file
+  parses as YAML, and the step's `path` reads back as the two lines.
+
+#### What was built
+
+* `when/when.go`, `lex.go`, `parse.go`, `eval.go`, `value.go`, `key.go`:
+  the exported names listed above and no others, plus the constants
+  `MaxSource` and `MaxDepth`. A hand-written scanner and a
+  recursive-descent parser; a regex compiles with `regexp` at parse time,
+  with the flags `i`, `m` and `s` written as `(?ims)`. `Parse` refuses a
+  canonical form over `MaxSource` (D1). The package imports only the
+  standard library.
+* `when/when_test.go`: the twelve tests of the table, and
+  `TestParseErrors`, `TestKeysInOrder` and `TestZeroExpr`.
+  `when/fuzz_test.go`: `FuzzParse`, seeded from the operator table and
+  five more sources. `when/bench_test.go`: `BenchmarkParse` and
+  `BenchmarkEval`. `when/testdata/fuzz/FuzzParse/01e90e822ccb8b53`: D1's
+  input.
+* `Makefile`: the `fuzz` target runs `./scripts/go-fuzz.sh -t
+  $(FUZZTIME) -m 1 ./when` after `./layout`, and its help text names
+  `when`. `.github/workflows/ci.yml`: D3.
+* Lint findings fixed on the way, before the checks below: `goconst` on
+  `"true"` and `"false"` (now `trueWord` and `falseWord`), and
+  `gocritic`'s `regexpSimplify` (`[0-9]` is `\d`, which RE2 limits to
+  ASCII).
+
+#### Checks (Rule 3)
+
+1. `gofmt -l when`: no output.
+2. `make pre-add-check FILES="<the nine when/*.go files>"`: exit 0,
+   "go-precheck: 9 file(s) clean in 1 module(s) (gofmt, golangci-lint, go
+   vet, go test, go mod tidy, govulncheck)."
+3. `make lint`: exit 0; "0 issues." for `GOOS=linux`, `darwin` and
+   `windows`.
+4. `GOWORK=off go test -race -count=1 ./...`: exit 0, 14 packages `ok`,
+   `when` among them; `internal/conformance` passes with `when` in its
+   scan.
+5. `GOWORK=off go test -shuffle=on -count=2 ./...`: exit 0, 14 packages
+   `ok`.
+6. `LC_ALL=C GOWORK=off go test -count=1 ./...`: exit 0, 14 packages `ok`.
+7. `GOWORK=off go mod tidy -diff`: exit 0, no output.
+8. `make fuzz FUZZTIME=20s`: exit 0; "go-fuzz: 1 fuzz targets ran clean
+   in ./layout", "go-fuzz: 1 fuzz targets ran clean in ./when"
+   (`FuzzParse`, 5,701,018 executions). No new input was written.
+9. Windows test host, go1.27.1 windows/amd64, on a copy of the tree:
+   `make pre-add-check` exit 0 ("83 file(s) clean in 1 module(s)"),
+   `make lint` exit 0 ("0 issues." for each target), `make vuln` exit 0
+   ("No vulnerabilities found."), `GOWORK=off go test -count=3
+   -shuffle=on ./when/` exit 0.
+10. `markdownlint-cli2 --config .markdownlint-cli2.jsonc` on
+    `docs/README.md` and this pair: "0 issues in 0 files"; the
+    configuration excludes MADR and PLAN files, so only `docs/README.md`
+    is linted. The relative-link check of the three files: 0 broken.
+11. Identifier scan of the diff and the new files, for the local account
+    name, the test host's name, home-directory paths and the employer's
+    domain: no match.
+
+Benchmarks, on the development host (`go test -run '^$' -bench .
+-benchmem ./when`): `BenchmarkParse` 5278 ns/op, 11173 B/op, 69 allocs/op;
+`BenchmarkEval` 110.2 ns/op, 32 B/op, 1 allocs/op.
+
+#### Mutations (Rule 4)
+
+Each on a scratch copy of the tree, with `go test -count=1 -run '^<Test>$'
+./when`. All seven killed:
+
+| Mutation | Applied as | Failing line |
+| :--- | :--- | :--- |
+| `&&` binds looser than `\|\|` | `or` loops on `tAnd` building `andNode`, `and` on `tOr` building `orNode` | `when_test.go:67: foo \|\| bar && baz read as (foo \|\| bar) && baz` |
+| an unset key compares equal to `''` | `cmpNode.eval` on an unset key uses `StringValue("")` | `when_test.go:93: an unset key equals ''` |
+| the depth limit is not checked | `p.depth > MaxDepth*1000` | `when_test.go:220: 65 nested parentheses parsed` |
+| `Layered` takes the last match | the loop runs from the last context | `when_test.go:155: k = bottom, true; want the first context's` |
+| `String` drops needed parentheses | `n.prec() < need-10` | `when_test.go:275: "!(a && b)" prints "!a && b", which differs on map[a:false b:false]` (after D2) |
+| `not in` is evaluated as `in` | `return in` | `when_test.go:105: "item not in l" = true, want false` |
+| D1: the canonical form's length is not checked | `n > MaxSource*100` | `when_test.go:212: a source of 4096 bytes printing longer than MaxSource: <nil>` |
