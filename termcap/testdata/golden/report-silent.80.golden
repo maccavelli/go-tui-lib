@@ -33,3 +33,11 @@
  24|palette                -
  25|palette_known          no
  24|secondary_attributes   -
+  0|
+  8|findings
+ 78|issue                  keyboard.kitty-unknown: The Kitty keyboard query had no
+ 75|                       answer before the probe ended. Fix: Run again; if it
+ 66|                       persists, give the prober a longer timeout.
+ 71|recommendation         terminal.unknown: Nothing names the terminal, so
+ 71|                       capabilities that depend on it are off. Fix: Set
+ 68|                       TERM_PROGRAM, or let LC_TERMINAL through SSH.

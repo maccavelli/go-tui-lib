@@ -42,12 +42,29 @@ func raw(cmd tea.Cmd) string {
 	return b.String()
 }
 
-func caps(terminal string, mux termcap.Mux, notify termcap.Support) termcap.Caps {
+// caps is a terminal of brand inside mux, whose answer to the OSC 99 query
+// was notify.
+func caps(brand termcap.Brand, mux termcap.Mux, notify termcap.Support) termcap.Caps {
 	var c termcap.Caps
-	c.Terminal.Set(terminal, termcap.Queried)
+	c.Brand.Set(brand, termcap.Environment)
 	c.Mux.Set(mux, termcap.Environment)
 	c.DesktopNotify.Set(notify, termcap.Queried)
 	return c
+}
+
+// sent is the NotifyResultMsg among msgs.
+func sent(t *testing.T, cmd tea.Cmd) NotifyResultMsg {
+	t.Helper()
+	var got []NotifyResultMsg
+	for _, m := range run(cmd) {
+		if r, ok := m.(NotifyResultMsg); ok {
+			got = append(got, r)
+		}
+	}
+	if len(got) != 1 {
+		t.Fatalf("%d NotifyResultMsg, want 1", len(got))
+	}
+	return got[0]
 }
 
 // notifier is an Always notifier that has seen c.
@@ -58,7 +75,7 @@ func notifier(c termcap.Caps, o ...NotifyOption) *Notifier {
 }
 
 func TestNotificationBytes(t *testing.T) {
-	kitty := caps("kitty", termcap.NoMux, termcap.Supported)
+	kitty := caps(termcap.BrandKitty, termcap.NoMux, termcap.Supported)
 	cases := []struct {
 		name string
 		p    Protocol
@@ -91,20 +108,24 @@ func TestAutoPicksTheProtocol(t *testing.T) {
 		c    termcap.Caps
 		want Protocol
 	}{
-		{caps("kitty(0.39.1)", termcap.NoMux, termcap.Supported), OSC99},
-		{caps("ghostty 1.1.0", termcap.NoMux, termcap.Unsupported), OSC777},
-		{caps("xterm-ghostty", termcap.NoMux, termcap.Unknown), OSC777},
-		{caps("foot", termcap.NoMux, termcap.Unsupported), OSC777},
-		{caps("iTerm.app", termcap.NoMux, termcap.Unsupported), OSC9},
-		{caps("WezTerm 20240203", termcap.NoMux, termcap.Unsupported), OSC9},
-		{caps("WarpTerminal", termcap.NoMux, termcap.Unsupported), OSC9},
-		{caps("xterm-256color", termcap.NoMux, termcap.Unsupported), Bell},
-		{caps("tmux 3.4", termcap.Tmux, termcap.Unsupported), Bell},
+		{caps(termcap.BrandKitty, termcap.NoMux, termcap.Supported), OSC99},
+		{caps(termcap.BrandGhostty, termcap.NoMux, termcap.Supported), OSC99},
+		{caps(termcap.BrandITerm2, termcap.NoMux, termcap.Supported), OSC99},
+		{caps(termcap.BrandWezTerm, termcap.NoMux, termcap.Supported), OSC99},
+		{caps(termcap.BrandGhostty, termcap.NoMux, termcap.Unsupported), OSC777},
+		{caps(termcap.BrandVTE, termcap.NoMux, termcap.Unknown), OSC777},
+		{caps(termcap.BrandFoot, termcap.NoMux, termcap.Unsupported), OSC777},
+		{caps(termcap.BrandITerm2, termcap.NoMux, termcap.Unsupported), OSC9},
+		{caps(termcap.BrandWezTerm, termcap.NoMux, termcap.Unsupported), OSC9},
+		{caps(termcap.BrandWarp, termcap.NoMux, termcap.Unsupported), OSC9},
+		{caps(termcap.BrandXTerm, termcap.NoMux, termcap.Unsupported), Bell},
+		{caps(termcap.BrandKitty, termcap.NoMux, termcap.Unsupported), Bell},
+		{caps(termcap.BrandITerm2, termcap.Zellij, termcap.Unsupported), Bell},
 		{termcap.Caps{}, Bell},
 	}
 	for _, c := range cases {
 		if got := notifier(c.c).chosen(); got != c.want {
-			t.Errorf("%q, OSC 99 %v: Auto chose %d, want %d", c.c.Terminal.Value, c.c.DesktopNotify.Value, got, c.want)
+			t.Errorf("%v, OSC 99 %v: Auto chose %d, want %d", c.c.Brand.Value, c.c.DesktopNotify.Value, got, c.want)
 		}
 	}
 }
@@ -112,11 +133,11 @@ func TestAutoPicksTheProtocol(t *testing.T) {
 func TestNotificationsAreWrappedInsideAMultiplexer(t *testing.T) {
 	x := Notification{Title: "Done", ID: "a"}
 	inner := "\x1b]99;i=a;Done\x07"
-	tmux := caps("kitty", termcap.Tmux, termcap.Supported)
+	tmux := caps(termcap.BrandKitty, termcap.Tmux, termcap.Supported)
 	if got := raw(notifier(tmux).Notify(x)); got != ansi.TmuxPassthrough(inner) {
 		t.Errorf("tmux: %q, want the tmux passthrough of %q", got, inner)
 	}
-	screen := caps("kitty", termcap.Screen, termcap.Supported)
+	screen := caps(termcap.BrandKitty, termcap.Screen, termcap.Supported)
 	if got := raw(notifier(screen).Notify(x)); got != ansi.ScreenPassthrough(inner, screenLimit) {
 		t.Errorf("screen: %q, want the screen passthrough of %q", got, inner)
 	}
@@ -125,38 +146,49 @@ func TestNotificationsAreWrappedInsideAMultiplexer(t *testing.T) {
 	}
 }
 
-func TestWhenUnfocused(t *testing.T) {
+// TestFocusPolicies drives each policy through unknown, focused, blurred
+// and focused-again, and checks what was sent and why not (MADR A1, Q6).
+func TestFocusPolicies(t *testing.T) {
 	x := Notification{Title: "Done"}
-	n := NewNotifier(WithProtocol(Bell))
-	if n.Notify(x) != nil {
-		t.Error("sent with no focus report")
+	steps := []struct {
+		name string
+		msg  tea.Msg
+	}{{"unknown", nil}, {"focused", tea.FocusMsg{}}, {"blurred", tea.BlurMsg{}}, {"focused again", tea.FocusMsg{}}}
+	want := map[Policy][]SkipReason{
+		WhenUnfocused: {SkipFocusUnknown, SkipFocused, NotSkipped, SkipFocused},
+		UnlessFocused: {NotSkipped, SkipFocused, NotSkipped, SkipFocused},
+		Always:        {NotSkipped, NotSkipped, NotSkipped, NotSkipped},
+		Never:         {SkipDisabled, SkipDisabled, SkipDisabled, SkipDisabled},
 	}
-	n.Update(tea.FocusMsg{})
-	if n.Notify(x) != nil {
-		t.Error("sent while focused")
-	}
-	n.Update(tea.BlurMsg{})
-	if raw(n.Notify(x)) != "\a" {
-		t.Error("not sent while unfocused")
-	}
-	n.Update(tea.FocusMsg{})
-	if n.Notify(x) != nil {
-		t.Error("sent after focus came back")
-	}
-	if raw(NewNotifier(WithProtocol(Bell), WithPolicy(Always)).Notify(x)) != "\a" {
-		t.Error("Always did not send with no focus report")
-	}
-	never := NewNotifier(WithProtocol(Bell), WithPolicy(Never))
-	never.Update(tea.BlurMsg{})
-	if never.Notify(x) != nil {
-		t.Error("Never sent")
+	for policy, reasons := range want {
+		n := NewNotifier(WithProtocol(Bell), WithPolicy(policy))
+		for i, s := range steps {
+			if s.msg != nil {
+				n.Update(s.msg)
+			}
+			cmd := n.Notify(x)
+			r := sent(t, cmd)
+			if r.Skipped != reasons[i] || r.Sent != (reasons[i] == NotSkipped) {
+				t.Errorf("policy %d, %s: Sent %v, Skipped %q; want skipped %q", policy, s.name, r.Sent, r.Skipped, reasons[i])
+			}
+			if wrote := raw(cmd); (wrote == "\a") != r.Sent {
+				t.Errorf("policy %d, %s: wrote %q with Sent %v", policy, s.name, wrote, r.Sent)
+			}
+		}
 	}
 }
 
 func TestEmptyNotificationIsNotSent(t *testing.T) {
 	n := notifier(termcap.Caps{}, WithProtocol(Bell))
-	if n.Notify(Notification{Title: "\x1b\x07", Body: "\x9b"}) != nil {
-		t.Fatal("a notification of control bytes only was sent")
+	cmd := n.Notify(Notification{Title: "\x1b\x07", Body: "\x9b\x1b[31m\n"})
+	if r := sent(t, cmd); r.Sent || r.Skipped != SkipEmpty {
+		t.Fatalf("a notification of controls only: %+v", r)
+	}
+	if raw(cmd) != "" {
+		t.Fatal("a notification of controls only wrote something")
+	}
+	if r := sent(t, notifier(termcap.Caps{}, WithProtocol(Off)).Notify(Notification{Title: "x"})); r.Skipped != SkipDisabled {
+		t.Fatalf("protocol Off: %+v", r)
 	}
 }
 
@@ -172,26 +204,30 @@ func (b *backend) Notify(_ context.Context, x Notification) error {
 
 func TestBackend(t *testing.T) {
 	b := &backend{}
-	if msgs := run(notifier(termcap.Caps{}, WithBackend(b)).Notify(Notification{Title: "Do\x1bne", Body: "b"})); len(msgs) != 1 || msgs[0] != nil {
-		t.Errorf("a backend's success sent %v, want nothing", msgs)
+	msgs := run(notifier(termcap.Caps{}, WithBackend(b)).Notify(Notification{Title: "Do\x1b[1mne", Body: "b"}))
+	if len(msgs) != 1 {
+		t.Fatalf("a backend's notification sent %v, want its result alone, nothing written", msgs)
+	}
+	if r, ok := msgs[0].(NotifyResultMsg); !ok || !r.Sent || r.Skipped != NotSkipped {
+		t.Errorf("a backend's success: %+v", msgs[0])
 	}
 	if len(b.got) != 1 || b.got[0].Title != "Done" {
 		t.Errorf("backend got %+v, want the cleaned notification", b.got)
 	}
 	failing := &backend{err: errors.New("no desktop")}
-	msgs := run(notifier(termcap.Caps{}, WithBackend(failing)).Notify(Notification{Title: "x"}))
-	if len(msgs) != 1 {
-		t.Fatalf("got %v", msgs)
-	}
-	if m, ok := msgs[0].(NotifyErrorMsg); !ok || !errors.Is(m.Err, failing.err) || m.Notification.Title != "x" {
-		t.Errorf("a backend's error came back as %#v, want a NotifyErrorMsg", msgs[0])
+	r := sent(t, notifier(termcap.Caps{}, WithBackend(failing)).Notify(Notification{Title: "x"}))
+	if r.Sent || r.Skipped != SkipFailed || !errors.Is(r.Err, failing.err) || r.Notification.Title != "x" {
+		t.Errorf("a backend's error came back as %+v", r)
 	}
 }
 
 func TestControlBytesAreStripped(t *testing.T) {
 	evil := "a\x1b]52;c;aGk=\x07b\x9bc\x00d\x7fe"
 	got := raw(notifier(termcap.Caps{}, WithProtocol(OSC9)).Notify(Notification{Title: evil, Body: evil}))
-	if want := "\x1b]9;a]52;c;aGk=bcde: a]52;c;aGk=bcde\x07"; got != want {
+	// The OSC 52 sequence goes whole. The raw byte 0x9b is CSI in its 8-bit
+	// form, so it goes with the "c" that ends it, as a terminal in 8-bit
+	// mode would read it; NUL and DEL go too.
+	if want := "\x1b]9;abde: abde\x07"; got != want {
 		t.Errorf("notification %q, want %q", got, want)
 	}
 	if got := strip("one\ntwo\tthree\r"); got != "one two three " {
@@ -238,8 +274,8 @@ func TestCopy(t *testing.T) {
 		return n
 	}
 	local := run(Copy(termcap.Caps{}, "hello"))
-	if count(local) != 1 || len(local) != 1 {
-		t.Errorf("outside tmux, Copy sent %v, want tea's OSC 52 alone", local)
+	if count(local) != 1 || len(local) != 2 {
+		t.Errorf("outside tmux, Copy sent %v, want tea's OSC 52 and its CopiedMsg", local)
 	}
 	var tmux termcap.Caps
 	tmux.Mux.Set(termcap.Tmux, termcap.Environment)

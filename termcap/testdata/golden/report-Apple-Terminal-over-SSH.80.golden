@@ -29,3 +29,13 @@
  24|palette                -
  25|palette_known          no
  29|secondary_attributes   1;95;0
+  0|
+  8|findings
+ 78|recommendation         keyboard.kitty-unsupported: The terminal did not answer
+ 80|                       the Kitty keyboard query, so keys such as shift+enter may
+ 76|                       not be told apart. Fix: Use a terminal with the Kitty
+ 79|                       keyboard protocol, such as kitty, Ghostty, WezTerm, foot
+ 33|                       or iTerm2.
+ 78|recommendation         terminal.apple-no-osc8: Apple Terminal mishandles OSC 8
+ 75|                       links, so links are shown with their URL. Fix: Use a
+ 58|                       terminal that supports OSC 8 links.

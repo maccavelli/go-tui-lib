@@ -34,9 +34,9 @@ const (
 type Protocol uint8
 
 const (
-	// Auto picks from the terminal's capabilities: OSC 99 when it answered
-	// the OSC 99 query, else OSC 777 or OSC 9 on terminals known to show
-	// them, else the bell.
+	// Auto picks from the terminal's capabilities, Caps.Notifications: OSC
+	// 99 when it answered the OSC 99 query, else OSC 9 or OSC 777 by
+	// brand, else the bell.
 	Auto Protocol = iota
 	// OSC99 is the Kitty desktop notifications protocol.
 	OSC99
@@ -62,18 +62,56 @@ const (
 	Always
 	// Never sends nothing.
 	Never
+	// UnlessFocused sends unless the terminal is known to be focused: when
+	// it is unfocused, and when focus is unknown, as on terminals that do
+	// not report it (MADR A1, Q6).
+	UnlessFocused
 )
+
+// SkipReason is why Notify sent nothing.
+type SkipReason uint8
+
+const (
+	// NotSkipped means the notification was sent.
+	NotSkipped SkipReason = iota
+	// SkipDisabled means the policy is Never, or the protocol Off.
+	SkipDisabled
+	// SkipEmpty means nothing was left of the text after cleaning.
+	SkipEmpty
+	// SkipFocused means the terminal has focus.
+	SkipFocused
+	// SkipFocusUnknown means WhenUnfocused, and no focus report has arrived.
+	SkipFocusUnknown
+	// SkipGated means the WithGate function said no.
+	SkipGated
+	// SkipFailed means the backend returned an error, in Err.
+	SkipFailed
+)
+
+var skipNames = []string{"", "disabled", "empty", "focused", "focus-unknown", "gated", "failed"}
+
+// String is the reason's name, "" when nothing was skipped.
+func (s SkipReason) String() string {
+	if int(s) < len(skipNames) {
+		return skipNames[s]
+	}
+	return strconv.Itoa(int(s))
+}
+
+// NotifyResultMsg reports what Notify did. Sent says the notification
+// left: written to the terminal, which does not confirm it, or accepted by
+// the backend.
+type NotifyResultMsg struct {
+	Notification Notification
+	Sent         bool
+	Skipped      SkipReason
+	Err          error // the backend's error, with SkipFailed
+}
 
 // Backend is a notifier the program supplies, such as a desktop API. The
 // library never starts a process itself.
 type Backend interface {
 	Notify(ctx context.Context, x Notification) error
-}
-
-// NotifyErrorMsg reports a Backend's error.
-type NotifyErrorMsg struct {
-	Notification Notification
-	Err          error
 }
 
 // NotifyOption configures a Notifier.
@@ -89,6 +127,16 @@ func WithPolicy(p Policy) NotifyOption { return func(n *Notifier) { n.policy = p
 // WithBackend sends notifications through b instead of the terminal.
 func WithBackend(b Backend) NotifyOption { return func(n *Notifier) { n.backend = b } }
 
+// WithGate lets f decide, last, whether a notification is sent, such as
+// only for a completed turn. The policy for that belongs to the program.
+func WithGate(f func(Notification) bool) NotifyOption { return func(n *Notifier) { n.gate = f } }
+
+// Text limits, in cells.
+const (
+	TitleCells = 80
+	BodyCells  = 240
+)
+
 // Notifier sends notifications that suit the terminal. A program passes it
 // every message, as it does a termcap.Prober, so it learns the terminal's
 // capabilities and focus.
@@ -96,6 +144,7 @@ type Notifier struct {
 	protocol Protocol
 	policy   Policy
 	backend  Backend
+	gate     func(Notification) bool
 
 	caps       termcap.Caps
 	focused    bool
@@ -126,35 +175,44 @@ func (n *Notifier) Update(msg tea.Msg) tea.Cmd {
 	return nil
 }
 
-// Notify returns the command that sends x, or nil when the policy, the
-// protocol or an empty notification says no.
+// Notify returns the command that sends x, and delivers NotifyResultMsg
+// to say what it did. The title and body are cleaned first: escape
+// sequences removed, line breaks collapsed to a space, controls removed,
+// and cut to TitleCells and BodyCells cells.
 func (n *Notifier) Notify(x Notification) tea.Cmd {
-	switch n.policy {
-	case Never:
-		return nil
-	case WhenUnfocused:
-		if !n.focusKnown || n.focused {
-			return nil
-		}
-	}
-	x.Title, x.Body = strip(x.Title), strip(x.Body)
-	if x.Title == "" && x.Body == "" {
-		return nil
+	x.Title, x.Body = clean(x.Title, TitleCells), clean(x.Body, BodyCells)
+	if skip := n.skip(x); skip != NotSkipped {
+		return result(NotifyResultMsg{Notification: x, Skipped: skip})
 	}
 	if n.backend != nil {
 		b := n.backend
 		return func() tea.Msg {
 			if err := b.Notify(context.Background(), x); err != nil {
-				return NotifyErrorMsg{Notification: x, Err: err}
+				return NotifyResultMsg{Notification: x, Skipped: SkipFailed, Err: err}
 			}
-			return nil
+			return NotifyResultMsg{Notification: x, Sent: true}
 		}
 	}
-	seq := n.encode(x)
-	if seq == "" {
-		return nil
+	return tea.Sequence(tea.Raw(n.encode(x)), result(NotifyResultMsg{Notification: x, Sent: true}))
+}
+
+func result(m NotifyResultMsg) tea.Cmd { return func() tea.Msg { return m } }
+
+// skip is why x is not to be sent, or NotSkipped.
+func (n *Notifier) skip(x Notification) SkipReason {
+	switch {
+	case n.policy == Never || n.backend == nil && n.chosen() == Off:
+		return SkipDisabled
+	case x.Title == "" && x.Body == "":
+		return SkipEmpty
+	case n.policy == WhenUnfocused && !n.focusKnown:
+		return SkipFocusUnknown
+	case (n.policy == WhenUnfocused || n.policy == UnlessFocused) && n.focusKnown && n.focused:
+		return SkipFocused
+	case n.gate != nil && !n.gate(x):
+		return SkipGated
 	}
-	return tea.Raw(seq)
+	return NotSkipped
 }
 
 // chosen is the protocol Notify uses now: the one set, or for Auto, the
@@ -163,19 +221,14 @@ func (n *Notifier) chosen() Protocol {
 	if n.protocol != Auto {
 		return n.protocol
 	}
-	if n.caps.DesktopNotify.Value == termcap.Supported {
+	v := n.caps.Notifications()
+	switch termcap.Supported {
+	case v.OSC99.Value:
 		return OSC99
-	}
-	term := strings.ToLower(n.caps.Terminal.Value)
-	for _, name := range []string{"ghostty", "foot", "vte"} {
-		if strings.Contains(term, name) {
-			return OSC777
-		}
-	}
-	for _, name := range []string{"iterm", "wezterm", "warp"} {
-		if strings.Contains(term, name) {
-			return OSC9
-		}
+	case v.OSC9.Value:
+		return OSC9
+	case v.OSC777.Value:
+		return OSC777
 	}
 	return Bell
 }

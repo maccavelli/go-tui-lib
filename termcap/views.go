@@ -90,6 +90,8 @@ func (c Caps) Links() LinkCaps {
 	switch {
 	case c.Mux.Value == Tmux && !atLeast(c.tmuxVersion(), 3, 4):
 		f.SetReason(Unsupported, Heuristic, ReasonTmuxLinks)
+	case c.Mux.Value == Screen || c.Mux.Value == Zellij:
+		f.SetReason(Unsupported, Heuristic, ReasonMuxNoLinks)
 	case brand == BrandAppleTerminal:
 		f.SetReason(Unsupported, Heuristic, ReasonAppleNoOSC8)
 	case brand == BrandWarp:

@@ -29,3 +29,10 @@
  24|palette                -
  25|palette_known          no
  24|secondary_attributes   -
+  0|
+  8|findings
+120|recommendation         keyboard.kitty-unsupported: The terminal did not answer the Kitty keyboard query, so keys such as
+119|                       shift+enter may not be told apart. Fix: Use a terminal with the Kitty keyboard protocol, such as
+ 63|                       kitty, Ghostty, WezTerm, foot or iTerm2.
+120|recommendation         terminal.unknown: Nothing names the terminal, so capabilities that depend on it are off. Fix: Set
+ 68|                       TERM_PROGRAM, or let LC_TERMINAL through SSH.

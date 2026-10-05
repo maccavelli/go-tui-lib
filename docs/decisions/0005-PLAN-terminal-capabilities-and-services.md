@@ -1323,3 +1323,152 @@ results file was once written to `/tmp` rather than the scratchpad, and
 removed. A shell redirection from a missing file opened
 `discipline_test.go` for appending and wrote nothing; its length was
 checked.
+
+### Step A1.3: doctor findings and services (2026-10-04)
+
+The owner committed and pushed Step A1.2 and its follow-up (`42e183b`) and
+said "proceed". No deviation: the choices below fill in what MADR A1
+leaves open, and none changes a decision. They are listed so the owner can
+overrule any of them.
+
+**What was built, in `termcap`.**
+
+* **`findings.go`:** `Disposition` (`Recommendation`, `Issue`), `Finding
+  {ID, Disposition, Message, Fix}`, and `Findings(c)`: one finding per
+  reason token found in `Caps`'s facts and in its keyboard, link and
+  notification views, in field order, each once. Every token has a
+  message and a fix in one table.
+* **`report.go`:** the text report ends with a `findings` section, one
+  wrapped line per finding (`disposition  token: message Fix: fix`),
+  absent when there is nothing to say. `WithReportJSON()` writes
+  `{"schema_version", "caps", "findings"}` instead, indented;
+  `ReportSchemaVersion` is 1. *Chosen here:* the JSON form is an option
+  of `Report`, not a second function.
+* **`views.go`, `reason.go`:** `Links()` refuses OSC 8 inside screen and
+  Zellij, with the new token `mux.hyperlinks-unsupported` (A1's "any
+  multiplexer", tmux 3.4 excepted).
+
+**What was built, in `termsvc`.**
+
+* **Notifications (`notify.go`, `termsvc.go`).** `Notify` always delivers
+  `NotifyResultMsg{Notification, Sent, Skipped, Err}`, with `SkipReason`
+  `disabled`, `empty`, `focused`, `focus-unknown` (A1), and, *chosen
+  here*, `gated` for `WithGate` and `failed` for a backend error.
+  `NotifyErrorMsg`, from Step 6, is gone: `termsvc` is unreleased, and
+  its error is `NotifyResultMsg.Err`. `UnlessFocused` sends when blurred
+  or unknown (Q6). `Auto` reads `Caps.Notifications()`: OSC 99, then
+  OSC 9, then OSC 777, then the bell. The text cleaning: escape sequences
+  removed whole (`ansi.Strip`), runs of line breaks collapsed to a space,
+  controls removed, blanks trimmed, cut by cells with `ansi.Truncate` to
+  `TitleCells` (80) and `BodyCells` (240).
+* **Clipboard (`clipboard.go`).** `Copy(c, text, ...CopyOption)` delivers
+  `CopiedMsg{Status, Route, Err}`: `Unconfirmed` on `RouteOSC52` or
+  `RouteOSC52Tmux`; with `WithClipboard(b)`, `Confirmed` or `Failed` on
+  `RouteBackend`; over `MaxCopyBytes` (*chosen here:* 100,000 bytes, A1's
+  "100 KB") `Failed` with nothing sent. `CopyPlan`, `TmuxLoadBuffer`, and
+  `ImageReadCommands(goos, wayland)`: osascript (`«class PNGf»`) on
+  macOS; PowerShell on Windows; elsewhere `wl-paste` under Wayland, then
+  `xclip`, then `powershell.exe` last, which reaches Windows from WSL,
+  because the signature A1 gives carries no WSL flag. *Chosen here:* a
+  clipboard error does not fall back to OSC 52; `CopyPlan` gives the
+  order, and the program walks it.
+* **Links (`links.go`).** `Display` (`LabelOnly`, `LabelAndURL`),
+  `LinkDisplay(c)` from `Caps.Links()`; `LinkPolicy{Schemes}` (empty
+  means http and https) with `Openable`, which also refuses control
+  characters, spaces and a missing scheme; `OpenURLMsg`, and, *chosen
+  here*, `LinkPolicy.Open(url) tea.Cmd`, which delivers it or nothing.
+* **The rest (`beacon.go`).** `SanitizeTitle` (escape sequences,
+  controls and twelve bidirectional marks removed; at most `TitleRunes`,
+  240). `Activity`, `ActivityState` with Kilo's six states (idle, busy,
+  retry, waiting, error, done, from the 0003 report §8.13),
+  `ParseActivity` (another version, an unknown state, more than
+  `ActivityAhead`, 5 s, ahead or `ActivityMaxAge`, 15 s, or more old
+  refused, `ErrActivity`), `ActivityBeacon` and `ActivityTickMsg` on
+  `ActivityInterval`, 5 s. `Pointer`: Ghostty and kitty outside a
+  multiplexer; `""` resets, an empty OSC 22 on kitty and `default` on
+  Ghostty. `ProgressSupported`: Ghostty, WezTerm, and iTerm2 3.6 or later
+  by its XTVERSION reply; an iTerm2 whose version is unseen is not.
+
+**Tests.** `termcap/findings_test.go`: `TestEveryReasonHasAFinding` (walks
+the tokens both ways), `TestFindings` (order, disposition, the tmux fix),
+`TestReportJSON`, `TestReportFindingsSection`. `termsvc/services_test.go`:
+`TestCopyStatus` (OSC 52, tmux, 100,000 bytes sent, 100,001 failed and
+not sent, a clipboard's success and error, an oversized copy never
+reaching the clipboard), `TestCopyPlan`, `TestImageReadCommands` (each
+`goos`, with and without Wayland), `TestLinkDisplay` (nine terminals the
+report lists, Apple Terminal, Warp, unknown, screen, Zellij, tmux 3.3 and
+3.4), `TestOpenable` (`javascript:`, `file:`, `data:`, `mailto:`, control
+bytes, a space, no scheme), `TestNotificationText` (line breaks, a
+sequence, a CJK body cut to 240 cells and 120 whole characters, an 80-cell
+title), `TestGate`, `TestSanitizeTitle` (ESC, U+202E, U+2066 and 300
+characters to 240), `TestActivity`, `TestParseActivity` (version 2, 6 s
+ahead and 15 s old refused; 4 s old, just under 15 s and 5 s ahead
+accepted), `TestActivityBeacon` (under `synctest`), `TestPointer`,
+`TestProgressSupported`. Step 6's tests were rewritten to A1's results:
+`TestFocusPolicies` drives every policy through unknown, focused, blurred
+and focused again; `TestAutoPicksTheProtocol` reads brands. Sixteen report
+goldens gain their findings and were read.
+
+**What the tests found.** A body of only controls and a line break
+cleaned to a single space, which is not empty, so it was sent: `clean`
+now trims. The OSC 9 test expected the `c` after a raw `0x9b` to stay;
+`ansi.Strip` reads `0x9b c` as an 8-bit CSI, as a terminal in 8-bit mode
+would, and drops both, which is the safer result, so the expectation
+changed. One mutation survived at first, "Auto prefers OSC 9 to OSC 99":
+no case had a terminal both answering OSC 99 and on the OSC 9 list; iTerm2
+and WezTerm with OSC 99 now pin the order. A test ran one command twice
+and saw the backend called twice; it now runs once.
+
+**Mutations,** each on a scratch copy, all 19 killed:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| `Copy` reports a terminal route `Confirmed` | `TestCopyStatus` |
+| the title keeps U+202E | `TestSanitizeTitle` |
+| the body is cut by bytes | `TestNotificationText`: "body is 160 cells, want 240" |
+| `ParseActivity` skips the version check | `TestParseActivity`: "version 2 … want ok false" |
+| `Openable` accepts `file:` | `TestOpenable`: "default policy opens \"file:///etc/passwd\"" |
+| the copy cap off by one | `TestCopyStatus`: "the largest payload" |
+| an oversized copy reaches the clipboard | `TestCopyStatus`: "one byte over" |
+| `Auto` prefers OSC 9 to OSC 99 | `TestAutoPicksTheProtocol`: "iterm2, OSC 99 supported: Auto chose 3, want 1" |
+| `UnlessFocused` sends while focused | `TestFocusPolicies` |
+| `WhenUnfocused` sends with focus unknown | `TestFocusPolicies` |
+| the gate ignored | `TestGate` |
+| line breaks not collapsed | `TestNotificationText` |
+| the pointer under a multiplexer | `TestPointer` |
+| progress on iTerm2 3.5 | `TestProgressSupported` |
+| `ParseActivity` accepts one 15 s old | `TestParseActivity` |
+| a token without a finding | `TestEveryReasonHasAFinding` |
+| the report omits the findings | `TestReportFindingsSection`, `TestReportGolden` |
+| the JSON report loses `schema_version` | `TestReportJSON` |
+| links shown as labels inside screen and Zellij | `TestLinkDisplay` |
+
+Every earlier set was rerun after this step's last change, all killed:
+Step 2's 7, Step 3's 17, Step 4's 7, Step 5's 6, Step 6's 11 (four
+re-pointed at the new code), A1.1's 17 and A1.2's 16. The mutation
+harness was changed to decode test output tolerantly, after a failing
+test printed a raw `0x9b` and stopped a run.
+
+**Checks.**
+
+* `make lint`: 0 issues for linux, darwin and windows, after findings
+  fixed in the code: `go fix`'s `reflect.Value.Fields` loop in
+  `Findings`; `revive`'s comment form on the `SkipReason`, `Status` and
+  `Route` constants; staticcheck ST1018 on format characters the editing
+  tool had written literally into a test, restored as `\u` escapes;
+  `goconst` ("None needed.", now `noFix`); and gosec G115 on an `int` to
+  `ActivityState` conversion, now a search over the states.
+* `make pre-add-check FILES=…` (thirteen Go files): `13 file(s) clean`.
+* `go test -race -count=1 ./...`, `LC_ALL=C go test ./...`,
+  `go test -shuffle=on -count=2 ./...` and `go test -race -count=5
+  ./termcap/...`, with `GOWORK=off`: pass.
+* `GOWORK=off go mod tidy -diff`: clean; `go.mod` unchanged.
+* Windows test host, on a copy (go1.27.1 windows/amd64): `make
+  pre-add-check` (`73 file(s) clean`), `make lint` (0 issues, three
+  targets), `make vuln` (none), and the four packages' tests shuffled
+  three times: all exit 0.
+* The identifier scan of the diff finds nothing.
+
+**Next.** Step 7, documentation and close-out: the guide, the docs tree,
+the release notes, and Verification, whose real-terminal checks need the
+owner's terminals.

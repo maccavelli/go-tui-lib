@@ -33,6 +33,8 @@ const (
 	ReasonWarpNoOSC8 = "terminal.warp-no-osc8"
 	// ReasonTmuxLinks: tmux passes hyperlinks from 3.4.
 	ReasonTmuxLinks = "tmux.hyperlinks-before-3.4"
+	// ReasonMuxNoLinks: screen and Zellij pass no hyperlinks.
+	ReasonMuxNoLinks = "mux.hyperlinks-unsupported"
 	// ReasonUnknownTerminal: nothing names the terminal, so a capability
 	// that depends on it fails closed.
 	ReasonUnknownTerminal = "terminal.unknown"
@@ -71,7 +73,7 @@ const (
 var reasons = []string{
 	ReasonKittyUnsupported, ReasonKittyUnknown, ReasonLeaksReleases, ReasonAlacrittyRelease,
 	ReasonTmuxExtendedKeys, ReasonMSYSNoKitty, ReasonWSLDeadKeys,
-	ReasonAppleNoOSC8, ReasonWarpNoOSC8, ReasonTmuxLinks, ReasonUnknownTerminal, ReasonZellijNoForwarding,
+	ReasonAppleNoOSC8, ReasonWarpNoOSC8, ReasonTmuxLinks, ReasonMuxNoLinks, ReasonUnknownTerminal, ReasonZellijNoForwarding,
 	ReasonColorFGBGGuess, ReasonDesktopAppearance,
 	ReasonLegacyConsoleGuess, ReasonWindowsTerminalGuess,
 	ReasonJetBrainsPaints, ReasonEditorTerminal, ReasonReplyTooLong,

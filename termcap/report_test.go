@@ -21,7 +21,8 @@ func reportOf(t *testing.T, c Caps, o ...ReportOption) string {
 func TestReportNamesEveryField(t *testing.T) {
 	for _, c := range []Caps{{}, full()} {
 		out := reportOf(t, c, WithReportWidth(0))
-		lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
+		facts, _, _ := strings.Cut(out, "\n\nfindings\n") // the findings follow the facts
+		lines := strings.Split(strings.TrimSuffix(facts, "\n"), "\n")
 		ct := reflect.TypeFor[Caps]()
 		if len(lines) != ct.NumField() {
 			t.Fatalf("%d lines for %d fields:\n%s", len(lines), ct.NumField(), out)

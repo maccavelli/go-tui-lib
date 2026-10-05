@@ -13,12 +13,12 @@ package termsvc
 import (
 	"errors"
 	"net/url"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
 
-	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/maccavelli/go-tui-lib/termcap"
@@ -39,17 +39,6 @@ func Wrap(c termcap.Caps, seq string) string {
 		return ansi.ScreenPassthrough(seq, screenLimit)
 	}
 	return seq
-}
-
-// Copy writes text to the system clipboard with OSC 52, through tea. Inside
-// tmux it also sends the OSC 52 wrapped for passthrough, for a tmux whose
-// set-clipboard is off. OSC 52 never replies, so a copy cannot be
-// confirmed.
-func Copy(c termcap.Caps, text string) tea.Cmd {
-	if c.Mux.Value == termcap.Tmux {
-		return tea.Batch(tea.SetClipboard(text), tea.Raw(Wrap(c, ansi.SetSystemClipboard(text))))
-	}
-	return tea.SetClipboard(text)
 }
 
 // ErrScheme is Link's error for a URL whose scheme it does not link.
@@ -113,4 +102,16 @@ func strip(s string) string {
 		s = s[size:]
 	}
 	return b.String()
+}
+
+// lineBreaks is a run of line breaks with the blanks around it.
+var lineBreaks = regexp.MustCompile(`[ \t]*[\r\n]+[ \t]*`)
+
+// clean is s for a notification: escape sequences removed, each run of
+// line breaks collapsed to one space, controls removed, blanks at either
+// end trimmed, and cut to cells cells, by width, never in the middle of a
+// character.
+func clean(s string, cells int) string {
+	s = lineBreaks.ReplaceAllString(ansi.Strip(s), " ")
+	return ansi.Truncate(strings.TrimSpace(strip(s)), cells, "")
 }

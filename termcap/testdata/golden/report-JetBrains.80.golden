@@ -29,3 +29,9 @@
  24|palette                -
  25|palette_known          no
  24|secondary_attributes   -
+  0|
+  8|findings
+ 77|recommendation         terminal.jetbrains-paints-queries: JetBrains terminals
+ 78|                       show queries as text, so none is sent, and capabilities
+ 77|                       are unknown. Fix: None needed; run in another terminal
+ 44|                       for every capability.

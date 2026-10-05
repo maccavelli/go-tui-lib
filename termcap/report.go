@@ -1,6 +1,7 @@
 package termcap
 
 import (
+	"encoding/json"
 	"fmt"
 	"image/color"
 	"io"
@@ -15,13 +16,31 @@ import (
 // ReportOption configures Report.
 type ReportOption func(*reportConfig)
 
-type reportConfig struct{ width int }
+type reportConfig struct {
+	width int
+	json  bool
+}
 
 // DefaultReportWidth is the width, in cells, Report wraps at.
 const DefaultReportWidth = 80
 
 // WithReportWidth wraps the report at w cells. Zero or less does not wrap.
 func WithReportWidth(w int) ReportOption { return func(r *reportConfig) { r.width = w } }
+
+// WithReportJSON writes the report as JSON instead: the schema version,
+// Caps, and the findings. The width does not apply.
+func WithReportJSON() ReportOption { return func(r *reportConfig) { r.json = true } }
+
+// ReportSchemaVersion is the JSON report's schema_version. It changes only
+// when a field is removed or retyped; a field added leaves it.
+const ReportSchemaVersion = 1
+
+// reportJSON is the JSON report.
+type reportJSON struct {
+	SchemaVersion int       `json:"schema_version"`
+	Caps          Caps      `json:"caps"`
+	Findings      []Finding `json:"findings"`
+}
 
 // nameWidth is the column the values start in.
 const nameWidth = 22
@@ -36,13 +55,26 @@ var notQueried = map[string]string{
 
 // Report writes c to w as one line per fact, in Caps's field order: the
 // fact's name, as JSON names it; its value; and where it came from, with
-// the reason a fact was not queried. The text is ASCII, with no colour, so
-// it can be pasted into an issue. Lines longer than the width wrap under
-// the value column.
+// its reason token, or the reason a fact was not queried. The findings
+// follow, one per token. The text is ASCII, with no colour, so it can be
+// pasted into an issue. Lines longer than the width wrap under the value
+// column. WithReportJSON writes the same as JSON.
 func Report(w io.Writer, c Caps, o ...ReportOption) error {
 	cfg := reportConfig{width: DefaultReportWidth}
 	for _, f := range o {
 		f(&cfg)
+	}
+	findings := Findings(c)
+	if cfg.json {
+		if findings == nil {
+			findings = []Finding{}
+		}
+		out, err := json.MarshalIndent(reportJSON{SchemaVersion: ReportSchemaVersion, Caps: c, Findings: findings}, "", "  ")
+		if err != nil {
+			return err
+		}
+		_, err = w.Write(append(out, '\n'))
+		return err
 	}
 	var b strings.Builder
 	v := reflect.ValueOf(c)
@@ -50,6 +82,12 @@ func Report(w io.Writer, c Caps, o ...ReportOption) error {
 	for i := range t.NumField() {
 		name := fieldName(t.Field(i))
 		b.WriteString(line(name, describe(name, v.Field(i), c.TimedOut), cfg.width))
+	}
+	if len(findings) > 0 {
+		b.WriteString("\nfindings\n")
+		for _, f := range findings {
+			b.WriteString(line(f.Disposition.String(), printable(f.ID+": "+f.Message+" Fix: "+f.Fix), cfg.width))
+		}
 	}
 	_, err := io.WriteString(w, b.String())
 	return err
