@@ -55,12 +55,16 @@ func (c *Caps) setEnv(e Env, goos, appearanceEnv string) {
 
 	// Bare cmd.exe sets no terminal variable, so on Windows a terminal the
 	// environment does not name may be the classic console host, until a
-	// WithConsoleHost hook can ask.
-	if goos == goosWindows && id.EnvBrand == BrandUnknown {
+	// WithConsoleHost hook can ask. Over SSH into Windows, sshd runs the
+	// program inside ConPTY, which answers the queries itself (A5).
+	switch {
+	case goos == goosWindows && id.Remote:
+		c.LegacyConsole.SetReason(false, Heuristic, ReasonConPTYAnswers)
+	case goos == goosWindows && id.EnvBrand == BrandUnknown:
 		c.LegacyConsole.SetReason(true, Heuristic, ReasonLegacyConsoleGuess)
-	} else if goos == goosWindows {
+	case goos == goosWindows:
 		c.LegacyConsole.Set(false, Heuristic)
-	} else {
+	default:
 		c.LegacyConsole.Set(false, Environment)
 	}
 

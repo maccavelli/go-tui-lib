@@ -116,3 +116,43 @@ func TestReportReturnsTheWriteError(t *testing.T) {
 		t.Fatalf("Report = %v, want the writer's error", err)
 	}
 }
+
+// TestReportKeepsTokensWhole is PLAN D12: the real-terminal check's run 3
+// showed "terminal.windows-terminal-" and "guess" on two lines.
+func TestReportKeepsTokensWhole(t *testing.T) {
+	var c Caps
+	c.Brand.SetReason(BrandWindowsTerminal, Heuristic, ReasonWindowsTerminalGuess)
+	for _, w := range []int{60, 64, 70, 80} {
+		out := reportOf(t, c, WithReportWidth(w))
+		// The facts alone: the findings section names the token too.
+		facts, _, _ := strings.Cut(out, "\n\nfindings\n")
+		if !strings.Contains(facts, ReasonWindowsTerminalGuess) {
+			t.Errorf("width %d: the token is broken in the facts:\n%s", w, facts)
+		}
+		for l := range strings.SplitSeq(strings.TrimSuffix(out, "\n"), "\n") {
+			if len(l) > w || strings.HasSuffix(l, "-") && !strings.HasSuffix(l, " -") { // " -" is an empty value
+				t.Errorf("width %d: a line of %d, broken at a hyphen or too long: %q", w, len(l), l)
+			}
+		}
+	}
+}
+
+func TestWrapWords(t *testing.T) {
+	cases := []struct {
+		s     string
+		limit int
+		want  []string
+	}{
+		{"a bb ccc", 4, []string{"a bb", "ccc"}},
+		{"#aa;#bb;#cc", 8, []string{"#aa;#bb;", "#cc"}},
+		{"one terminal.windows-terminal-guess two", 33, []string{"one", "terminal.windows-terminal-guess", "two"}},
+		{"abcdefghij", 4, []string{"abcd", "efgh", "ij"}},
+		{"x  y", 1, []string{"x", "y"}},
+		{"", 5, []string{""}},
+	}
+	for _, c := range cases {
+		if got := wrapWords(c.s, c.limit); strings.Join(got, "|") != strings.Join(c.want, "|") {
+			t.Errorf("wrapWords(%q, %d) = %q, want %q", c.s, c.limit, got, c.want)
+		}
+	}
+}

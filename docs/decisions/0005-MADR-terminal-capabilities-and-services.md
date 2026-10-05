@@ -1072,6 +1072,35 @@ program cannot ask tea for no flags.
 **Unchanged.** A1's lists of terminals, the ledger, `ReleasesReported`,
 and every other part of A1.
 
+### A5 (2026-10-05): the Windows guesses are local only
+
+*Status: accepted (2026-10-05).* It is deviation D11 of
+[0005-PLAN-terminal-capabilities-and-services.md](0005-PLAN-terminal-capabilities-and-services.md),
+found by the real-terminal check in Step 7.
+
+**Found.** The owner ran the doctor program over an interactive SSH
+session, from WezTerm on macOS into an MSYS2 shell on a Windows host. The
+report said `brand windows-terminal (heuristic)` and `legacy_console yes`,
+and its finding told the user to run in Windows Terminal. A1's two Windows
+rules, "an unknown brand on Windows is Windows Terminal" and "an unnamed
+terminal on Windows is the legacy console", describe a local console; over
+SSH the terminal is the client's, which the Windows host's environment does
+not name. The same run showed the replies were not WezTerm's: DA1
+`61;6;7;21;22;23;24;28;32;42` (no Sixel), DA2 `0;10;1`, no OSC 11. Windows'
+ConPTY, inside which sshd runs the program, answered the queries itself.
+
+**Decision** (the owner, picked from options, 2026-10-05, "Guess only when
+local, add a finding", the recommendation).
+
+* `FromEnv` refines an unknown brand to Windows Terminal only when the
+  session is not remote.
+* `LegacyConsole` is the `Heuristic` guess `true` only on Windows, with no
+  terminal named, and not remote. On Windows over SSH it is `false`, with
+  the new reason token `terminal.conpty-answers`, whose finding says that
+  ConPTY answers the queries itself, so the facts describe ConPTY rather
+  than the user's terminal.
+* A1's other rules stand.
+
 ## More Information
 
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md)

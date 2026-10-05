@@ -195,13 +195,65 @@ func printable(s string) string {
 	return string(b)
 }
 
+// wrapWords breaks s into lines of at most limit cells, only after a
+// space, ';' or ',', so a reason token, which holds hyphens, and a colour
+// stay whole; ansi's wrappers break at every hyphen (PLAN D12). A word
+// longer than the line is cut.
+func wrapWords(s string, limit int) []string {
+	var lines []string
+	var line strings.Builder
+	width := 0
+	flush := func() {
+		lines = append(lines, strings.TrimRight(line.String(), " "))
+		line.Reset()
+		width = 0
+	}
+	for _, w := range words(s) {
+		if width == 0 {
+			w = strings.TrimLeft(w, " ")
+		}
+		if width > 0 && width+ansi.StringWidth(strings.TrimRight(w, " ")) > limit {
+			flush()
+			w = strings.TrimLeft(w, " ")
+		}
+		for ansi.StringWidth(w) > limit && ansi.StringWidth(strings.TrimRight(w, " ")) > limit {
+			cut := ansi.Truncate(w, limit, "")
+			line.WriteString(cut)
+			flush()
+			w = w[len(cut):]
+		}
+		line.WriteString(w)
+		width += ansi.StringWidth(w)
+	}
+	if line.Len() > 0 || len(lines) == 0 {
+		flush()
+	}
+	return lines
+}
+
+// words splits s after each space, ';' and ','.
+func words(s string) []string {
+	var out []string
+	start := 0
+	for i := range len(s) {
+		if s[i] == ' ' || s[i] == ';' || s[i] == ',' {
+			out = append(out, s[start:i+1])
+			start = i + 1
+		}
+	}
+	if start < len(s) {
+		out = append(out, s[start:])
+	}
+	return out
+}
+
 // line is one fact, wrapped at width under its value column.
 func line(name, text string, width int) string {
 	head := fmt.Sprintf("%-*s ", nameWidth, name)
 	if width <= 0 || width <= len(head)+10 {
 		return head + text + "\n"
 	}
-	wrapped := strings.Split(ansi.Wrap(text, width-len(head), ";,"), "\n")
+	wrapped := wrapWords(text, width-len(head))
 	indent := strings.Repeat(" ", len(head))
 	var b strings.Builder
 	for i, l := range wrapped {

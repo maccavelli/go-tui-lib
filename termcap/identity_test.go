@@ -61,6 +61,10 @@ func TestFromEnvRefinesOnWindowsOnly(t *testing.T) {
 	if lin := FromEnv(Env{}, "linux"); lin.Brand != BrandUnknown {
 		t.Errorf("Linux, no variables: Brand %v, want unknown", lin.Brand)
 	}
+	// Over SSH the terminal is the client's: no guess (A5).
+	if ssh := FromEnv(Env{"SSH_CONNECTION=a 1 b 22"}, "windows"); ssh.Brand != BrandUnknown || !ssh.Remote {
+		t.Errorf("Windows over SSH: Brand %v, Remote %v; want unknown, remote", ssh.Brand, ssh.Remote)
+	}
 	var c Caps
 	c.setEnv(Env{}, "windows", "")
 	if c.Brand != (Fact[Brand]{Value: BrandWindowsTerminal, Origin: Heuristic, Reason: ReasonWindowsTerminalGuess}) {
@@ -122,6 +126,8 @@ func TestLegacyConsole(t *testing.T) {
 		{Env{"WT_SESSION=x"}, "windows", Fact[bool]{Value: false, Origin: Heuristic}},
 		{Env{"WEZTERM_PANE=0"}, "windows", Fact[bool]{Value: false, Origin: Heuristic}},
 		{Env{}, "linux", Fact[bool]{Value: false, Origin: Environment}},
+		{Env{"SSH_TTY=/dev/pty0"}, "windows", Fact[bool]{Value: false, Origin: Heuristic, Reason: ReasonConPTYAnswers}},
+		{Env{"SSH_CONNECTION=a 1 b 22", "WT_SESSION=x"}, "windows", Fact[bool]{Value: false, Origin: Heuristic, Reason: ReasonConPTYAnswers}},
 	}
 	for _, c := range cases {
 		var caps Caps

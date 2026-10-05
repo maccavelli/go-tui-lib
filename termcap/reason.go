@@ -51,6 +51,10 @@ const (
 	// ReasonLegacyConsoleGuess: on Windows with no terminal variables, the
 	// console is taken for the legacy console host.
 	ReasonLegacyConsoleGuess = "console.no-terminal-variables"
+	// ReasonConPTYAnswers: over SSH into Windows, ConPTY answers the
+	// queries itself, so the replies describe ConPTY, not the user's
+	// terminal (A5).
+	ReasonConPTYAnswers = "terminal.conpty-answers"
 	// ReasonWindowsTerminalGuess: on Windows an unnamed terminal is taken
 	// for Windows Terminal, whose default-terminal hand-off omits
 	// WT_SESSION.
@@ -75,6 +79,6 @@ var reasons = []string{
 	ReasonTmuxExtendedKeys, ReasonMSYSNoKitty, ReasonWSLDeadKeys,
 	ReasonAppleNoOSC8, ReasonWarpNoOSC8, ReasonTmuxLinks, ReasonMuxNoLinks, ReasonUnknownTerminal, ReasonZellijNoForwarding,
 	ReasonColorFGBGGuess, ReasonDesktopAppearance,
-	ReasonLegacyConsoleGuess, ReasonWindowsTerminalGuess,
+	ReasonLegacyConsoleGuess, ReasonConPTYAnswers, ReasonWindowsTerminalGuess,
 	ReasonJetBrainsPaints, ReasonEditorTerminal, ReasonReplyTooLong,
 }

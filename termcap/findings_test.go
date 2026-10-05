@@ -50,6 +50,26 @@ func TestFindings(t *testing.T) {
 	}
 }
 
+// TestFindingsOverSSHIntoWindows is the real-terminal check's run 3: WezTerm
+// on macOS, over SSH, into MSYS2 on Windows (PLAN Step 7, D11).
+func TestFindingsOverSSHIntoWindows(t *testing.T) {
+	var c Caps
+	c.setEnv(Env{"TERM=xterm-256color", "MSYSTEM=UCRT64", "SSH_CONNECTION=a 1 b 22", "SSH_TTY=/dev/pty0"}, "windows", "")
+	if c.Brand.Value != BrandUnknown || c.LegacyConsole.Value {
+		t.Errorf("Brand %+v, LegacyConsole %+v; want no Windows guess over SSH", c.Brand, c.LegacyConsole)
+	}
+	var ids []string
+	for _, f := range Findings(c) {
+		ids = append(ids, f.ID)
+		if f.ID == ReasonLegacyConsoleGuess || f.ID == ReasonWindowsTerminalGuess {
+			t.Errorf("finding %q over SSH", f.ID)
+		}
+	}
+	if !strings.Contains(strings.Join(ids, " "), ReasonConPTYAnswers) {
+		t.Errorf("findings %v lack %q", ids, ReasonConPTYAnswers)
+	}
+}
+
 func TestReportJSON(t *testing.T) {
 	var c Caps
 	c.setEnv(Env{}, "windows", "")

@@ -100,9 +100,9 @@ func (p *Platform) UnmarshalText(t []byte) error {
 
 // Identity is what the environment says about the terminal.
 type Identity struct {
-	// Brand is EnvBrand refined: on Windows an unknown brand is Windows
-	// Terminal, whose default-terminal hand-off omits WT_SESSION. A
-	// decision that must not trust the guess reads EnvBrand.
+	// Brand is EnvBrand refined: on Windows, outside SSH, an unknown brand
+	// is Windows Terminal, whose default-terminal hand-off omits
+	// WT_SESSION. A decision that must not trust the guess reads EnvBrand.
 	Brand, EnvBrand Brand
 	// Version is the terminal's version, kept only when the variable that
 	// named the brand also gave it.
@@ -128,9 +128,14 @@ var itermSession = regexp.MustCompile(`^w\d+t\d+p\d+:`)
 // crosses SSH; Terminator sets VTE_VERSION too; and WT_SESSION is last.
 func FromEnv(env Env, goos string) Identity {
 	id := Identity{Term: env.Getenv("TERM"), TermFeatures: env.Getenv("TERM_FEATURES")}
+	_, tty := env.LookupEnv("SSH_TTY")
+	_, conn := env.LookupEnv("SSH_CONNECTION")
+	id.Remote = tty || conn
 	id.EnvBrand, id.Version = envBrand(env)
 	id.Brand = id.EnvBrand
-	if id.Brand == BrandUnknown && goos == goosWindows {
+	// Over SSH the terminal is the client's, which the host's environment
+	// does not name, so the guess is for a local console only (A5).
+	if id.Brand == BrandUnknown && goos == goosWindows && !id.Remote {
 		id.Brand = BrandWindowsTerminal
 	}
 
@@ -158,10 +163,6 @@ func FromEnv(env Env, goos string) Identity {
 	case env.Getenv("WSL_DISTRO_NAME") != "" || env.Getenv("WSL_INTEROP") != "":
 		id.Platform = PlatformWSL
 	}
-
-	_, tty := env.LookupEnv("SSH_TTY")
-	_, conn := env.LookupEnv("SSH_CONNECTION")
-	id.Remote = tty || conn
 	return id
 }
 

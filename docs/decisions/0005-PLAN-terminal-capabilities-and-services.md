@@ -1647,3 +1647,103 @@ func main() {
 
 This PLAN stays `in-progress` until those runs are recorded and CI is
 green on the pushed tree; then it is `complete`, and the owner tags.
+
+### Step 7: the real-terminal check (2026-10-05)
+
+The owner committed and pushed Step 7 (`bd27f47`); CI run 37318451757 on
+it: `completed success`. At the owner's request the agent set the doctor
+program up in the owner's home directory on the development Mac and on the
+Windows test host, from the record's code block (the same SHA-256 on both),
+pinned to `bd27f47`, and built; a smoke run under a pseudo-terminal on the
+Mac quit by itself and printed a report (`timed_out yes`, as nothing
+answered). The owner then ran it on real terminals. Terminals are named by
+product only.
+
+**Run 1: WezTerm 20240203-110809-5046fc22, macOS, local.** Passes.
+`complete yes`; brand `wezterm` from XTVERSION; palette, foreground and
+background read; Sixel and Kitty graphics supported. `kitty_keyboard
+unsupported` (WezTerm answers only with `enable_kitty_keyboard`),
+`color_scheme_reports unsupported` and `desktop_notify unsupported` match
+this build. One finding, `keyboard.kitty-unsupported`.
+
+**Run 4: Windows Terminal, Windows, local.** Passes. `complete yes`;
+brand `windows-terminal` from `WT_SESSION`; `legacy_console no`; palette
+read; Sixel supported. *Noted:* Windows Terminal does not answer XTVERSION,
+and the report shows `terminal unknown (not-queried)`, though the query was
+sent; the terminal-name fact has no "asked, no reply" marking. Left for a
+later change.
+
+**Run 2: tmux, first attempt, did not run.** The handoff listed the three
+commands on one line with commas, and they were typed as one: tmux started
+a session named `td,` running `then`, which exited at once. The replies
+that then appeared in the shell were tmux's own start-up queries (DA1, DA2,
+XTVERSION, OSC 10 and 11), answered by WezTerm after the tmux client had
+gone. A handoff error; to be rerun, one command per line.
+
+**Run 3: SSH, first attempt, printed nothing.** `ssh -t <host> 'bash -lc
+…'` to the Windows host printed nothing. The agent reproduced it: with a
+pseudo-terminal, the host's OpenSSH and Git Bash return nothing for any
+command, even `echo`, on a fresh connection too; without one, commands run.
+A host SSH configuration issue, not termdoctor's.
+
+**Run 3: SSH, interactive, from WezTerm on macOS into MSYS2 on the Windows
+host.** Ran, and found two defects: `brand windows-terminal (heuristic)`
+and `legacy_console yes`, with the finding "Run in Windows Terminal", all
+wrong for an SSH session; and the reason token `terminal.windows-terminal-guess`
+wrapped at its hyphen. The replies were ConPTY's, not WezTerm's (MADR A5).
+Correct: `remote yes`, `platform msys`, the gated queries not sent, tea's
+2026 and 2027 query skipped over SSH.
+
+**Deviation D11 (2026-10-05): the Windows guesses fired over SSH.** The
+agent stopped and asked. The owner picked "Guess only when local, add a
+finding", the recommendation. MADR amendment A5 records it. In scope:
+`termcap/identity.go`, `env.go`, `reason.go`, `findings.go` and their
+tests.
+
+**Deviation D12 (2026-10-05): the report broke a token.** `ansi.Wrap` and
+`ansi.Wordwrap` always break at a hyphen. The agent stopped and asked. The
+owner picked "Never break inside a token", the recommendation: the report
+wraps only at spaces, `;` and `,`, and cuts a word longer than the line. In
+scope: `termcap/report.go`, its tests and the goldens.
+
+**Still to run:** tmux (one command per line), and kitty for the
+light-and-dark leak check, which neither WezTerm nor Windows Terminal could
+test, as neither supports mode 2031.
+
+**D11 and D12, done (2026-10-05).**
+
+* **D11** (`identity.go`, `env.go`, `reason.go`, `findings.go`):
+  `FromEnv` reads `Remote` first, and refines an unknown brand to Windows
+  Terminal only when not remote. `setEnv` sets `LegacyConsole` on Windows
+  over SSH to `false`, `Heuristic`, `terminal.conpty-answers`, before the
+  local guess. The new token's finding: "Over SSH into Windows, ConPTY
+  answers the queries itself, so these facts describe ConPTY, not your
+  terminal."
+* **D12** (`report.go`): `wrapWords` breaks only after a space, `;` or
+  `,`, trims the blanks at a break, and cuts a word longer than the line.
+  No golden changed: none of them had broken at a hyphen.
+* **Tests:** `TestFromEnvRefinesOnWindowsOnly` and `TestLegacyConsole`
+  gain the SSH cases; `TestFindingsOverSSHIntoWindows` is run 3's
+  environment (no Windows guess, the ConPTY finding);
+  `TestReportKeepsTokensWhole` (widths 60, 64, 70 and 80, the facts
+  section alone, no line broken at a hyphen) and `TestWrapWords`. The
+  first form of the token test survived its mutation: the token also
+  appears whole in the findings section, so it now reads the facts alone,
+  and a probe of `ansi.Wrap` confirmed the break at 70 and 80 columns. Its
+  hyphen check first also caught empty values printed as `-`, and was
+  narrowed to exclude them.
+* **Mutations,** all 6 killed: the Windows Terminal guess over SSH; the
+  legacy-console guess over SSH; no ConPTY finding; `ansi.Wrap` restored
+  ("width 70: the token is broken in the facts"); words split at a hyphen;
+  a long word not cut. Every earlier set was rerun after: 100 more, all
+  killed. One A1.1 anchor moved and was updated.
+* **Checks:** `make lint` (three targets), `make pre-add-check` (13
+  files), `-race`, `LC_ALL=C`, `-shuffle=on -count=2`, `-race -count=5
+  ./termcap/...` and `go mod tidy -diff`: clean. The Windows test host:
+  `make pre-add-check` (`74 file(s) clean`), `make lint`, `make vuln` and
+  the four packages' tests shuffled three times: exit 0. The identifier
+  scan finds nothing.
+
+**Next:** after the owner's push, the doctor program in both home
+directories is rebuilt at the new commit; then run 3 is repeated, and the
+tmux and kitty runs are made.
