@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/colorprofile"
 
 	"github.com/maccavelli/go-tui-lib/internal/termevent/termeventtest"
 )
@@ -227,5 +228,32 @@ func TestAlacrittyVersionFromDA2(t *testing.T) {
 		if got := KeyboardFlags(caps).ReportEventTypes; got != c.events {
 			t.Errorf("DA2 %v: event types %v, want %v", c.da2, got, c.events)
 		}
+	}
+}
+
+// TestCapsMsgWaitsForTheColourProfile: tea sends tea.ColorProfileMsg
+// unordered with tea.EnvMsg, so CapsMsg waits for it; the deadline does
+// not (MADR A3, PLAN D10).
+func TestCapsMsgWaitsForTheColourProfile(t *testing.T) {
+	p := New()
+	feed(p, tea.EnvMsg(local))
+	if n := count[CapsMsg](feed(p, termeventtest.DeviceAttributes(62))); n != 0 {
+		t.Fatalf("%d CapsMsg before the colour profile", n)
+	}
+	c := capsOf(t, feed(p, tea.ColorProfileMsg{Profile: colorprofile.ANSI256}))
+	if !c.Complete || c.Profile != colorprofile.ANSI256 {
+		t.Errorf("Complete %v, Profile %v; want the sentinel's CapsMsg with the profile", c.Complete, c.Profile)
+	}
+
+	jb := New()
+	feed(jb, tea.EnvMsg(Env{"TERMINAL_EMULATOR=JetBrains-JediTerm"}))
+	if c := capsOf(t, feed(jb, tea.ColorProfileMsg{Profile: colorprofile.TrueColor})); c.Profile != colorprofile.TrueColor {
+		t.Errorf("JetBrains: Profile %v", c.Profile)
+	}
+
+	late := New()
+	feed(late, tea.EnvMsg(local))
+	if c := capsOf(t, feed(late, timeoutMsg{late})); !c.TimedOut {
+		t.Error("the deadline waited for the colour profile")
 	}
 }

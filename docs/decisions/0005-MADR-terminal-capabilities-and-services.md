@@ -1093,7 +1093,11 @@ and every other part of A1.
   * that tmux delivers replies to passthrough queries back to the pane (crush
     relies on it for its Kitty graphics query);
   * which terminals implement OSC 777 `notify`;
-  * terminals' OSC 52 size limits.
+  * terminals' OSC 52 size limits;
+  * how Alacritty packs its version into DA2. Step A1.2 takes the second
+    field as `major*10000 + minor*100 + patch` and reads 0.14 or older as
+    under 1500; the 0003 report's figure, "packed 2401", does not match
+    that reading, and Alacritty's source was not consulted.
 
   PLAN Step 1 records what the fake-terminal spike shows. The first two are
   checked on real terminals in Verification.

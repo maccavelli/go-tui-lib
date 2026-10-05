@@ -1210,3 +1210,116 @@ The owner picked "Wait for ColorProfileMsg", the recommendation:
 `CapsMsg` waits for `tea.ColorProfileMsg` too, and the deadline delivers
 regardless. MADR A3 records it. The unit tests' `start` helper feeds
 `tea.ColorProfileMsg` first, as tea does.
+
+**What was built.**
+
+* **DA2** (`prober.go`): `ansi.RequestSecondaryDeviceAttributes` joins
+  the safe set, after the OSC 11 query and before the gated queries, so
+  before DA1. `Caps.SecondaryAttributes` holds the reply. DA1 `1;2` with
+  DA2 `1;95;0`, in either order, names Apple Terminal (`Queried`); either
+  alone does not.
+* **Alacritty** (`views.go`): event types once DA2's second field is 1500
+  or more; without a DA2, or under 1500, none, with the reason. The
+  encoding is an assumption, now in the MADR's "Not verified here".
+* **The reply cap:** a raw reply over 1024 bytes is not parsed, by a
+  built-in query or an added one. A built-in query whose reply prefix it
+  carries (OSC 99) is marked answered, so silence does not overwrite it,
+  and its fact is `Unknown`, `Queried`, `probe.reply-too-long`.
+* **`(*Prober).IsReplyFragment(msg)`**, as A2 restates it: a
+  `uv.UnknownEvent` that begins a reply (`CSI ?`, `CSI >`, `OSC`, the
+  XTVERSION `DCS >|`, the Kitty graphics `APC G`) and does not finish it,
+  while the probe awaits a reply; then each key press up to the CSI final
+  byte, or BEL (ctrl+g) or ST (ESC then `\`) for a string; at most 1 KiB.
+  It keeps its own state, so an input filter calls it once per message in
+  order.
+* **The JetBrains gate:** where `EnvBrand` is JetBrains, the prober sends
+  nothing, no batch and no background query, and delivers `CapsMsg`
+  with every query fact `Unknown`, `NotQueried`,
+  `terminal.jetbrains-paints-queries`. `WithoutHeuristic` does not lift it
+  (Q7). Tea's own start-up queries (DECRQM 2026 and 2027, the Kitty
+  keyboard query) still go out there; they are tea's, and the later
+  `termmode` record owns them.
+* **The editor gate:** inside Neovim's, Vim's or Emacs's terminal, the
+  gated set is skipped, with `editor.terminal-gated` on the OSC 99 and
+  Kitty graphics facts; `WithoutHeuristic` lifts it.
+* **Reason tokens:** `ReasonJetBrainsPaints`, `ReasonEditorTerminal`,
+  `ReasonReplyTooLong`.
+* **D10:** `CapsMsg` waits for `tea.ColorProfileMsg`.
+* **`termcaptest`:** `Profile.DA2` and `Profile.Paints`;
+  `Terminal.Painted()`; the profiles `AppleTerminalSSH()` and `JetBrains()`;
+  DA2 replies for Kitty, xterm and tmux. `answer` is split in two
+  (`answerCSI`, `answerString`) after `gocyclo` measured it at 41.
+
+**Tests** (`discipline_test.go`): `TestDA2IsSentBeforeDA1`,
+`TestAppleTerminalFingerprint` (both orders; DA1 alone, DA2 alone, a
+different DA1, a different DA2 and a short DA2 refused),
+`TestReplyCap` (1024 bytes parsed, 1025 not and not marked silent, an
+added query not given 1033), `TestJetBrainsSendsNothing`,
+`TestEditorTerminalSkipsTheGatedQueries` (Neovim, Vim, Emacs; lifted by
+`WithoutHeuristic`), `TestIsReplyFragment` (the spike's CSI shape; an OSC
+ended by ctrl+g; one ended by ST; `alt+[`; a complete sequence; nothing
+awaited), `TestIsReplyFragmentStopsAt1KiB`, `TestAlacrittyVersionFromDA2`,
+`TestCapsMsgWaitsForTheColourProfile`. `termcaptest_test.go`:
+`TestAppleTerminalOverSSH`, `TestJetBrainsIsLeftUntouched` (none of the
+prober's queries painted), `TestNoBackgroundQueryUnderJetBrains` (Q8's
+second half: no OSC 11 at all), `TestPaintingTerminal`. The report goldens
+gain the DA2 line and the two new profiles, sixteen files, each read:
+Apple Terminal over SSH shows `apple-terminal (query)` beside
+`env_brand unknown (env)`; JetBrains shows every query fact with the
+JetBrains reason and `complete no`.
+
+**A test-program fix (Step 4's).** The first `-race -count=5` run failed
+`TestResetBeforeExit` once: "mode 2031: set,reset,reset". The test app
+returned `Quit()` from every `Update` after `StopMsg`, so a message after
+it, such as the reset's own `tea.RawMsg`, wrote the reset again. It now
+quits once. The assertion is unchanged; twenty `-race` runs of it passed
+after.
+
+**Mutations,** each on a scratch copy, all 16 killed:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| DA2 sent after DA1 | `TestDA2IsSentBeforeDA1`: "DA2 at 248, DA1 at 245" |
+| the reply cap off by one | `TestReplyCap`: "a 1024-byte reply: … reply-too-long, want parsed" |
+| the JetBrains gate skipped | `TestJetBrainsIsLeftUntouched`: "the prober's query \"\x1b[?2031$p\" was painted" |
+| the editor gate skipped | `TestEditorTerminalSkipsTheGatedQueries`: "sent the gated \"\x1b[>q\"" |
+| Apple Terminal from DA1 alone | `TestAppleTerminalFingerprint`: "DA1 alone: read as Apple Terminal" |
+| the fingerprint not checked on DA1 | `TestAppleTerminalFingerprint`: "DA2 then DA1: Brand … unknown" |
+| a CSI fragment never ends | `TestIsReplyFragment`: "CSI step 3 (x): true" |
+| ST does not end a string fragment | `TestIsReplyFragment`: "a key after ST is a fragment" |
+| a fragment has no length bound | `TestIsReplyFragmentStopsAt1KiB`: "ran to 2055 bytes" |
+| fragments counted with nothing awaited | `TestIsReplyFragment`: "a fragment before the batch was sent" |
+| a complete sequence read as a fragment | `TestIsReplyFragment` |
+| Alacritty 0.15 refused event types | `TestAlacrittyVersionFromDA2`: "DA2 [0 1500 1]: event types false" |
+| a long reply marked silent at the sentinel | `TestReplyCap`: "{Value:unsupported …}, want unparsed with the reason" |
+| the painting terminal paints nothing | `TestPaintingTerminal` |
+| the fake terminal ignores DA2 | `TestAppleTerminalOverSSH` |
+| `CapsMsg` does not wait for the colour profile (D10) | `TestCapsMsgWaitsForTheColourProfile` |
+
+Every earlier set was rerun after this step's last change: Step 2's 7,
+Step 3's 17, Step 4's 7, Step 5's 6, Step 6's 11 and Step A1.1's 17, all
+killed. Five anchors moved with the code and were updated first.
+
+**Checks.**
+
+* `make lint`: 0 issues for linux, darwin and windows, after the
+  `gocyclo` finding above.
+* `make pre-add-check FILES=…` (the eleven Go files): `11 file(s) clean`.
+* `go test -race -count=1 ./...`, `LC_ALL=C go test ./...`,
+  `go test -shuffle=on -count=2 ./...`, `go test -race -count=5
+  ./termcap/...` and `go test -race -count=30 -run ReportGolden
+  ./termcap`, with `GOWORK=off`: pass, after D10 and the test-program fix.
+* `GOWORK=off go mod tidy -diff`: clean; `go.mod` unchanged.
+* Windows test host, on a copy (go1.27.1 windows/amd64): `make
+  pre-add-check` (`67 file(s) clean`), `make lint` (0 issues, three
+  targets), `make vuln` (none), and the four packages' tests shuffled
+  three times: all exit 0.
+* The identifier scan of the diff finds nothing.
+
+**Mistakes, none in the tree.** A test's added `Parse` first returned
+true for every message, the `tea.EnvMsg` that starts the probe included,
+and was fixed to count only raw replies before any result was trusted. A
+results file was once written to `/tmp` rather than the scratchpad, and
+removed. A shell redirection from a missing file opened
+`discipline_test.go` for appending and wrote nothing; its length was
+checked.
