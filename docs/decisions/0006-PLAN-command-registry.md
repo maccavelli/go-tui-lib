@@ -287,6 +287,7 @@ the enumerations), `command/handler.go`, `command/registry.go`,
   `WithPrefixer`, and the methods `Register`, `Remove`, `Lookup`, `Slash`,
   `All`, `Available`, `Version`, `Watch`, `Dispatch`, `Run`, `Cancel`,
   `CancelAll`. (`ReplaceSource` is Step 5's; `ParseSlash` Step 4's.)
+* *D5:* `ErrUnknown`, `ErrUnavailable` and `ErrRefused`.
 * `Decision` (`AllowOnce`, `AllowAlways`, `RejectOnce`, `RejectAlways`)
   with `ACPKind() string`; `Gate`; `Auditor`; `Record`; `SlogAuditor`.
 * The messages `ResultMsg`, `PromptMsg`, `ChangedMsg`, `ConflictMsg`,
@@ -303,6 +304,9 @@ the enumerations), `command/handler.go`, `command/registry.go`,
   once, returning its `Result.Cmd` batched with a `ResultMsg`, or returns
   a `tea.Cmd` that runs an `Async` command under a context `Cancel`
   reaches. `Run` does the same synchronously, for any mode.
+* *D4:* `Danger` and `Origin` start at 1; `Register` refuses a zero
+  `Danger`, and `Dispatch` and `Run` a zero `Origin`. *D6:* `OriginMouse`
+  needs `SurfaceKey`; `OriginProgram` is checked against `When` only.
 * The policy (§7): `ReadOnly` and `UI` run for every origin; `Mutating`
   from `OriginAgent`, and `Destructive` from `OriginAgent` or `OriginCLI`,
   ask the gate, and with none are `RejectOnce`. `AllowAlways` and
@@ -313,13 +317,13 @@ the enumerations), `command/handler.go`, `command/registry.go`,
 | Test | Shows |
 | :--- | :--- |
 | `TestIDValid` | `workspace.focus.next` is valid; an upper-case letter, an empty segment, a leading `-` and 129 bytes are not |
-| `TestRegisterDuplicate` | a second command with one ID is an error |
-| `TestAllSorted`, `TestAvailable` | `All` is in ID order; `Available` honours `When` and `Surfaces` |
+| `TestRegisterDuplicate` | a second command with one ID is an error (*D4: and a command with no `Danger`*) |
+| `TestAllSorted`, `TestAvailable` | `All` is in ID order; `Available` honours `When` and `Surfaces` (*D6: and `Dispatch` checks a click against `SurfaceKey`, and the program against `When` only*) |
 | `TestDispatchLoop` | a `Loop` command runs during `Dispatch`; its `Result.Cmd` and a `ResultMsg` come back |
 | `TestDispatchAsync` | an `Async` command runs only when the returned `tea.Cmd` runs |
 | `TestRunMatchesDispatch` | `Run` and `Dispatch` give the same `Result` for one request |
 | `TestCancel`, `TestExclusive` | a running async command sees its context cancelled |
-| `TestPolicy` | every origin against every danger, without a gate and with one |
+| `TestPolicy` | every origin against every danger, without a gate and with one (*D4: a request with no origin is refused; D5: each failure is `ErrUnknown`, `ErrUnavailable` or `ErrRefused` under `errors.Is`*) |
 | `TestAlways` | `AllowAlways` is remembered per command and caller; `RejectOnce` is not |
 | `TestSlogAuditor` | one record per dispatch on the given logger, never the default logger |
 | `TestSnapshotsUnderRace` | under `-race`, `All` and `Lookup` from many goroutines during writes see whole snapshots, and `Version` never falls |
@@ -915,3 +919,148 @@ Each on a scratch copy of the tree, with `go test -count=1 -run '^<Test>$'
 | `String` drops needed parentheses | `n.prec() < need-10` | `when_test.go:275: "!(a && b)" prints "!a && b", which differs on map[a:false b:false]` (after D2) |
 | `not in` is evaluated as `in` | `return in` | `when_test.go:105: "item not in l" = true, want false` |
 | D1: the canonical form's length is not checked | `n > MaxSource*100` | `when_test.go:212: a source of 4096 bytes printing longer than MaxSource: <nil>` |
+
+### Step 3: `command` core
+
+#### Deviations
+
+Found before any Step 3 code was written; MADR amendment A4 records the
+decisions.
+
+* **D4 (2026-10-05): zero values.** The PLAN lists `Danger` and `Origin`
+  in order but not their values. With plain `iota`, an undeclared
+  `Danger` is `ReadOnly`, which an agent runs with no gate, and a request
+  without an `Origin` is `OriginKey`. Options given: zero means unset and
+  is refused (recommended); zero is treated as the safe level; plain
+  `iota`. **The owner picked "Zero means unset; refuse it".**
+* **D5 (2026-10-05): exported errors.** Step 8's exit code 3 needs
+  `command/cli` to recognise a refusal, and the step lists no error.
+  Options given: three sentinel errors (recommended); one error type with
+  a code; none until Step 8. **The owner picked "Three sentinel
+  errors"**, which adds `ErrUnknown`, `ErrUnavailable` and `ErrRefused`
+  to the step's names (Rule 2).
+* **D6 (2026-10-05): the surfaces of a click and of the program.** Five
+  origins have a surface; `OriginMouse` and `OriginProgram` do not.
+  Options given: a click as a key and the program unchecked
+  (recommended); neither checked; a new `SurfaceMouse`. **The owner
+  picked "Mouse as Key; Program unchecked".**
+
+#### What was built
+
+* `command/command.go`: the package documentation, `ID` (`Valid`,
+  `Segments`), `Command`, `Schema`, and the enumerations `Kind`,
+  `Danger`, `Surface` (with `AllSurfaces`), `Mode`, `Scope` (with
+  `Global`), `SourceKind`, `Source` and `Origin`, each with `String`.
+  `command/handler.go`: `Handler`, `HandlerFunc`, `Invocation`, `Result`,
+  `Request`. `command/registry.go`: `Registry`, `NewRegistry`,
+  `RegistryOption`, `WithGate`, `WithAuditor`, `WithPrefixer`, the
+  errors (D5), and `Register`, `Remove`, `Lookup`, `Slash`, `All`,
+  `Available`, `Version`, `Watch`. `command/dispatch.go`: `Dispatch`,
+  `Run`, `Cancel`, `CancelAll`. `command/gate.go`: `Decision`
+  (`ACPKind`), `Gate`. `command/audit.go`: `Auditor`, `Record`,
+  `SlogAuditor`. `command/messages.go`: `ResultMsg`, `PromptMsg`,
+  `ChangedMsg`, `ConflictMsg`, `QuitRequestMsg`, `Conflict`. No other
+  exported name. `command` imports `when`, `bubbletea` and the standard
+  library only.
+* Choices inside the listed names, none of which adds a name:
+  * `Decision` also starts at 1, as `Danger` and `Origin` do under D4, so a
+    gate that returns the zero value refuses. This applies D4's rule to a
+    third type the owner was not asked about, and is stated here so it
+    can be reversed.
+  * `Conflict` is `{ID, Slash, Renamed, Holder}`: the loaded command, the
+    name it asked for, the name it got, and the command that holds the
+    name. Step 5 fills it.
+  * `Dispatch` asks the gate on the calling goroutine, in the order this
+    step's Build gives; the `Gate` documentation says a gate that waits
+    for the user is reached through `Run`, from the agent's goroutine.
+  * A `Forward` command needs no handler and ignores one; its text is
+    `/<Slash> <Raw>`, or `/<ID> <Raw>` when it has no slash name.
+  * `All` includes hidden commands and `Available` leaves them out; a zero
+    surface given to `Available` is any surface. `Slash` accepts a name
+    with or without its leading `/`. `Register` keeps its own copies of
+    `Aliases`, `Args`, `Output` and `Meta`.
+  * Every request is audited, including one for an unknown ID; a record's
+    `Decision` is zero when the request failed before the policy was
+    asked. `Record.Args` is the request's JSON as given: masking `secret`
+    fields is Step 4's (`TestAuditMasksSecrets`).
+  * `WithPrefixer` stores its function, which Step 5 uses.
+* Tests beyond the table: `TestRegisterCopies`, `TestStrings`,
+  `TestPromptAndForward` (a `PromptMsg` for a `Prompt` and a `Forward`,
+  none for an `Action`), `TestNonExclusiveRunsTogether`,
+  `TestDecisionACPKind`.
+* Fixed on the way: `make modernize` replaced a hand-written loop in
+  `dispatch_test.go` with `slices.Contains`, and revive's
+  `confusing-naming` renamed the test helper `newRegistry` to
+  `registryOf`. The first `make pre-add-check` run passed with the helper
+  still named `newRegistry`; `make lint` then reported it, and so did the
+  next pre-add check. Why the first run passed was not investigated.
+* `TestAlways`'s gate first indexed an empty answer queue, so the
+  "`AllowAlways` is not remembered" mutation was killed by a panic. The
+  gate now reports an unexpected question as a test error, and the
+  mutation fails on that assertion.
+
+#### Checks (Rule 3)
+
+1. `gofmt -l command`: no output.
+2. `make pre-add-check FILES="<the eleven command/*.go files>"`: exit 0,
+   "go-precheck: 11 file(s) clean in 1 module(s) (gofmt, golangci-lint,
+   go vet, go test, go mod tidy, govulncheck)."
+3. `make lint`: exit 0; `go fix -diff` silent, and "0 issues." for
+   `GOOS=linux`, `darwin` and `windows`.
+4. `GOWORK=off go test -race -count=1 ./...`: exit 0, 15 packages `ok`,
+   `command` among them; `internal/conformance` passes with `command` in
+   its scan.
+5. `GOWORK=off go test -shuffle=on -count=2 ./...`: exit 0, 15 packages
+   `ok`.
+6. `LC_ALL=C GOWORK=off go test -count=1 ./...`: exit 0, 15 packages `ok`.
+7. `GOWORK=off go mod tidy -diff`: exit 0, no output.
+8. No fuzz target in this step.
+9. Windows test host, go1.27.1 windows/amd64, on a copy of the tree:
+   `make pre-add-check` exit 0 ("94 file(s) clean in 1 module(s)"),
+   `make lint` exit 0, `make vuln` exit 0 ("No vulnerabilities found."),
+   `GOWORK=off go test -count=3 -shuffle=on ./command/` exit 0.
+10. `markdownlint-cli2` on `docs/README.md`: 0 issues (the configuration
+    excludes MADR and PLAN files); the relative-link check of
+    `docs/README.md` and this pair: 0 broken.
+11. Identifier scan of the diff and `command/`, for the local account
+    name, the test host's name, home-directory paths and the employer's
+    domain: no match.
+
+Benchmarks, on the development host (`go test -run '^$' -bench .
+-benchmem ./command`), over 500 commands, half with a `When`:
+`BenchmarkLookup` 30.10 ns/op, 0 allocs; `BenchmarkAvailable` 16093 ns/op,
+0 allocs; `BenchmarkDispatchLoop` 241.9 ns/op, 560 B/op, 5 allocs/op.
+
+#### Mutations (Rule 4)
+
+Each on a scratch copy of the tree. All eleven killed: the step's six, and
+five for D4–D6. Step 2's set was not rerun, because this step changes
+nothing under `when/`.
+
+| Mutation | Applied as | Failing line |
+| :--- | :--- | :--- |
+| the default policy allows `Mutating` for agents | `asks`: `case Mutating: return false` | `gate_test.go:90: no gate: mutating from agent: <nil>; want refused true` |
+| `AllowAlways` is not remembered | only `RejectAlways` is stored | `gate_test.go:123: the gate was asked about mutating for a, which it answered always` |
+| `Version` is not bumped on `Remove` | `Remove` stores a snapshot with the old version and channel | `registry_test.go:285: after Remove: <nil>, want ChangedMsg{2}` |
+| `Exclusive` is ignored | `running.start(ctx, c.ID, false)` | `dispatch_test.go:184: the async command did not end` |
+| a write changes the published snapshot in place | `Register` appends to `old.entries` (run with `-race`) | `registry_test.go:218: All: b9.c6 after b9.c6`, and the race detector's report |
+| `Dispatch` skips `When` | `!e.holds(c) && req.Origin == 0` | `dispatch_test.go:45: with its When false: ran true, <nil>`; `TestAvailable` fails too |
+| D4: `Register` accepts an undeclared `Danger` | `c.Danger > Destructive` only | `registry_test.go:120: no danger: registered` |
+| D4: a request with no origin runs | `req.Origin > OriginProgram` only | `gate_test.go:111: Run({ID:readonly … Origin:unset …}): <nil>, want command: refused` |
+| D5: a gate refusal is not `ErrRefused` | the refusal wraps `ErrUnavailable` | `gate_test.go:90: reject once: mutating from agent: command: not available: …; want refused true` |
+| D6: a click is not checked against `SurfaceKey` | `case OriginKey:` alone | `registry_test.go:189: palette from mouse: <nil>, want command: not available` |
+| D6: the program is checked against a surface | `case OriginAgent, OriginProgram: return SurfaceAgent` | `registry_test.go:189: palette from program: command: not available: …, want <nil>` |
+
+#### Open for later steps
+
+Found while building Step 3, and outside it; each will be raised as a
+deviation when its step starts, unless the owner decides it sooner:
+
+* **Agents and `Loop` commands (Steps 6 and 7).** `Run` runs a `Loop`
+  command on the caller's goroutine, as this step's Build says. An agent's
+  tool call arrives on its own goroutine, so `CallMCP` running a
+  workspace command through `Run` would touch the workspace off the event
+  loop, which the workspace does not allow (0003-REPORT §1.12).
+* **`--yes` and the gate (Step 8).** `command/cli` receives a registry
+  whose gate was fixed by `NewRegistry`, so `--yes` and `WithConfirm` have
+  no way to approve a `Destructive` request from the shell for one call.

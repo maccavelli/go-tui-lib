@@ -1,0 +1,53 @@
+package command
+
+import (
+	"context"
+	"encoding/json"
+
+	tea "charm.land/bubbletea/v2"
+
+	"github.com/maccavelli/go-tui-lib/when"
+)
+
+// Handler does a command's work. The same handler serves every surface: it
+// returns structured and human output, and a handler that needs the Bubble
+// Tea runtime returns the effect as Result.Cmd.
+type Handler interface {
+	Run(ctx context.Context, inv *Invocation) (Result, error)
+}
+
+// HandlerFunc is a function used as a Handler.
+type HandlerFunc func(ctx context.Context, inv *Invocation) (Result, error)
+
+// Run calls f.
+func (f HandlerFunc) Run(ctx context.Context, inv *Invocation) (Result, error) {
+	return f(ctx, inv)
+}
+
+// Invocation is what a handler is given: the command, its arguments, and
+// who asked.
+type Invocation struct {
+	Command Command
+	Args    json.RawMessage // the arguments, as JSON
+	Raw     string          // the slash tail, verbatim
+	Origin  Origin
+	Caller  string       // the agent's or MCP client's name, for example
+	Context when.Context // the context the command was enabled in; never nil
+}
+
+// Result is what a command produced.
+type Result struct {
+	Value any     // structured output: --json, MCP structuredContent
+	Text  string  // human output: the shell's stdout, MCP text, a toast; a prompt's text
+	Cmd   tea.Cmd // a follow-up effect for a TUI host; the shell ignores it
+}
+
+// Request asks the registry to run a command.
+type Request struct {
+	ID      ID
+	Args    json.RawMessage
+	Raw     string
+	Origin  Origin
+	Caller  string
+	Context when.Context // the context When is evaluated in; nil is empty
+}

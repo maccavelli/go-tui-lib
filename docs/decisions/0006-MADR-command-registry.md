@@ -241,6 +241,7 @@ type Schema = json.RawMessage
   | `Destructive` | cannot be undone, or writes outside the project | `destructiveHint: true` | agent and CLI: ask |
 
   A loaded command with no declared danger is `Mutating`, never lower.
+  (*A4: the zero `Danger` is "not declared", and `Register` refuses it.*)
 * **`Meta`** carries what this record does not foresee (icons, a plugin's
   own keys). It round-trips through the exporters as `_meta`.
 
@@ -1187,6 +1188,56 @@ in place.
 "Bound the canonical form too", the recommendation. The alternative was to
 limit the source only, and to have the round-trip property, and
 `FuzzParse`, hold only for an expression whose canonical form fits.
+
+### A4 (2026-10-05): unset danger and origin, the registry's errors, and the surfaces of a click and of the program
+
+*Status: accepted (2026-10-05).* Found before writing Step 3 of
+[0006-PLAN-command-registry.md](0006-PLAN-command-registry.md), recorded
+there as deviations D4, D5 and D6. §2, §3, §5 and §7 name the
+enumerations, `Dispatch` and `Run` but leave three things open.
+
+**Found.**
+
+1. **Zero values.** If `ReadOnly` were `Danger`'s zero value, a built-in
+   that forgot to declare its danger would run for an agent with no
+   gate, against §7's "the default policy is safe". If `OriginKey` were
+   `Origin`'s zero, a request that forgot its origin would get a user's
+   rights.
+2. **Errors.** §10's exit code 3, "refused by the gate", needs
+   `command/cli`, another package, to tell a refusal from other errors.
+   Neither §3 nor §5 names an error a caller can test.
+3. **Surfaces.** `Dispatch` checks `Surfaces` against the request's
+   origin. Five origins have a surface of their own; `OriginMouse` and
+   `OriginProgram` have none.
+
+**Decided.**
+
+1. `Danger` and `Origin` start at 1, and their zero value means "not
+   declared". `Register` refuses a command whose `Danger` is zero; `New`
+   and the loaders set one. `Dispatch` and `Run` refuse a request whose
+   `Origin` is zero. `Kind`'s zero is `Action` and `Mode`'s is `Loop`,
+   the defaults §2 and §3 name, and a zero `Surfaces` is every surface
+   (§2).
+2. `command` exports three sentinel errors, wrapped with detail and
+   tested with `errors.Is`: `ErrUnknown` (no command has the ID),
+   `ErrUnavailable` (its `When` is false, or its `Surfaces` exclude the
+   origin) and `ErrRefused` (the policy or the gate said no).
+3. `OriginMouse` needs `SurfaceKey`, because a click is a direct binding,
+   as a key is. `OriginProgram`, the program running its own command, is
+   checked against `When` only.
+
+**Changed.** §2's danger table, annotated in place.
+
+**Owner questions for A4.** *Answered 2026-10-05* (picked from options),
+each the recommendation:
+
+* "Zero means unset; refuse it". The alternatives were to treat an unset
+  `Danger` as `Mutating` and an unset `Origin` as `OriginAgent` without
+  refusing, or plain `iota`, where an unset `Danger` is `ReadOnly`.
+* "Three sentinel errors". The alternatives were one `*Error` type with a
+  code, or no exported error until Step 8.
+* "Mouse as Key; Program unchecked". The alternatives were to check
+  neither against `Surfaces`, or to add a `SurfaceMouse`.
 
 ## More Information
 

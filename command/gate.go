@@ -1,0 +1,107 @@
+package command
+
+import (
+	"context"
+	"fmt"
+	"sync"
+)
+
+// Decision is a gate's answer, with ACP's four permission option kinds.
+// Its zero value is "no decision", which refuses.
+type Decision uint8
+
+// The decisions.
+const (
+	AllowOnce    Decision = iota + 1 // run this time
+	AllowAlways                      // run, and do not ask again for this command and caller
+	RejectOnce                       // refuse this time
+	RejectAlways                     // refuse, and do not ask again for this command and caller
+)
+
+// ACPKind is d as ACP's PermissionOptionKind: "allow_once", "allow_always",
+// "reject_once" or "reject_always"; "" for no decision.
+func (d Decision) ACPKind() string {
+	switch d {
+	case AllowOnce:
+		return "allow_once"
+	case AllowAlways:
+		return "allow_always"
+	case RejectOnce:
+		return "reject_once"
+	case RejectAlways:
+		return "reject_always"
+	}
+	return ""
+}
+
+func (d Decision) allows() bool { return d == AllowOnce || d == AllowAlways }
+
+// Gate is asked before a command runs when the policy says to ask:
+// typically a permission dialog. Dispatch asks it on the goroutine that
+// calls Dispatch, and Run on Run's; a gate that waits for the user is
+// reached through Run, from the agent's goroutine.
+type Gate interface {
+	Decide(ctx context.Context, inv *Invocation) (Decision, error)
+}
+
+// asks reports whether the policy asks the gate before a command of danger
+// d runs for origin o: a mutating command from an agent, and a destructive
+// one from an agent or the shell.
+func asks(d Danger, o Origin) bool {
+	switch d {
+	case Mutating:
+		return o == OriginAgent
+	case Destructive:
+		return o == OriginAgent || o == OriginCLI
+	}
+	return false
+}
+
+// alwaysKey is what AllowAlways and RejectAlways are remembered by.
+type alwaysKey struct {
+	id     ID
+	caller string
+}
+
+// policy holds the gate and the remembered answers.
+type policy struct {
+	gate   Gate
+	mu     sync.Mutex
+	always map[alwaysKey]Decision
+}
+
+// decide is the policy's answer for inv: AllowOnce when it does not ask,
+// a remembered answer, or the gate's. A refusal is an error wrapping
+// ErrRefused.
+func (p *policy) decide(ctx context.Context, inv *Invocation) (Decision, error) {
+	if !asks(inv.Command.Danger, inv.Origin) {
+		return AllowOnce, nil
+	}
+	key := alwaysKey{inv.Command.ID, inv.Caller}
+	p.mu.Lock()
+	d, ok := p.always[key]
+	p.mu.Unlock()
+	if !ok {
+		if p.gate == nil {
+			return RejectOnce, fmt.Errorf("%w: %s %s from %s needs a gate, and there is none",
+				ErrRefused, inv.Command.Danger, inv.Command.ID, inv.Origin)
+		}
+		var err error
+		d, err = p.gate.Decide(ctx, inv)
+		if err != nil {
+			return RejectOnce, fmt.Errorf("%w: %s: the gate failed: %w", ErrRefused, inv.Command.ID, err)
+		}
+		if d == AllowAlways || d == RejectAlways {
+			p.mu.Lock()
+			p.always[key] = d
+			p.mu.Unlock()
+		}
+	}
+	if !d.allows() {
+		if d != RejectAlways {
+			d = RejectOnce
+		}
+		return d, fmt.Errorf("%w: %s: the gate said %s", ErrRefused, inv.Command.ID, d.ACPKind())
+	}
+	return d, nil
+}
