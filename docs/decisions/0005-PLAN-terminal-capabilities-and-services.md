@@ -1,6 +1,6 @@
 ---
-status: in-progress
-date: 2026-10-04
+status: complete
+date: 2026-10-05
 associated-madr: "0005-MADR-terminal-capabilities-and-services.md"
 ---
 # Implement terminal capabilities and services (`termcap`, `termsvc`)
@@ -1747,3 +1747,64 @@ test, as neither supports mode 2031.
 **Next:** after the owner's push, the doctor program in both home
 directories is rebuilt at the new commit; then run 3 is repeated, and the
 tmux and kitty runs are made.
+
+**The real-terminal check, at `1f0d562` (2026-10-05).** The owner
+committed and pushed D11 and D12 (`1f0d562`; CI run 37334179522:
+`completed success`). The agent rebuilt the doctor program at that commit
+in both home directories, and the owner ran it.
+
+* **Run 3 again: SSH from WezTerm on macOS into MSYS2 on Windows.** Fixed:
+  `brand unknown (env)`, `legacy_console no (heuristic:
+  terminal.conpty-answers)`; findings `terminal.conpty-answers`,
+  `keyboard.msys-no-kitty` and `terminal.unknown`; no token broken. Tea's
+  2026 and 2027 facts read `unsupported (query)` this time, where the
+  first run left them not queried. Those facts come only from tea's own
+  reports, so the first run means either that tea skipped its query or
+  that ConPTY's answer had not arrived; which, was not checked. Both
+  readings are reported correctly.
+* **Run 2: tmux 3.7c inside WezTerm, macOS, `allow-passthrough on`.**
+  Passes. `terminal tmux 3.7c (query)`, `mux tmux (query)`, brand
+  `wezterm` from WezTerm's own variable inside tmux; `TmuxQuery`'s output
+  read (`extended-keys-format xterm`, the client's features and flags);
+  `kitty_graphics supported`: **tmux delivered the outer terminal's reply
+  to a passthrough query**, which closes the MADR's open item.
+  `desktop_notify unsupported`, as WezTerm itself does not answer OSC 99
+  (run 1). tmux answers DECRQM 2031 itself (`color_scheme_reports
+  supported`), so the prober subscribed inside tmux. One finding,
+  `keyboard.kitty-unsupported`.
+* **Run 5: kitty 0.49.2, macOS, local.** Passes, with no finding: the Kitty
+  keyboard protocol (flags 1), modes 2031, 2048 and 1004, OSC 99, Kitty
+  graphics, brand `kitty` from XTVERSION, palette, foreground and
+  background; DA2 `1;4000;49`. `grapheme_width unsupported`, as kitty does
+  not take mode 2027.
+
+**The light-and-dark check.** Asked whether, after runs 2 and 5 exited,
+switching macOS between light and dark printed anything at the shell
+prompt, the owner answered: "no garbage appeared". Both runs had
+subscribed to mode 2031, so the reset was written before exit.
+
+### Close-out (2026-10-05)
+
+Verification, the two items Step 7 left open:
+
+| Item | State |
+| :--- | :--- |
+| real terminals | done: WezTerm on macOS (run 1), Windows Terminal on Windows (run 4), tmux 3.7c inside WezTerm (run 2), SSH from macOS into MSYS2 on Windows (run 3, twice: D11 and D12 found and fixed), kitty on macOS (run 5); no light-and-dark report reached the shell after runs 2 and 5; tmux delivers passthrough replies |
+| CI green after the owner's push | done: run 37334179522 on `1f0d562`, the last code change; this close-out changes records only |
+
+Not done, and why:
+
+* **A JetBrains terminal** was not run; none was at hand (the MADR asked for
+  one "if one is available"). The JetBrains gate is covered by
+  `TestJetBrainsSendsNothing`, `TestJetBrainsIsLeftUntouched` and the
+  painting fake terminal, whose mutation shows the prober's queries painted
+  when the gate is skipped.
+* **Left for later, by name:** Windows Terminal answers no XTVERSION, and
+  the report then says `terminal unknown (not-queried)` though the query
+  was sent (run 4); the terminal-name fact has no "asked, no reply"
+  marking. The MADR's remaining "Not verified here" items (which terminals
+  implement OSC 777 `notify`, OSC 52 size limits, Alacritty's DA2
+  encoding) stay open.
+
+This PLAN is `complete`. `termcap`, `termcap/termcaptest` and `termsvc`
+are ready for the next minor after `v0.2.0`; the tag is the owner's.

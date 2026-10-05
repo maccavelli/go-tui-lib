@@ -1120,7 +1120,10 @@ local, add a finding", the recommendation).
   OSC 8 hyperlink specification. Each is linked in the report.
 * **Not verified here:**
   * that tmux delivers replies to passthrough queries back to the pane (crush
-    relies on it for its Kitty graphics query);
+    relies on it for its Kitty graphics query). *Verified 2026-10-05:* in
+    `0005-PLAN`'s real-terminal check, tmux 3.7c with `allow-passthrough on`
+    inside WezTerm returned WezTerm's reply to the wrapped Kitty graphics
+    query, and the probe read `kitty_graphics supported`;
   * which terminals implement OSC 777 `notify`;
   * terminals' OSC 52 size limits;
   * how Alacritty packs its version into DA2. Step A1.2 takes the second
