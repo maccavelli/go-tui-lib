@@ -1,577 +1,798 @@
 ---
 status: proposed
-date: 2026-10-02
+date: 2026-10-05
 associated-madr: "0006-MADR-command-registry.md"
 ---
-# Implement the command registry (`command`, `when`, `command/cli`)
+# Implement the command registry (`when`, `command`, `command/cli`, and the Cobra and Kong front ends)
 
 Associated MADR: [0006-MADR-command-registry.md](0006-MADR-command-registry.md)
 
-**Revision, 2026-10-02.** The owner answered the MADR's Q1–Q4, and the
-MADR is `accepted`. Q4 departs from the recommendation: a Cobra and fang
-adapter, `command/cobra`, ships as well as `command/cli`. It needs its own
-dependency record first, so it is Step 10, blocked on that record. Step 1,
-the scope tables and Verification changed to match. This PLAN is still
-`proposed`, because execution is not yet approved.
+## Revisions
 
-**Revision, later on 2026-10-02.** MADR amendment A1 (proposed) and
-[0010-MADR-nested-adapter-modules.md](0010-MADR-nested-adapter-modules.md)
-(proposed) move the Cobra front end into the nested module
-`command/cobracmd`, without fang, and add a Kong front end, the nested
-module `command/kongcmd`. A1 also aligns §4's tags with Kong's. Step 4,
-Step 10, the new Step 11, the scope tables, Out of scope, Verification and
-Rollout changed to match. Steps 10 and 11 wait for 0010's acceptance and
-for its Phases 2–5, and run only after the root release that contains
-Steps 1 to 9.
+* **2026-10-02.** The owner answered the MADR's Q1–Q4, and the MADR is
+  `accepted`. Q4 added a Cobra front end beside `command/cli`.
+* **Later on 2026-10-02.** MADR amendment A1 and
+  [0010-MADR-nested-adapter-modules.md](0010-MADR-nested-adapter-modules.md)
+  moved the Cobra front end into the nested module `command/cobracmd`,
+  without fang, added a Kong front end, `command/kongcmd`, and aligned the
+  argument tags with Kong's.
+* **2026-10-03.** The owner accepted A1 and approved
+  [0010-PLAN-nested-adapter-modules.md](0010-PLAN-nested-adapter-modules.md).
+* **2026-10-05.** Rewritten after an audit of the tree at `v0.3.0`
+  (`81a61de`), recorded as MADR amendment A2, at the owner's request
+  ("assess the codebase for current facts … ensure the plan is accurate,
+  updated, and is actionable, detailed, and deterministic"). What changed,
+  and why:
+  * the preconditions that 0004 and 0010 set are met, so the conditional
+    and "blocked" wording is gone, and Steps 10 and 11 wait only for the
+    `v0.4.0` tag;
+  * A1's tags are the only tag vocabulary; §4's `doc` and `arg:"…"` are
+    not built;
+  * `workspace.resize` takes `split`, `workspace.layout.reset` is
+    `SetState` of the zero state, `workspace.theme.set` calls a new
+    `Workspace.SetBackground`, and `SchemaOf` supports `map[string]T`
+    (A2, Q5);
+  * the exporters target MCP 2026-07-28 (A2, Q6);
+  * the registry's own commands move from Step 3 to Step 4, because
+    `command.describe` takes an argument and `New[A]` arrives in Step 4;
+  * each fuzz target joins `make fuzz` in the step that adds it, so CI
+    fuzzes it from that step on;
+  * every step now lists its files, its exported names, its tests by name,
+    its golden files, its mutations, its commands and its done criteria;
+  * a Step 12 closes the PLAN after both front ends, which the old Step 9
+    did by reference.
 
-**Revision, 2026-10-03.** The owner accepted MADR amendment A1, and
-approved [0010-PLAN-nested-adapter-modules.md](0010-PLAN-nested-adapter-modules.md),
-whose Phases 2–6 run after `v0.1.5`. Nothing in this PLAN's steps changes.
-Steps 10 and 11 still wait for 0010-PLAN's Phases 2–5. This PLAN stays
-`proposed`, because its execution is not yet approved.
+  The text this revision replaces is in git at `4c6261e`.
 
 ## Goal
 
-Ship `when`, `command` and `command/cli`, and the workspace's built-in
-commands, so that one definition per action serves keys, the palette, slash
-commands, help, the shell and agents (MADR §1–§10).
+Ship `when`, `command` and `command/cli` in the root module's `v0.4.0`,
+with the workspace's built-in commands, so that one definition per action
+serves keys, the palette, slash commands, help, the shell and agents; then
+ship the Cobra and Kong front ends as the nested modules
+`command/cobracmd` and `command/kongcmd`, each at `v0.1.0` (MADR §1–§11,
+A1, A2).
 
 Done means every item under Verification holds, CI is green on the pushed
-tree, and the owner can tag the release.
+tree, and the owner has tagged `v0.4.0`, `command/cobracmd/v0.1.0` and
+`command/kongcmd/v0.1.0`.
 
 ## Scope
 
+### Facts this PLAN starts from (2026-10-05)
+
+| Fact | Where it was read |
+| :--- | :--- |
+| Go 1.27.1; `encoding/json/v2` builds with no `GOEXPERIMENT` | `go version`; a scratch build (MADR A2, item 1) |
+| the root module is at `v0.3.0`; its `go.mod` is unchanged since `v0.2.0` | `git tag`; `go.mod` |
+| 0002, 0004, 0005 and 0010 are `complete` | `docs/README.md` |
+| `go.work` lists `.` only; `scripts/go-modules.sh` lists the modules for CI's matrix | `go.work`; `.github/workflows/ci.yml` |
+| `.golangci.yml` confines Cobra and pflag to `command/cobracmd/**`, Kong to `command/kongcmd/**` | `.golangci.yml`, the `cobra` and `kong` depguard rules |
+| `internal/conformance` scans every package of every module | `internal/conformance/conformance_test.go` |
+| `make fuzz` runs `scripts/go-fuzz.sh` once per package, one line each | `Makefile`, target `fuzz` |
+| golden files are `tuitest.Text` or `tuitest.Golden`, rewritten with `-tuitest.update` | `tuitest/tuitest.go` |
+| the workspace methods the built-ins wrap, and their signatures | `go doc ./workspace` (MADR A2, item 2) |
+
 ### In scope
 
-| Step | Paths | What |
-| :--- | :--- | :--- |
-| 1 | `docs/decisions/0006-*`, `docs/README.md` | accept the records |
-| 2 | `when/` | expression parser, evaluator, typed keys, layering, fuzz target |
-| 3 | `command/` (core) | `ID`, `Command`, `Registry`, `Dispatch` and `Run`, messages, gate, audit |
-| 4 | `command/` (args) | `New[A]`, `SchemaOf`, strict decoding, validation, slash arguments; the Kong-aligned tags of MADR A1 once A1 is accepted |
-| 5 | `command/` (sources) | `LoadDir`, front matter, `FromMCPPrompts`, `FromACP`, clashes |
-| 6 | `command/` (exporters) | `MCPTools`, `CallMCP`, `ACPCommands`, `Manifest` |
-| 7 | `workspace/` | `Commands(w)`, `WhenContext()`, `Contexter`, context keys |
-| 8 | `command/cli/` | shell subcommands, flags, `--json`, exit codes |
-| 9 | `README.md`, `docs/`, `docs/guides/commands.md`, `Makefile` (`fuzz`) | documentation, release notes, close-out |
-| ~~10~~ | ~~`command/cobra/`; `go.mod`, `go.sum`; `.golangci.yml` (`depguard`); `AGENTS.md` (Dependencies)~~ | ~~the Cobra and fang adapter, blocked on its dependency record~~ (replaced below, MADR A1) |
-| 10 | `command/cobracmd/` (its own `go.mod` and `go.sum`), `command/cobracmd/docs/`; `go.work` | the nested Cobra module, blocked as the revision note says |
-| 11 | `command/kongcmd/` (its own `go.mod` and `go.sum`); `go.work` | the nested Kong module, blocked as the revision note says |
+| Step | Paths | Delivers | Released in |
+| :--- | :--- | :--- | :--- |
+| 1 | `docs/decisions/0006-*`, `docs/README.md` | the records (this revision) | — |
+| 2 | `when/`, `Makefile` | the expression language | `v0.4.0` |
+| 3 | `command/` | the command, the registry, dispatch, the gate, the audit trail | `v0.4.0` |
+| 4 | `command/`, `Makefile` | arguments: `New[A]`, `SchemaOf`, strict decoding, slash parsing; the registry's own commands | `v0.4.0` |
+| 5 | `command/` | sources: command files, MCP prompts, ACP commands, clashes | `v0.4.0` |
+| 6 | `command/` | the MCP and ACP exporters and the manifest | `v0.4.0` |
+| 7 | `workspace/` | `Commands`, `WhenContext`, `Contexter`, the context keys, `SetBackground` | `v0.4.0` |
+| 8 | `command/cli/` | the standard-library front end | `v0.4.0` |
+| 9 | `README.md`, `docs/` | documentation; the root release | `v0.4.0` |
+| 10 | `command/cobracmd/`, `go.work`, docs | the Cobra front end, a nested module | `command/cobracmd/v0.1.0` |
+| 11 | `command/kongcmd/`, `go.work`, docs | the Kong front end, a nested module | `command/kongcmd/v0.1.0` |
+| 12 | `docs/` | close-out | — |
 
-Steps 1–9 add no module. `go.mod` and `go.sum` do not change in them, and
-every import is the standard library or a module 0001-MADR §3 already
-names. The root `go.mod` never gains Cobra or Kong. Step 10's module
-requires `github.com/spf13/cobra`, and Step 11's
-`github.com/alecthomas/kong`, each in its own `go.mod` only, at the
-versions 0010-MADR §1 names and the step re-checks.
+The root `go.mod` and `go.sum` do not change in any step: every import in
+Steps 2 to 9 is the standard library or `charm.land/bubbletea/v2`, which the
+root already requires. The root `go.mod` never names Cobra or Kong.
 
 ### Out of scope
 
 * The keymap engine
   ([0007-PLAN-keymap-engine.md](0007-PLAN-keymap-engine.md)) and the
   palette ([0008-PLAN-command-palette.md](0008-PLAN-command-palette.md)).
-  The workspace's existing `KeyMap` stays as it is until 0007 moves it.
-* A permission dialog. This PLAN defines the `Gate` interface and the
-  default refusal; the dialog is a later widget record.
-* An MCP server or ACP transport. The exporters produce the shapes; a host
-  wires them.
-* ~~Writing the Cobra and fang dependency record. Step 10 waits for it.~~
-  0010-MADR is that record, for Cobra and Kong.
-* The multi-module tooling (`go.work`, the per-module gates, CI and the
-  release procedure). It is
-  [0010-PLAN-nested-adapter-modules.md](0010-PLAN-nested-adapter-modules.md)'s,
-  and Steps 10 and 11 wait for it.
-* fang (0010-MADR Q1: dropped). Styled help, version and man pages come
-  from `cobracmd` itself (MADR A1).
-* A third-party Kong completion module, such as `kong-completion`
-  (0010-MADR Q2: `kongcmd` generates its own).
-* Shell completion scripts from `command/cli`, and YAML or TOML command
-  files (MADR Q1). ~~Completion comes through fang in Step 10.~~
-  Completion comes from `cobracmd` and `kongcmd` (Steps 10 and 11).
+  The workspace's `KeyMap` stays as it is until 0007 moves it.
+* A permission dialog: this PLAN defines `Gate` and the default refusal.
+* An MCP server or an ACP transport, the MCP list envelope (`ttlMs`,
+  `cacheScope`) and `subscriptions/listen`: the host's (MADR A2, Q6).
+* `terminal.*` context keys from `termcap` (MADR A2, item 5).
+* YAML or TOML command files (MADR Q1), fang (0010-MADR Q1), a third-party
+  Kong completion module (0010-MADR Q2), and shell completion scripts from
+  `command/cli`.
 * Any change in pi-go.
 * `git push` and tags, which are the owner's.
 
 ## Rules for every step
 
-1. **Order.** Each step's package compiles, passes its tests and passes the
-   pre-add gate before the next step starts.
-2. **Mutation proofs.** Each step names mutations of its key invariants.
-   Each is applied to a scratch copy and must make a named test fail. A
-   mutation that survives, or does not compile, is replaced and recorded.
-3. **Checks per step:**
-   * `make pre-add-check FILES=…`;
-   * `make lint`;
-   * `go test -race -count=1 ./...`;
-   * `LC_ALL=C go test ./...`;
-   * the Windows test host on a scratch copy;
-   * `go mod tidy -diff`.
-4. **Conventions.** Every package follows 0001-MADR §6. In particular,
-   nothing writes to `os.Stdout` or `os.Stderr`, nothing sets the alternate
-   screen or installs a signal handler, and every glyph comes from `glyph`.
-5. **Commit.** One commit per step, made by the owner. At the end of each
-   step the agent stops with the pre-add checks passed and the step's
-   evidence in the execution record, and stages and commits nothing. The
-   owner commits with `git commit --no-edit` and pushes. (2026-10-02: the
-   org rules forbid agent commits to `main`, and the owner chose this over
-   a `feature/` branch.)
+1. **Order.** A step starts when the previous one is committed. Its
+   packages compile, its tests pass, and its checks are clean before it
+   ends.
+2. **Exported API.** A step adds exactly the exported names it lists. A
+   name it needs and does not list stops the step for the owner, and is
+   recorded as a deviation.
+3. **Checks,** with their output in the execution record:
+   1. `gofmt -l` on the step's Go files prints nothing;
+   2. `make pre-add-check FILES="<the step's Go files>"`;
+   3. `make lint`, which runs `make modernize` and golangci-lint for
+      `GOOS=linux`, `darwin` and `windows`;
+   4. `GOWORK=off go test -race -count=1 ./...`;
+   5. `GOWORK=off go test -shuffle=on -count=2 ./...`;
+   6. `LC_ALL=C GOWORK=off go test -count=1 ./...`;
+   7. `GOWORK=off go mod tidy -diff`;
+   8. `make fuzz FUZZTIME=20s` when the step adds a fuzz target;
+   9. on the Windows test host, on a copy of the tree: `make
+      pre-add-check`, `make lint`, `make vuln`, and the step's packages'
+      tests with `-shuffle=on -count=3`;
+   10. `markdownlint-cli2 --config .markdownlint-cli2.jsonc` and a
+       relative-link check on the Markdown the step changes;
+   11. the identifier scan of the diff: no hostname, account name or
+       real-machine path.
+4. **Mutation proofs.** Each listed mutation is applied to a scratch copy
+   of the tree, never the tree itself, and the named test must fail; the
+   failing line goes in the execution record. A mutation that survives, or
+   does not compile, stops the step: the test is strengthened, or the
+   mutation replaced, and either is recorded. After a step changes code
+   that an earlier step's mutation anchors on, the earlier steps' sets run
+   again.
+5. **Golden files** are written with `-tuitest.update`, and every one is
+   read before the step ends.
+6. **Conventions** (0001-MADR §6, AGENTS.md). Nothing writes to
+   `os.Stdout` or `os.Stderr`, reads the process environment, starts a
+   process, sets the alternate screen or installs a signal handler; every
+   glyph comes from `glyph`; output goes to the writers a caller gives.
+   `internal/conformance` covers each new package with no change to it.
+7. **Deviations.** Anything the PLAN does not say, or that contradicts a
+   fact here, stops the step: the agent gives the evidence and the
+   options, the owner picks, and the choice is recorded in this PLAN, and
+   in the MADR when a decision or a fact changes, before work continues.
+8. **Commits.** One commit per step, made by the owner with `git commit
+   --no-edit`, unless the owner asks the agent to commit in that turn. The
+   agent stages nothing otherwise.
 
 ## Implementation Steps
 
 ### Step 1: records
 
-The owner accepted the MADR on 2026-10-02, answering Q1–Q4, and the
-answers are recorded in it. Q4 added `command/cobra`, which is Step 10.
-When execution is approved, set this PLAN `in-progress` and update
-`docs/README.md`.
+* MADR amendment A2 is accepted, and this revision is written. When the
+  owner approves execution, this PLAN is set `in-progress`, with
+  `docs/README.md`'s row, at the start of Step 2.
+* **Done when:** the owner approves execution.
 
 ### Step 2: `when`
 
-* The API of MADR §8: `Parse`, `MustParse`, `Expr` with `Eval`, `String`
-  and `Keys`, `Check`, `Context`, `Value`, `Map`, `Layered`, and the typed
-  `Key[T]` with `NewKey`, `Set` and `Get`.
-* A hand-written lexer and recursive-descent parser for the MADR's
-  grammar. Regexes compile with `regexp` at parse time. The source limit
-  is 4 KiB and the nesting limit 64.
-* **Tests:**
-  * every operator, alone and combined;
-  * the VS Code precedence examples: `!foo && bar` and
-    `foo || bar && baz`;
-  * unset keys: falsy alone, unequal to everything, so `x != 'a'` holds;
-  * `in` and `not in` over a list key;
-  * quoted strings with spaces, barewords, numbers, `true` and `false`;
-  * `Layered` takes the first context that has the key;
-  * `Check` reports an unknown key and a number compared with a string;
-  * a 4 KiB + 1 source and 65 nested parentheses are errors.
-* **Fuzz.** `FuzzParse`: no panic; for every parsed input,
-  `Parse(e.String())` succeeds and gives the same `String()`; `Eval` on a
-  random `Map` does not panic. The target joins `make fuzz`.
-* **Benchmarks:** `Parse` and `Eval` of a five-clause expression.
-* **Mutations:**
-  * `&&` binds looser than `||`;
-  * an unset key compares equal to `""`;
-  * the depth limit is not checked;
-  * `Layered` takes the last match;
-  * `String()` drops parentheses.
+**Files:** `when/when.go` (package documentation, `Expr`, `Parse`,
+`MustParse`, `Check`), `when/lex.go`, `when/parse.go`, `when/eval.go`,
+`when/value.go`, `when/key.go`; tests `when/when_test.go`,
+`when/fuzz_test.go`, `when/bench_test.go`; `Makefile`.
+
+**Exported names** (MADR §8):
+
+```go
+func Parse(src string) (Expr, error)
+func MustParse(src string) Expr
+type Expr struct{ /* compiled */ }
+func (e Expr) Eval(c Context) bool
+func (e Expr) String() string
+func (e Expr) Keys() iter.Seq[string]
+func Check(e Expr, known Keys) []error
+
+type Context interface{ Value(key string) (Value, bool) }
+type Kind uint8                // KindBool, KindNumber, KindString, KindList
+type Value struct{ /* one of the four kinds */ }
+func BoolValue(b bool) Value
+func NumberValue(f float64) Value
+func StringValue(s string) Value
+func ListValue(l []string) Value
+func (v Value) Kind() Kind
+func (v Value) Bool() bool       // the truth of a key alone (§8)
+func (v Value) Number() (float64, bool)
+func (v Value) String() string   // canonical text
+func (v Value) List() ([]string, bool)
+type Map map[string]Value
+func (m Map) Value(key string) (Value, bool)
+func Layered(cs ...Context) Context
+type Keys map[string]Kind
+type Key[T bool | int | float64 | string | []string] struct{ Name, Doc string }
+func NewKey[T bool | int | float64 | string | []string](name, doc string) Key[T]
+func (k Key[T]) Set(m Map, v T)
+func (k Key[T]) Get(c Context) (T, bool)
+func (k Key[T]) Kind() Kind
+```
+
+An `int` is held as `KindNumber`. `MaxSource = 4096` and `MaxDepth = 64`
+are exported constants.
+
+**Build:** a hand-written lexer, and a recursive-descent parser of the
+MADR's grammar with its precedence. A regex compiles with `regexp` at parse
+time. `String` writes the canonical form: single spaces around binary
+operators, parentheses only where precedence needs them, strings in single
+quotes.
+
+**Tests** (`when/when_test.go`):
+
+| Test | Shows |
+| :--- | :--- |
+| `TestOperators` | every operator of §8, alone, on a `Map` |
+| `TestPrecedence` | `!foo && bar` is `(!foo) && bar`; `foo \|\| bar && baz` is `foo \|\| (bar && baz)` |
+| `TestUnsetKeys` | an unset key alone is false; it is unequal to every value, so `x != 'a'` is true |
+| `TestIn` | `in` and `not in` over a list key, and over an unset key |
+| `TestTerms` | quoted strings with spaces, barewords, integers, decimals, `true`, `false` |
+| `TestNoSpacesNeeded` | `a==1&&b!=2` parses as `a == 1 && b != 2` |
+| `TestLayered` | the first context that holds a key wins |
+| `TestCheck` | an unknown key, and a number compared with a string, are reported |
+| `TestLimits` | 4097 bytes of source, and 65 nested parentheses, are errors, not panics |
+| `TestRegexIsRE2` | `=~ /(a+)+$/` evaluates in linear time on a long input; a bad regex is a parse error |
+| `TestStringRoundTrip` | `Parse(e.String()).String() == e.String()` over the operator table |
+| `TestTypedKeys` | `Key[T].Set` and `Get` for each `T`; `Get` of the wrong kind is false |
+
+`FuzzParse` (`when/fuzz_test.go`): no panic; for every parsed input,
+`Parse(e.String())` succeeds and gives the same `String()`; `Eval` on a
+`Map` built from the fuzz input does not panic. Seeds: the operator
+table. Benchmarks `BenchmarkParse` and `BenchmarkEval` on a five-clause
+expression.
+
+**Makefile:** the `fuzz` target gains
+`@./scripts/go-fuzz.sh -t $(FUZZTIME) -m 1 ./when`, and its help text
+names `when`.
+
+**Mutations:**
+
+| Mutation | Must fail |
+| :--- | :--- |
+| `&&` binds looser than `\|\|` | `TestPrecedence` |
+| an unset key compares equal to `''` | `TestUnsetKeys` |
+| the depth limit is not checked | `TestLimits` |
+| `Layered` takes the last match | `TestLayered` |
+| `String` drops needed parentheses | `TestStringRoundTrip` |
+| `not in` is evaluated as `in` | `TestIn` |
+
+**Done when:** the checks of Rule 3 are clean, `make fuzz` covers `when`,
+and every mutation is killed.
 
 ### Step 3: `command` core
 
-* The types of MADR §2, §3, §5 and §7 except the exporters: `ID` and its
-  validation, `Command`, `Kind`, `Danger`, `Surface`, `Mode`, `Scope`,
-  `Source`, `Handler`, `HandlerFunc`, `Invocation`, `Result`, `Request`,
-  `Registry` with its options and methods, `Decision`, `Gate`, `Auditor`,
-  `Record`, `SlogAuditor`, and the messages `ResultMsg`, `PromptMsg`,
-  `ChangedMsg`, `ConflictMsg` and `QuitRequestMsg`.
-* The registry snapshot is an immutable sorted slice and an index map
-  behind `atomic.Pointer`. Writes take a mutex, copy, bump `Version` and
-  publish. `Watch` waits on a channel closed at each publish.
-* The registry's own commands: `command.list`, `command.describe` and
-  `app.quit`.
-* **Tests:**
-  * `ID.Valid` accepts `workspace.focus.next` and refuses an upper-case
-    letter, an empty segment, a leading dash and 129 bytes;
-  * `Register` refuses a duplicate ID;
-  * `All` is sorted, and `Available` honours `When` and `Surfaces`;
-  * `Dispatch` of a `Loop` command runs it at once and returns its
-    `Result.Cmd` with a `ResultMsg`; an `Async` command runs only when the
-    returned `tea.Cmd` runs;
-  * `Run` gives the same `Result` as `Dispatch` for the same request;
-  * `Cancel` and `Exclusive` cancel a running async command, seen through
-    its context;
-  * the default policy: for `Origin: Agent`, `ReadOnly` and `UI` run,
-    `Mutating` is refused without a gate and asks the gate when there is
-    one; for `Origin: CLI`, `Destructive` asks;
-  * `AllowAlways` is remembered per command and caller; `RejectOnce` is
-    not;
-  * `SlogAuditor` writes one record per dispatch to the given logger;
-  * `app.quit` sends `QuitRequestMsg` and nothing else;
-  * under `-race`, `All` and `Lookup` from many goroutines while
-    `ReplaceSource` runs see whole snapshots only, and `Version` never
-    falls;
-  * `Watch` returns `ChangedMsg` after a change, and not before.
-* **Benchmarks:** `Lookup`, `Available` over 500 commands, and `Dispatch`
-  of a no-op `Loop` command.
-* **Mutations:**
-  * the default gate allows `Mutating` for agents;
-  * `AllowAlways` is not remembered;
-  * `Version` is not bumped on `Remove`;
-  * `Exclusive` is ignored;
-  * a write mutates the published snapshot in place.
+**Files:** `command/command.go` (package documentation, `ID`, `Command`,
+the enumerations), `command/handler.go`, `command/registry.go`,
+`command/dispatch.go`, `command/gate.go`, `command/audit.go`,
+`command/messages.go`; tests `command/registry_test.go`,
+`command/dispatch_test.go`, `command/gate_test.go`,
+`command/bench_test.go`.
 
-### Step 4: arguments
+**Exported names** (MADR §2, §3, §5, §7):
 
-* `New[A]`, `SchemaOf[A]`, `NoArgs`, `ArgError`, and the `doc` and `arg`
-  tags of MADR §4.
-* The schema walk uses `reflect.Type.Fields()`. Decoding uses
-  `encoding/json/v2` with `RejectUnknownMembers(true)`, then checks the
-  keywords the MADR lists. `ArgError` carries a JSON Pointer path.
-* `Registry.ParseSlash`: tokenises with quotes, fills `pos` fields in
-  order and `name=value` pairs by name, and gives a one-string-argument
-  command the whole tail. It produces the same JSON as `--args` would.
-* **Tests:**
-  * golden schemas (`testdata/golden/schema-*.json`) for a flat struct,
-    nested structs, slices, pointers, enums, bounds, `time.Duration`, a
-    custom `JSONSchema()` type and `NoArgs`; each has `$schema` 2020-12
-    and parses as JSON;
-  * `NoArgs` emits `{"type": "object", "additionalProperties": false}`,
-    as MCP recommends;
-  * strict decoding refuses an unknown member, a wrong type, a missing
-    required field, an out-of-range number and a value outside its enum,
-    each with an `*ArgError` found by `errors.AsType` and naming its path;
-  * `/resize 4`, `/resize delta=4 pane=logs` and `/resize "4"` decode to
-    the same arguments; a stray positional is an error;
-  * an unsupported field type (a channel) is an error from `SchemaOf`,
-    not a panic.
-* **Mutations:**
-  * `omitzero` fields are marked required;
-  * unknown members are accepted;
-  * `maximum` is not checked;
-  * positional values fill fields in reverse order.
-* **Once MADR A1 is accepted,** the tags are A1's vocabulary instead of
-  `doc` and `arg:"…"`: `help`, `default`, `enum:"a,b"`, `arg:""` for
-  positionals in field order, `short`, `hidden`, `placeholder`, `group`,
-  and `schema:"min=…,max=…,minLen=…,maxLen=…,secret"`.
-  * **More tests:**
-    * `SchemaOf` returns an error for a scalar `enum` field that is neither
-      required nor defaulted, as Kong would;
-    * a `schema` key Kong does not know, and the `json` name, survive in
-      the emitted schema;
-    * golden schemas are regenerated for the new tags and read before they
-      are committed.
-  * The test that one struct means the same thing to the registry and to a
-    Kong grammar built from it needs Kong, so it lives in Step 11's module.
-  * **More mutations:**
-    * a field's `arg` presence is ignored, so a positional becomes a flag;
-    * `enum` is split on `|` instead of `,`.
+* `ID` with `Valid() error` and `Segments() iter.Seq[string]`;
+  `Command` with the fields of §2; `Schema = json.RawMessage`.
+* `Kind` (`Action`, `Prompt`, `Forward`), `Danger` (`ReadOnly`, `UI`,
+  `Mutating`, `Destructive`), `Surface` (`SurfaceKey`, `SurfacePalette`,
+  `SurfaceSlash`, `SurfaceCLI`, `SurfaceAgent`, and `AllSurfaces`), `Mode`
+  (`Loop`, `Async`), `Scope` (a string; `Global` is `""`), `SourceKind`
+  (`Builtin`, `User`, `Project`, `MCP`, `ACP`, `Plugin`), `Source`,
+  `Origin` (`OriginKey`, `OriginMouse`, `OriginPalette`, `OriginSlash`,
+  `OriginCLI`, `OriginAgent`, `OriginProgram`), each with `String`.
+* `Handler`, `HandlerFunc`, `Invocation`, `Result`, `Request`.
+* `Registry`, `NewRegistry`, `RegistryOption`, `WithGate`, `WithAuditor`,
+  `WithPrefixer`, and the methods `Register`, `Remove`, `Lookup`, `Slash`,
+  `All`, `Available`, `Version`, `Watch`, `Dispatch`, `Run`, `Cancel`,
+  `CancelAll`. (`ReplaceSource` is Step 5's; `ParseSlash` Step 4's.)
+* `Decision` (`AllowOnce`, `AllowAlways`, `RejectOnce`, `RejectAlways`)
+  with `ACPKind() string`; `Gate`; `Auditor`; `Record`; `SlogAuditor`.
+* The messages `ResultMsg`, `PromptMsg`, `ChangedMsg`, `ConflictMsg`,
+  `QuitRequestMsg`; `Conflict`.
+
+**Build:**
+
+* The snapshot is an immutable slice sorted by ID and a map from ID and
+  from slash name, behind an `atomic.Pointer`. A write takes a mutex,
+  copies, bumps `Version`, publishes, and closes the channel `Watch`
+  waits on.
+* `Dispatch` checks `When` and `Surfaces` for the request's origin and
+  context, asks the policy (§7), audits, and then runs a `Loop` command at
+  once, returning its `Result.Cmd` batched with a `ResultMsg`, or returns
+  a `tea.Cmd` that runs an `Async` command under a context `Cancel`
+  reaches. `Run` does the same synchronously, for any mode.
+* The policy (§7): `ReadOnly` and `UI` run for every origin; `Mutating`
+  from `OriginAgent`, and `Destructive` from `OriginAgent` or `OriginCLI`,
+  ask the gate, and with none are `RejectOnce`. `AllowAlways` and
+  `RejectAlways` are remembered per command ID and caller.
+
+**Tests:**
+
+| Test | Shows |
+| :--- | :--- |
+| `TestIDValid` | `workspace.focus.next` is valid; an upper-case letter, an empty segment, a leading `-` and 129 bytes are not |
+| `TestRegisterDuplicate` | a second command with one ID is an error |
+| `TestAllSorted`, `TestAvailable` | `All` is in ID order; `Available` honours `When` and `Surfaces` |
+| `TestDispatchLoop` | a `Loop` command runs during `Dispatch`; its `Result.Cmd` and a `ResultMsg` come back |
+| `TestDispatchAsync` | an `Async` command runs only when the returned `tea.Cmd` runs |
+| `TestRunMatchesDispatch` | `Run` and `Dispatch` give the same `Result` for one request |
+| `TestCancel`, `TestExclusive` | a running async command sees its context cancelled |
+| `TestPolicy` | every origin against every danger, without a gate and with one |
+| `TestAlways` | `AllowAlways` is remembered per command and caller; `RejectOnce` is not |
+| `TestSlogAuditor` | one record per dispatch on the given logger, never the default logger |
+| `TestSnapshotsUnderRace` | under `-race`, `All` and `Lookup` from many goroutines during writes see whole snapshots, and `Version` never falls |
+| `TestWatch` | `Watch`'s command returns `ChangedMsg` after a change, not before |
+
+Benchmarks: `BenchmarkLookup`, `BenchmarkAvailable` over 500 commands,
+`BenchmarkDispatchLoop` of a no-op command.
+
+**Mutations:**
+
+| Mutation | Must fail |
+| :--- | :--- |
+| the default policy allows `Mutating` for agents | `TestPolicy` |
+| `AllowAlways` is not remembered | `TestAlways` |
+| `Version` is not bumped on `Remove` | `TestWatch` |
+| `Exclusive` is ignored | `TestExclusive` |
+| a write changes the published snapshot in place | `TestSnapshotsUnderRace` |
+| `Dispatch` skips `When` | `TestAvailable` or `TestDispatchLoop` |
+
+**Done when:** the checks are clean and every mutation is killed.
+
+### Step 4: arguments, and the registry's own commands
+
+**Files:** `command/args.go` (`New`, `Option` and its constructors,
+`NoArgs`, `ArgError`), `command/schema.go` (`SchemaOf`, the tags),
+`command/decode.go`, `command/slash.go` (`ParseSlash`),
+`command/builtin.go`; tests `command/schema_test.go`,
+`command/decode_test.go`, `command/slash_test.go`,
+`command/builtin_test.go`, `command/fuzz_test.go`; goldens
+`command/testdata/golden/schema-*.golden`; `Makefile`.
+
+**Exported names** (MADR §4, A1, A2):
+
+* `New[A any](id ID, title string, run func(context.Context, *Invocation, A) (Result, error), opts ...Option) (Command, error)`,
+  `SchemaOf[A any]() (Schema, error)`, `NoArgs`, `ArgError{Path, Reason}`.
+* `Option`, one constructor per `Command` field New does not take:
+  `WithDescription`, `WithCategory`, `WithSlash(name string, aliases ...string)`,
+  `WithArgHint`, `WithOutput(Schema)`, `WithWhen`, `WithScope`,
+  `WithDanger`, `WithIdempotent`, `WithOpenWorld`, `WithSurfaces`,
+  `WithMode`, `WithExclusive`, `WithWhileBusy`, `WithHidden`, `WithMeta(key string, v any)`.
+* `(*Registry).ParseSlash(line string) (Request, error)`.
+
+**The tags** are A1's only: `json`, `help`, `default`, `enum:"a,b"`,
+`arg:""` (positional, in field order), `short`, `hidden`, `placeholder`,
+`group`, and `schema:"min=…,max=…,minLen=…,maxLen=…,secret"`. `SchemaOf`
+supports string, bool, the integer and float kinds, slices, nested structs,
+pointers, `map[string]T` (A2), `time.Duration` (a string), and a type with
+its own `JSONSchema() Schema`. It refuses a scalar `enum` field that is
+neither required nor defaulted (A1), and any other type, with an error.
+
+**Decoding:** `encoding/json/v2` with `json.RejectUnknownMembers(true)`,
+then `type`, `required`, `enum`, `minimum`, `maximum`, `minLength`,
+`maxLength`, `items` and `additionalProperties: false` are checked. An
+`*ArgError` carries a JSON Pointer path.
+
+**Slash parsing:** quotes group words; positionals fill `arg` fields in
+field order; `name=value` fills any field; a command with one string
+argument takes the whole tail. The result is the JSON `--args` would send.
+
+**The registry's own commands,** registered by `NewRegistry`:
+`command.list` (`NoArgs`, `ReadOnly`, every surface), `command.describe`
+(`{id string}` positional, `ReadOnly`, every surface) and `app.quit`
+(`NoArgs`, `UI`, no CLI surface), which only sends `QuitRequestMsg`.
+
+**Goldens** (`tuitest.Text`): `schema-flat`, `schema-nested`,
+`schema-slices`, `schema-pointers`, `schema-enum`, `schema-bounds`,
+`schema-duration`, `schema-map`, `schema-custom`, `schema-noargs`. Each is
+valid JSON naming `$schema` 2020-12; `schema-noargs` is `{"type":
+"object", "additionalProperties": false}` with `$schema`.
+
+**Tests:**
+
+| Test | Shows |
+| :--- | :--- |
+| `TestSchemaGolden` | the ten goldens |
+| `TestSchemaRefuses` | a channel field, and an enum neither required nor defaulted, are errors, not panics |
+| `TestSchemaKeepsUnknownKeys` | a `schema` key Kong does not read, and the `json` name, survive in the schema |
+| `TestDecodeStrict` | an unknown member, a wrong type, a missing required field, a number out of range and a value outside its enum are each an `*ArgError` found with `errors.AsType`, naming its path |
+| `TestSlashForms` | `/resize sidebar 4`, `/resize split=sidebar delta=4` and `/resize "sidebar" "4"` give the same JSON; a stray positional is an error |
+| `TestSlashWholeTail` | a one-string command takes the whole tail |
+| `TestAuditMasksSecrets` | a field tagged `schema:"secret"` is masked in every audit `Record` |
+| `TestBuiltins` | `command.list` lists every command once; `command.describe` returns a command's ID, schema and danger; `app.quit` sends `QuitRequestMsg` and nothing else |
+
+`FuzzParseSlash`: no panic, and every accepted line decodes against its
+command's schema. The `fuzz` target gains
+`@./scripts/go-fuzz.sh -t $(FUZZTIME) -m 1 ./command`.
+
+**Mutations:**
+
+| Mutation | Must fail |
+| :--- | :--- |
+| `omitzero` fields are marked required | `TestSchemaGolden` |
+| unknown members are accepted | `TestDecodeStrict` |
+| `maximum` is not checked | `TestDecodeStrict` |
+| positionals fill fields in reverse order | `TestSlashForms` |
+| `arg` presence is ignored, so a positional becomes a flag | `TestSlashForms` |
+| `enum` is split on `\|` | `TestSchemaGolden` |
+| a map field is refused | `TestSchemaGolden` |
+| `secret` is not masked | `TestAuditMasksSecrets` |
+
+**Done when:** the checks are clean, `make fuzz` covers `command`, every
+golden is read, and every mutation is killed.
 
 ### Step 5: sources and loaders
 
-* `SourceKind`, `LoadDir`, the front-matter parser, `$NAME` and
-  `$ARGUMENTS` expansion, `MCPPrompt` and `PromptGetter`,
-  `FromMCPPrompts`, `ACPCommand`, `FromACP`, `ReplaceSource`, `Conflict`
-  and the default prefixer (MADR §6).
-* **Tests,** over a `testing/fstest.MapFS` tree and an `os.Root` on a
-  temporary directory:
-  * golden commands from a tree with subdirectories, front matter and
-    placeholders;
-  * each front-matter error (unknown key, duplicate key, nested value, no
-    closing `---`, bad `danger`, bad `when`) names the file and line;
-  * a file with no front matter is a prompt with its first line as the
-    description;
-  * a symlink out of the root is refused through `os.Root.FS()`;
-  * `$FOCUS` becomes a required string argument; expansion substitutes
-    it and `$ARGUMENTS`, and leaves `$lower` and `$$` alone;
-  * nothing in a command file is executed: a body containing `!{ls}` and
-    `$(ls)` expands to that text unchanged;
-  * a loaded command with no `danger` is `Mutating`;
-  * MCP prompts become `mcp.<server>.<name>` prompt commands whose schema
-    has the prompt's arguments, `required` respected;
-  * ACP commands become `acp.<agent>.<name>` forwards; running one sends
-    `PromptMsg{Text: "/name args"}`;
-  * a loaded slash name equal to a built-in's is renamed `user:name`, and
-    a `Conflict` is returned and sent as `ConflictMsg`;
-  * `ReplaceSource` removes the source's old commands in the same
-    version that adds the new ones.
-* **Fuzz.** `FuzzFrontMatter`: no panic, and every accepted input
-  re-serialises to an equivalent front matter.
-* **Mutations:**
-  * a built-in loses a slash clash;
-  * unknown front-matter keys are ignored;
-  * a loaded command without `danger` defaults to `ReadOnly`;
-  * `ReplaceSource` keeps the old commands.
+**Files:** `command/source.go` (`ReplaceSource`, the prefixer),
+`command/loaddir.go`, `command/frontmatter.go`, `command/expand.go`,
+`command/mcpprompt.go`, `command/acp.go` (`ACPCommand`, `FromACP`); tests
+`command/loaddir_test.go`, `command/frontmatter_test.go`,
+`command/sources_test.go`; a test tree `command/testdata/commands/`; goldens
+`command/testdata/golden/loaddir.golden`.
+
+**Exported names** (MADR §6): `LoadDir(fsys fs.FS, src Source)
+([]Command, []error)`; `MCPPrompt`, `MCPPromptArgument`, `PromptGetter`,
+`FromMCPPrompts`; `ACPCommand`, `ACPCommandInput`, `FromACP`;
+`(*Registry).ReplaceSource(src Source, cmds []Command) []Conflict`.
+
+**Build:** the front matter is MADR §6's strict subset; `$NAME`
+placeholders become required string arguments; `$ARGUMENTS` is the slash
+tail; expansion is text substitution only; a loaded command with no
+`danger` is `Mutating`; IDs are `user.…`, `project.…`, `mcp.<server>.…`,
+`acp.<agent>.…`, `plugin.<name>.…`; a loaded slash name that a built-in
+holds becomes `<prefix>:<name>` and a `Conflict`, also sent as
+`ConflictMsg`.
+
+**Tests:**
+
+| Test | Shows |
+| :--- | :--- |
+| `TestLoadDirGolden` | the commands of `testdata/commands/`, with subdirectories, front matter and placeholders |
+| `TestFrontMatterErrors` | an unknown key, a duplicate key, a nested value, no closing `---`, a bad `danger` and a bad `when` each name the file and line |
+| `TestNoFrontMatter` | a file without it is a prompt whose description is its first line |
+| `TestRootRefusesSymlink` | through `os.Root.FS()` on a temporary directory, a symlink out of the root is refused |
+| `TestExpand` | `$FOCUS` and `$ARGUMENTS` are substituted; `$lower`, `$$`, `!{ls}` and `$(ls)` stay as text |
+| `TestDefaultDanger` | a file without `danger` is `Mutating` |
+| `TestFromMCPPrompts` | `mcp.<server>.<name>` prompts whose schema has the prompt's arguments, `required` kept |
+| `TestFromACP` | `acp.<agent>.<name>` forwards; running one sends `PromptMsg{Text: "/name args"}` |
+| `TestSlashClash` | a loaded `/review` beside a built-in one is `/user:review`, with a `Conflict` and a `ConflictMsg` |
+| `TestReplaceSource` | the old commands go in the same version the new ones arrive |
+
+`FuzzFrontMatter`: no panic; every accepted input re-serialises to an
+equivalent front matter.
+
+**Mutations:**
+
+| Mutation | Must fail |
+| :--- | :--- |
+| a built-in loses a slash clash | `TestSlashClash` |
+| unknown front-matter keys are ignored | `TestFrontMatterErrors` |
+| a command without `danger` defaults to `ReadOnly` | `TestDefaultDanger` |
+| `ReplaceSource` keeps the old commands | `TestReplaceSource` |
+| `!{…}` is expanded | `TestExpand` |
+
+**Done when:** the checks are clean, the golden is read, and every
+mutation is killed.
 
 ### Step 6: exporters
 
-* `MCPTool`, `MCPToolAnnotations`, `MCPCallResult`, `MCPContent`,
-  `ACPCommand`, `Manifest`, and the registry methods `MCPTools`,
-  `CallMCP`, `ACPCommands` and `Manifest` (MADR §7).
-* The danger table of MADR §2 maps to `readOnlyHint`,
-  `destructiveHint`, `idempotentHint` and `openWorldHint`. `Meta`
-  exports as `_meta`.
-* **Tests:**
-  * golden JSON for a catalogue of one command per kind and danger level;
-  * the field names are exactly MCP 2025-11-25's (`name`, `title`,
-    `description`, `inputSchema`, `outputSchema`, `annotations`,
-    `content`, `structuredContent`, `isError`) and ACP's (`name`,
-    `description`, `input`, `hint`), checked by decoding the golden JSON
-    into `map[string]any` and comparing key sets;
-  * `CallMCP` with bad arguments, an unknown name or a gate refusal gives
-    `isError: true` and a text message, never a Go error;
-  * `CallMCP` runs as `Origin: Agent`, so the default gate applies;
-  * hidden commands and commands without `Surfaces&Agent` are not
-    exported;
-  * `Manifest` round-trips through JSON.
-* **Mutations:**
-  * `Destructive` exports `destructiveHint: false`;
-  * `CallMCP` runs as `Origin: Program`, bypassing the gate;
-  * hidden commands are exported.
+**Files:** `command/mcp.go`, `command/acpexport.go`,
+`command/manifest.go`; tests `command/export_test.go`; goldens
+`command/testdata/golden/mcp-tools.golden`, `mcp-call-*.golden`,
+`acp-commands.golden`, `manifest.golden`.
+
+**Exported names** (MADR §7, A2): `MCPTool`, `MCPToolAnnotations`,
+`MCPCallResult`, `MCPContent`, `Manifest`, `ManifestCommand`; the methods
+`MCPTools(ctx when.Context) []MCPTool`, `CallMCP(ctx context.Context, name
+string, arguments json.RawMessage, caller string) MCPCallResult`,
+`ACPCommands(ctx when.Context) []ACPCommand`, `Manifest() Manifest`.
+
+**The target is MCP 2026-07-28** (A2, Q6). Before the first golden, the
+step fetches `schema/2026-07-28/schema.ts` and records, in the execution
+record, the field names of `Tool`, `ToolAnnotations` and
+`CallToolResult`; the tests hold them as literal lists, and no test reads
+the network.
+
+* `MCPTool`: `name` (the ID), `title`, `description`, `inputSchema`,
+  `outputSchema` (omitted when empty), `annotations`, `_meta`.
+* `MCPCallResult`: `content`, `structuredContent` (omitted when empty),
+  `isError`, and `resultType: "complete"`.
+* Danger maps to annotations as MADR §2's table says.
+* `MCPTools` and `ACPCommands` list in ID order, hidden commands and
+  commands without `SurfaceAgent` left out.
+* `CallMCP` runs as `OriginAgent`; a bad argument, an unknown name and a
+  refusal are `isError: true` with a text the model can act on, never a
+  Go error.
+
+**Tests:**
+
+| Test | Shows |
+| :--- | :--- |
+| `TestExportGolden` | the goldens, for a catalogue of one command per kind and danger level |
+| `TestMCPFieldNames` | decoded into `map[string]any`, each object's keys are a subset of 2026-07-28's, and the required ones are present |
+| `TestACPFieldNames` | `name`, `description`, `input`, `hint`, and nothing else |
+| `TestCallMCPErrors` | a bad argument, an unknown name and a gate refusal each give `isError: true` and a message |
+| `TestCallMCPIsAgent` | the default policy applies to `CallMCP` |
+| `TestExportFilters` | hidden and non-agent commands are not exported |
+| `TestManifestRoundTrip` | the manifest round-trips through JSON |
+
+**Mutations:**
+
+| Mutation | Must fail |
+| :--- | :--- |
+| `Destructive` exports `destructiveHint: false` | `TestExportGolden` |
+| `CallMCP` runs as `OriginProgram` | `TestCallMCPIsAgent` |
+| hidden commands are exported | `TestExportFilters` |
+| `resultType` is left out | `TestMCPFieldNames` |
+| tools are listed in insertion order | `TestExportGolden` |
+
+**Done when:** the checks are clean, the field names are recorded, the
+goldens are read, and every mutation is killed.
 
 ### Step 7: workspace integration
 
-* `workspace.Commands(w, o...)` with `WithLayouts(map[string]layout.Node)`,
-  the commands of MADR §9, `Workspace.WhenContext()`, the optional
-  `Contexter` interface, and the typed keys `workspace.focusedPane`,
-  `workspace.zoomed`, `workspace.hiddenPanes`, `workspace.overlay`,
-  `workspace.modal`, `workspace.width` and `workspace.height`.
-* `workspace.theme.set` calls `SetTheme` from
-  [0004-PLAN-integrate-charm-v2-and-go-1-27.md](0004-PLAN-integrate-charm-v2-and-go-1-27.md).
-  If that PLAN has not landed, this step stops and asks (Rule 1).
-* **Tests, through real `tea` messages:**
-  * each built-in, dispatched through a registry, gives the same frame and
-    `State` as calling the method it wraps;
-  * `workspace.panes` returns every visible pane's ID, title, rectangle
-    and focus, and the hidden ones as hidden;
-  * `workspace.layout.use` offers only the names given in `WithLayouts`,
-    as a schema enum;
-  * `WhenContext` layers the top overlay, then the focused pane's
-    `Contexter`, then the workspace keys;
-  * an agent may run `workspace.zoom` (UI) under the default gate;
-  * the existing key bindings still work.
-* **Golden frames:** the agent-session example zoomed and restored through
-  `Dispatch`, across the matrix at 80 and 160 columns.
-* **Mutations:**
-  * `WhenContext` puts the workspace keys before the focused pane's;
-  * `workspace.panes` omits hidden panes;
-  * `workspace.focus.next` moves focus twice.
+**Files:** `workspace/commands.go`, `workspace/context.go`,
+`workspace/background.go`; tests `workspace/commands_test.go`,
+`workspace/context_test.go`, `workspace/background_test.go`; goldens
+`workspace/testdata/golden/commands-*`.
+
+**Exported names** (MADR §8, §9, A2):
+
+* `Commands(w *Workspace, o ...CommandOption) []command.Command`,
+  `CommandOption`, `WithLayouts(map[string]layout.Node) CommandOption`;
+* `(*Workspace).WhenContext() when.Context`; `Contexter interface{
+  WhenContext() when.Context }`;
+* the typed keys, as package variables: `KeyFocusedPane`
+  (`workspace.focusedPane`, string), `KeyZoomed` (`workspace.zoomed`,
+  bool), `KeyHiddenPanes` (`workspace.hiddenPanes`, list), `KeyOverlay`
+  (`workspace.overlay`, string), `KeyModal` (`workspace.modal`, bool),
+  `KeyWidth` (`workspace.width`, int), `KeyHeight` (`workspace.height`,
+  int); and `ContextKeys() when.Keys`;
+* `(*Workspace).SetBackground(bg theme.Background) tea.Cmd` (A2, Q5).
+
+**The built-ins,** each `Loop` mode, every surface but CLI, Danger `UI`
+unless marked:
+
+| ID | Slash | Arguments | Calls |
+| :--- | :--- | :--- | :--- |
+| `workspace.focus` | `focus` | `pane` (`arg`) | `Focus`; a pane not in the plan is an `ArgError` |
+| `workspace.focus.next`, `.prev` | `next`, `prev` | — | `FocusNext`, `FocusPrev` |
+| `workspace.zoom` | `zoom` | `pane` (`arg`, `omitzero`) | `Zoom(pane)`, the focused pane when empty |
+| `workspace.toggle` | `toggle` | `pane` (`arg`) | `Toggle` |
+| `workspace.resize` | `resize` | `split` (`arg`), `delta` (`arg`, `-200..200`) | `Resize`; a split that is not a resizable separator of `Plan()` is an `ArgError` |
+| `workspace.layout.use` | `layout` | `name` (`arg`, an enum of `WithLayouts`'s keys) | `SetLayout`; registered only when `WithLayouts` names a layout |
+| `workspace.layout.reset` | — | — | `SetState(layout.State{})` |
+| `workspace.state.get` | — | — | `State()`, as `Value`; `ReadOnly` |
+| `workspace.state.set` | — | `state` (a `layout.State`) | `SetState` |
+| `workspace.panes` | `panes` | — | each pane's ID, title (`Titled`, else the ID), rectangle (`Plan().Panes`), focus and hidden state (`Plan().Hidden`), in focus-ring order; `ReadOnly` |
+| `workspace.overlay.close` | `close` | — | `Pop`; with no overlay, a `Result.Text` that says so |
+| `workspace.theme.set` | `theme` | `background` (`arg`, `dark`, `light`, `auto`) | `SetBackground(theme.Dark)`, `(theme.Light)` or `(theme.Unknown)` |
+
+**`SetBackground`:** a new `pinnedBg` field, and the last reported
+background kept apart from the one in use. `theme.Dark` or `theme.Light`
+pins it, rebuilds, and a later `tea.BackgroundColorMsg` changes only the
+reported one; `theme.Unknown` unpins, rebuilds from the reported one, and
+returns `tea.RequestBackgroundColor` unless `WithoutBackgroundQuery`; on a
+workspace built `WithTheme` it records the choice and returns nil.
+
+**`WhenContext`** layers the top overlay's `Contexter`, then the focused
+pane's, then the workspace's keys.
+
+**Tests:**
+
+| Test | Shows |
+| :--- | :--- |
+| `TestBuiltinsMatchMethods` | each built-in, dispatched through a registry, gives the same frame and `State` as its method |
+| `TestPanesCommand` | every pane, visible and hidden, with its rectangle and focus |
+| `TestResizeSplit` | `sidebar` moves; a pane name or a positional split is an `ArgError` |
+| `TestLayoutUseEnum` | the schema's enum is exactly `WithLayouts`'s keys, sorted; without them the command is absent |
+| `TestLayoutReset` | a zoomed, resized and hidden layout returns to the zero state |
+| `TestWhenContextLayers` | overlay, then focused pane, then workspace |
+| `TestAgentMayZoom` | `workspace.zoom` runs for `OriginAgent` under the default policy |
+| `TestKeysStillWork` | the existing key bindings still work |
+| `TestSetBackgroundPins` | a pinned dark survives a light `BackgroundColorMsg` |
+| `TestSetBackgroundAuto` | `Unknown` rebuilds from the reported background and returns the query, or nil with `WithoutBackgroundQuery` |
+| `TestSetBackgroundFixedTheme` | on a `WithTheme` workspace the frame does not change |
+| `TestCommandsGolden` | the agent-session example zoomed, restored and set light through `Dispatch`, across the matrix at 80 and 160 columns |
+
+**Mutations:**
+
+| Mutation | Must fail |
+| :--- | :--- |
+| `WhenContext` puts the workspace keys first | `TestWhenContextLayers` |
+| `workspace.panes` leaves hidden panes out | `TestPanesCommand` |
+| `workspace.focus.next` moves twice | `TestBuiltinsMatchMethods` |
+| a background message overrides a pinned background | `TestSetBackgroundPins` |
+| `auto` sends no query | `TestSetBackgroundAuto` |
+| `workspace.resize` accepts any split | `TestResizeSplit` |
+
+**Done when:** the checks are clean, the goldens are read, and every
+mutation is killed. `workspace`'s new imports are `command` and `when`
+only.
 
 ### Step 8: `command/cli`
 
-* `cli.Run` and its options (MADR §10): word and dotted forms, flags from
-  the schema, `--args`, `--json`, `--yes`, the verbs `list`, `describe`,
-  `schema` and `help`, and the exit codes.
-* **Tests:**
-  * golden help for the registry and for one command, at 60 and 100
-    columns, all ASCII;
-  * `--delta 4` and `--args '{"delta": 4}'` give the same request;
-  * a string, integer, boolean, enum and array property each parse, and a
-    bad value exits 2 with the `ArgError` on stderr;
-  * `--json` writes `Result.Value`; without it, `Result.Text`;
-  * a `Destructive` command exits 3 without `--yes` or a confirm callback;
-  * commands without `Surfaces&CLI` are neither listed nor runnable;
-  * nothing is written to `os.Stdout` or `os.Stderr`: the conformance scan
-    covers the package, and the tests pass `bytes.Buffer`s.
-* **Example:** `ExampleRun` builds a registry with two commands and runs
-  `list` and one command with `--json`.
-* **Mutations:**
-  * `--yes` is not required for `Destructive`;
-  * a usage error exits 1;
-  * hidden commands are listed.
+**Files:** `command/cli/cli.go`, `command/cli/flags.go`,
+`command/cli/help.go`; tests `command/cli/cli_test.go`,
+`command/cli/example_test.go`; goldens
+`command/cli/testdata/golden/help-*.golden`.
 
-### Step 9: documentation and close-out
+**Exported names** (MADR §10): `Run(ctx context.Context, r
+*command.Registry, args []string, stdout, stderr io.Writer, o ...Option)
+int`; `Option`, `WithName(string)`, `WithConfirm(func(prompt string)
+bool)`, `WithContext(when.Context)`, `WithWidth(int)`; the exit-code
+constants `ExitOK = 0`, `ExitFailed = 1`, `ExitUsage = 2`,
+`ExitRefused = 3`.
 
-* **`docs/guides/commands.md`:**
-  * defining a command, and `New[A]` with tags;
-  * kinds, danger levels and the default gate;
-  * dispatching from `Update`, and `Run` for the shell and tests;
-  * user and project command files, and their front matter;
-  * MCP prompts and ACP commands;
-  * exporting to an agent;
-  * `when` expressions and context keys;
-  * `command/cli`.
-* **Doc comments** in each package's main file, as 0002-PLAN Step 8
-  recorded.
-* **Docs tree:** `docs/architecture.md` gains the three packages and
-  their imports; `docs/README.md` rows, including "I want to…" rows for
-  adding a command, letting an agent drive the TUI, and running commands
-  from the shell; README Status.
-* **`Makefile`:** the `fuzz` target gains `./when` and `./command`.
-* **Release notes** in the execution record. Steps 1–9 can be released
-  without ~~Step 10~~ Steps 10 and 11, and must be, because those modules
-  require the root release that contains Steps 1–9 (0010-MADR §3). Mark
-  `complete` only after ~~Step 10~~ Steps 10 and 11 too, and after CI is
-  green on the pushed tree. The owner tags.
+**Build:** word and dotted forms; a flag per schema property, an array
+repeating its flag; `--args`, `--json`, `--yes`; the verbs `list`,
+`describe`, `schema`, `help`. Help is plain ASCII at the option's width
+(80 by default). A shell invocation is `OriginCLI`; `Result.Cmd` is
+ignored; commands without `SurfaceCLI` are neither listed nor run.
 
-### Step 10: `command/cobracmd`, the nested Cobra module (blocked)
+**Tests:**
 
-*Revised 2026-10-02 for MADR amendment A1 and 0010-MADR.* The original
-text is kept, struck through, below the new one.
+| Test | Shows |
+| :--- | :--- |
+| `TestHelpGolden` | the registry's help and one command's, at 60 and 100 columns, ASCII only |
+| `TestFlagsEqualArgs` | `--delta 4` and `--args '{"delta":4}'` build the same request |
+| `TestFlagKinds` | a string, integer, boolean, enum and array property each parse; a bad value exits 2 with the `ArgError` on stderr |
+| `TestJSONOutput` | `--json` writes `Result.Value`; otherwise `Result.Text` |
+| `TestDestructiveNeedsYes` | without `--yes` or `WithConfirm`, exit 3 |
+| `TestCLISurface` | a command without `SurfaceCLI` is neither listed nor run |
+| `TestWritersOnly` | everything goes to the given buffers |
 
-* **Blocked** until all hold:
-  * MADR A1 and 0010-MADR are accepted;
-  * [0010-PLAN-nested-adapter-modules.md](0010-PLAN-nested-adapter-modules.md)'s
-    Phases 2–5 are complete, so the gates loop over modules;
-  * the owner has tagged the root release that contains Steps 1–9.
-* **Before the first commit,** record in the execution record Cobra's and
-  pflag's newest versions and their `go.mod`, the licence of each module
-  the new `go.mod` adds, and `govulncheck ./...` in the new module with
-  `GOWORK=off`. A finding there stops the step for the owner.
-* **What lands** (MADR A1, `cobracmd`):
-  * `command/cobracmd/go.mod`: `module
-    github.com/maccavelli/go-tui-lib/command/cobracmd`, `go 1.27.1`,
-    requiring the tagged root release and `github.com/spf13/cobra`, with no
-    `replace`; `go work use ./command/cobracmd` adds it to `go.work`;
-  * `New`, `Mount`, `Run` and the options; the tree from dotted IDs,
-    groups added before children, annotations, `Hidden`, `Deprecated`;
-  * flags from each schema through pflag: an enum `pflag.Value` with
-    `FixedCompletions`, `MarkFlagRequired`, positional `Args`, flag
-    groups where the schema expresses them;
-  * completion from the registry, and scripts for bash, zsh, fish and
-    PowerShell written to the caller's writer;
-  * `--args`, `--json`, `--yes`, `list`, `describe`, `schema` and the exit
-    codes of `command/cli`;
-  * help through `SetHelpFunc` and `SetUsageFunc`, with `theme` and `glyph`
-    at the option's width;
-  * `command/cobracmd/docs`: `GenMan` and `GenMarkdownCustom` to the
-    caller's writer, with `DisableAutoGenTag` and a fixed date;
-  * depguard, per 0010-MADR §4: Cobra is allowed in this module only, and
-    no other adapter's dependency is.
-* **Tests:**
-  * the shared front-end cases (MADR A1): for the same arguments,
-    `cobracmd` and `command/cli` build the same `Request`, write the same
-    `--json` output and return the same exit code;
-  * commands without `Surfaces&CLI`, and hidden ones, are not in the tree;
-  * a dotted ID becomes nested commands, and a category becomes a group;
-  * `Mount` grafts the registry into a program's existing tree beside its
-    own commands, and both run;
-  * an enum flag refuses a value outside the enum, and completes the enum's
-    values;
-  * golden help across 0001-MADR §6's matrix, at 60 and 100 columns;
-  * golden completion scripts for the four shells;
-  * golden man and Markdown pages, unchanged between two runs;
-  * `Run` never reads `os.Args` and never writes to `os.Stdout` or
-    `os.Stderr`: a test runs it with empty buffers and a planted
-    `os.Args`, and the conformance scan covers the module;
-  * a second `New` in one process builds a working tree, and registers no
-    completion twice for any one flag, so Cobra's refusal of a repeated
-    registration never fires.
-* **Mutations:**
-  * a flag's type is taken from the Go field instead of the schema;
-  * `Destructive` runs without `--yes`;
-  * `Run` does not call `SetArgs`, so `os.Args` is read;
-  * a group is added after its children (Cobra panics);
-  * depguard allows Cobra in the root module.
-* **Checks:** the per-module gates of 0010-MADR §4, with `GOWORK=off`, and
-  again in workspace mode.
+`ExampleRun` builds a registry with two commands and runs `list` and one
+command with `--json`.
 
-*Superseded 2026-10-02 by the text above (MADR A1); the original, struck
-through:*
+**Mutations:**
 
-* ~~**Blocked** until a dependency record naming `github.com/spf13/cobra`
-  and `github.com/charmbracelet/fang` is accepted (AGENTS.md
-  Dependencies).~~
-* ~~**What lands** (MADR §10): `command/cobra` builds a `*cobra.Command`
-  tree from a registry; fang wraps the root for styled help, man pages,
-  completion and version; `go.mod` and `go.sum` gain the two modules;
-  `depguard` allows Cobra and fang in `command/cobra/`; AGENTS.md's
-  Dependencies list names them.~~
-* ~~**Tests:** the same requests, outputs and exit codes as
-  `command/cli`; no hidden or non-CLI commands; output only to Cobra's
-  writers; golden help at 60 and 100 columns, with and without colour.~~
-* ~~**Mutations:** a flag's type from the Go field; `Destructive` without
-  `--yes`; `depguard` allows Cobra in `command`.~~
+| Mutation | Must fail |
+| :--- | :--- |
+| `--yes` is not required | `TestDestructiveNeedsYes` |
+| a usage error exits 1 | `TestFlagKinds` |
+| hidden commands are listed | `TestHelpGolden` |
+| `--json` writes `Result.Text` | `TestJSONOutput` |
 
-### Step 11: `command/kongcmd`, the nested Kong module (blocked)
+**Done when:** the checks are clean, the goldens are read, and every
+mutation is killed.
 
-Added 2026-10-02 for MADR amendment A1.
+### Step 9: documentation, and the root release `v0.4.0`
 
-* **Blocked** on the same three conditions as Step 10. Steps 10 and 11
-  are independent of each other.
-* **Before the first commit,** record Kong's newest version and its
-  `go.mod`, the licence of each module the new `go.mod` adds, and
-  `govulncheck ./...` in the new module with `GOWORK=off`.
-* **What lands** (MADR A1, `kongcmd`):
-  * `command/kongcmd/go.mod`: `module
-    github.com/maccavelli/go-tui-lib/command/kongcmd`, `go 1.27.1`,
-    requiring the tagged root release and `github.com/alecthomas/kong`,
-    with no `replace`; `go work use ./command/kongcmd`;
-  * `New`, `Adapter.Options`, `Adapter.Parser`, `Adapter.Run`,
-    `Adapter.Resolver` and the options;
-  * one `kong.DynamicCommand` per top-level ID segment, each grammar built
-    with `reflect.StructOf` from the schema, with `id` and `danger` tags;
-  * dispatch from `ctx.Selected()` through the registry, as `Origin: CLI`;
-  * `kong.Name`, `kong.Writers`, and an `Exit` that panics a sentinel
-    `Run` recovers;
-  * `kong.ExplicitGroups`, `PostBuild`, and a `kong.Help` printer with
-    `theme` and `glyph` at the option's width;
-  * completion scripts for bash, zsh, fish and PowerShell, generated from
-    the registry and written to the caller's writer (0010-MADR Q2);
-  * depguard, per 0010-MADR §4.
-* **Tests:**
-  * golden completion scripts for each shell, from one registry; adding a
-    command or an enum value changes each script; no script is written to
-    `os.Stdout`, and no module beyond Kong is required;
-  * the shared front-end cases, as in Step 10;
-  * **one struct, two readers:** for representative argument structs in
-    A1's tags, `SchemaOf` and a Kong grammar built from the same struct
-    agree on names, required fields, enums, defaults and the order of
-    positionals;
-  * a dotted ID selects through nested `cmd` fields, and runs the right
-    registry command;
-  * `--help` prints help and returns exit code 0, and `Parse` does not
-    continue after it;
-  * mounted into a program's own grammar, the program's static commands
-    and the registry's commands both parse, and `Run` reports `handled`
-    false for the program's own;
-  * help at the option's width, whatever `$COLUMNS` says; golden help
-    across 0001-MADR §6's matrix, at 60 and 100 columns;
-  * nothing is written to `os.Stdout` or `os.Stderr`, and `os.Args` is never
-    read: empty buffers, a planted `os.Args`, and the conformance scan;
-  * `Resolver` fills a flag from a value given to it, and a command-line
-    flag still wins;
-  * no generated field carries an `env` tag unless an option asks for one.
-* **Mutations:**
-  * `Exit` returns instead of panicking, so parsing continues after
-    `--help` (the `--help` test must fail);
-  * dispatch reads the first registry command instead of `ctx.Selected()`;
-  * an enum's default is dropped from the grammar (Kong refuses it);
-  * `kong.Writers` is not set;
-  * depguard allows Kong in the root module.
-* **Checks:** as in Step 10.
+* **`docs/guides/commands.md` (new):** defining a command and `New[A]`
+  with the tags; kinds, danger and the default gate; dispatching from
+  `Update`, and `Run` for the shell and tests; command files and their
+  front matter; MCP prompts and ACP commands; exporting to an agent, with
+  what a host still owns under MCP 2026-07-28 (the list envelope,
+  `subscriptions/listen`); `when` and the context keys;
+  `workspace.Commands` and `SetBackground`; `command/cli`.
+* **`docs/architecture.md`:** the three packages and their imports,
+  `workspace`'s two new imports, the tree. **`docs/README.md`:** "I want
+  to…" rows for adding a command, letting an agent drive the TUI, and
+  running commands from the shell. **`README.md`:** Status.
+* **Release notes** in the execution record.
+* **Checks:** Rule 3, and `make release-check`.
+* **The release:** the owner commits, pushes and, with CI green, tags
+  `v0.4.0`. The agent then runs the consumer smoke test of
+  `docs/guides/releasing.md` against `v0.4.0`, importing `command`,
+  `when` and `command/cli`, and records it.
+* **Done when:** `v0.4.0` is tagged and the smoke test builds.
+
+### Step 10: `command/cobracmd`, the Cobra front end
+
+**Starts when** `v0.4.0` is tagged.
+
+* **Before the first file,** record in the execution record: the newest
+  `github.com/spf13/cobra` and `github.com/spf13/pflag` versions and
+  their `go.mod`s, the licence of each module the new `go.mod` adds, and
+  `GOWORK=off govulncheck ./...` in the new module. A finding stops the
+  step for the owner. 0010-MADR §5 named Cobra v1.10.2 and pflag v1.0.10.
+* **Files:** `command/cobracmd/go.mod` (`module
+  github.com/maccavelli/go-tui-lib/command/cobracmd`, `go 1.27.1`,
+  requiring `github.com/maccavelli/go-tui-lib v0.4.0` and Cobra, no
+  `replace`), `go.sum`, `cobracmd.go`, `flags.go`, `help.go`,
+  `complete.go`; `command/cobracmd/docs/docs.go`; tests, and the shared
+  front-end cases in `command/cobracmd/frontend_test.go`; goldens under
+  `command/cobracmd/testdata/golden/`. `go work use ./command/cobracmd`.
+  `AGENTS.md` and `docs/architecture.md` drop "(planned)" from the
+  module's row.
+* **Exported names** (MADR A1): `New`, `Mount`, `Run`, `Option`,
+  `WithName`, `WithConfirm`, `WithContext`, `WithTheme`, `WithGlyphs`,
+  `WithWidth`; in `docs`, `Man(w io.Writer, root *cobra.Command, date
+  time.Time) error` and `Markdown(w io.Writer, root *cobra.Command) error`.
+* **Build:** MADR A1's tree, flags, completion, verbs, exit codes, help and
+  rules, as written there.
+* **Tests:** the shared front-end cases agree with `command/cli`; no
+  hidden or non-CLI command in the tree; nested commands and groups;
+  `Mount` beside a program's own commands; an enum flag refuses and
+  completes; golden help across 0001-MADR §6's matrix at 60 and 100
+  columns; golden completion scripts for bash, zsh, fish and PowerShell;
+  golden man and Markdown pages, unchanged between two runs; `Run` reads no
+  `os.Args` and writes to no standard stream; a second `New` in one
+  process works and registers no completion twice.
+* **Mutations:** a flag's type from the Go field instead of the schema;
+  `Destructive` without `--yes`; `Run` without `SetArgs`; a group added
+  after its children; depguard allowing Cobra in the root.
+* **Checks:** Rule 3, in the module's directory with `GOWORK=off`, and
+  the tests again in workspace mode; `scripts/go-modules.sh --check`.
+* **The release:** the owner commits, pushes and tags
+  `command/cobracmd/v0.1.0`; the agent runs the smoke test against it.
+* **Done when:** the tag exists and the smoke test builds.
+
+### Step 11: `command/kongcmd`, the Kong front end
+
+**Starts when** `v0.4.0` is tagged; it does not wait for Step 10.
+
+* **Before the first file,** record the newest
+  `github.com/alecthomas/kong` and its `go.mod`, each licence, and
+  `GOWORK=off govulncheck ./...`. 0010-MADR §5 named Kong v1.16.1.
+* **Files:** `command/kongcmd/go.mod` (as Step 10's, with Kong),
+  `go.sum`, `kongcmd.go`, `grammar.go`, `help.go`, `complete.go`,
+  `resolver.go`; tests, the shared front-end cases in
+  `command/kongcmd/frontend_test.go`; goldens under
+  `command/kongcmd/testdata/golden/`. `go work use ./command/kongcmd`.
+  `AGENTS.md` and `docs/architecture.md` drop "(planned)".
+* **Exported names** (MADR A1): `New`, `Adapter`, `Adapter.Options`,
+  `Adapter.Parser`, `Adapter.Run`, `Adapter.Resolver`, `Option`,
+  `WithName`, `WithConfirm`, `WithContext`, `WithTheme`, `WithGlyphs`,
+  `WithWidth`.
+* **Build:** MADR A1's mounting, grammars, dispatch, groups, help,
+  settings, completion and rules, as written there.
+* **Tests:** golden completion scripts for each shell; the shared
+  front-end cases; one struct, two readers (`SchemaOf` and the Kong
+  grammar agree on names, required fields, enums, defaults and positional
+  order); nested `cmd` selection; `--help` returns 0 and parsing stops;
+  mounting beside a program's own grammar, with `handled` false for its
+  commands; help at the option's width whatever `$COLUMNS` says, golden
+  across the matrix at 60 and 100 columns; no standard stream and no
+  `os.Args`; `Resolver` fills a flag and a command-line flag wins; no `env`
+  tag unless asked.
+* **Mutations:** `Exit` returns instead of panicking; dispatch from the
+  first registry command instead of `ctx.Selected()`; an enum's default
+  dropped; `kong.Writers` unset; depguard allowing Kong in the root.
+* **Checks:** as Step 10.
+* **The release:** the owner tags `command/kongcmd/v0.1.0`; the agent
+  runs the smoke test against it.
+* **Done when:** the tag exists and the smoke test builds.
+
+### Step 12: close-out
+
+* Verification, item by item, in the execution record; this PLAN set
+  `complete`, with `docs/README.md`'s row.
+* **Done when:** every Verification item holds.
 
 ## Verification
 
-* Every step's mutations are killed.
-* On the macOS development host and the Windows test host, all pass:
-  * `make pre-add-check`, `make lint` and `make vuln`;
-  * `go test -race -count=1 ./...`, `go test -shuffle=on -count=2 ./...`
-    and `LC_ALL=C go test ./...`;
-  * `make fuzz`.
-* `go mod tidy -diff` is clean. `go.mod` is unchanged by Steps 1–9, and
-  ~~Step 10 adds only Cobra and fang, at the versions their record pins.~~
-  the root's `go.mod` never names Cobra or Kong.
-* ~~`depguard` allows Cobra and fang in `command/cobra/` only.~~
-* For Steps 10 and 11, every gate of 0010-MADR §4 passes in each nested
-  module with `GOWORK=off`, and again in workspace mode: vet, `-race`,
-  `LC_ALL=C`, lint for three operating systems, `go mod tidy -diff` and
-  govulncheck. Each nested `go.mod` has no `replace`, and requires a
-  tagged root release.
-* `depguard` allows Cobra in `command/cobracmd` only, and Kong in
-  `command/kongcmd` only.
-* `depguard` still refuses the Charm v1 paths, mcplib, the MCP go-sdk and
-  go-llmprovider-sdk in every package, the new ones included.
-* `internal/conformance` covers `when`, `command`, `command/cli`,
-  ~~`command/cobra`~~ `command/cobracmd` and `command/kongcmd`, and finds
-  nothing.
-* The shared front-end cases pass in `command/cli`, `cobracmd` and
-  `kongcmd`.
-* The exporters' field names match the MCP 2025-11-25 and ACP pages cited
-  in the MADR.
-* The identifier scan of 0001-PLAN V7 finds nothing.
-* After the owner's push, CI is green on all three operating systems.
+* Every step's mutations are killed, and each earlier set again after a
+  later change moves its anchors.
+* Rule 3's checks are clean at every step, on the macOS development host
+  and the Windows test host.
+* `make fuzz` covers `layout`, `when` and `command`, and CI's `gates` job
+  runs it.
+* The root `go.mod` is unchanged from `v0.3.0` through `v0.4.0`, and never
+  names Cobra or Kong; `go mod tidy -diff` is clean in every module.
+* Each nested `go.mod` requires `v0.4.0`, has no `replace`, and passes
+  every gate of 0010-MADR §4 with `GOWORK=off` and in workspace mode.
+* depguard keeps Cobra and pflag in `command/cobracmd`, Kong in
+  `command/kongcmd`, and refuses the Charm v1 paths, mcplib, the MCP
+  go-sdk and go-llmprovider-sdk everywhere.
+* `internal/conformance` finds nothing in `when`, `command`, `command/cli`,
+  `cobracmd` and `kongcmd`.
+* The shared front-end cases pass in all three front ends.
+* The MCP field names match 2026-07-28's schema, and the ACP ones the ACP
+  pages, as recorded in Step 6.
+* The consumer smoke test builds against `v0.4.0`,
+  `command/cobracmd/v0.1.0` and `command/kongcmd/v0.1.0`.
+* The identifier scan finds nothing, and CI is green after each push.
 
 ## Rollout and Rollback
 
-* **Rollout.** The owner pushes Steps 1–9 and tags the release. ~~Step 10
-  follows in a later release once its dependency record is accepted.~~
-  Steps 10 and 11 follow, in the order 0010-MADR §3 sets:
-  1. the root release that contains Steps 1–9 is tagged;
-  2. each nested module requires that release, lands, and is tagged under
-     its prefix, `command/cobracmd/v0.1.0` and `command/kongcmd/v0.1.0`;
-  3. a consumer smoke test, in a scratch module outside the repository,
-     runs `go get` on each tagged module and `go build ./...`, and its
-     output goes in the execution record.
-
-  pi-go adopts the registry under its own records: its slash commands, user
-  and project command files, ACP agent commands and palette all register
-  here.
-* **Rollback.** Before the push, each step is one local commit. After it, a
-  patch release fixes forward. The packages are new, so a consumer that
-  does not import them is unaffected. Step 7's addition to `workspace` is
-  additive: removing `Commands` and `WhenContext` breaks only callers of
-  those two names.
-* **Rolling back a front end.** `cobracmd` and `kongcmd` are released apart
-  from the root, so a fault in one is fixed forward under its own prefix,
-  and a consumer pins its previous tag meanwhile. Tags are never moved or
-  deleted (0010-MADR §3).
+* **Rollout:** Steps 2 to 9 are pushed and `v0.4.0` is tagged; then each
+  front end lands, requires `v0.4.0`, and is tagged under its prefix
+  (0010-MADR §3). pi-go adopts the registry under its own records.
+* **Rollback:** before a push, each step is one local commit; after it, a
+  patch release fixes forward. The new packages are additive, so a
+  consumer that does not import them is unaffected. Step 7 adds names to
+  `workspace` and changes no existing one; removing them breaks only their
+  callers. A front end is fixed forward under its own prefix while a
+  consumer pins its previous tag; tags are never moved or deleted.
 
 ## Execution Record
 

@@ -16,19 +16,20 @@ stable API.
 
 ## Status
 
-- **Multi-pane workspaces, `v0.2.0`.** `layout` arranges panes: a main
+- **The current release is `v0.3.0`.** `v0` means the API may still
+  change.
+- **Multi-pane workspaces, since `v0.1.0`.** `layout` arranges panes: a main
   pane with a sidebar on either side, a bottom pane, a footer, responsive
   folds and saved state. `workspace` hosts them in a Bubble Tea program,
   with focus, resize, zoom, overlays, mouse and cursor, drawing into one
   reused cell buffer, measuring text as Bubble Tea writes it, and following
   the terminal's theme. `glyph`, `theme` and `tuitest` are the foundations
-  every package uses. pi-go's agent session is the first consumer. `v0`
-  means the API may still change.
-- **On `main`, for the next minor:** `termcap` learns the terminal's
-  capabilities from one probe, over SSH and inside tmux, with a reason for
-  every answer and a doctor report; `termsvc` sends notifications,
-  clipboard writes and links that suit the terminal; `termcap/termcaptest`
-  tests a program against fake terminals.
+  every package uses. pi-go's agent session is the first consumer.
+- **Terminal capabilities and services, since `v0.3.0`.** `termcap`
+  learns the terminal's capabilities from one probe, over SSH and inside
+  tmux, with a reason for every answer and a doctor report; `termsvc` sends
+  notifications, clipboard writes and links that suit the terminal;
+  `termcap/termcaptest` tests a program against fake terminals.
 - **The stack is Charm v2:** `charm.land/bubbletea/v2`,
   `charm.land/lipgloss/v2` and `charm.land/bubbles/v2`, with
   `github.com/charmbracelet/colorprofile` and

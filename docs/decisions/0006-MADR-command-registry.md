@@ -2,7 +2,7 @@
 status: accepted
 date: 2026-10-02
 decision-makers: owner
-consulted: 0003-REPORT-agent-tui-ecosystem-research.md (opencode, gemini-cli, codex, crush, toad, Textual, VS Code, k9s, lazygit, gh-dash); MCP specification 2025-11-25; Agent Client Protocol; Go 1.27.1 standard library; for amendment A1, 0010-REPORT-nested-modules-and-adapter-sources.md (Cobra v1.10.2, pflag v1.0.10, fang v2.0.1 and Kong v1.16.1 at source)
+consulted: 0003-REPORT-agent-tui-ecosystem-research.md (opencode, gemini-cli, codex, crush, toad, Textual, VS Code, k9s, lazygit, gh-dash); MCP specification 2025-11-25, and 2026-07-28 for amendment A2; Agent Client Protocol; Go 1.27.1 standard library; for amendment A1, 0010-REPORT-nested-modules-and-adapter-sources.md (Cobra v1.10.2, pflag v1.0.10, fang v2.0.1 and Kong v1.16.1 at source)
 informed: pi-go
 ---
 # Make one command registry the source of every action, for keys, palette, slash commands, the shell and agents, on open standards
@@ -66,7 +66,8 @@ Evidence (read-only, 2026-10-02; the research is in
   TOML files. k9s and lazygit read YAML plugins with a scope, a command and
   a confirm flag.
 * **The open standards the registry must speak** (fetched 2026-10-02):
-  * **MCP 2025-11-25, `tools/list`.** A tool is `name`, `title`,
+  * **MCP 2025-11-25, `tools/list`** (*A2: the exporters target 2026-07-28,
+    whose `Tool` is the same*). A tool is `name`, `title`,
     `description`, `icons`, `inputSchema`, `outputSchema`, `annotations`
     and `execution`. `inputSchema` defaults to JSON Schema 2020-12. A tool
     with no parameters should use
@@ -571,14 +572,14 @@ returns the workspace's own commands, closed over `w`:
 | `workspace.focus.next`, `workspace.focus.prev` | `next`, `prev` | — | UI |
 | `workspace.zoom` | `zoom` | `pane` (default focused) | UI |
 | `workspace.toggle` | `toggle` | `pane` | UI |
-| `workspace.resize` | `resize` | `pane`, `delta` | UI |
+| `workspace.resize` | `resize` | `pane`, `delta` (*A2: `split`, `delta`*) | UI |
 | `workspace.layout.use` | `layout` | `name`: an enum of the layouts given in `WithLayouts` | UI |
-| `workspace.layout.reset` | — | — | UI |
+| `workspace.layout.reset` | — | — (*A2: `SetState` of the zero `State`*) | UI |
 | `workspace.state.get` | — | — | ReadOnly |
 | `workspace.state.set` | — | `state` (layout `State` JSON) | UI |
 | `workspace.panes` | `panes` | — | ReadOnly |
 | `workspace.overlay.close` | `close` | — | UI |
-| `workspace.theme.set` | `theme` | `background`: dark, light or auto | UI |
+| `workspace.theme.set` | `theme` | `background`: dark, light or auto (*A2: through `SetBackground`*) | UI |
 
 The registry itself contributes `command.list` and `command.describe`
 (ReadOnly), so an agent can discover what it may call, and `app.quit`
@@ -638,7 +639,7 @@ func Run(ctx context.Context, r *command.Registry, args []string,
 
 * This lands after `termcap`, in the next minor release after
   [0005-PLAN-terminal-capabilities-and-services.md](0005-PLAN-terminal-capabilities-and-services.md).
-  The owner tags. `v0` allows API change.
+  The owner tags. `v0` allows API change. *A2: that release is `v0.4.0`.*
 * `command`, `when` and `command/cli` render nothing except CLI help, which
   is plain ASCII text. `command/cobra`'s help is fang's, and its output
   goes to the writers Cobra is given. CLI help is golden-tested at two
@@ -1025,6 +1026,137 @@ names them (0010-MADR, REPORT §2). In its place:
 **Owner questions for A1.** None beyond 0010-MADR's Q1 (fang) and Q2 (Kong
 completion), which this amendment follows. Both were answered on
 2026-10-02 as recommended: no fang, and Kong completion generated here.
+
+### A2 (2026-10-05): the audit after `v0.3.0`
+
+*Status: accepted (2026-10-05).* The owner asked for the codebase to be
+assessed for current facts and this record's PLAN evaluated against it, to
+make the PLAN accurate and actionable. The PLAN,
+[0006-PLAN-command-registry.md](0006-PLAN-command-registry.md), was revised
+the same day to match.
+
+**Found, read-only, against the tree at `v0.3.0` (`81a61de`) and Go
+1.27.1.** Each item names what this record says and what holds.
+
+1. **Go 1.27.1 (§ Context, "Go 1.27.1 gives everything").** Holds.
+   `encoding/json/v2` is in `$GOROOT/api/go1.27.txt`; its sources carry
+   `//go:build goexperiment.jsonv2`, and that experiment is on by default:
+   a scratch program built with no `GOEXPERIMENT` decoded with
+   `json.RejectUnknownMembers(true)` and refused an unknown member.
+   `reflect.Type.Fields() iter.Seq[StructField]` and `reflect.Value.Fields`,
+   `errors.AsType`, and `(*os.Root).FS` are in the API files. Generic
+   methods are in use already (`Workspace.PaneAs[T]`).
+2. **The workspace's methods (§ Context, §9).**
+   * `Resize(sep string, delta int)` moves a **named split's separator**,
+     not a pane (`layout.State.Resize` is keyed by split name; only a
+     `Separator` with `Resizable` moves). §9's `workspace.resize` with a
+     `pane` argument, and §4's and A1's `resizeArgs` example with a `Pane`
+     field, do not match. The command takes `split` and `delta` (below).
+   * There is no method for `workspace.layout.reset`. `SetState` of the
+     zero `layout.State` is that reset: "The zero State changes nothing."
+   * `workspace.theme.set` with `auto` has nothing to call. A workspace
+     follows the terminal unless built `WithTheme`; `SetTheme` on a
+     following workspace is rebuilt over at the next profile or background
+     message, and nothing returns a workspace to following. Owner question
+     Q5, below.
+   * The other built-ins have their methods, with these signatures:
+     `Focus(id)`, `FocusNext()`, `FocusPrev()`, `Zoom(id)` (zooms, or
+     restores when `id` is zoomed or empty), `Toggle(id)`, `SetLayout(root)`,
+     `State()`, `SetState(s)`, `Pop()`, `Focused()`, `Overlays()` and
+     `Plan()` (rectangles in `Plan.Panes`, hidden panes in `Plan.Hidden`).
+     `Push`, `Send`, `SendOverlay`, `SetPane`, `Broadcast`, `Panes`,
+     `PaneAs` and `SetTheme` exist too; `layout` has the four sidebar
+     presets.
+   * `layout.State` holds `Resize map[string]int`. §4's supported types have
+     no map, so `workspace.state.set` could not take a `State`. `SchemaOf`
+     also supports `map[string]T`, as an object whose
+     `additionalProperties` is `T`'s schema.
+3. **MCP (§ Context, §7).** The current revision is **2026-07-28**, not
+   2025-11-25 (the specification's changelog,
+   <https://modelcontextprotocol.io/specification/2026-07-28/changelog>,
+   fetched 2026-10-05). For this record: the `Tool` object and its
+   annotations are unchanged; `inputSchema` and `outputSchema` may use any
+   JSON Schema 2020-12 keyword; every result carries a required
+   `resultType`, `"complete"` for an ordinary one; `tools/list` and
+   `prompts/list` results carry `ttlMs` and `cacheScope`, and servers
+   SHOULD list tools in a deterministic order; list-change notifications
+   reach a client through `subscriptions/listen`; sessions and the
+   `initialize` handshake are gone. Owner question Q6, below.
+4. **ACP (§ Context, §7).** Unchanged: `AvailableCommand` is `{name,
+   description, input: {hint}}`, a command runs as `/name args` prompt
+   text, and `PermissionOption.kind` is `allow_once`, `allow_always`,
+   `reject_once` or `reject_always`, with the outcome `selected` and an
+   `optionId`, or `cancelled` (fetched 2026-10-05).
+5. **`termcap` (§8).** It shipped in `v0.3.0`. `terminal.*` context keys
+   are still a later record's; nothing in `termcap` imports `when`.
+6. **Versioning (§11, A1).** The root's next minor is `v0.4.0`. It carries
+   the PLAN's Steps 1 to 9; `command/cobracmd/v0.1.0` and
+   `command/kongcmd/v0.1.0` follow it and require it.
+7. **The modules (A1).** 0010's tooling is in place: `go.work` lists `.`;
+   `scripts/go-modules.sh` feeds CI's test matrix, so a module added with
+   `go work use` is tested on three operating systems with no workflow
+   change; `.golangci.yml` already confines Cobra and pflag to
+   `command/cobracmd`, and Kong to `command/kongcmd`;
+   `internal/conformance` scans every package of every module it finds.
+   The adapter steps need only their own directories, `go.work`, and the
+   documents.
+
+**Decision.**
+
+* **§9, corrected to the workspace's API.** `workspace.resize` takes
+  `split` (a resizable separator of the current plan; any other is an
+  argument error) and `delta`. `workspace.layout.reset` is `SetState(
+  layout.State{})`. §4's and A1's example becomes:
+
+  ```go
+  type resizeArgs struct {
+      Split string `json:"split" arg:"" help:"the split whose separator moves" placeholder:"SPLIT"`
+      Delta int    `json:"delta" arg:"" help:"cells to give the pane before it; negative takes" schema:"min=-200,max=200"`
+  }
+  ```
+
+  so `/resize sidebar 4` fills both.
+* **§4, maps.** `SchemaOf` supports `map[string]T`.
+* **Q5, `workspace.theme.set`** (the owner, picked from options,
+  2026-10-05, "Add Workspace.SetBackground", the recommendation). The
+  workspace gains `SetBackground(bg theme.Background) tea.Cmd`:
+  * `theme.Dark` or `theme.Light` pins the background, rebuilds the theme
+    through its builder, and keeps it pinned when the terminal later
+    reports another background;
+  * `theme.Unknown` returns to following: the theme is rebuilt from the
+    background the terminal last reported, and the command is
+    `tea.RequestBackgroundColor`, unless the workspace was built
+    `WithoutBackgroundQuery`;
+  * on a workspace built `WithTheme`, which follows nothing, it records
+    the choice and changes nothing visible.
+
+  `workspace.theme.set` takes `background`, one of `dark`, `light` and
+  `auto`, and calls it.
+* **Q6, the MCP revision** (the owner, picked from options, 2026-10-05,
+  "2026-07-28", the recommendation). The exporters target 2026-07-28:
+  `MCPCallResult` carries `resultType: "complete"`, which an earlier
+  client ignores; `MCPTools` lists in ID order; the list envelope (`ttlMs`,
+  `cacheScope`) and `subscriptions/listen` are the host's, and the guide
+  says so. The golden exports and the field-name test pin 2026-07-28's
+  schema.
+* **§11, versioning,** as found in item 6.
+
+**Unchanged.** Option A; every other built-in; the registry, handlers,
+gate, audit trail, `when`, the loaders, the ACP exporter, `command/cli`;
+A1's front ends, tags and rules.
+
+**Owner questions for A2.** *Answered 2026-10-05* (picked from options):
+Q5 "Add Workspace.SetBackground"; Q6 "2026-07-28". Both are the
+recommendation.
+
+* **Q5.** What `workspace.theme.set` does, given the workspace's theme
+  API. Recommended: the `SetBackground` above. The alternatives were to
+  drop the command until a theme record, or to offer dark and light only
+  through `SetTheme`, which a following workspace undoes at the next
+  background message.
+* **Q6.** Which MCP revision the exporters target. Recommended:
+  2026-07-28. The alternative was to keep 2025-11-25, which a 2026-07-28
+  client still reads, treating a result without `resultType` as complete.
 
 ## More Information
 

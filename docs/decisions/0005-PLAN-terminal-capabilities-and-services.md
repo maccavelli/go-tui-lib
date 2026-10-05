@@ -1808,3 +1808,13 @@ Not done, and why:
 
 This PLAN is `complete`. `termcap`, `termcap/termcaptest` and `termsvc`
 are ready for the next minor after `v0.2.0`; the tag is the owner's.
+
+**After the release (2026-10-05).** The owner committed and pushed the
+close-out (`81a61de`), CI was green, and the owner tagged `v0.3.0`
+(annotated) on it. The agent ran the releasing guide's consumer smoke test
+against the tag, in a scratch module outside the repository: a program
+importing `termcap` and `termsvc`, then `go get
+github.com/maccavelli/go-tui-lib@v0.3.0`, `go mod tidy` and `go build
+./...`, each exit 0; the program ran. At the owner's request
+(2026-10-05), `README.md`'s Status names `v0.3.0` as the current release
+and the three packages as shipped in it.
