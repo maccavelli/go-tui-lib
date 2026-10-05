@@ -1472,3 +1472,178 @@ test printed a raw `0x9b` and stopped a run.
 **Next.** Step 7, documentation and close-out: the guide, the docs tree,
 the release notes, and Verification, whose real-terminal checks need the
 owner's terminals.
+
+### Step 7: documentation and close-out (2026-10-05)
+
+The owner committed Step A1.3 (`414bf12`) and said "proceed". No
+deviation.
+
+**Documentation.**
+
+* **`docs/guides/terminal-capabilities.md` (new):** embedding a `Prober`
+  beside a workspace, with `workspace.WithoutBackgroundQuery()` (Q8);
+  quitting through `Quit()`, or `Restore()` first, because mode 2031 is on
+  by default, and `WithoutColorSchemeUpdates` for programs that cannot;
+  what arrives (`CapsMsg`, `ColorSchemeMsg`), facts, origins, reason
+  tokens and the views; the options; not probing without input; dropping
+  split replies with `IsReplyFragment` in `tea.WithFilter`; tmux and
+  running `TmuxQuery`; notifications, focus reports and
+  `NotifyResultMsg`; the clipboard (`CopiedMsg`, `CopyPlan`,
+  `TmuxLoadBuffer`, `ImageReadCommands`) and links; titles, marks, the
+  beacon, the pointer and progress; a doctor command; testing with
+  `termcaptest`, `FromEnv` and `WithGOOS`; what the library never does.
+* **`termcap/example_test.go` (new):** `ExampleProber` (compiled: the
+  embedding the guide shows, with the filter) and `ExampleReport` (run,
+  with output).
+* **`docs/architecture.md`:** eight packages and four internal ones; the
+  import graph and table gain `termcap`, `termcap/termcaptest`, `termsvc`,
+  `internal/termevent` and its `termeventtest`; ultraviolet is kept to two
+  packages; the tree and the guides line; "What is not here" names
+  `termmode`, `inline` and image protocols.
+* **`docs/README.md`:** five task rows point at the guide, and the 0005
+  row says why rather than "will be".
+* **`README.md`:** Status was stale since `v0.2.0` was tagged, and is
+  current: the workspace at `v0.2.0`, and the three packages on `main`
+  for the next minor; a task row for the guide.
+
+**Checks.** markdownlint, with the repository's configuration: 0 issues.
+The link check over the four changed Markdown files: 0 broken. `make
+pre-add-check FILES=termcap/example_test.go`: clean. `make lint` (three
+targets), `make vuln`, `go test -race -count=1 ./...`, `LC_ALL=C go test
+./...`, `go test -shuffle=on -count=2 ./...` and `GOWORK=off go mod tidy
+-diff`: clean. The Windows test host: `make pre-add-check`, `make lint`,
+`make vuln` and the four packages' tests shuffled three times: all exit 0.
+The identifier scan of the diff finds nothing.
+
+**Release notes, for the next minor after `v0.2.0`.** The tag is the
+owner's.
+
+* **New: `termcap`.** One probe, sent on the first `tea.EnvMsg` and ended
+  by DA1 or a 2 s deadline, learns the terminal's capabilities: the Kitty
+  keyboard protocol, modes 2031, 2048 and 1004, light or dark, the
+  background, foreground and palette, desktop notifications, Kitty
+  graphics, Sixel, the terminal's name and brand, the multiplexer, and,
+  behind a heuristic, the queries some terminals print. It never re-asks
+  what tea asks. Each fact carries its origin and a reason token;
+  `Report` and `Findings` explain them. `CapsMsg` arrives once.
+* **New: `termsvc`.** Notifications by OSC 99, 777, 9 or the bell, with
+  focus policies and results; the clipboard with delivery status; links
+  that fall back to showing their URL; OSC 133 prompt marks; titles; an
+  activity beacon; the pointer; progress support.
+* **New: `termcap/termcaptest`.** Scripted fake terminals and `Run`, for
+  testing a program that embeds a prober.
+* **Programs that embed a `Prober` must quit through `Quit()`,** or write
+  `Restore()`, because it subscribes to mode 2031 by default.
+* **Beside a workspace, build it with `workspace.WithoutBackgroundQuery()`**
+  so the background is asked once.
+* **No module is added.** `go.mod` is unchanged since `v0.2.0`; ultraviolet
+  is now read in `internal/termevent` as well as `internal/cells`.
+* **Nothing else changes.** `workspace`, `theme`, `layout`, `glyph` and
+  `tuitest` are as `v0.2.0` left them.
+
+**Verification, item by item.**
+
+| Item | State |
+| :--- | :--- |
+| every step's mutations killed, A1's included | done: 120 in the last rerun, Steps 2 to A1.3 |
+| nothing quits a `Prober` without `Quit()` or `Restore()`; the reset test seen failing with `tea.Quit` | done: the guide, `ExampleProber`, the golden test's program, `termcaptest`'s test program and the doctor program below all quit through `Quit()`; Step 4's mutation killed the reset test |
+| macOS and the Windows host: `make pre-add-check`, `make lint`, `make vuln` | done, every step |
+| `-race`, `-shuffle=on -count=2`, `LC_ALL=C` | done on macOS. On the Windows host the tests ran shuffled three times; `-race` was not run there, as CI's Windows job does not run it, and `LC_ALL=C` is a Unix locale |
+| `go mod tidy -diff` clean; direct requirements unchanged since 0004's close-out | done |
+| no package writes to `os.Stdout` or `os.Stderr`, sets `AltScreen`, calls `signal.Notify`, reads the process environment, or starts a process | done: `internal/conformance`, and the source test in `termcap` and in `termsvc` |
+| **real terminals** | **open: needs the owner's terminals.** The program below prints `Report` |
+| the identifier scan finds nothing; nothing copied from crush or any other project | done; every query and reply was written from the protocols' specifications |
+| CI green on all three operating systems after the owner's push | open, after the push |
+
+**The real-terminal check, for the owner.** Run the program below on at
+least two real terminals on different operating systems, once inside tmux,
+and once over SSH, and paste each report into this record, the terminals
+named by product only. Each run shows whether tmux delivers passthrough
+replies (`desktop_notify` and `kitty_graphics` inside tmux), and, after it
+exits on a terminal with 2031 (`color_scheme_reports supported`), switching
+the system between light and dark must print nothing into the shell. A
+JetBrains terminal, if one is at hand, must show nothing painted (Q7).
+
+```go
+// termdoctor runs termcap's probe on the real terminal it is started in,
+// waits three seconds for late replies, quits through the prober, and
+// prints the report: for 0005-PLAN's real-terminal check. It is not part
+// of the library.
+//
+//	go mod init example.com/termdoctor
+//	go get github.com/maccavelli/go-tui-lib@main
+//	go mod tidy
+//	go run .            # or: go run . -json
+//
+// Inside tmux it also runs TmuxQuery and passes the result to the prober.
+package main
+
+import (
+	"flag"
+	"fmt"
+	"os"
+	"os/exec"
+	"time"
+
+	tea "charm.land/bubbletea/v2"
+
+	"github.com/maccavelli/go-tui-lib/termcap"
+)
+
+// doneMsg ends the run, after late replies have had their chance.
+type doneMsg struct{}
+
+type model struct{ probe *termcap.Prober }
+
+func (m *model) Init() tea.Cmd {
+	return tea.Batch(m.probe.Init(), tea.Tick(3*time.Second, func(time.Time) tea.Msg { return doneMsg{} }))
+}
+
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	cmd := m.probe.Update(msg)
+	if _, ok := msg.(doneMsg); ok {
+		return m, tea.Batch(cmd, m.probe.Quit()) // resets mode 2031 first
+	}
+	return m, cmd
+}
+
+func (m *model) View() tea.View {
+	v := tea.NewView("probing the terminal for three seconds...")
+	v.ReportFocus = true
+	return v
+}
+
+func main() {
+	asJSON := flag.Bool("json", false, "print the report as JSON")
+	flag.Parse()
+
+	m := &model{probe: termcap.New()}
+	if os.Getenv("TMUX") != "" {
+		argv := termcap.TmuxQuery()
+		if out, err := exec.Command(argv[0], argv[1:]...).Output(); err == nil {
+			m.probe.SetTmux(termcap.ParseTmux(string(out)))
+		}
+	}
+	p := tea.NewProgram(m, tea.WithFilter(func(_ tea.Model, msg tea.Msg) tea.Msg {
+		if m.probe.IsReplyFragment(msg) {
+			return nil
+		}
+		return msg
+	}))
+	if _, err := p.Run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	var o []termcap.ReportOption
+	if *asJSON {
+		o = append(o, termcap.WithReportJSON())
+	}
+	if err := termcap.Report(os.Stdout, m.probe.Caps(), o...); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+```
+
+This PLAN stays `in-progress` until those runs are recorded and CI is
+green on the pushed tree; then it is `complete`, and the owner tags.

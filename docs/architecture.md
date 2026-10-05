@@ -11,15 +11,20 @@ planned (Modules, below).
   package named after it. There is no root package. Helpers shared between
   packages go under `internal/`.
 - **Go 1.27.1**, with no `toolchain` line.
-- **Five packages,** and one internal one, for multi-pane terminal
-  workspaces and the foundations
+- **Eight packages,** and four internal ones, for multi-pane terminal
+  workspaces, terminal capabilities and services, and the foundations
   every package uses.
 
 ## Packages
 
 ```text
  workspace     Bubble Tea pane host       → layout, theme, glyph, internal/cells; bubbletea, lipgloss, bubbles/key, bubbles/help
- internal/cells  the reused frame buffer  → layout; ultraviolet, x/ansi (its only importer)
+ internal/cells  the reused frame buffer  → layout; ultraviolet, x/ansi
+ termsvc       terminal services          → termcap; bubbletea, x/ansi
+ termcap       capabilities, the probe    → internal/termevent; bubbletea, x/ansi, colorprofile
+ termcap/termcaptest  fake terminals      → termcap; bubbletea, x/ansi, colorprofile (tests)
+ internal/termevent   pass-through events → ultraviolet
+ internal/termevent/termeventtest  those events for tests → ultraviolet, bubbletea
  theme         palettes, roles, styles    → glyph; lipgloss, colorprofile
  glyph         Unicode and ASCII glyphs   → standard library
  layout        geometry and state         → standard library
@@ -33,6 +38,11 @@ planned (Modules, below).
 | `layout` | `Rect`, `Size` (fixed, percent, ratio, fill; min, max, shrink order), `Node` (`Pane`, `Split`, `Responsive`, or a custom node), `Solve` → `Plan`; `State` (JSON); the sidebar presets |
 | `workspace` | `Pane` and its optional interfaces; `Workspace` (routing, focus, chrome, resize, zoom, hide, overlays, cursor, `View`, `help.KeyMap`, the width method, a following theme, `Panes`, `PaneAs`); `Wrap`; `KeyMap` |
 | `internal/cells` | `Frame`: a reused cell buffer that draws strings into rectangles with a chosen width method |
+| `termcap` | `Prober` (one batch of queries ended by DA1, a deadline, tea's own replies observed, mode 2031 and its reset, `IsReplyFragment`); `Caps` of `Fact`s with origin and reason; `FromEnv` and `Identity`; the keyboard, link and notification views; `TmuxQuery`; `Report` and `Findings` |
+| `termcap/termcaptest` | `Terminal`, a scripted fake terminal; `Profile` and seven profiles; `Run` |
+| `termsvc` | `Notifier` (OSC 99, 777, 9 or the bell; focus policies; `NotifyResultMsg`); `Copy` and `CopiedMsg`; `Link`, `LinkDisplay`, `LinkPolicy`; prompt marks; `Wrap`; `SanitizeTitle`; the activity beacon; `Pointer`; `ProgressSupported` |
+| `internal/termevent` | `Decode`: the ultraviolet events tea passes through untranslated, as plain values |
+| `internal/termevent/termeventtest` | those events built for tests outside `internal/termevent` |
 | `tuitest` | `Golden` across {colour, no colour} × {UTF-8, ASCII} × widths; `Text` for a single file; `Annotate` |
 
 - **`layout` has no Charm import,** so its solver can serve any front end.
@@ -47,8 +57,18 @@ planned (Modules, below).
 - **The workspace measures as Bubble Tea writes:** `ansi.WcWidth` by
   default, switching to `ansi.GraphemeWidth` on the terminal's mode 2027
   report, unless `WithWidthMethod` fixes it (§3).
-- **`internal/cells` is the only importer of ultraviolet,** which has no
-  tagged release, so an upstream change is one package's fix (§1).
+- **`internal/cells` and `internal/termevent` are the only importers of
+  ultraviolet,** which has no tagged release, so an upstream change is one
+  package's fix (§1; [0005-MADR](decisions/0005-MADR-terminal-capabilities-and-services.md) §1).
+  `internal/termevent/termeventtest`, under the second, builds its events
+  for other packages' tests.
+- **`termcap` learns, and `termsvc` acts.** The probe reads the
+  environment from `tea.EnvMsg` only, never from the process; neither
+  package starts a process, and commands such as `TmuxQuery` are returned
+  for the program to run
+  ([0005-MADR](decisions/0005-MADR-terminal-capabilities-and-services.md)).
+  A source test in each refuses `os.Getenv`, `os.LookupEnv`, `os.Environ`
+  and `os/exec`.
 - **Nothing writes to the terminal.** No package writes to `os.Stdout` or
   `os.Stderr`, prints with `fmt.Print*` or the `print` builtins, logs
   through `log`'s standard logger or `log/slog`'s default logger, calls
@@ -104,9 +124,11 @@ scripts/
   go-modules_test.sh        its offline test
   go-fuzz.sh                fuzzes each fuzz target of a package in turn
   go-fuzz_test.sh           its offline test
-glyph/ theme/ layout/ workspace/ tuitest/
+glyph/ theme/ layout/ workspace/ tuitest/ termcap/ termsvc/
                             the packages; goldens under each testdata/golden/
-internal/cells/             the reused frame buffer, the only ultraviolet importer
+termcap/termcaptest/        fake terminals for tests
+internal/cells/             the reused frame buffer, an ultraviolet importer
+internal/termevent/         pass-through events, the other ultraviolet importer
 internal/conformance/       the terminal-ownership scan (tests only)
 .claude/ .grok/ .opencode/  per-agent pointers to AGENTS.md
 opencode.json
@@ -115,7 +137,8 @@ docs/
   architecture.md           this file
   decisions/                MADR and PLAN records
   reports/                  REPORT records
-  guides/                   how-to guides: workspaces, releasing
+  guides/                   how-to guides: workspaces, terminal
+                            capabilities, releasing
 ```
 
 ## Dependencies
@@ -142,8 +165,9 @@ docs/
   `github.com/alecthomas/kong` to `command/kongcmd`, and
   `charm.land/glamour/v2` to `stream/glamourmd`. Each rule covers `$all`
   less `!**/<dir>/**`.
-- **Kept to one package by `depguard`:** `github.com/charmbracelet/ultraviolet`
-  to `internal/cells`.
+- **Kept to two packages by `depguard`:** `github.com/charmbracelet/ultraviolet`
+  to `internal/cells` and `internal/termevent` (with
+  `internal/termevent/termeventtest` beneath it), test files included.
 
 ## Tooling
 
@@ -231,6 +255,13 @@ docs/
 - **Standard panes** (log tail, metrics view, scrolling text and
   Markdown), **overlay widgets** (dialog, picker, palette, toast), a **help
   footer** and **`updatetea`.** Each is its own record.
+- **Terminal modes and inline scrollback** (`termmode`, `inline`): mode
+  plans, teardown, restore bytes and the Windows console helpers, and the
+  per-terminal scrollback strategy. Each is a later record; until then tea
+  still asks for Kitty disambiguation everywhere
+  ([0005-MADR](decisions/0005-MADR-terminal-capabilities-and-services.md) A4).
+- **Image protocols** (Kitty placeholders, Sixel, iTerm2), which add
+  `Query` values to `termcap`.
 - **`make apicheck`.** It needs a `v1` tag to compare against, and comes
   with the `v1` record.
 - **A release workflow, Dependabot, and any tag** other than the owner's.

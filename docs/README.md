@@ -68,7 +68,12 @@ it was when they were written
 | see the planned keymap and `keybindings.json` format | [0007-MADR](decisions/0007-MADR-keymap-engine.md) |
 | see the planned command palette and fuzzy matcher | [0008-MADR](decisions/0008-MADR-command-palette.md) |
 | see how streamed Markdown, frames and untrusted text will be handled | [0009-MADR](decisions/0009-MADR-streaming-content-engine.md) |
-| see how terminal capabilities will be detected | [0005-MADR](decisions/0005-MADR-terminal-capabilities-and-services.md) |
+| know why terminal capabilities are detected this way | [0005-MADR](decisions/0005-MADR-terminal-capabilities-and-services.md) |
+| learn what the terminal supports, over SSH and inside tmux | [guides/terminal-capabilities.md](guides/terminal-capabilities.md) |
+| quit without leaving mode 2031 set | [guides/terminal-capabilities.md](guides/terminal-capabilities.md#quit-through-the-prober) |
+| send a notification, copy to the clipboard, or show a link | [guides/terminal-capabilities.md](guides/terminal-capabilities.md#notifications-and-focus) |
+| write a doctor command | [guides/terminal-capabilities.md](guides/terminal-capabilities.md#a-doctor-command) |
+| test a program against fake terminals | [guides/terminal-capabilities.md](guides/terminal-capabilities.md#test-with-fake-terminals) |
 | know why the workspace draws with ultraviolet directly | [0004-MADR](decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md) |
 | make borders line up after emoji, or measure as the workspace does | [guides/building-workspaces.md](guides/building-workspaces.md#text-width) |
 | follow the terminal's light or dark theme, or keep my own colours | [guides/building-workspaces.md](guides/building-workspaces.md#chrome-and-theme) |
