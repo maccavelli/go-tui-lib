@@ -20,20 +20,20 @@ import (
 // Cancel reaches. A Prompt or Forward command also sends a PromptMsg. A
 // request that cannot run returns a ResultMsg whose Err says why.
 func (r *Registry) Dispatch(ctx context.Context, req Request) tea.Cmd {
-	inv, d, err := r.admit(ctx, req)
+	e, inv, d, err := r.admit(ctx, req)
 	if err != nil {
-		r.audit(req, d, outcome{started: time.Now()}, err)
+		r.audit(req, e, d, outcome{started: time.Now()}, err)
 		return msgCmd(ResultMsg{Request: req, Err: err})
 	}
 	if inv.Command.Mode == Async {
 		return func() tea.Msg {
 			o := r.execute(ctx, inv)
-			r.audit(req, d, o, o.err)
+			r.audit(req, e, d, o, o.err)
 			return tea.Batch(effects(req, inv, o)...)()
 		}
 	}
 	o := r.execute(ctx, inv)
-	r.audit(req, d, o, o.err)
+	r.audit(req, e, d, o, o.err)
 	return tea.Batch(effects(req, inv, o)...)
 }
 
@@ -42,13 +42,13 @@ func (r *Registry) Dispatch(ctx context.Context, req Request) tea.Cmd {
 // to do with Result.Cmd. It is the shell's, agents' and tests' way in. An
 // Async command's run is one Cancel reaches.
 func (r *Registry) Run(ctx context.Context, req Request) (Result, error) {
-	inv, d, err := r.admit(ctx, req)
+	e, inv, d, err := r.admit(ctx, req)
 	if err != nil {
-		r.audit(req, d, outcome{started: time.Now()}, err)
+		r.audit(req, e, d, outcome{started: time.Now()}, err)
 		return Result{}, err
 	}
 	o := r.execute(ctx, inv)
-	r.audit(req, d, o, o.err)
+	r.audit(req, e, d, o, o.err)
 	return o.res, o.err
 }
 
@@ -59,13 +59,14 @@ func (r *Registry) Cancel(id ID) { r.running.cancel(id) }
 func (r *Registry) CancelAll() { r.running.cancelAll() }
 
 // admit finds req's command and decides whether it may run: the origin is
-// set, the command is offered on the origin's surface, its When holds,
-// and the policy allows it.
-func (r *Registry) admit(ctx context.Context, req Request) (*Invocation, Decision, error) {
+// set, the command is offered on the origin's surface, its When holds, its
+// arguments fit its schema (and gain its defaults), and the policy allows
+// it. The entry is nil when no command has the ID.
+func (r *Registry) admit(ctx context.Context, req Request) (*entry, *Invocation, Decision, error) {
 	s := r.snap.Load()
 	i, ok := s.byID[req.ID]
 	if !ok {
-		return nil, 0, fmt.Errorf("%w: %q", ErrUnknown, req.ID)
+		return nil, nil, 0, fmt.Errorf("%w: %q", ErrUnknown, req.ID)
 	}
 	e := &s.entries[i]
 	c := req.Context
@@ -77,19 +78,26 @@ func (r *Registry) admit(ctx context.Context, req Request) (*Invocation, Decisio
 		Origin: req.Origin, Caller: req.Caller, Context: c,
 	}
 	if req.Origin == 0 || req.Origin > OriginProgram {
-		return nil, 0, fmt.Errorf("%w: %s: the request's origin is %s", ErrRefused, req.ID, req.Origin)
+		return e, nil, 0, fmt.Errorf("%w: %s: the request's origin is %s", ErrRefused, req.ID, req.Origin)
 	}
 	if sf := req.Origin.surface(); sf != 0 && e.cmd.surfaces()&sf == 0 {
-		return nil, 0, fmt.Errorf("%w: %s is not offered on the %s surface", ErrUnavailable, req.ID, sf)
+		return e, nil, 0, fmt.Errorf("%w: %s is not offered on the %s surface", ErrUnavailable, req.ID, sf)
 	}
 	if !e.holds(c) {
-		return nil, 0, fmt.Errorf("%w: %s: when %q is false", ErrUnavailable, req.ID, e.cmd.When)
+		return e, nil, 0, fmt.Errorf("%w: %s: when %q is false", ErrUnavailable, req.ID, e.cmd.When)
+	}
+	if e.args != nil {
+		args, err := e.args.prepare(req.Args)
+		if err != nil {
+			return e, nil, 0, err
+		}
+		inv.Args = args
 	}
 	d, err := r.policy.decide(ctx, inv)
 	if err != nil {
-		return nil, d, err
+		return e, nil, d, err
 	}
-	return inv, d, nil
+	return e, inv, d, nil
 }
 
 // outcome is one run of a handler.
@@ -144,13 +152,18 @@ func effects(req Request, inv *Invocation, o outcome) []tea.Cmd {
 
 func msgCmd(m tea.Msg) tea.Cmd { return func() tea.Msg { return m } }
 
-// audit records a request when there is an auditor.
-func (r *Registry) audit(req Request, d Decision, o outcome, err error) {
+// audit records a request when there is an auditor, with the values its
+// command's schema marks secret masked. e is nil for an unknown command.
+func (r *Registry) audit(req Request, e *entry, d Decision, o outcome, err error) {
 	if r.auditor == nil {
 		return
 	}
+	args := req.Args
+	if e != nil {
+		args = e.args.mask(args)
+	}
 	r.auditor.Audit(Record{
-		ID: req.ID, Origin: req.Origin, Caller: req.Caller, Args: req.Args,
+		ID: req.ID, Origin: req.Origin, Caller: req.Caller, Args: args,
 		Decision: d, Started: o.started, Duration: o.dur, Err: err,
 	})
 }

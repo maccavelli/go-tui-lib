@@ -1,0 +1,51 @@
+  1|{
+ 60|  "$schema": "https://json-schema.org/draft/2020-12/schema",
+ 19|  "type": "object",
+ 17|  "properties": {
+ 13|    "name": {
+ 22|      "type": "string"
+  6|    },
+ 10|    "n": {
+ 23|      "type": "integer"
+  6|    },
+ 14|    "inner": {
+ 23|      "type": "object",
+ 21|      "properties": {
+ 17|        "pane": {
+ 27|          "type": "object",
+ 25|          "properties": {
+ 19|            "id": {
+ 30|              "type": "string"
+ 14|            },
+ 21|            "size": {
+ 31|              "type": "integer"
+ 13|            }
+ 12|          },
+ 23|          "required": [
+ 16|            "id"
+ 12|          ],
+ 39|          "additionalProperties": false
+ 10|        },
+ 18|        "named": {
+ 27|          "type": "object",
+ 25|          "properties": {
+ 24|            "verbose": {
+ 32|              "type": "boolean",
+ 40|              "description": "say more",
+ 24|              "x-cli": {
+ 29|                "short": "v",
+ 33|                "group": "Output"
+ 15|              }
+ 13|            }
+ 12|          },
+ 39|          "additionalProperties": false
+  9|        }
+  8|      },
+ 19|      "required": [
+ 14|        "pane"
+  8|      ],
+ 35|      "additionalProperties": false
+  5|    }
+  4|  },
+ 31|  "additionalProperties": false
+  1|}

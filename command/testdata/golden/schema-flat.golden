@@ -1,0 +1,43 @@
+  1|{
+ 60|  "$schema": "https://json-schema.org/draft/2020-12/schema",
+ 19|  "type": "object",
+ 17|  "properties": {
+ 14|    "split": {
+ 23|      "type": "string",
+ 55|      "description": "the split whose separator moves",
+ 16|      "x-cli": {
+ 20|        "arg": true,
+ 30|        "placeholder": "SPLIT"
+  7|      }
+  6|    },
+ 14|    "count": {
+ 24|      "type": "integer",
+ 31|      "description": "how many"
+  6|    },
+ 13|    "rate": {
+ 22|      "type": "number"
+  6|    },
+ 11|    "on": {
+ 23|      "type": "boolean"
+  6|    },
+ 14|    "debug": {
+ 24|      "type": "boolean",
+ 16|      "x-cli": {
+ 22|        "hidden": true
+  7|      }
+  6|    },
+ 16|    "verbose": {
+ 24|      "type": "boolean",
+ 32|      "description": "say more",
+ 16|      "x-cli": {
+ 21|        "short": "v",
+ 25|        "group": "Output"
+  7|      }
+  5|    }
+  4|  },
+ 15|  "required": [
+ 12|    "split",
+ 11|    "count"
+  4|  ],
+ 31|  "additionalProperties": false
+  1|}

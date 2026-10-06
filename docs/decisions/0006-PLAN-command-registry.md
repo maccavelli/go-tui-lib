@@ -353,7 +353,8 @@ Benchmarks: `BenchmarkLookup`, `BenchmarkAvailable` over 500 commands,
 `command/builtin.go`; tests `command/schema_test.go`,
 `command/decode_test.go`, `command/slash_test.go`,
 `command/builtin_test.go`, `command/fuzz_test.go`; goldens
-`command/testdata/golden/schema-*.golden`; `Makefile`.
+`command/testdata/golden/schema-*.golden`; `Makefile`. (*D12: and
+`.github/workflows/ci.yml`.*)
 
 **Exported names** (MADR §4, A1, A2):
 
@@ -387,6 +388,13 @@ argument takes the whole tail. The result is the JSON `--args` would send.
 `command.list` (`NoArgs`, `ReadOnly`, every surface), `command.describe`
 (`{id string}` positional, `ReadOnly`, every surface) and `app.quit`
 (`NoArgs`, `UI`, no CLI surface), which only sends `QuitRequestMsg`.
+(*D8: none has a slash name. D10: `command.list` lists what `Available`
+gives the caller.*)
+
+*D7:* `New` returns an error when no `WithDanger` is given. *D9:* `secret`
+is `"writeOnly": true`; `short`, `placeholder`, `group` and `hidden` go in
+one `"x-cli"` object, written only when one is set. *D11:* so does `"arg":
+true`, and positionals follow the order of `properties`.
 
 **Goldens** (`tuitest.Text`): `schema-flat`, `schema-nested`,
 `schema-slices`, `schema-pointers`, `schema-enum`, `schema-bounds`,
@@ -400,12 +408,12 @@ valid JSON naming `$schema` 2020-12; `schema-noargs` is `{"type":
 | :--- | :--- |
 | `TestSchemaGolden` | the ten goldens |
 | `TestSchemaRefuses` | a channel field, and an enum neither required nor defaulted, are errors, not panics |
-| `TestSchemaKeepsUnknownKeys` | a `schema` key Kong does not read, and the `json` name, survive in the schema |
+| `TestSchemaKeepsUnknownKeys` | a `schema` key Kong does not read, and the `json` name, survive in the schema (*D9: and `short`, `placeholder`, `group` and `hidden` survive in `x-cli`*) |
 | `TestDecodeStrict` | an unknown member, a wrong type, a missing required field, a number out of range and a value outside its enum are each an `*ArgError` found with `errors.AsType`, naming its path |
 | `TestSlashForms` | `/resize sidebar 4`, `/resize split=sidebar delta=4` and `/resize "sidebar" "4"` give the same JSON; a stray positional is an error |
 | `TestSlashWholeTail` | a one-string command takes the whole tail |
 | `TestAuditMasksSecrets` | a field tagged `schema:"secret"` is masked in every audit `Record` |
-| `TestBuiltins` | `command.list` lists every command once; `command.describe` returns a command's ID, schema and danger; `app.quit` sends `QuitRequestMsg` and nothing else |
+| `TestBuiltins` | `command.list` lists every command once; `command.describe` returns a command's ID, schema and danger; `app.quit` sends `QuitRequestMsg` and nothing else (*D8: none has a slash name; D10: `command.list` leaves out hidden, unavailable and other-surface commands*) |
 
 `FuzzParseSlash`: no panic, and every accepted line decodes against its
 command's schema. The `fuzz` target gains
@@ -1064,3 +1072,177 @@ deviation when its step starts, unless the owner decides it sooner:
 * **`--yes` and the gate (Step 8).** `command/cli` receives a registry
   whose gate was fixed by `NewRegistry`, so `--yes` and `WithConfirm` have
   no way to approve a `Destructive` request from the shell for one call.
+
+### Step 4: arguments, and the registry's own commands
+
+#### Deviations
+
+Found before any Step 4 code was written; MADR amendment A5 records the
+decisions.
+
+* **D7 (2026-10-05): `New` without a danger.** A4 has `Register` refuse
+  an undeclared `Danger` and says `New` sets one, but not what `New` does
+  when its caller names none. Options given: return an error
+  (recommended); default to `Mutating`. **The owner picked "Return an
+  error".**
+* **D8 (2026-10-05): the built-ins' slash names.** The step and MADR §9
+  give `command.list`, `command.describe` and `app.quit` none. Options
+  given: none (recommended); `/commands`, `/describe` and `/quit`. **The
+  owner picked "None".**
+* **D9 (2026-10-05): tags with no JSON Schema keyword.** Only the schema
+  reaches the audit trail and the front ends, and `secret`, `short`,
+  `placeholder`, `group` and `hidden` have no keyword. Options given:
+  `writeOnly` and one `x-cli` object (recommended); a separate `x-`
+  keyword for each; drop the four CLI-only tags. **The owner picked
+  "writeOnly + one x-cli object".**
+* **D10 (2026-10-05): what `command.list` lists.** Options given: what
+  the caller can run now (recommended); every command not hidden; every
+  command. **The owner picked "What the caller can run now".**
+* **D11 (2026-10-05): positionals in the schema.** `arg:""` has no JSON
+  Schema keyword either, and D9's question missed it; `ParseSlash` needs
+  each positional and its order. Options given: `"arg": true` in `x-cli`,
+  in the order of `properties` (recommended); one `x-cli` list of the
+  positional names on the object. **The owner picked `"arg": true` in
+  `x-cli`.**
+* **D12 (2026-10-05): CI's fuzz step, again.** As in D3, `make fuzz`
+  runs `command`'s target in CI, but the step's comment named only
+  `layout` and `when`, and a failing `command` input was not uploaded.
+  Options given: add `.github/workflows/ci.yml` to the step (recommended);
+  leave it as a known gap. **The owner picked "Add ci.yml to Step 4".**
+  The comment names all three, and the artifact's `path` gains
+  `command/testdata/fuzz/`; the file parses as YAML and the path reads
+  back as the three lines.
+
+#### What was built
+
+* `command/args.go`: `New`, `Option` and its sixteen constructors,
+  `NoArgs`, `ArgError`. `command/schema.go`: `SchemaOf` and the tags.
+  `command/decode.go`: the checks, defaults, masking and strict decode.
+  `command/slash.go`: `ParseSlash`. `command/builtin.go`: the registry's
+  own commands. No other exported name.
+* Changed from Step 3: `NewRegistry` builds its first snapshot, still
+  version 0, with the three commands; `Register` and `NewRegistry` share
+  `addEntries`. `admit` checks a command's arguments against its schema
+  after `When` and before the policy, so the gate is never asked about a
+  malformed request, and passes the checked arguments, defaults filled, to
+  the handler. `audit` masks with the command's schema. Step 3's
+  `TestRegisterDuplicate`, `TestAllSorted`, `TestAvailable` and
+  `TestSnapshotsUnderRace` counted every command; they now leave out the
+  three built-ins (the `ids` helper and the race test's count).
+* Choices inside the listed names, none of which adds a name:
+  * A field with `default` is optional, as in Kong, which A1 aligns with:
+    A1's enum rule, "required or have a default", reads that way. The
+    registry fills an absent default before it checks the arguments.
+  * Every command with a schema has its arguments checked, whatever its
+    origin; a command without one (a `Forward`, or one built by hand) is
+    not. A loaded schema is enforced for `type` (a string or a list),
+    `required`, `enum`, `minimum`, `maximum`, `minLength`, `maxLength`,
+    `items`, `properties` and `additionalProperties`, and nested at most
+    64 deep; any other keyword is carried and ignored, as MADR §4 says.
+  * The json options `omitzero`, `omitempty` and `embed` are read; any
+    other (`string`, `case`, `format`) is an error. An embedded struct
+    without a name is flattened, as `encoding/json/v2` embeds it.
+    `[]byte` is a base64 string, an unsigned integer has `minimum` 0, a
+    `time.Duration` is a string with a `pattern` and is decoded with
+    `time.ParseDuration`, and `enum` on a slice applies to its items.
+  * `ParseSlash` takes the line with or without its `/`. `Raw` is the
+    text after the name. A quoted `name=value` is a positional value, an
+    unquoted one whose name is not a property is an `ArgError`, and a
+    positional already given by name is skipped. `ParseSlash` checks and
+    fills the arguments too, so an accepted line runs.
+  * A masked value is `"***"`. Arguments that hold a secret and cannot be
+    read are recorded as none.
+  * Filling a default re-encodes the arguments, so their numbers pass
+    through `float64`; an integer beyond 2^53 in a request that also
+    gets a default loses precision. Without a default filled, the bytes
+    pass unchanged.
+  * `command.list` and `command.describe` return an unexported
+    `commandInfo` as `Value`, with JSON names; Step 6's `Manifest` may
+    replace it.
+* Tests beyond the table: `TestDefaultsFilled`, `TestLoadedSchema`,
+  `TestNewNeedsDanger` (D7, and every option landing),
+  `TestUnknownMembersEachLayer`.
+* Found and fixed while building, before the checks below:
+  * `jsontext.Token.String` panicked on a token voided by the next read;
+    the property name is now copied first.
+  * `SchemaOf` called a value `JSONSchema` method on a nil pointer for a
+    `*T` field; a pointer now takes its element's schema. The golden
+    test found it.
+  * Lint: `goconst` (JSON Schema's type names are constants now),
+    `unconvert` (`json.RawMessage` is `jsontext.Value` in Go 1.27, so the
+    conversion did nothing), `errcheck` on three type assertions and a
+    marshal, and `make modernize`'s `slices.Contains`. `go vet` refused a
+    test struct with a repeated json tag; the case now repeats the name
+    through an untagged field.
+* `make fuzz` gained `./command`; a 60-second run of `FuzzParseSlash`
+  before the checks: 9,075,320 executions, no failure.
+
+#### Checks (Rule 3)
+
+1. `gofmt -l command`: no output.
+2. `make pre-add-check FILES="<the twenty-one command/*.go files>"`: exit
+   0, "go-precheck: 21 file(s) clean in 1 module(s) (gofmt,
+   golangci-lint, go vet, go test, go mod tidy, govulncheck)."
+3. `make lint`: exit 0; `go fix -diff` silent, and "0 issues." for
+   `GOOS=linux`, `darwin` and `windows`.
+4. `GOWORK=off go test -race -count=1 ./...`: exit 0, 15 packages `ok`.
+5. `GOWORK=off go test -shuffle=on -count=2 ./...`: exit 0, 15 packages
+   `ok`.
+6. `LC_ALL=C GOWORK=off go test -count=1 ./...`: exit 0, 15 packages `ok`.
+7. `GOWORK=off go mod tidy -diff`: exit 0, no output.
+8. `make fuzz FUZZTIME=20s`: exit 0; "1 fuzz targets ran clean" in
+   `./layout`, `./when` and `./command` (`FuzzParseSlash`, 3,211,475
+   executions). No input was written.
+9. Windows test host, go1.27.1 windows/amd64, on a copy of the tree,
+   after the last change: `make pre-add-check` exit 0, `make lint` exit
+   0, `make vuln` exit 0, `GOWORK=off go test -count=3 -shuffle=on
+   ./command/` exit 0. An earlier run of the same, before
+   `TestUnknownMembersEachLayer`, reported "104 file(s) clean" and "No
+   vulnerabilities found."
+10. `markdownlint-cli2` on `docs/README.md`: 0 issues (the configuration
+    excludes MADR and PLAN files); the relative-link check of
+    `docs/README.md` and this pair: 0 broken.
+11. Identifier scan of the diff, `command/*.go` and the goldens, for the
+    local account name, the test host's name, home-directory paths and
+    the employer's domain: no match.
+
+The ten goldens were written with `-tuitest.update` and each was read:
+valid JSON naming the 2020-12 `$schema`, properties in field order,
+`required` as the rules say, `writeOnly` on the secret, `x-cli` on the
+tagged fields, and `schema-noargs` exactly `{"$schema": …, "type":
+"object", "additionalProperties": false}`.
+
+Benchmarks, unchanged from Step 3 within noise: `BenchmarkLookup` 29.13
+ns/op; `BenchmarkAvailable` 16106 ns/op; `BenchmarkDispatchLoop` 238.2
+ns/op, 560 B/op, 5 allocs/op.
+
+#### Mutations (Rule 4)
+
+Each on a scratch copy of the tree. All thirteen killed, run again after
+the last test change. Step 3's eleven were run again too, because this
+step changed `registry.go` and `dispatch.go`: all killed, with the
+snapshot mutation's anchor moved into `addEntries(...)`. Step 2's set was
+not rerun, because nothing under `when/` changed.
+
+| Mutation | Applied as | Failing line |
+| :--- | :--- | :--- |
+| `omitzero` fields are marked required | `optional` ignores the json options | `schema_test.go:119: tuitest: schema-map …: line 19 differs` |
+| unknown members are accepted | the schema check and the strict decode both accept them | `decode_test.go:56: {"name":"a","delta":1,"inner":{"x":1,"y":2}}: <nil>, want an *ArgError at "/inner/y"` |
+| `maximum` is not checked | `x > *r.max+1e9` | `decode_test.go:56: {"name":"a","delta":9}: <nil>, want an *ArgError at "/delta"` |
+| positionals fill fields in reverse order | each positional is prepended | `slash_test.go:44: "/resize sidebar 4": command: argument /delta: "sidebar" is not a number` |
+| `arg` presence is ignored | `f.Tag.Get("arg") != ""` | `slash_test.go:44: "/resize sidebar 4": command: arguments: "sidebar" is one positional value too many` |
+| `enum` is split on `\|` | `strings.SplitSeq(e, "\|")` | `schema_test.go:108: enum: … enum value "1,2,3": strconv.ParseInt: … invalid syntax` |
+| a map field is refused | every map key kind is refused | `schema_test.go:108: map: command: schema: map[string]int: a map key must be a string …` |
+| `secret` is not masked | `mask` returns the arguments as given | `decode_test.go:159: record 0 holds the secret: …` |
+| D7: `New` accepts a command with no danger | the check never fires | `builtin_test.go:80: New without WithDanger succeeded` |
+| D8: a built-in has a slash name | `app.quit` gets `/quit` | `builtin_test.go:23: app.quit: registered true, slash "quit" []; want registered with no slash name` |
+| D9: `secret` is not written as `writeOnly` | the `secret` key does nothing | `decode_test.go:159: record 0 holds the secret: …` |
+| D9: `x-cli` is not written | `memberIf(false, "x-cli", …)` | `schema_test.go:218: split: x-cli map[], want map[arg:true placeholder:SPLIT]` |
+| D10: `command.list` lists every command | `r.All()` | `builtin_test.go:45: command.list from agent = [… hidden off shell shown], want [app.quit command.describe command.list shown]` |
+
+The unknown-member mutation disables both layers because each covers the
+other: with one disabled, `TestDecodeStrict` still passed. Run alone, the
+two single-layer mutations survived; `TestUnknownMembersEachLayer` was
+added, and both are now killed:
+`decode_test.go:80: the schema check accepted an unknown member` and
+`decode_test.go:83: the strict decode accepted an unknown member`.

@@ -51,10 +51,11 @@ type snapshot struct {
 	changed chan struct{}  // closed when the next version is published
 }
 
-// entry is a command with its compiled When.
+// entry is a command with its compiled When and arguments schema.
 type entry struct {
 	cmd  Command
 	when when.Expr
+	args *rule // nil when the command has no schema
 }
 
 // RegistryOption configures NewRegistry.
@@ -73,7 +74,8 @@ func WithPrefixer(f func(Source) string) RegistryOption {
 	return func(r *Registry) { r.prefixer = f }
 }
 
-// NewRegistry returns an empty registry at version 0.
+// NewRegistry returns a registry at version 0 holding only its own
+// commands: command.list, command.describe and app.quit.
 func NewRegistry(o ...RegistryOption) *Registry {
 	r := &Registry{}
 	r.policy.always = map[alwaysKey]Decision{}
@@ -81,11 +83,11 @@ func NewRegistry(o ...RegistryOption) *Registry {
 	for _, f := range o {
 		f(r)
 	}
-	r.snap.Store(&snapshot{
-		byID:    map[ID]int{},
-		bySlash: map[string]int{},
-		changed: make(chan struct{}),
-	})
+	entries, err := addEntries(nil, map[ID]bool{}, map[string]bool{}, r.builtins())
+	if err != nil {
+		panic(err) // the registry's own commands are fixed; this is a bug
+	}
+	r.snap.Store(newSnapshot(0, entries))
 	return r
 }
 
@@ -100,9 +102,17 @@ func (r *Registry) Register(cmds ...Command) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	old := r.snap.Load()
-	entries := slices.Clone(old.entries)
-	ids := keySet(old.byID)
-	slashes := keySet(old.bySlash)
+	entries, err := addEntries(slices.Clone(old.entries), keySet(old.byID), keySet(old.bySlash), cmds)
+	if err != nil {
+		return err
+	}
+	r.publish(old, entries)
+	return nil
+}
+
+// addEntries compiles cmds and appends them to entries, claiming their IDs
+// and slash names in ids and slashes; it reports every command it refuses.
+func addEntries(entries []entry, ids map[ID]bool, slashes map[string]bool, cmds []Command) ([]entry, error) {
 	var errs []error
 	for _, c := range cmds {
 		e, err := compile(c)
@@ -115,11 +125,7 @@ func (r *Registry) Register(cmds ...Command) error {
 		}
 		entries = append(entries, e)
 	}
-	if len(errs) > 0 {
-		return errors.Join(errs...)
-	}
-	r.publish(old, entries)
-	return nil
+	return entries, errors.Join(errs...)
 }
 
 // keySet copies m's keys into a set.
@@ -131,7 +137,8 @@ func keySet[K comparable](m map[K]int) map[K]bool {
 	return s
 }
 
-// compile checks c on its own and compiles its When.
+// compile checks c on its own and compiles its When and its arguments
+// schema.
 func compile(c Command) (entry, error) {
 	if err := c.ID.Valid(); err != nil {
 		return entry{}, err
@@ -152,6 +159,13 @@ func compile(c Command) (entry, error) {
 	c.Output = slices.Clone(c.Output)
 	c.Meta = maps.Clone(c.Meta)
 	var e entry
+	if len(c.Args) > 0 {
+		r, err := compileRule(c.Args)
+		if err != nil {
+			return entry{}, fmt.Errorf("command: %s: args schema: %w", c.ID, err)
+		}
+		e.args = r
+	}
 	if c.When != "" {
 		x, err := when.Parse(c.When)
 		if err != nil {
@@ -208,9 +222,15 @@ func (r *Registry) Remove(ids ...ID) {
 // publish builds and stores the snapshot after old, holding entries, and
 // wakes Watch. The caller holds r.mu, and entries is its own copy.
 func (r *Registry) publish(old *snapshot, entries []entry) {
+	r.snap.Store(newSnapshot(old.version+1, entries))
+	close(old.changed)
+}
+
+// newSnapshot sorts entries, which it then owns, and indexes them.
+func newSnapshot(version uint64, entries []entry) *snapshot {
 	slices.SortFunc(entries, func(a, b entry) int { return strings.Compare(string(a.cmd.ID), string(b.cmd.ID)) })
 	s := &snapshot{
-		version: old.version + 1,
+		version: version,
 		entries: entries,
 		byID:    make(map[ID]int, len(entries)),
 		bySlash: make(map[string]int, len(entries)),
@@ -225,8 +245,7 @@ func (r *Registry) publish(old *snapshot, entries []entry) {
 			s.bySlash[a] = i
 		}
 	}
-	r.snap.Store(s)
-	close(old.changed)
+	return s
 }
 
 // Lookup is the command with id.

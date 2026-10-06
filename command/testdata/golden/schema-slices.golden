@@ -1,0 +1,35 @@
+  1|{
+ 60|  "$schema": "https://json-schema.org/draft/2020-12/schema",
+ 19|  "type": "object",
+ 17|  "properties": {
+ 13|    "tags": {
+ 22|      "type": "array",
+ 16|      "items": {
+ 24|        "type": "string"
+  8|      },
+ 16|      "x-cli": {
+ 19|        "arg": true
+  7|      }
+  6|    },
+ 14|    "sizes": {
+ 22|      "type": "array",
+ 16|      "items": {
+ 25|        "type": "integer"
+  7|      }
+  6|    },
+ 13|    "data": {
+ 23|      "type": "string",
+ 33|      "contentEncoding": "base64"
+  6|    },
+ 14|    "fixed": {
+ 22|      "type": "array",
+ 16|      "items": {
+ 24|        "type": "number"
+  7|      }
+  5|    }
+  4|  },
+ 15|  "required": [
+ 10|    "tags"
+  4|  ],
+ 31|  "additionalProperties": false
+  1|}

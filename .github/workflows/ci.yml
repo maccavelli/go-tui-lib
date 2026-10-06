@@ -100,8 +100,8 @@ jobs:
           cache-dependency-path: '**/go.sum'
       # Each fuzz target for 20 s; a failing input is kept as an artifact
       # (docs/decisions/0002-PLAN-multi-pane-workspace-layouts.md Step 5,
-      # docs/decisions/0006-PLAN-command-registry.md Step 2). Only layout and
-      # when, in the root module, have fuzz targets.
+      # docs/decisions/0006-PLAN-command-registry.md Steps 2 and 4). Only
+      # layout, when and command, in the root module, have fuzz targets.
       - name: fuzz
         shell: bash
         env:
@@ -117,6 +117,7 @@ jobs:
           path: |
             layout/testdata/fuzz/
             when/testdata/fuzz/
+            command/testdata/fuzz/
           if-no-files-found: ignore
           retention-days: 14
       # Targets the matrix does not run: a build-tag gap fails here

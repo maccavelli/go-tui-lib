@@ -1,0 +1,22 @@
+  1|{
+ 60|  "$schema": "https://json-schema.org/draft/2020-12/schema",
+ 19|  "type": "object",
+ 17|  "properties": {
+ 15|    "resize": {
+ 23|      "type": "object",
+ 31|      "additionalProperties": {
+ 25|        "type": "integer"
+  7|      }
+  6|    },
+ 15|    "labels": {
+ 23|      "type": "object",
+ 31|      "additionalProperties": {
+ 24|        "type": "string"
+  7|      }
+  5|    }
+  4|  },
+ 15|  "required": [
+ 12|    "labels"
+  4|  ],
+ 31|  "additionalProperties": false
+  1|}

@@ -1,0 +1,36 @@
+  1|{
+ 60|  "$schema": "https://json-schema.org/draft/2020-12/schema",
+ 19|  "type": "object",
+ 17|  "properties": {
+ 13|    "mode": {
+ 23|      "type": "string",
+ 15|      "enum": [
+ 15|        "fast",
+ 14|        "slow"
+  7|      ]
+  6|    },
+ 14|    "level": {
+ 24|      "type": "integer",
+ 15|      "enum": [
+ 10|        1,
+ 10|        2,
+  9|        3
+  8|      ],
+ 18|      "default": 2
+  6|    },
+ 13|    "tags": {
+ 22|      "type": "array",
+ 16|      "items": {
+ 25|        "type": "string",
+ 17|        "enum": [
+ 14|          "a",
+ 13|          "b"
+  9|        ]
+  7|      }
+  5|    }
+  4|  },
+ 15|  "required": [
+ 10|    "mode"
+  4|  ],
+ 31|  "additionalProperties": false
+  1|}

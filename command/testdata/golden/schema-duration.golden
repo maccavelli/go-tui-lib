@@ -1,0 +1,16 @@
+  1|{
+ 60|  "$schema": "https://json-schema.org/draft/2020-12/schema",
+ 19|  "type": "object",
+ 17|  "properties": {
+ 16|    "timeout": {
+ 23|      "type": "string",
+ 23|      "default": "30s",
+ 83|      "pattern": "^[-+]?(0|([0-9]+(\\.[0-9]*)?|\\.[0-9]+)(ns|us|µs|μs|ms|s|m|h))+$"
+  6|    },
+ 14|    "every": {
+ 23|      "type": "string",
+ 83|      "pattern": "^[-+]?(0|([0-9]+(\\.[0-9]*)?|\\.[0-9]+)(ns|us|µs|μs|ms|s|m|h))+$"
+  5|    }
+  4|  },
+ 31|  "additionalProperties": false
+  1|}

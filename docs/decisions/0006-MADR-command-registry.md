@@ -346,7 +346,8 @@ type ArgError struct{ Path, Reason string } // errors.AsType[*ArgError]
   * `doc` is the description.
   * `arg` holds `enum=a|b`, `min`, `max`, `minLen`, `maxLen`, `default`,
     `pos=N` (slash and CLI position) and `secret` (masked in audit
-    records).
+    records). (*A1 replaced these tags; A5 says how the ones with no JSON
+    Schema keyword are carried.*)
   * Supported types: string, bool, the integer and float kinds, slices,
     nested structs, `time.Duration` (a string), and any type with its own
     `JSONSchema() Schema` method.
@@ -586,7 +587,8 @@ returns the workspace's own commands, closed over `w`:
 
 The registry itself contributes `command.list` and `command.describe`
 (ReadOnly), so an agent can discover what it may call, and `app.quit`
-(UI), which only sends `QuitRequestMsg`.
+(UI), which only sends `QuitRequestMsg`. (*A5: none has a slash name, and
+`command.list` lists what the caller can run now.*)
 
 * `workspace.panes` returns each pane's ID, title, rectangle, focus and
   hidden state as `Value`. An agent can then see the screen's structure
@@ -1238,6 +1240,64 @@ each the recommendation:
   code, or no exported error until Step 8.
 * "Mouse as Key; Program unchecked". The alternatives were to check
   neither against `Surfaces`, or to add a `SurfaceMouse`.
+
+### A5 (2026-10-05): `New` without a danger, the registry's own commands, and tags with no JSON Schema keyword
+
+*Status: accepted (2026-10-05).* Found before writing Step 4 of
+[0006-PLAN-command-registry.md](0006-PLAN-command-registry.md), recorded
+there as deviations D7–D10.
+
+**Found.**
+
+1. A4 has `Register` refuse an undeclared `Danger`, and says `New` sets
+   one, without saying what `New` does when its caller names none.
+2. §9 and the PLAN give `command.list`, `command.describe` and `app.quit`
+   no slash names, and do not say whether that is deliberate.
+3. Only a command's JSON Schema reaches the audit trail, `command/cli`
+   and the Cobra and Kong front ends. A1's `secret`, `short`,
+   `placeholder`, `group` and `hidden` have no JSON Schema keyword, so
+   without a rule they are read and lost.
+4. §9 says `command.list` lets an agent discover what it may call, and
+   the PLAN's test says it "lists every command once", which leaves open
+   whether that means every command or the ones the caller can run.
+5. A1's `arg:""` makes a property positional, and has no JSON Schema
+   keyword either; slash parsing, the shell and the front ends need it and
+   its order. Item 3's question named four tags and missed this one.
+
+**Decided.**
+
+1. `New` returns an error when no `WithDanger` is given. The loaders
+   still default to `Mutating` (§6).
+2. The three have no slash name. A program that wants `/quit` registers
+   its own command with its own word, so no built-in word can clash with
+   a program's.
+3. `secret` is the standard `"writeOnly": true`, which audit masking
+   reads. `short`, `placeholder`, `group` and `hidden` go in one
+   extension keyword, written only when one is set:
+   `"x-cli": {"short": "d", "placeholder": "PANE", "group": "g",
+   "hidden": true}`. JSON Schema 2020-12 treats an unknown keyword as an
+   annotation, so validators and MCP clients ignore it.
+4. `command.list` returns what `Available` would for the caller: the
+   commands that are not hidden, are offered on the caller's surface, and
+   whose `When` holds in the caller's context. A request from the program
+   is not filtered by surface, as A4 has it.
+5. A positional property carries `"arg": true` in its `x-cli` object.
+   Positionals are taken in the order of `properties`, which `SchemaOf`
+   writes in field order and the registry reads in document order.
+
+**Changed.** §4's tag list and §9's built-ins, annotated in place.
+
+**Owner questions for A5.** *Answered 2026-10-05* (picked from options),
+each the recommendation:
+
+* "Return an error". The alternative was to default to `Mutating`.
+* "None". The alternative was `/commands`, `/describe` and `/quit`.
+* "writeOnly + one x-cli object". The alternatives were a separate `x-`
+  keyword for each tag, or to drop the four CLI-only tags.
+* "What the caller can run now". The alternatives were every command that
+  is not hidden, or every command.
+* `"arg": true` in `x-cli`. The alternative was one `x-cli` list of the
+  positional names on the object.
 
 ## More Information
 

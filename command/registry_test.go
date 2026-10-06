@@ -68,10 +68,16 @@ func resultOf(t *testing.T, msgs []tea.Msg) ResultMsg {
 	return found[0]
 }
 
+// builtinIDs is the registry's own commands, which ids leaves out.
+var builtinIDs = map[ID]bool{idList: true, idDescribe: true, idQuit: true}
+
+// ids is the IDs seq yields, but the registry's own.
 func ids(seq func(func(Command) bool)) []ID {
 	var out []ID
 	for c := range seq {
-		out = append(out, c.ID)
+		if !builtinIDs[c.ID] {
+			out = append(out, c.ID)
+		}
 	}
 	return out
 }
@@ -214,12 +220,14 @@ func TestSnapshotsUnderRace(t *testing.T) {
 				var prev ID
 				n := 0
 				for c := range r.All() {
-					if n > 0 && c.ID <= prev {
+					if prev != "" && c.ID <= prev {
 						t.Errorf("All: %s after %s", c.ID, prev)
 						return
 					}
 					prev = c.ID
-					n++
+					if !builtinIDs[c.ID] {
+						n++
+					}
 				}
 				if n%per != 0 {
 					t.Errorf("All saw %d commands, not whole batches of %d", n, per)

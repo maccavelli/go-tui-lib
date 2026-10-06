@@ -1,0 +1,18 @@
+  1|{
+ 60|  "$schema": "https://json-schema.org/draft/2020-12/schema",
+ 19|  "type": "object",
+ 17|  "properties": {
+ 14|    "color": {
+ 23|      "type": "string",
+ 33|      "pattern": "^#[0-9a-f]{6}$"
+  6|    },
+ 13|    "back": {
+ 23|      "type": "string",
+ 33|      "pattern": "^#[0-9a-f]{6}$"
+  5|    }
+  4|  },
+ 15|  "required": [
+ 11|    "color"
+  4|  ],
+ 31|  "additionalProperties": false
+  1|}

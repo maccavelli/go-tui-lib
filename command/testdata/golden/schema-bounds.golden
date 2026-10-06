@@ -1,0 +1,34 @@
+  1|{
+ 60|  "$schema": "https://json-schema.org/draft/2020-12/schema",
+ 19|  "type": "object",
+ 17|  "properties": {
+ 14|    "delta": {
+ 24|      "type": "integer",
+ 22|      "minimum": -200,
+ 20|      "maximum": 200
+  6|    },
+ 13|    "name": {
+ 23|      "type": "string",
+ 21|      "minLength": 1,
+ 20|      "maxLength": 8
+  6|    },
+ 14|    "token": {
+ 23|      "type": "string",
+ 23|      "writeOnly": true
+  6|    },
+ 14|    "count": {
+ 24|      "type": "integer",
+ 18|      "minimum": 0
+  6|    },
+ 14|    "ratio": {
+ 24|      "type": "integer",
+ 19|      "minimum": 0,
+ 20|      "maximum": 100
+  5|    }
+  4|  },
+ 15|  "required": [
+ 12|    "delta",
+ 10|    "name"
+  4|  ],
+ 31|  "additionalProperties": false
+  1|}
