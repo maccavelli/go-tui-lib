@@ -1,0 +1,12 @@
+  1|{
+ 27|  "resultType": "complete",
+ 14|  "content": [
+  5|    {
+ 21|      "type": "text",
+ 29|      "text": "{\"lines\":3}"
+  5|    }
+  4|  ],
+ 24|  "structuredContent": {
+ 14|    "lines": 3
+  3|  }
+  1|}

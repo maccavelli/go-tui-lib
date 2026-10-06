@@ -41,15 +41,50 @@ func (r *Registry) Dispatch(ctx context.Context, req Request) tea.Cmd {
 // checks Dispatch makes, and returns its Result; the caller decides what
 // to do with Result.Cmd. It is the shell's, agents' and tests' way in. An
 // Async command's run is one Cancel reaches.
+//
+// With WithLoop, a Loop command runs on the program's event loop: Run
+// sends a LoopMsg and waits until the loop has run it or ctx ends. Its
+// Result.Cmd goes to the program, and the Result Run returns has none.
+// Without WithLoop, a Loop command runs on Run's caller.
 func (r *Registry) Run(ctx context.Context, req Request) (Result, error) {
 	e, inv, d, err := r.admit(ctx, req)
 	if err != nil {
 		r.audit(req, e, d, outcome{started: time.Now()}, err)
 		return Result{}, err
 	}
-	o := r.execute(ctx, inv)
+	var o outcome
+	if inv.Command.Mode == Loop && r.loop != nil {
+		o = r.onLoop(ctx, inv)
+	} else {
+		o = r.execute(ctx, inv)
+	}
 	r.audit(req, e, d, o, o.err)
 	return o.res, o.err
+}
+
+// onLoop runs inv on the program's loop through a LoopMsg, and waits for
+// it or for ctx. A LoopMsg the loop reaches after ctx has ended runs
+// nothing.
+func (r *Registry) onLoop(ctx context.Context, inv *Invocation) outcome {
+	done := make(chan outcome, 1)
+	msg := LoopMsg{run: func() tea.Cmd {
+		if err := ctx.Err(); err != nil {
+			done <- outcome{started: time.Now(), err: err}
+			return nil
+		}
+		o := r.execute(ctx, inv)
+		cmd := o.res.Cmd
+		o.res.Cmd = nil
+		done <- o
+		return cmd
+	}}
+	go r.loop(msg) // Send blocks until the program takes it
+	select {
+	case o := <-done:
+		return o
+	case <-ctx.Done():
+		return outcome{started: time.Now(), err: ctx.Err()}
+	}
 }
 
 // Cancel cancels the running async invocations of id.

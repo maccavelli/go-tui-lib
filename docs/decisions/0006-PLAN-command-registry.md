@@ -511,6 +511,9 @@ mutation is killed.
 `MCPTools(ctx when.Context) []MCPTool`, `CallMCP(ctx context.Context, name
 string, arguments json.RawMessage, caller string) MCPCallResult`,
 `ACPCommands(ctx when.Context) []ACPCommand`, `Manifest() Manifest`.
+(*D24: and `WithLoop(send func(tea.Msg)) RegistryOption` and `LoopMsg`
+with `Run() tea.Cmd`. D25: `ACPCommands` exports slash commands only.
+D26: `command.list` and `command.describe` return `ManifestCommand`.*)
 
 **The target is MCP 2026-07-28** (A2, Q6). Before the first golden, the
 step fetches `schema/2026-07-28/schema.ts` and records, in the execution
@@ -538,6 +541,7 @@ the network.
 | `TestACPFieldNames` | `name`, `description`, `input`, `hint`, and nothing else |
 | `TestCallMCPErrors` | a bad argument, an unknown name and a gate refusal each give `isError: true` and a message |
 | `TestCallMCPIsAgent` | the default policy applies to `CallMCP` |
+| *D24:* `TestRunOnLoop` | with `WithLoop`, `Run` of a `Loop` command sends a `LoopMsg`, runs only when it is run, returns its result, and gives its `Cmd` to the program; without it, `Run` runs on its caller |
 | `TestExportFilters` | hidden and non-agent commands are not exported |
 | `TestManifestRoundTrip` | the manifest round-trips through JSON |
 
@@ -1080,6 +1084,7 @@ deviation when its step starts, unless the owner decides it sooner:
   tool call arrives on its own goroutine, so `CallMCP` running a
   workspace command through `Run` would touch the workspace off the event
   loop, which the workspace does not allow (0003-REPORT §1.12).
+  (*Resolved in Step 6 as D24, MADR A7: `WithLoop`.*)
 * **`--yes` and the gate (Step 8).** `command/cli` receives a registry
   whose gate was fixed by `NewRegistry`, so `--yes` and `WithConfirm` have
   no way to approve a `Destructive` request from the shell for one call.
@@ -1436,3 +1441,152 @@ the `draft`. "`Version` is not bumped on `Remove`" now replaces
 now starts the draft's entries on the old snapshot's array,
 `s.entries[:0]`, and fails `TestSnapshotsUnderRace` under the race
 detector. Step 2's set was not rerun: nothing under `when/` changed.
+
+### Step 6: exporters
+
+#### Deviations
+
+Found before any Step 6 code was written; MADR amendment A7 records the
+decisions. Each was asked with options, and the owner picked the
+recommendation on 2026-10-05.
+
+* **D24: `Loop` commands run from off the loop** (Step 3's open item).
+  `WithLoop(send)` and `LoopMsg`: `Run`, and so `CallMCP`, hands a `Loop`
+  command to the program's loop and waits. Two names added to the step
+  (Rule 2), and the test `TestRunOnLoop`.
+* **D25: what `ACPCommands` exports.** Slash commands only, under their
+  slash names.
+* **D26: `ManifestCommand` and Step 4's `commandInfo`.** One exported
+  type; `command.list` and `command.describe` return `ManifestCommand`.
+
+#### MCP 2026-07-28's field names
+
+`schema/2026-07-28/schema.ts` was fetched on 2026-10-05 from the
+`modelcontextprotocol/modelcontextprotocol` repository's `main` branch:
+3197 lines, SHA-256
+`742750af0bb8c716e7030c4977c992b55d1adc4407e9e66997db5846baedc2cd`. The
+names, as `export_test.go` holds them:
+
+* `Tool` (`BaseMetadata`, `Icons`): `name`, `title`, `icons`,
+  `description`, `inputSchema`, `outputSchema`, `annotations`, `_meta`;
+  required `name` and `inputSchema`, whose `type` is `"object"`.
+* `ToolAnnotations`: `title`, `readOnlyHint` (default false),
+  `destructiveHint` (default true), `idempotentHint` (default false),
+  `openWorldHint` (default true). The last three mean something only when
+  `readOnlyHint` is false.
+* `CallToolResult` (`Result`): `_meta`, `resultType` (required: `"complete"`,
+  `"input_required"` or another string), `content` (required),
+  `structuredContent` (any JSON value), `isError`.
+* `TextContent`: `type` (`"text"`), `text`, `annotations`, `_meta`;
+  required `type` and `text`.
+
+Because `destructiveHint` and `openWorldHint` default to true, the
+exporter writes every hint that applies: `readOnlyHint` and
+`openWorldHint` always, and `destructiveHint` and `idempotentHint` when
+`readOnlyHint` is false. `Tool.title` carries the title, so the
+annotations' `title` is not written.
+
+#### What was built
+
+* `command/mcp.go`: `MCPTool`, `MCPToolAnnotations`, `MCPCallResult`,
+  `MCPContent`, `MCPTools`, `CallMCP`. `command/acpexport.go`:
+  `ACPCommands`. `command/manifest.go`: `Manifest`, `ManifestCommand`,
+  `(*Registry).Manifest`. `command/registry.go`: `WithLoop`.
+  `command/messages.go`: `LoopMsg` and its `Run`. `command/dispatch.go`:
+  `Run` hands a `Loop` command to the loop under `WithLoop` (D24).
+  `command/builtin.go`: `ManifestCommand` replaces `commandInfo` (D26).
+  No other exported name.
+* Choices inside the listed names:
+  * A command without an arguments schema is exported with
+    `{"type": "object"}`, which MCP requires and which says nothing
+    false. Its arguments are not checked.
+  * `CallMCP`'s text is `Result.Text`, else `Result.Value` as JSON, as MCP
+    recommends for a client that reads only text; `Result.Value` is
+    `structuredContent`. A value that does not marshal is an error
+    result. A result with neither has an empty `content`.
+  * Each error result is one sentence the model can act on: no such
+    tool, not available now, refused ("Do not retry it unchanged"), bad
+    arguments ("Fix them and call again"), or failed.
+  * `Manifest` has `format` 1 and the registry's version, from one
+    snapshot, and includes hidden commands. `ManifestCommand` adds
+    `argHint`, `scope`, `idempotent`, `openWorld`, `exclusive` and
+    `whileBusy` to Step 4's fields.
+  * Under `WithLoop`, `Run` sends the `LoopMsg` from a new goroutine,
+    because `tea.Program.Send` blocks until the program takes the
+    message. A `LoopMsg` that reaches the loop after its caller's context
+    ended runs nothing.
+* Tests beyond the table: `TestRunOnLoop` (D24).
+* Found while building:
+  * `TestExportFilters` expected ACP names in name order; the export is in
+    ID order (`acp.agent.plan`, `session.reset`, `user.review`,
+    `view.zoom`), and the test now says so.
+  * The "`Run` ignores `WithLoop`" mutation was first killed only by
+    `go test`'s ten-minute timeout, because `TestRunOnLoop` waited for the
+    `LoopMsg` with no deadline. Its waits now give up after five seconds,
+    and the mutation fails on `export_test.go:318: Run sent no LoopMsg`.
+
+#### Checks (Rule 3)
+
+1. `gofmt -l command`: no output.
+2. `make pre-add-check FILES="<the thirty-four command/*.go files>"`:
+   exit 0, "go-precheck: 34 file(s) clean in 1 module(s) (gofmt,
+   golangci-lint, go vet, go test, go mod tidy, govulncheck)."
+3. `make lint`: exit 0; `go fix -diff` silent, and "0 issues." for
+   `GOOS=linux`, `darwin` and `windows`.
+4. `GOWORK=off go test -race -count=1 ./...`: exit 0, 15 packages `ok`.
+5. `GOWORK=off go test -shuffle=on -count=2 ./...`: exit 0, 15 packages
+   `ok`.
+6. `LC_ALL=C GOWORK=off go test -count=1 ./...`: exit 0, 15 packages `ok`.
+7. `GOWORK=off go mod tidy -diff`: exit 0, no output.
+8. No fuzz target in this step.
+9. Windows test host, go1.27.1 windows/amd64, on a copy of the tree:
+   `make pre-add-check` exit 0 ("117 file(s) clean in 1 module(s)"),
+   `make lint` exit 0, `make vuln` exit 0 ("No vulnerabilities found."),
+   `GOWORK=off go test -count=3 -shuffle=on ./command/` exit 0.
+10. `markdownlint-cli2` on `docs/README.md`: 0 issues (the configuration
+    excludes MADR and PLAN files); the relative-link check of
+    `docs/README.md` and this pair: 0 broken.
+11. Identifier scan of the diff, `command/*.go` and the goldens, for the
+    local account name, the test host's name, home-directory paths and
+    the employer's domain: no match.
+
+The eleven goldens were written with `-tuitest.update` and each was read:
+
+* `mcp-tools`: nine tools in ID order, without the hidden, shell-only and
+  unavailable commands, with the hints MADR §2 maps.
+* `acp-commands`: the four slash commands in ID order, with their hints.
+* `manifest`: format 1, version 3, every command, hidden ones too.
+* The seven `mcp-call-*` results: text, a value with its JSON text, a
+  prompt's expansion, and errors for a failure, bad arguments, an
+  unknown name and a refusal.
+
+**Benchmarks,** on the development host, now idle (load average 2.3),
+three runs each: `BenchmarkLookup` 29.58–29.64 ns/op;
+`BenchmarkAvailable` 15738–15986 ns/op; `BenchmarkDispatchLoop`
+234.2–238.6 ns/op, 560 B/op, 5 allocs/op. These match Step 4's figures,
+which confirms that the slowdown measured during Step 5 was the host's
+load.
+
+#### Mutations (Rule 4)
+
+Each on a scratch copy of the tree. All nine killed: the step's five and
+four for D24 and D25. D26 has none, because the compiler checks the type
+the built-ins return.
+
+| Mutation | Failing line |
+| :--- | :--- |
+| `Destructive` exports `destructiveHint: false` | `export_test.go:103: tuitest: mcp-tools …: line 124 differs` |
+| `CallMCP` runs as `OriginProgram` | `export_test.go:224: the gate saw origins [] and callers []` |
+| hidden commands are exported | `export_test.go:242: MCPTools exports secret.tool` |
+| `resultType` is left out | `export_test.go:157: the result of view.zoom lacks the required "resultType"` |
+| tools are not listed in ID order | `export_test.go:103: tuitest: mcp-tools …: line 3 differs` |
+| D24: `Run` ignores `WithLoop` | `export_test.go:318: Run sent no LoopMsg` |
+| D24: `Run` returns the `Cmd` it gave the program | `export_test.go:334: Run = {… Cmd:0x…}, <nil>; want the result without its Cmd` |
+| D24: a `LoopMsg` runs after its caller gave up | `export_test.go:363: a LoopMsg ran after its caller gave up` |
+| D25: commands without a slash name go to ACP | `export_test.go:257: ACPCommands = [plan      reset review zoom], want [plan reset review zoom] …` |
+
+The lines above are from the final run, after `TestRunOnLoop`'s
+deadlines were added. Because this step changed `dispatch.go`,
+`registry.go`, `builtin.go` and `messages.go`, Step 3's eleven, Step 4's
+thirteen and two single-layer mutations, and Step 5's sixteen ran again:
+all killed. Step 2's set was not rerun: nothing under `when/` changed.

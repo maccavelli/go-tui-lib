@@ -1,0 +1,27 @@
+  1|[
+  3|  {
+ 19|    "name": "plan",
+ 32|    "description": "Plan first",
+ 14|    "input": {
+ 20|      "hint": "goal"
+  5|    }
+  4|  },
+  3|  {
+ 20|    "name": "reset",
+ 40|    "description": "Resets the session."
+  4|  },
+  3|  {
+ 21|    "name": "review",
+ 37|    "description": "Review the diff",
+ 14|    "input": {
+ 21|      "hint": "FOCUS"
+  5|    }
+  4|  },
+  3|  {
+ 19|    "name": "zoom",
+ 35|    "description": "Zooms a pane.",
+ 14|    "input": {
+ 20|      "hint": "pane"
+  5|    }
+  3|  }
+  1|]

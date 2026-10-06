@@ -298,6 +298,8 @@ type Result struct {
 
 * **`Loop` is the default `Mode`,** because the workspace is not safe for
   concurrent use (0003-REPORT §1.12) and most UI commands are instant.
+  (*A7: `Run` from off the loop hands a `Loop` command to the loop through
+  `WithLoop`.*)
   `Async` is for slow work: a file search, a network call, a long prompt
   expansion.
 * **Cancellation.** `Registry.Cancel(id ID)` and `CancelAll()` cancel
@@ -1367,6 +1369,56 @@ each the recommendation. The alternatives were:
 10. refusing the command;
 11. no schema for a file whose only placeholder is `$ARGUMENTS`, and
     stray words refused when it has others.
+
+### A7 (2026-10-05): `Loop` commands run from off the loop, ACP export, and one command description
+
+*Status: accepted (2026-10-05).* Found before writing Step 6 of
+[0006-PLAN-command-registry.md](0006-PLAN-command-registry.md), recorded
+there as deviations D24–D26. The first was found while building Step 3
+and left open for this step.
+
+**Found.**
+
+1. §3 has `Run` serve "the shell, agents and tests", for any mode, and
+   §7's `CallMCP` runs as an agent. An agent's tool call arrives on its
+   own goroutine, so a `Loop` command run through `Run` touches the
+   workspace off the event loop, which §3 makes the reason for `Loop`.
+2. §7 names `ACPCommands` without saying which commands it exports or
+   under what name. ACP's available commands are what a user types as
+   `/name`.
+3. §7's `Manifest` describes each command, and the registry's own
+   `command.list` and `command.describe` already did so with an unexported
+   type of nearly the same fields.
+
+**Decided.**
+
+1. **`WithLoop(send func(tea.Msg))`**, a registry option: the host passes
+   `program.Send`. With it, `Run`, and so `CallMCP`, sends a `LoopMsg`
+   for a `Loop` command and waits until the loop has run it, or until the
+   context ends. The host's `Update` returns `msg.Run()` for a `LoopMsg`,
+   which runs the handler on the loop and gives its `Result.Cmd` to the
+   program; `Run` then returns the result without the `Cmd`, which has
+   gone to the program already. Without `WithLoop`, `Run` runs a `Loop`
+   command on its caller's goroutine, as before, which suits the shell
+   and tests. With `WithLoop` set, `Update` must use `Dispatch`, not
+   `Run`, or it waits for itself.
+2. **`ACPCommands` exports slash commands only**, under their slash
+   names, with `ArgHint` as `input.hint`. A command without a slash name
+   is left out, because a user cannot type it.
+3. **`ManifestCommand` is the one exported description of a command.**
+   `command.list` and `command.describe` return it, and the unexported
+   type is removed.
+
+**Changed.** §3's `Loop` note, annotated in place.
+
+**Owner questions for A7.** *Answered 2026-10-05* (picked from options),
+each the recommendation. The alternatives were:
+
+1. to document only that the host calls `CallMCP` from its loop, where a
+   gate that waits for the user cannot be used, or to defer to Step 7;
+2. to export every agent-surface command, by ID when it has no slash
+   name;
+3. to keep both types.
 
 ## More Information
 

@@ -29,7 +29,7 @@ func TestBuiltins(t *testing.T) {
 		if err != nil {
 			t.Fatalf("command.list from %s: %v", o, err)
 		}
-		infos, _ := res.Value.([]commandInfo)
+		infos, _ := res.Value.([]ManifestCommand)
 		var out []ID
 		for _, i := range infos {
 			out = append(out, i.ID)
@@ -51,7 +51,7 @@ func TestBuiltins(t *testing.T) {
 		t.Errorf("describing an unknown ID: %v", err)
 	}
 	res, err = r.Run(t.Context(), Request{ID: idDescribe, Args: []byte(`{"id":"command.describe"}`), Origin: OriginAgent})
-	info, _ := res.Value.(commandInfo)
+	info, _ := res.Value.(ManifestCommand)
 	if err != nil || info.ID != idDescribe || info.Danger != "read-only" || len(info.Args) == 0 {
 		t.Fatalf("command.describe: %+v, %v", info, err)
 	}

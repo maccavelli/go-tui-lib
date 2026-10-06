@@ -38,6 +38,7 @@ type Registry struct {
 	policy   policy
 	auditor  Auditor
 	prefixer func(Source) string
+	loop     func(tea.Msg) // WithLoop's send, or nil
 	running  running
 }
 
@@ -77,6 +78,14 @@ func WithAuditor(a Auditor) RegistryOption { return func(r *Registry) { r.audito
 func WithPrefixer(f func(Source) string) RegistryOption {
 	return func(r *Registry) { r.prefixer = f }
 }
+
+// WithLoop gives the registry the program's event loop: send is the
+// program's Send. Run, called off the loop, then hands a Loop command to
+// the loop as a LoopMsg and waits for it, so an agent's tool call never
+// touches the program's state from its own goroutine
+// (docs/decisions/0006-MADR-command-registry.md A7). With WithLoop set,
+// Update must use Dispatch, not Run, or it waits for itself.
+func WithLoop(send func(tea.Msg)) RegistryOption { return func(r *Registry) { r.loop = send } }
 
 // NewRegistry returns a registry at version 0 holding only its own
 // commands: command.list, command.describe and app.quit.

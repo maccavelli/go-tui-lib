@@ -1,0 +1,198 @@
+  1|[
+  3|  {
+ 29|    "name": "acp.agent.plan",
+ 20|    "title": "plan",
+ 32|    "description": "Plan first",
+ 20|    "inputSchema": {
+ 22|      "type": "object"
+  6|    },
+ 20|    "annotations": {
+ 28|      "readOnlyHint": false,
+ 31|      "destructiveHint": false,
+ 30|      "idempotentHint": false,
+ 28|      "openWorldHint": false
+  6|    },
+ 14|    "_meta": {
+ 14|      "acp": {
+ 22|        "name": "plan"
+  7|      }
+  5|    }
+  4|  },
+  3|  {
+ 23|    "name": "app.quit",
+ 20|    "title": "Quit",
+ 68|    "description": "Asks the program to quit; the program decides.",
+ 20|    "inputSchema": {
+ 64|      "$schema": "https://json-schema.org/draft/2020-12/schema",
+ 23|      "type": "object",
+ 35|      "additionalProperties": false
+  6|    },
+ 20|    "annotations": {
+ 28|      "readOnlyHint": false,
+ 31|      "destructiveHint": false,
+ 30|      "idempotentHint": false,
+ 28|      "openWorldHint": false
+  5|    }
+  4|  },
+  3|  {
+ 31|    "name": "command.describe",
+ 34|    "title": "Describe a command",
+ 81|    "description": "Describes one command: its ID, arguments schema and danger.",
+ 20|    "inputSchema": {
+ 64|      "$schema": "https://json-schema.org/draft/2020-12/schema",
+ 23|      "type": "object",
+ 21|      "properties": {
+ 15|        "id": {
+ 27|          "type": "string",
+ 44|          "description": "the command's ID",
+ 20|          "x-cli": {
+ 24|            "arg": true,
+ 31|            "placeholder": "ID"
+ 11|          }
+  9|        }
+  8|      },
+ 19|      "required": [
+ 12|        "id"
+  8|      ],
+ 35|      "additionalProperties": false
+  6|    },
+ 20|    "annotations": {
+ 27|      "readOnlyHint": true,
+ 28|      "openWorldHint": false
+  5|    }
+  4|  },
+  3|  {
+ 27|    "name": "command.list",
+ 29|    "title": "List commands",
+134|    "description": "Lists the commands the caller can run now: not hidden, offered where it asks from, and available in its context.",
+ 20|    "inputSchema": {
+ 64|      "$schema": "https://json-schema.org/draft/2020-12/schema",
+ 23|      "type": "object",
+ 35|      "additionalProperties": false
+  6|    },
+ 20|    "annotations": {
+ 27|      "readOnlyHint": true,
+ 28|      "openWorldHint": false
+  5|    }
+  4|  },
+  3|  {
+ 23|    "name": "doc.read",
+ 24|    "title": "doc.read",
+ 41|    "description": "Reads the document.",
+ 20|    "inputSchema": {
+ 64|      "$schema": "https://json-schema.org/draft/2020-12/schema",
+ 23|      "type": "object",
+ 35|      "additionalProperties": false
+  6|    },
+ 21|    "outputSchema": {
+ 23|      "type": "object",
+ 21|      "properties": {
+ 18|        "lines": {
+ 27|          "type": "integer"
+  9|        }
+  7|      }
+  6|    },
+ 20|    "annotations": {
+ 27|      "readOnlyHint": true,
+ 28|      "openWorldHint": false
+  5|    }
+  4|  },
+  3|  {
+ 27|    "name": "files.delete",
+ 28|    "title": "files.delete",
+ 37|    "description": "Deletes a file.",
+ 20|    "inputSchema": {
+ 64|      "$schema": "https://json-schema.org/draft/2020-12/schema",
+ 23|      "type": "object",
+ 21|      "properties": {
+ 17|        "path": {
+ 27|          "type": "string",
+ 46|          "description": "the file to delete",
+ 25|          "minLength": 1,
+ 20|          "x-cli": {
+ 23|            "arg": true
+ 11|          }
+  9|        }
+  8|      },
+ 19|      "required": [
+ 14|        "path"
+  8|      ],
+ 35|      "additionalProperties": false
+  6|    },
+ 20|    "annotations": {
+ 28|      "readOnlyHint": false,
+ 30|      "destructiveHint": true,
+ 30|      "idempotentHint": false,
+ 27|      "openWorldHint": true
+  5|    }
+  4|  },
+  3|  {
+ 28|    "name": "session.reset",
+ 29|    "title": "session.reset",
+ 41|    "description": "Resets the session.",
+ 20|    "inputSchema": {
+ 64|      "$schema": "https://json-schema.org/draft/2020-12/schema",
+ 23|      "type": "object",
+ 35|      "additionalProperties": false
+  6|    },
+ 20|    "annotations": {
+ 28|      "readOnlyHint": false,
+ 31|      "destructiveHint": false,
+ 30|      "idempotentHint": false,
+ 28|      "openWorldHint": false
+  5|    }
+  4|  },
+  3|  {
+ 26|    "name": "user.review",
+ 22|    "title": "review",
+ 37|    "description": "Review the diff",
+ 20|    "inputSchema": {
+ 64|      "$schema": "https://json-schema.org/draft/2020-12/schema",
+ 23|      "type": "object",
+ 21|      "properties": {
+ 18|        "FOCUS": {
+ 27|          "type": "string",
+ 20|          "x-cli": {
+ 23|            "arg": true
+ 11|          }
+  9|        }
+  8|      },
+ 19|      "required": [
+ 15|        "FOCUS"
+  8|      ],
+ 35|      "additionalProperties": false
+  6|    },
+ 20|    "annotations": {
+ 27|      "readOnlyHint": true,
+ 28|      "openWorldHint": false
+  5|    }
+  4|  },
+  3|  {
+ 24|    "name": "view.zoom",
+ 25|    "title": "view.zoom",
+ 35|    "description": "Zooms a pane.",
+ 20|    "inputSchema": {
+ 64|      "$schema": "https://json-schema.org/draft/2020-12/schema",
+ 23|      "type": "object",
+ 21|      "properties": {
+ 17|        "pane": {
+ 27|          "type": "string",
+ 61|          "description": "the pane; default the focused one",
+ 20|          "x-cli": {
+ 23|            "arg": true
+ 11|          }
+  9|        }
+  8|      },
+ 35|      "additionalProperties": false
+  6|    },
+ 20|    "annotations": {
+ 28|      "readOnlyHint": false,
+ 31|      "destructiveHint": false,
+ 29|      "idempotentHint": true,
+ 28|      "openWorldHint": false
+  6|    },
+ 14|    "_meta": {
+ 20|      "icon": "zoom"
+  5|    }
+  3|  }
+  1|]

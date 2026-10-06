@@ -14,34 +14,6 @@ const (
 	idQuit     ID = "app.quit"
 )
 
-// commandInfo is a command as command.list and command.describe give it.
-type commandInfo struct {
-	ID          ID       `json:"id"`
-	Title       string   `json:"title"`
-	Description string   `json:"description,omitzero"`
-	Category    string   `json:"category,omitzero"`
-	Slash       string   `json:"slash,omitzero"`
-	Aliases     []string `json:"aliases,omitzero"`
-	Kind        string   `json:"kind"`
-	Danger      string   `json:"danger"`
-	Surfaces    string   `json:"surfaces"`
-	Mode        string   `json:"mode"`
-	When        string   `json:"when,omitzero"`
-	Hidden      bool     `json:"hidden,omitzero"`
-	Source      string   `json:"source"`
-	Args        Schema   `json:"args,omitzero"`
-	Output      Schema   `json:"output,omitzero"`
-}
-
-func infoOf(c *Command) commandInfo {
-	return commandInfo{
-		ID: c.ID, Title: c.Title, Description: c.Description, Category: c.Category,
-		Slash: c.Slash, Aliases: c.Aliases, Kind: c.Kind.String(), Danger: c.Danger.String(),
-		Surfaces: c.surfaces().String(), Mode: c.Mode.String(), When: c.When, Hidden: c.Hidden,
-		Source: c.Source.String(), Args: c.Args, Output: c.Output,
-	}
-}
-
 // describeArgs is command.describe's argument.
 type describeArgs struct {
 	ID string `json:"id" arg:"" help:"the command's ID" placeholder:"ID"`
@@ -50,10 +22,10 @@ type describeArgs struct {
 // builtins is the registry's own commands, closed over r.
 func (r *Registry) builtins() []Command {
 	list, err1 := New(idList, "List commands", func(_ context.Context, inv *Invocation, _ NoArgs) (Result, error) {
-		var infos []commandInfo
+		var infos []ManifestCommand
 		var text strings.Builder
 		for c := range r.Available(inv.Context, inv.Origin.surface()) {
-			infos = append(infos, infoOf(&c))
+			infos = append(infos, manifestCommandOf(&c))
 			text.WriteString(string(c.ID) + "  " + c.Title + "\n")
 		}
 		return Result{Value: infos, Text: text.String()}, nil
@@ -65,7 +37,7 @@ func (r *Registry) builtins() []Command {
 		if !ok {
 			return Result{}, &ArgError{Path: "/id", Reason: "no command has this ID"}
 		}
-		info := infoOf(&c)
+		info := manifestCommandOf(&c)
 		text := string(c.ID) + "\n" + c.Title + "\n"
 		if c.Description != "" {
 			text += c.Description + "\n"

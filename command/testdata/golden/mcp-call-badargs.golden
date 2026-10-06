@@ -1,0 +1,10 @@
+  1|{
+ 27|  "resultType": "complete",
+ 14|  "content": [
+  5|    {
+ 21|      "type": "text",
+142|      "text": "The arguments do not fit the tool's input schema: command: argument /pane: is an integer, not string. Fix them and call again."
+  5|    }
+  4|  ],
+ 17|  "isError": true
+  1|}

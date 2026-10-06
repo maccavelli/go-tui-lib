@@ -1,0 +1,248 @@
+  1|{
+ 14|  "format": 1,
+ 15|  "version": 3,
+ 15|  "commands": [
+  5|    {
+ 29|      "id": "acp.agent.plan",
+ 22|      "title": "plan",
+ 34|      "description": "Plan first",
+ 22|      "slash": "plan",
+ 20|      "aliases": [],
+ 24|      "argHint": "goal",
+ 24|      "kind": "forward",
+ 27|      "danger": "mutating",
+ 48|      "surfaces": "key|palette|slash|cli|agent",
+ 21|      "mode": "loop",
+ 24|      "scope": "global",
+ 27|      "source": "acp:agent"
+  6|    },
+  5|    {
+ 23|      "id": "app.quit",
+ 22|      "title": "Quit",
+ 70|      "description": "Asks the program to quit; the program decides.",
+ 23|      "kind": "action",
+ 21|      "danger": "ui",
+ 44|      "surfaces": "key|palette|slash|agent",
+ 21|      "mode": "loop",
+ 24|      "scope": "global",
+ 26|      "source": "builtin",
+ 15|      "args": {
+ 66|        "$schema": "https://json-schema.org/draft/2020-12/schema",
+ 25|        "type": "object",
+ 37|        "additionalProperties": false
+  7|      }
+  6|    },
+  5|    {
+ 31|      "id": "command.describe",
+ 36|      "title": "Describe a command",
+ 83|      "description": "Describes one command: its ID, arguments schema and danger.",
+ 30|      "argHint": "command id",
+ 23|      "kind": "action",
+ 28|      "danger": "read-only",
+ 48|      "surfaces": "key|palette|slash|cli|agent",
+ 21|      "mode": "loop",
+ 24|      "scope": "global",
+ 25|      "idempotent": true,
+ 26|      "source": "builtin",
+ 15|      "args": {
+ 66|        "$schema": "https://json-schema.org/draft/2020-12/schema",
+ 25|        "type": "object",
+ 23|        "properties": {
+ 17|          "id": {
+ 29|            "type": "string",
+ 46|            "description": "the command's ID",
+ 22|            "x-cli": {
+ 26|              "arg": true,
+ 33|              "placeholder": "ID"
+ 13|            }
+ 11|          }
+ 10|        },
+ 21|        "required": [
+ 14|          "id"
+ 10|        ],
+ 37|        "additionalProperties": false
+  7|      }
+  6|    },
+  5|    {
+ 27|      "id": "command.list",
+ 31|      "title": "List commands",
+136|      "description": "Lists the commands the caller can run now: not hidden, offered where it asks from, and available in its context.",
+ 23|      "kind": "action",
+ 28|      "danger": "read-only",
+ 48|      "surfaces": "key|palette|slash|cli|agent",
+ 21|      "mode": "loop",
+ 24|      "scope": "global",
+ 25|      "idempotent": true,
+ 26|      "source": "builtin",
+ 15|      "args": {
+ 66|        "$schema": "https://json-schema.org/draft/2020-12/schema",
+ 25|        "type": "object",
+ 37|        "additionalProperties": false
+  7|      }
+  6|    },
+  5|    {
+ 23|      "id": "doc.read",
+ 26|      "title": "doc.read",
+ 43|      "description": "Reads the document.",
+ 23|      "kind": "action",
+ 28|      "danger": "read-only",
+ 48|      "surfaces": "key|palette|slash|cli|agent",
+ 21|      "mode": "loop",
+ 24|      "scope": "global",
+ 26|      "source": "builtin",
+ 15|      "args": {
+ 66|        "$schema": "https://json-schema.org/draft/2020-12/schema",
+ 25|        "type": "object",
+ 37|        "additionalProperties": false
+  8|      },
+ 17|      "output": {
+ 25|        "type": "object",
+ 23|        "properties": {
+ 20|          "lines": {
+ 29|            "type": "integer"
+ 11|          }
+  9|        }
+  7|      }
+  6|    },
+  5|    {
+ 27|      "id": "files.delete",
+ 30|      "title": "files.delete",
+ 39|      "description": "Deletes a file.",
+ 23|      "kind": "action",
+ 30|      "danger": "destructive",
+ 48|      "surfaces": "key|palette|slash|cli|agent",
+ 21|      "mode": "loop",
+ 24|      "scope": "global",
+ 24|      "openWorld": true,
+ 26|      "source": "builtin",
+ 15|      "args": {
+ 66|        "$schema": "https://json-schema.org/draft/2020-12/schema",
+ 25|        "type": "object",
+ 23|        "properties": {
+ 19|          "path": {
+ 29|            "type": "string",
+ 48|            "description": "the file to delete",
+ 27|            "minLength": 1,
+ 22|            "x-cli": {
+ 25|              "arg": true
+ 13|            }
+ 11|          }
+ 10|        },
+ 21|        "required": [
+ 16|          "path"
+ 10|        ],
+ 37|        "additionalProperties": false
+  7|      }
+  6|    },
+  5|    {
+ 22|      "id": "not.now",
+ 25|      "title": "not.now",
+ 23|      "slash": "later",
+ 23|      "kind": "action",
+ 21|      "danger": "ui",
+ 48|      "surfaces": "key|palette|slash|cli|agent",
+ 21|      "mode": "loop",
+ 21|      "when": "busy",
+ 24|      "scope": "global",
+ 25|      "source": "builtin"
+  6|    },
+  5|    {
+ 26|      "id": "secret.tool",
+ 29|      "title": "secret.tool",
+ 24|      "slash": "secret",
+ 23|      "kind": "action",
+ 21|      "danger": "ui",
+ 48|      "surfaces": "key|palette|slash|cli|agent",
+ 21|      "mode": "loop",
+ 24|      "scope": "global",
+ 21|      "hidden": true,
+ 25|      "source": "builtin"
+  6|    },
+  5|    {
+ 28|      "id": "session.reset",
+ 31|      "title": "session.reset",
+ 43|      "description": "Resets the session.",
+ 23|      "slash": "reset",
+ 23|      "kind": "action",
+ 27|      "danger": "mutating",
+ 48|      "surfaces": "key|palette|slash|cli|agent",
+ 21|      "mode": "loop",
+ 24|      "scope": "global",
+ 26|      "source": "builtin",
+ 15|      "args": {
+ 66|        "$schema": "https://json-schema.org/draft/2020-12/schema",
+ 25|        "type": "object",
+ 37|        "additionalProperties": false
+  7|      }
+  6|    },
+  5|    {
+ 25|      "id": "shell.only",
+ 28|      "title": "shell.only",
+ 23|      "slash": "shell",
+ 23|      "kind": "action",
+ 21|      "danger": "ui",
+ 24|      "surfaces": "cli",
+ 21|      "mode": "loop",
+ 24|      "scope": "global",
+ 25|      "source": "builtin"
+  6|    },
+  5|    {
+ 26|      "id": "user.review",
+ 24|      "title": "review",
+ 39|      "description": "Review the diff",
+ 24|      "slash": "review",
+ 20|      "aliases": [],
+ 25|      "argHint": "FOCUS",
+ 23|      "kind": "prompt",
+ 28|      "danger": "read-only",
+ 48|      "surfaces": "key|palette|slash|cli|agent",
+ 21|      "mode": "loop",
+ 24|      "scope": "global",
+ 23|      "source": "user",
+ 15|      "args": {
+ 66|        "$schema": "https://json-schema.org/draft/2020-12/schema",
+ 25|        "type": "object",
+ 23|        "properties": {
+ 20|          "FOCUS": {
+ 29|            "type": "string",
+ 22|            "x-cli": {
+ 25|              "arg": true
+ 13|            }
+ 11|          }
+ 10|        },
+ 21|        "required": [
+ 17|          "FOCUS"
+ 10|        ],
+ 37|        "additionalProperties": false
+  7|      }
+  6|    },
+  5|    {
+ 24|      "id": "view.zoom",
+ 27|      "title": "view.zoom",
+ 37|      "description": "Zooms a pane.",
+ 22|      "slash": "zoom",
+ 24|      "argHint": "pane",
+ 23|      "kind": "action",
+ 21|      "danger": "ui",
+ 48|      "surfaces": "key|palette|slash|cli|agent",
+ 21|      "mode": "loop",
+ 24|      "scope": "global",
+ 25|      "idempotent": true,
+ 26|      "source": "builtin",
+ 15|      "args": {
+ 66|        "$schema": "https://json-schema.org/draft/2020-12/schema",
+ 25|        "type": "object",
+ 23|        "properties": {
+ 19|          "pane": {
+ 29|            "type": "string",
+ 63|            "description": "the pane; default the focused one",
+ 22|            "x-cli": {
+ 25|              "arg": true
+ 13|            }
+ 11|          }
+ 10|        },
+ 37|        "additionalProperties": false
+  7|      }
+  5|    }
+  3|  ]
+  1|}

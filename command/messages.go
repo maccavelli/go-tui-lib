@@ -1,6 +1,10 @@
 package command
 
-import "time"
+import (
+	"time"
+
+	tea "charm.land/bubbletea/v2"
+)
 
 // ResultMsg follows every Dispatch: the request, what the command
 // produced, its error, and how long it ran. Err is ErrUnknown,
@@ -30,6 +34,19 @@ type ChangedMsg struct {
 // ConflictMsg reports the slash names a load had to rename.
 type ConflictMsg struct {
 	Conflicts []Conflict
+}
+
+// LoopMsg is a Loop command that Run, called off the event loop, hands to
+// the program (WithLoop). The host's Update returns msg.Run(), which runs
+// the command on the loop and returns its Result.Cmd.
+type LoopMsg struct{ run func() tea.Cmd }
+
+// Run runs the command and returns its effect for the program.
+func (m LoopMsg) Run() tea.Cmd {
+	if m.run == nil {
+		return nil
+	}
+	return m.run()
 }
 
 // QuitRequestMsg asks the program to quit. The program decides; the

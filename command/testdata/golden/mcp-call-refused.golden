@@ -1,0 +1,10 @@
+  1|{
+ 27|  "resultType": "complete",
+ 14|  "content": [
+  5|    {
+ 21|      "type": "text",
+166|      "text": "The call to session.reset was refused: command: refused: mutating session.reset from agent needs a gate, and there is none. Do not retry it unchanged."
+  5|    }
+  4|  ],
+ 17|  "isError": true
+  1|}
