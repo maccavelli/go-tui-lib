@@ -119,7 +119,7 @@ func tail(s []string, n int) []string {
 
 // session builds the agent session on root with theme th, sized w × h,
 // and streams some activity into it.
-func session(root layout.Node, th theme.Theme, w, h int) *workspace.Workspace {
+func session(root layout.Node, th theme.Theme, w, h int, opts ...workspace.Option) *workspace.Workspace {
 	ws := workspace.New(root, map[layout.PaneID]workspace.Pane{
 		"session": &transcript{},
 		"metrics": &metrics{rows: [][2]string{
@@ -127,7 +127,7 @@ func session(root layout.Node, th theme.Theme, w, h int) *workspace.Workspace {
 		}},
 		"logs":   &logs{},
 		"footer": &footer{text: "claude | mode ask | ctx 18% | $0.042"},
-	}, workspace.WithTheme(th), workspace.WithPaneChrome("footer", workspace.None))
+	}, append([]workspace.Option{workspace.WithTheme(th), workspace.WithPaneChrome("footer", workspace.None)}, opts...)...)
 	ws.Init()
 	ws.Update(tea.WindowSizeMsg{Width: w, Height: h})
 	for _, l := range []string{"you: list the open files", "agent: reading the workspace", "agent: 3 files are open"} {

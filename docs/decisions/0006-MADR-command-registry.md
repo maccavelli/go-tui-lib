@@ -1420,6 +1420,41 @@ each the recommendation. The alternatives were:
    name;
 3. to keep both types.
 
+### A8 (2026-10-06): the workspace's hidden panes, unknown panes, and the panes list
+
+*Status: accepted (2026-10-06).* Found before writing Step 7 of
+[0006-PLAN-command-registry.md](0006-PLAN-command-registry.md), recorded
+there as deviations D27–D29. §8 and §9 name the key and the commands and
+leave these open.
+
+**Decided.**
+
+1. **`workspace.hiddenPanes` is `Plan().Hidden`:** every pane the layout
+   knows and is not showing, whether the user hid it, a responsive rule
+   dropped it, or it was squeezed out. It matches what `workspace.panes`
+   reports as hidden.
+2. **A pane the layout does not know is an argument error** for
+   `workspace.zoom` and `workspace.toggle`, as it is for `workspace.focus`
+   and `workspace.resize`. "Known" means placed or in `Plan().Hidden`.
+   The workspace's own `Zoom` and `Toggle` methods are unchanged.
+3. **`workspace.panes` lists** the focus ring first, then placed panes
+   outside the ring (a footer that takes no focus) in tree order, then
+   `Plan().Hidden` in its order. Panes the layout tree never mentions are
+   left out.
+4. **`workspace.resize`'s `split`** (found while building, after items
+   1–3). A2 took a split's name for what `Resize` moves, but `layout` names
+   each separator `<split>:<index>`: the agent preset's is `sidebar:0`, and
+   `Resize("sidebar", …)` moves nothing. `split` takes a resizable
+   separator's ID on screen, or a split's name when that split has exactly
+   one resizable separator on screen, so A2's `/resize sidebar 4` means
+   `sidebar:0`. A name with more than one is an argument error that lists
+   them.
+
+**Owner questions for A8.** *Answered 2026-10-06* (picked from options),
+each the recommendation. The alternatives were: `State().Hidden`, the
+panes the user hid; an argument error for focus and resize only; tree
+order with hidden panes last; for item 4, separator IDs only.
+
 ## More Information
 
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md):

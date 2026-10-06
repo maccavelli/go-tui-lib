@@ -573,7 +573,8 @@ goldens are read, and every mutation is killed.
   WhenContext() when.Context }`;
 * the typed keys, as package variables: `KeyFocusedPane`
   (`workspace.focusedPane`, string), `KeyZoomed` (`workspace.zoomed`,
-  bool), `KeyHiddenPanes` (`workspace.hiddenPanes`, list), `KeyOverlay`
+  bool), `KeyHiddenPanes` (`workspace.hiddenPanes`, list; *D27:
+  `Plan().Hidden`*), `KeyOverlay`
   (`workspace.overlay`, string), `KeyModal` (`workspace.modal`, bool),
   `KeyWidth` (`workspace.width`, int), `KeyHeight` (`workspace.height`,
   int); and `ContextKeys() when.Keys`;
@@ -586,8 +587,8 @@ unless marked:
 | :--- | :--- | :--- | :--- |
 | `workspace.focus` | `focus` | `pane` (`arg`) | `Focus`; a pane not in the plan is an `ArgError` |
 | `workspace.focus.next`, `.prev` | `next`, `prev` | — | `FocusNext`, `FocusPrev` |
-| `workspace.zoom` | `zoom` | `pane` (`arg`, `omitzero`) | `Zoom(pane)`, the focused pane when empty |
-| `workspace.toggle` | `toggle` | `pane` (`arg`) | `Toggle` |
+| `workspace.zoom` | `zoom` | `pane` (`arg`, `omitzero`) | `Zoom(pane)`, the focused pane when empty (*D28: a pane the layout does not know is an `ArgError`*) |
+| `workspace.toggle` | `toggle` | `pane` (`arg`) | `Toggle` (*D28: likewise*) |
 | `workspace.resize` | `resize` | `split` (`arg`), `delta` (`arg`, `-200..200`) | `Resize`; a split that is not a resizable separator of `Plan()` is an `ArgError` |
 | `workspace.layout.use` | `layout` | `name` (`arg`, an enum of `WithLayouts`'s keys) | `SetLayout`; registered only when `WithLayouts` names a layout |
 | `workspace.layout.reset` | — | — | `SetState(layout.State{})` |
@@ -612,8 +613,8 @@ pane's, then the workspace's keys.
 | Test | Shows |
 | :--- | :--- |
 | `TestBuiltinsMatchMethods` | each built-in, dispatched through a registry, gives the same frame and `State` as its method |
-| `TestPanesCommand` | every pane, visible and hidden, with its rectangle and focus |
-| `TestResizeSplit` | `sidebar` moves; a pane name or a positional split is an `ArgError` |
+| `TestPanesCommand` | every pane, visible and hidden, with its rectangle and focus (*D29: the ring, then other placed panes, then `Plan().Hidden`*) |
+| `TestResizeSplit` | `sidebar` moves; a pane name or a positional split is an `ArgError` (*D30: `sidebar` means the separator `sidebar:0`, which also works; a name with several separators is an `ArgError`*) |
 | `TestLayoutUseEnum` | the schema's enum is exactly `WithLayouts`'s keys, sorted; without them the command is absent |
 | `TestLayoutReset` | a zoomed, resized and hidden layout returns to the zero state |
 | `TestWhenContextLayers` | overlay, then focused pane, then workspace |
@@ -1590,3 +1591,135 @@ deadlines were added. Because this step changed `dispatch.go`,
 `registry.go`, `builtin.go` and `messages.go`, Step 3's eleven, Step 4's
 thirteen and two single-layer mutations, and Step 5's sixteen ran again:
 all killed. Step 2's set was not rerun: nothing under `when/` changed.
+
+### Step 7: workspace integration
+
+#### Deviations
+
+Found before any Step 7 code was written; MADR amendment A8 records the
+decisions. Each was asked with options, and the owner picked the
+recommendation on 2026-10-06.
+
+* **D27: what `workspace.hiddenPanes` holds.** `Plan().Hidden`.
+* **D28: an unknown pane for `workspace.zoom` and `workspace.toggle`.** An
+  `ArgError`, as for `focus` and `resize`.
+* **D29: `workspace.panes`'s order and members.** The focus ring, then
+  other placed panes in tree order, then `Plan().Hidden`; panes the tree
+  never mentions are left out.
+* **D30 (2026-10-06): `workspace.resize`'s `split`** (found while
+  building, after D27–D29; MADR A8 item 4). `layout` names separators
+  `<split>:<index>`, so `Resize("sidebar", …)`, which A2's example and this
+  step's test assumed, moves nothing. Options given: a separator ID, or a
+  split name with exactly one resizable separator on screen
+  (recommended); separator IDs only. **The owner picked "A separator ID,
+  or a name with one".**
+
+#### What was built
+
+* `workspace/commands.go`: `Commands`, `CommandOption`, `WithLayouts`, and
+  the thirteen built-ins of the step's table, each `Loop`, offered on every
+  surface but the shell, `UI` or `ReadOnly` as the table says, in the
+  category `Workspace`. `workspace/context.go`: `Contexter`, the seven
+  typed keys, `ContextKeys`, `(*Workspace).WhenContext`.
+  `workspace/background.go`: `(*Workspace).SetBackground`.
+  `workspace/workspace.go`: a `pinnedBg` field beside `bg`, which now
+  holds only what the terminal last reported. `rebuildTheme` builds for
+  the pinned background when there is one, and a `tea.BackgroundColorMsg`
+  rebuilds only when none is pinned. No other exported name. `workspace`
+  newly imports `command` and `when`, and nothing else
+  (`go list -deps ./workspace`).
+* Choices inside the listed names:
+  * `workspace.focus` refuses a pane that cannot take focus now (one that
+    is not placed, or a `Focusable` pane that says no, such as a footer),
+    since `Focus` would do nothing.
+  * `workspace.zoom` with no pane zooms the focused one, and so restores
+    the layout when the focused pane is zoomed already, as `Zoom` does.
+  * `workspace.state.set` restores the previous state when the layout
+    cannot use the new one, and refuses it with an `ArgError` at `/state`.
+    The workspace's own `SetState` keeps the bad state and reports it
+    through `Err`. `layout.State`'s `version` is required in the schema,
+    as its json tag has no `omitempty`.
+  * `workspace.layout.use`'s enum is set by editing the schema `New`
+    emits, because the layout names are known only at run time.
+  * `workspace.panes` returns each pane's `id`, `title`, `x`, `y`,
+    `width`, `height`, `focused` and `hidden`, with a hidden pane's
+    rectangle zero. Its text is one line per pane.
+  * `workspace.overlay.close` with no overlay open returns the text "No
+    overlay is open." and no error.
+  * `KeyWidth` and `KeyHeight` are the workspace's size, not the
+    terminal's.
+* Test code: `session` in `workspace/agent_test.go` takes extra
+  options, so `TestCommandsGolden` can build the agent session following
+  the background. Existing callers are unchanged. Tests beyond the table:
+  `TestUnknownPanes` (D28), `TestStateSetRefusesBadState` and
+  `TestContextKeys`. `TestAgentMayZoom` runs the zoom twice: once through
+  `CallMCP` on the caller, and once through `WithLoop`, where the agent's
+  goroutine waits until the test, acting as the loop, runs the `LoopMsg`
+  (A7).
+* Found while building:
+  * D30.
+  * In `TestWhenContextLayers`, the test pane first embedded another test
+    pane, whose `Update` returned the embedded value. The workspace kept
+    that, so the overlay lost its `Contexter`, and the pane was not
+    focusable. The test pane now stands alone.
+  * D29's mutation would have survived, because in the agent preset the
+    focus ring follows the tree. `TestPanesCommand` gained a case with
+    `WithFocusRing` in another order.
+
+#### Checks (Rule 3)
+
+1. `gofmt -l workspace`: no output.
+2. `make pre-add-check FILES="<the eight workspace files>"`: exit 0,
+   "go-precheck: 8 file(s) clean in 1 module(s) (gofmt, golangci-lint, go
+   vet, go test, go mod tidy, govulncheck)."
+3. `make lint`: exit 0; `go fix -diff` silent, and "0 issues." for
+   `GOOS=linux`, `darwin` and `windows`.
+4. `GOWORK=off go test -race -count=1 ./...`: exit 0, 15 packages `ok`.
+5. `GOWORK=off go test -shuffle=on -count=2 ./...`: exit 0, 15 packages
+   `ok`.
+6. `LC_ALL=C GOWORK=off go test -count=1 ./...`: exit 0, 15 packages `ok`.
+7. `GOWORK=off go mod tidy -diff`: exit 0, no output.
+8. No fuzz target in this step.
+9. Windows test host, go1.27.1 windows/amd64, on a copy of the tree:
+   `make pre-add-check` exit 0 ("123 file(s) clean in 1 module(s)"),
+   `make lint` exit 0, `make vuln` exit 0 ("No vulnerabilities found."),
+   `GOWORK=off go test -count=3 -shuffle=on ./workspace/` exit 0.
+10. `markdownlint-cli2` on `docs/README.md`: 0 issues (the configuration
+    excludes MADR and PLAN files); the relative-link check of
+    `docs/README.md` and this pair: 0 broken.
+11. Identifier scan of the diff, the new workspace files, the tests and
+    the goldens, for the local account name, the test host's name,
+    home-directory paths and the employer's domain: no match.
+
+The twenty-four `commands-*` goldens were written with `-tuitest.update`
+and read:
+
+* `commands-zoomed` (no colour, ASCII, 80) and `commands-restored` (no
+  colour, ASCII, 80, and no colour, UTF-8, 160) in full.
+* Every file checked for 30 lines at its width, the footer the only
+  other line, which zoomed frames do not show.
+* `commands-light` compared with `commands-restored`: the colour files
+  differ on all 29 bordered lines, and the no-colour files are
+  identical. Choosing the light background changes colour and nothing
+  else (0001-MADR §6, rule 4).
+
+#### Mutations (Rule 4)
+
+Each on a scratch copy of the tree; every failure is an assertion. All
+eleven killed: the step's six, one for each of D27–D30, and one for the
+`WithTheme` rule of `SetBackground`. This step changes nothing in
+`command` or `when`, so the earlier steps' sets were not rerun.
+
+| Mutation | Failing line |
+| :--- | :--- |
+| `WhenContext` puts the workspace keys first | `context_test.go:39: workspace.width = 60, true; want 1` |
+| `workspace.panes` leaves hidden panes out | `commands_test.go:201: panes = [session logs footer], want [session logs footer metrics]` |
+| `workspace.focus.next` moves twice | `commands_test.go:146: next: the frames differ:` |
+| a background message overrides a pinned background | `background_test.go:46: a light report rebuilt a pinned dark theme: [2]` |
+| `auto` sends no query | `background_test.go:63: auto does not ask the terminal again` |
+| `workspace.resize` accepts any split | `commands_test.go:272: split "session": <nil>, want an ArgError at /split` |
+| D27: `workspace.hiddenPanes` holds `State().Hidden` | `context_test.go:64: workspace.hiddenPanes = [metrics], want Plan().Hidden [metrics logs footer]` |
+| D28: zoom and toggle accept an unknown pane | `commands_test.go:282: workspace.zoom of an unknown pane: <nil>, want an ArgError at /pane` |
+| D29: `workspace.panes` ignores the focus ring | `commands_test.go:226: with a focus ring: panes = [session metrics logs footer], want [logs metrics session footer]` |
+| D30: a split's name is not resolved | `commands_test.go:234: command: argument /split: is not a resizable split on screen` |
+| `SetBackground` changes a `WithTheme` workspace | `background_test.go:85: 0 on a WithTheme workspace returned a command` |

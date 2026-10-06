@@ -145,11 +145,12 @@ type Workspace struct {
 	follow   bool            // rebuild the theme on profile and background messages
 	builder  ThemeBuilder    // how to rebuild it; nil is theme.New with the glyphs in use
 	profile  colorprofile.Profile
-	bg       theme.Background
-	noQuery  bool     // WithoutBackgroundQuery
-	regions  []region // the last frame's regions, top first, for hit testing
-	last     string   // the last frame
-	dirty    bool     // something changed since the last frame
+	bg       theme.Background // the background the terminal last reported
+	pinnedBg theme.Background // SetBackground's choice; Unknown follows bg
+	noQuery  bool             // WithoutBackgroundQuery
+	regions  []region         // the last frame's regions, top first, for hit testing
+	last     string           // the last frame
+	dirty    bool             // something changed since the last frame
 	drag     *drag
 }
 
@@ -317,11 +318,12 @@ func (w *Workspace) rebuildTheme() {
 	if !w.follow {
 		return
 	}
+	bg := w.background()
 	if w.builder != nil {
-		w.SetTheme(w.builder(w.profile, w.bg))
+		w.SetTheme(w.builder(w.profile, bg))
 		return
 	}
-	w.SetTheme(theme.New(w.profile, w.bg, w.theme.Glyphs))
+	w.SetTheme(theme.New(w.profile, bg, w.theme.Glyphs))
 }
 
 // Err returns the error of the last layout, if any. The workspace keeps the
@@ -429,7 +431,9 @@ func (w *Workspace) Update(msg tea.Msg) tea.Cmd {
 	case tea.BackgroundColorMsg:
 		if m.Color != nil {
 			w.bg = theme.FromDark(m.IsDark())
-			w.rebuildTheme()
+			if w.pinnedBg == theme.Unknown {
+				w.rebuildTheme()
+			}
 		}
 	}
 	return w.Broadcast(msg)
