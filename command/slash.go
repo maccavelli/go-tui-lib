@@ -74,19 +74,24 @@ func slashObject(r *rule, tail string) (map[string]any, error) {
 	for _, w := range words {
 		if k, v, ok := strings.Cut(w.text, "="); ok && !w.quoted {
 			p := r.prop(k)
-			if p == nil {
+			switch {
+			case p != nil:
+				if err := assign(obj, k, p, v); err != nil {
+					return nil, err
+				}
+				continue
+			case !r.rest:
 				return nil, &ArgError{Path: "/" + pointerToken(k), Reason: "is not a known argument"}
 			}
-			if err := assign(obj, k, p, v); err != nil {
-				return nil, err
-			}
-			continue
 		}
 		// A positional already given by name is skipped.
 		for next < len(positional) && !positional[next].r.is(tArray) && obj[positional[next].name] != nil {
 			next++
 		}
 		if next >= len(positional) {
+			if r.rest {
+				continue // the words stay in Raw, for $ARGUMENTS (A6)
+			}
 			return nil, &ArgError{Reason: fmt.Sprintf("%q is one positional value too many", w.text)}
 		}
 		p := positional[next]

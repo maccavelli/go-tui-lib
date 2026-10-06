@@ -1,0 +1,42 @@
+ 12|user.fix-bug
+ 16|  title: Fix_Bug
+ 36|  description: Fix the bug in $FILE.
+ 16|  slash: fix-bug
+ 14|  kind: prompt
+ 21|  danger: destructive
+ 14|  hidden: true
+ 15|  arghint: FILE
+ 14|  source: user
+192|  args: {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"FILE":{"type":"string","x-cli":{"arg":true}}},"required":["FILE"],"additionalProperties":false}
+ 15|user.git.commit
+ 19|  title: git/commit
+ 37|  description: Write a commit message
+ 19|  slash: git:commit
+ 14|  kind: prompt
+ 18|  danger: mutating
+ 15|  hidden: false
+ 22|  arghint: SCOPE STYLE
+ 14|  source: user
+271|  args: {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"SCOPE":{"type":"string","x-cli":{"arg":true}},"STYLE":{"type":"string","x-cli":{"arg":true}}},"required":["SCOPE","STYLE"],"additionalProperties":false,"x-cli":{"rest":true}}
+ 10|user.notes
+ 14|  title: notes
+ 34|  description: Summarise the notes
+ 14|  slash: notes
+ 14|  kind: prompt
+ 18|  danger: mutating
+ 15|  hidden: false
+ 14|  source: user
+133|  args: {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","additionalProperties":false,"x-cli":{"rest":true}}
+ 11|user.review
+ 24|  title: Review the diff
+ 46|  description: Review the staged diff for bugs
+ 15|  slash: review
+ 20|  aliases: rv, check
+ 16|  category: Code
+ 14|  kind: prompt
+ 19|  danger: read-only
+ 43|  when: workspace.focusedPane == transcript
+ 15|  hidden: false
+ 16|  arghint: FOCUS
+ 14|  source: user
+254|  args: {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"FOCUS":{"type":"string","description":"what to look at first","x-cli":{"arg":true}}},"required":["FOCUS"],"additionalProperties":false,"x-cli":{"rest":true}}

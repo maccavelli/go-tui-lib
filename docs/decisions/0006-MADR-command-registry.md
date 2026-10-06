@@ -417,7 +417,10 @@ func FromACP(agent string, cmds []ACPCommand) []Command
   name is taken is renamed `<prefix>:<name>` (`/user:review`,
   `/mcp:github:issue`), as gemini-cli does. Every rename is a `Conflict`,
   returned and sent as `ConflictMsg`, so a program can show it. `Prefixer`
-  replaces the prefix rule.
+  replaces the prefix rule. (*A6: a built-in registered later takes the
+  name too; a renamed name that is also taken is dropped; `ConflictMsg`
+  arrives through `Watch`; a command that cannot load is a `Conflict`
+  with `Err`.*)
 * **`ReplaceSource` swaps a source's whole set atomically,** because ACP
   sends the full list in each `available_commands_update` and MCP sends
   `list_changed` without a diff.
@@ -439,9 +442,11 @@ func FromACP(agent string, cmds []ACPCommand) []Command
     `category`, `danger`, `when`, `hidden`, `arg.<NAME>`). An unknown key,
     a duplicate key or a nested value is an error naming the file and line.
   * `$NAME` placeholders (`\$([A-Z][A-Z0-9_]*)`) become required string
-    arguments. `$ARGUMENTS` is the whole slash tail.
+    arguments. `$ARGUMENTS` is the whole slash tail. (*A6: the property is
+    named as written, and is positional in order of first use.*)
   * Subdirectories become ID segments: `git/commit.md` is `user.git.commit`
-    and `/user:git:commit`.
+    and `/user:git:commit`. (*A6: its slash name is `git:commit`;
+    `/user:git:commit` is the form a clash gives it.*)
   * The loader reads an `fs.FS`. A host passes `os.Root.FS()` for its
     user and project directories, so a symlink cannot escape them. Where
     those directories are (XDG, project root) is the host's choice.
@@ -1298,6 +1303,70 @@ each the recommendation:
   is not hidden, or every command.
 * `"arg": true` in `x-cli`. The alternative was one `x-cli` list of the
   positional names on the object.
+
+### A6 (2026-10-05): loading, names and clashes
+
+*Status: accepted (2026-10-05).* Found before writing Step 5 of
+[0006-PLAN-command-registry.md](0006-PLAN-command-registry.md), recorded
+there as deviations D13–D22. §6 names the loaders and the clash rule and
+leaves these open.
+
+**Decided.**
+
+1. **`PromptGetter`** is `func(ctx context.Context, name string, args
+   map[string]string) (string, error)`. The host calls its MCP client and
+   joins the result's text; `FromMCPPrompts` knows the server, so the
+   getter is one per server.
+2. **A name that is not an ID segment** (an MCP `github_issue`, an ACP
+   `Plan Mode`, a file `Review.md`) is mapped to one: lowercased, each run
+   of other characters one `-`, the ends trimmed. The slash name is that
+   segment. When two names map to one segment, or a name maps to nothing,
+   the later one is refused and reported.
+3. **`Conflict` gains `Err error`.** A command `ReplaceSource` cannot load
+   (a malformed ID, one outside the source's namespace or held by another
+   source, a bad `when`, no danger) is a `Conflict` with `Err` set and
+   `Renamed` empty.
+4. **A loaded file's slash name** is its path with `:` between parts
+   (`git/commit.md` is `git:commit`), as gemini-cli does, unless its front
+   matter's `slash:` says otherwise. It becomes `<prefix>:<name>` only on
+   a clash.
+5. **A placeholder's property** is named as written: `$FOCUS` is `FOCUS`.
+6. **Placeholders are positional,** with `"arg": true` (A5), in the order
+   each first appears in the body; `name=value` still works.
+7. **Built-ins win whatever the order.** `Register` takes a slash name a
+   loaded command holds, and the loaded command is renamed and reported.
+8. **`ConflictMsg` arrives through `Watch`.** Its command returns
+   `ChangedMsg`, and with it a `ConflictMsg` when the change it woke for
+   renamed or refused a command.
+9. **An ACP forward keeps the agent's name** in `Meta["acp"] = {"name":
+   …}`; a `Forward`'s text uses it when present, otherwise the slash name.
+10. **A renamed name that is also taken is dropped:** the command loads
+    without it, reported as a `Conflict` whose `Renamed` is empty.
+11. **A file that uses `$ARGUMENTS` takes any slash tail.** Found while
+    building, after items 1–10: such a file's schema refused words past
+    its positionals, so `/notes 100` failed for a file whose only
+    placeholder is `$ARGUMENTS`. Its object schema is marked `"x-cli":
+    {"rest": true}`; `ParseSlash` fills the positionals and leaves any
+    further words out of the arguments, in `Raw`, which `$ARGUMENTS`
+    takes whole. Other commands still refuse stray words.
+
+**Changed.** §6's clash rule and placeholder notes, annotated in place.
+
+**Owner questions for A6.** *Answered 2026-10-05* (picked from options),
+each the recommendation. The alternatives were:
+
+1. a getter that returns MCP messages, with two more exported types;
+2. refusing names that are not segments;
+3. `ReplaceSource` returning an error too, or dropping silently;
+4. always prefixing loaded slash names;
+5. lowercased property names;
+6. `name=value` only;
+7. `Register` returning an error, so built-ins must come first;
+8. the host building `ConflictMsg` from `ReplaceSource`'s result;
+9. using `Title` as the forwarded name;
+10. refusing the command;
+11. no schema for a file whose only placeholder is `$ARGUMENTS`, and
+    stray words refused when it has others.
 
 ## More Information
 

@@ -42,20 +42,24 @@ type Registry struct {
 }
 
 // snapshot is one published version of the registry. Nothing changes it
-// once it is published.
+// once it is published, but next, which is set once, before changed is
+// closed.
 type snapshot struct {
-	version uint64
-	entries []entry        // sorted by ID
-	byID    map[ID]int     // index into entries
-	bySlash map[string]int // slash names and aliases, index into entries
-	changed chan struct{}  // closed when the next version is published
+	version   uint64
+	entries   []entry        // sorted by ID
+	byID      map[ID]int     // index into entries
+	bySlash   map[string]int // slash names and aliases, index into entries
+	changed   chan struct{}  // closed when the next version is published
+	next      *snapshot      // the next version, once changed is closed
+	conflicts []Conflict     // what the write that made this version renamed or refused
 }
 
 // entry is a command with its compiled When and arguments schema.
 type entry struct {
-	cmd  Command
-	when when.Expr
-	args *rule // nil when the command has no schema
+	cmd     Command
+	when    when.Expr
+	args    *rule // nil when the command has no schema
+	builtin bool  // added by Register, not loaded by ReplaceSource
 }
 
 // RegistryOption configures NewRegistry.
@@ -83,18 +87,23 @@ func NewRegistry(o ...RegistryOption) *Registry {
 	for _, f := range o {
 		f(r)
 	}
-	entries, err := addEntries(nil, map[ID]bool{}, map[string]bool{}, r.builtins())
-	if err != nil {
-		panic(err) // the registry's own commands are fixed; this is a bug
+	d := r.draftOf(&snapshot{}, nil)
+	for _, c := range r.builtins() {
+		if err := d.addBuiltin(c); err != nil {
+			panic(err) // the registry's own commands are fixed; this is a bug
+		}
 	}
-	r.snap.Store(newSnapshot(0, entries))
+	r.snap.Store(newSnapshot(0, d.entries, nil))
 	return r
 }
 
-// Register adds cmds, all or none. It is an error for an ID to be
-// malformed or taken, for a slash name or alias to be taken or malformed,
-// for Danger to be undeclared, for an Action or Prompt to have no handler,
-// and for When not to parse.
+// Register adds built-in commands, all or none. It is an error for an ID
+// to be malformed or taken, for a slash name or alias to be malformed or
+// held by another built-in, for Danger to be undeclared, for an Action or
+// Prompt to have no handler, and for When not to parse. A slash name a
+// loaded command holds goes to the built-in, and the loaded command is
+// renamed as ReplaceSource renames, reported through Watch
+// (docs/decisions/0006-MADR-command-registry.md A6).
 func (r *Registry) Register(cmds ...Command) error {
 	if len(cmds) == 0 {
 		return nil
@@ -102,39 +111,18 @@ func (r *Registry) Register(cmds ...Command) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	old := r.snap.Load()
-	entries, err := addEntries(slices.Clone(old.entries), keySet(old.byID), keySet(old.bySlash), cmds)
-	if err != nil {
-		return err
-	}
-	r.publish(old, entries)
-	return nil
-}
-
-// addEntries compiles cmds and appends them to entries, claiming their IDs
-// and slash names in ids and slashes; it reports every command it refuses.
-func addEntries(entries []entry, ids map[ID]bool, slashes map[string]bool, cmds []Command) ([]entry, error) {
+	d := r.draftOf(old, nil)
 	var errs []error
 	for _, c := range cmds {
-		e, err := compile(c)
-		if err == nil {
-			err = claim(c, ids, slashes)
-		}
-		if err != nil {
+		if err := d.addBuiltin(c); err != nil {
 			errs = append(errs, err)
-			continue
 		}
-		entries = append(entries, e)
 	}
-	return entries, errors.Join(errs...)
-}
-
-// keySet copies m's keys into a set.
-func keySet[K comparable](m map[K]int) map[K]bool {
-	s := make(map[K]bool, len(m))
-	for k := range m {
-		s[k] = true
+	if len(errs) > 0 {
+		return errors.Join(errs...)
 	}
-	return s
+	r.publish(old, d)
+	return nil
 }
 
 // compile checks c on its own and compiles its When and its arguments
@@ -177,32 +165,113 @@ func compile(c Command) (entry, error) {
 	return e, nil
 }
 
-// claim takes c's ID and slash names in ids and slashes, or says which is
-// taken or malformed.
-func claim(c Command, ids map[ID]bool, slashes map[string]bool) error {
-	if ids[c.ID] {
-		return fmt.Errorf("command: %s is registered already", c.ID)
+// slashNames is c's slash name and aliases.
+func slashNames(c *Command) []string {
+	if c.Slash == "" {
+		return c.Aliases
 	}
-	names := c.Aliases
-	if c.Slash != "" {
-		names = append([]string{c.Slash}, c.Aliases...)
-	}
-	for _, n := range names {
-		if n == "" || strings.HasPrefix(n, "/") || strings.ContainsFunc(n, isSpaceOrControl) {
-			return fmt.Errorf("command: %s: slash name %q is empty, starts with /, or holds a space or control character", c.ID, n)
-		}
-		if slashes[n] {
-			return fmt.Errorf("command: %s: slash name %q is taken", c.ID, n)
-		}
-	}
-	ids[c.ID] = true
-	for _, n := range names {
-		slashes[n] = true
+	return append([]string{c.Slash}, c.Aliases...)
+}
+
+// validSlash says why n cannot be a slash name, or nil.
+func validSlash(id ID, n string) error {
+	if n == "" || strings.HasPrefix(n, "/") || strings.ContainsFunc(n, isSpaceOrControl) {
+		return fmt.Errorf("command: %s: slash name %q is empty, starts with /, or holds a space or control character", id, n)
 	}
 	return nil
 }
 
 func isSpaceOrControl(c rune) bool { return c <= ' ' || c == 0x7f || (c >= 0x80 && c < 0xa0) }
+
+// draft is a write in progress: a copy of a snapshot's entries, indexed,
+// and the conflicts the write has met.
+type draft struct {
+	entries   []entry
+	ids       map[ID]int
+	slashes   map[string]int
+	conflicts []Conflict
+	prefix    func(Source) string
+}
+
+// draftOf copies s's entries, leaving out those drop reports.
+func (r *Registry) draftOf(s *snapshot, drop func(*entry) bool) *draft {
+	d := &draft{ids: map[ID]int{}, slashes: map[string]int{}, prefix: r.prefix}
+	for i := range s.entries {
+		if drop == nil || !drop(&s.entries[i]) {
+			d.entries = append(d.entries, s.entries[i])
+		}
+	}
+	for i := range d.entries {
+		d.ids[d.entries[i].cmd.ID] = i
+		for _, n := range slashNames(&d.entries[i].cmd) {
+			d.slashes[n] = i
+		}
+	}
+	return d
+}
+
+// addBuiltin adds c, taking any slash name a loaded command holds.
+func (d *draft) addBuiltin(c Command) error {
+	e, err := compile(c)
+	if err != nil {
+		return err
+	}
+	e.builtin = true
+	if _, ok := d.ids[c.ID]; ok {
+		return fmt.Errorf("command: %s is registered already", c.ID)
+	}
+	names := slashNames(&e.cmd)
+	for _, n := range names {
+		if err := validSlash(c.ID, n); err != nil {
+			return err
+		}
+		if i, ok := d.slashes[n]; ok && d.entries[i].builtin {
+			return fmt.Errorf("command: %s: slash name %q is taken by %s", c.ID, n, d.entries[i].cmd.ID)
+		}
+	}
+	at := len(d.entries)
+	d.entries = append(d.entries, e)
+	d.ids[c.ID] = at
+	for _, n := range names {
+		if i, ok := d.slashes[n]; ok && i != at {
+			d.displace(i, n, c.ID)
+		}
+		d.slashes[n] = at
+	}
+	return nil
+}
+
+// displace moves the loaded command at i off the slash name n, which
+// holder takes: to its prefix and n, or to none when that is taken too.
+func (d *draft) displace(i int, n string, holder ID) {
+	c := &d.entries[i].cmd
+	renamed := d.rename(c.Source, n, i)
+	if c.Slash == n {
+		c.Slash = renamed
+	}
+	aliases := make([]string, 0, len(c.Aliases))
+	for _, a := range c.Aliases {
+		switch {
+		case a != n:
+			aliases = append(aliases, a)
+		case renamed != "":
+			aliases = append(aliases, renamed)
+		}
+	}
+	c.Aliases = aliases
+	d.conflicts = append(d.conflicts, Conflict{ID: c.ID, Slash: n, Renamed: renamed, Holder: holder})
+}
+
+// rename claims src's prefixed form of n for the entry at i, or returns ""
+// when that is taken too.
+func (d *draft) rename(src Source, n string, i int) string {
+	renamed := d.prefix(src) + ":" + n
+	if _, taken := d.slashes[renamed]; taken {
+		return ""
+	}
+	d.slashes[renamed] = i
+	return renamed
+}
 
 // Remove takes the commands with ids out. IDs that are not registered are
 // ignored; when none is, the version does not change.
@@ -210,31 +279,32 @@ func (r *Registry) Remove(ids ...ID) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	old := r.snap.Load()
-	entries := slices.DeleteFunc(slices.Clone(old.entries), func(e entry) bool {
-		return slices.Contains(ids, e.cmd.ID)
-	})
-	if len(entries) == len(old.entries) {
+	d := r.draftOf(old, func(e *entry) bool { return slices.Contains(ids, e.cmd.ID) })
+	if len(d.entries) == len(old.entries) {
 		return
 	}
-	r.publish(old, entries)
+	r.publish(old, d)
 }
 
-// publish builds and stores the snapshot after old, holding entries, and
-// wakes Watch. The caller holds r.mu, and entries is its own copy.
-func (r *Registry) publish(old *snapshot, entries []entry) {
-	r.snap.Store(newSnapshot(old.version+1, entries))
+// publish builds and stores the snapshot after old from d, and wakes
+// Watch. The caller holds r.mu.
+func (r *Registry) publish(old *snapshot, d *draft) {
+	s := newSnapshot(old.version+1, d.entries, d.conflicts)
+	old.next = s
+	r.snap.Store(s)
 	close(old.changed)
 }
 
 // newSnapshot sorts entries, which it then owns, and indexes them.
-func newSnapshot(version uint64, entries []entry) *snapshot {
+func newSnapshot(version uint64, entries []entry, conflicts []Conflict) *snapshot {
 	slices.SortFunc(entries, func(a, b entry) int { return strings.Compare(string(a.cmd.ID), string(b.cmd.ID)) })
 	s := &snapshot{
-		version: version,
-		entries: entries,
-		byID:    make(map[ID]int, len(entries)),
-		bySlash: make(map[string]int, len(entries)),
-		changed: make(chan struct{}),
+		version:   version,
+		entries:   entries,
+		byID:      make(map[ID]int, len(entries)),
+		bySlash:   make(map[string]int, len(entries)),
+		changed:   make(chan struct{}),
+		conflicts: conflicts,
 	}
 	for i, e := range entries {
 		s.byID[e.cmd.ID] = i
@@ -308,12 +378,31 @@ func (e *entry) holds(c when.Context) bool {
 func (r *Registry) Version() uint64 { return r.snap.Load().version }
 
 // Watch returns a command that waits for the registry's next change and
-// then returns ChangedMsg. The host issues it again after each ChangedMsg,
-// as with any subscription.
+// then returns ChangedMsg, with a ConflictMsg when that change renamed or
+// refused a command (docs/decisions/0006-MADR-command-registry.md A6). The
+// host issues it again after each ChangedMsg, as with any subscription.
 func (r *Registry) Watch() tea.Cmd {
-	ch := r.snap.Load().changed
+	s := r.snap.Load()
 	return func() tea.Msg {
-		<-ch
-		return ChangedMsg{Version: r.Version()}
+		<-s.changed
+		next := s.next
+		changed := ChangedMsg{Version: next.version}
+		if len(next.conflicts) == 0 {
+			return changed
+		}
+		return tea.BatchMsg{msgCmd(changed), msgCmd(ConflictMsg{Conflicts: slices.Clone(next.conflicts)})}
 	}
+}
+
+// prefix is the prefix a loaded command from src takes on a slash clash:
+// the WithPrefixer function's, or the source's kind and its name as an ID
+// segment, "mcp:github".
+func (r *Registry) prefix(src Source) string {
+	if r.prefixer != nil {
+		return r.prefixer(src)
+	}
+	if src.Name == "" {
+		return src.Kind.String()
+	}
+	return src.Kind.String() + ":" + segment(src.Name)
 }

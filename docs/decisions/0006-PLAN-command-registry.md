@@ -442,12 +442,23 @@ golden is read, and every mutation is killed.
 `command/mcpprompt.go`, `command/acp.go` (`ACPCommand`, `FromACP`); tests
 `command/loaddir_test.go`, `command/frontmatter_test.go`,
 `command/sources_test.go`; a test tree `command/testdata/commands/`; goldens
-`command/testdata/golden/loaddir.golden`.
+`command/testdata/golden/loaddir.golden`. (*Added in execution: the
+regression input `command/testdata/fuzz/FuzzFrontMatter/0bb99b90c9197b64`.*)
 
 **Exported names** (MADR §6): `LoadDir(fsys fs.FS, src Source)
 ([]Command, []error)`; `MCPPrompt`, `MCPPromptArgument`, `PromptGetter`,
 `FromMCPPrompts`; `ACPCommand`, `ACPCommandInput`, `FromACP`;
 `(*Registry).ReplaceSource(src Source, cmds []Command) []Conflict`.
+(*D13: `PromptGetter` is `func(ctx context.Context, name string, args
+map[string]string) (string, error)`. D15: `Conflict` gains `Err error`.*)
+
+*Deviations D13–D22* (MADR A6): names that are not ID segments are
+mapped to one (D14); a file's slash name is its path joined with `:`
+(D16); a placeholder's property is named as written (D17) and is
+positional in order of first use (D18); `Register` takes a slash name a
+loaded command holds (D19); `Watch` returns `ConflictMsg` with
+`ChangedMsg` (D20); an ACP forward keeps the agent's name in
+`Meta["acp"]` (D21); a renamed name that is also taken is dropped (D22).
 
 **Build:** the front matter is MADR §6's strict subset; `$NAME`
 placeholders become required string arguments; `$ARGUMENTS` is the slash
@@ -469,7 +480,7 @@ holds becomes `<prefix>:<name>` and a `Conflict`, also sent as
 | `TestDefaultDanger` | a file without `danger` is `Mutating` |
 | `TestFromMCPPrompts` | `mcp.<server>.<name>` prompts whose schema has the prompt's arguments, `required` kept |
 | `TestFromACP` | `acp.<agent>.<name>` forwards; running one sends `PromptMsg{Text: "/name args"}` |
-| `TestSlashClash` | a loaded `/review` beside a built-in one is `/user:review`, with a `Conflict` and a `ConflictMsg` |
+| `TestSlashClash` | a loaded `/review` beside a built-in one is `/user:review`, with a `Conflict` and a `ConflictMsg` (*D19, D20, D22: also when the built-in comes later, through `Watch`, and a doubly taken name is dropped*) |
 | `TestReplaceSource` | the old commands go in the same version the new ones arrive |
 
 `FuzzFrontMatter`: no panic; every accepted input re-serialises to an
@@ -1246,3 +1257,182 @@ two single-layer mutations survived; `TestUnknownMembersEachLayer` was
 added, and both are now killed:
 `decode_test.go:80: the schema check accepted an unknown member` and
 `decode_test.go:83: the strict decode accepted an unknown member`.
+
+### Step 5: sources and loaders
+
+#### Deviations
+
+Found before any Step 5 code was written; MADR amendment A6 records the
+decisions. Each was asked with options and the owner picked the
+recommendation on 2026-10-05; the alternatives are in A6.
+
+* **D13: `PromptGetter`'s signature,** which §6 does not give.
+  `func(ctx, name, args) (string, error)`.
+* **D14: names that are not ID segments** (MCP, ACP and file names).
+  Mapped to a segment; a duplicate or empty result is refused and
+  reported.
+* **D15: reporting a command `ReplaceSource` cannot load,** with no
+  error return. `Conflict` gains `Err error`.
+* **D16: a loaded file's slash name.** Its path joined with `:`,
+  prefixed only on a clash.
+* **D17: a placeholder's property name.** As written.
+* **D18: placeholders on the slash line.** Positional, in order of first
+  use.
+* **D19: a built-in registered after a loaded command holds its slash
+  name.** `Register` takes it, and the loaded command is renamed.
+* **D20: how `ConflictMsg` reaches the host.** Through `Watch`.
+* **D21: an ACP forward's name.** Kept in `Meta["acp"]`.
+* **D22: a renamed slash name that is also taken.** Dropped; the command
+  still loads.
+* **D23: `$ARGUMENTS` and stray words** (found while building, after
+  D13–D22 were answered; MADR A6 item 11). The `LoadDir` golden showed
+  `notes.md`, which uses only `$ARGUMENTS`, with a schema of no
+  properties, so `/notes 100` would be refused. Options given: mark such
+  a file's object `"x-cli": {"rest": true}` so `ParseSlash` leaves words
+  past the positionals in `Raw` (recommended); no schema for a file whose
+  only placeholder is `$ARGUMENTS`. **The owner picked "x-cli rest on the
+  object".**
+
+#### What was built
+
+* `command/source.go`: `ReplaceSource`, the namespaces and `segment`.
+  `command/loaddir.go`: `LoadDir`. `command/frontmatter.go`: the front
+  matter's parser, checks and writer. `command/expand.go`: placeholders and
+  expansion. `command/mcpprompt.go`: `MCPPrompt`, `MCPPromptArgument`,
+  `PromptGetter`, `FromMCPPrompts`. `command/acp.go`: `ACPCommand`,
+  `ACPCommandInput`, `FromACP`. `Conflict` gained `Err` (D15). No other
+  exported name.
+* Changed from Steps 3 and 4: the write path is a `draft`, a copy of the
+  snapshot's entries with its indexes. `Register`, `ReplaceSource`,
+  `Remove` and `NewRegistry` all build one. An entry records whether
+  `Register` added it, which is what "built-in" means for D19. A snapshot
+  carries its write's conflicts and a pointer to the next version, set
+  before the old version's channel closes, so `Watch` reports exactly the
+  change it woke for (D20). `forwardText` reads `Meta["acp"]` (D21).
+  `cliInfo` and the compiled schema gained `rest` (D23).
+* Choices inside the listed names:
+  * A loaded file's title is its path without `.md` (`git/commit`), unless
+    its front matter has `title`. Without `description`, it is the body's
+    first non-blank line, with a Markdown heading's `#`s removed.
+  * Blank lines inside the front matter are allowed, and a comment line is
+    an error, like any line that is not `key: value`. A value may be
+    wrapped in one pair of matching quotes, which are removed, with no
+    escapes. A value that starts with `[`, `{`, `|` or `>` is nested and
+    refused.
+  * An `arg.<NAME>` that names no placeholder in the body is an error at
+    its line. `aliases` is comma-separated.
+  * `LoadDir` reads User, Project and Plugin sources, skips files and
+    directories whose names start with `.`, and reads only `*.md`. A file
+    that is not UTF-8 is an error. The body is trimmed of surrounding
+    space once, at load.
+  * An MCP prompt's arguments are positional in MCP's order, as D18 has
+    placeholders; its title is MCP's `title`, else its name. An ACP
+    command's title is its name.
+  * Loaded commands are `Mutating` unless their front matter declares a
+    danger. That includes MCP prompts and ACP forwards, which have none
+    to declare.
+  * A command that names one slash name twice keeps it once. A loaded
+    command whose slash name another loaded source holds is renamed:
+    whichever arrives later is renamed.
+  * `ReplaceSource` always publishes a version, even when nothing changes.
+* Tests beyond the table: `TestArgumentsTakesRest` (D23) and
+  `TestLoadDirSources`.
+* Found while building:
+  * D23, from reading the `LoadDir` golden.
+  * `FuzzFrontMatter` found that a quoted value of spaces, `" "`, was
+    written back unquoted, then trimmed to nothing and refused. The writer
+    now quotes a value with space at either end. The failing input is
+    kept as a regression seed, and it failed before the fix: that is how
+    it was found.
+  * Lint: `goconst` (`keySlash` and `keyHidden`), and gocritic's
+    `weakCond` (`len(m) == 2` for a regex match).
+  * Three test inputs or expectations were wrong and were corrected:
+    * the notes body keeps its heading line;
+    * `fix-bug` has one string placeholder, so Step 4's whole-tail rule
+      rightly takes every word;
+    * an unclosed front matter whose next line reads as a field fails at
+      that line, so the test's unclosed case has fields only.
+
+#### Checks (Rule 3)
+
+1. `gofmt -l command`: no output.
+2. `make pre-add-check FILES="<the thirty command/*.go files>"`: exit 0,
+   "go-precheck: 30 file(s) clean in 1 module(s) (gofmt, golangci-lint,
+   go vet, go test, go mod tidy, govulncheck)."
+3. `make lint`: exit 0; `go fix -diff` silent, and "0 issues." for
+   `GOOS=linux`, `darwin` and `windows`.
+4. `GOWORK=off go test -race -count=1 ./...`: exit 0, 15 packages `ok`.
+5. `GOWORK=off go test -shuffle=on -count=2 ./...`: exit 0, 15 packages
+   `ok`.
+6. `LC_ALL=C GOWORK=off go test -count=1 ./...`: exit 0, 15 packages `ok`.
+7. `GOWORK=off go mod tidy -diff`: exit 0, no output.
+8. `make fuzz FUZZTIME=20s`: exit 0. `./layout` and `./when` ran clean,
+   and "2 fuzz targets ran clean in ./command": `FuzzFrontMatter`
+   3,555,935 executions, `FuzzParseSlash` 3,168,280. Before that, after
+   the writer's fix, each `command` target ran clean for 60 seconds:
+   10,733,913 and 8,707,766 executions.
+9. Windows test host, go1.27.1 windows/amd64, on a copy of the tree:
+   `make pre-add-check` exit 0 ("113 file(s) clean in 1 module(s)"),
+   `make lint` exit 0, `make vuln` exit 0 ("No vulnerabilities found."),
+   and `go test -count=3 -shuffle=on ./command/` printed `ok`. That
+   line's `exit=` showed `grep`'s status, not the test's: the script
+   placed it wrong. `TestRootRefusesSymlink` ran there with `-v`:
+   `--- PASS`, not skipped, so `os.Root` refused the escaping symlink on
+   Windows too.
+10. `markdownlint-cli2` on `docs/README.md`: 0 issues (the configuration
+    excludes MADR and PLAN files); the relative-link check of
+    `docs/README.md` and this pair: 0 broken.
+11. Identifier scan of the diff, `command/*.go`, the golden, the test tree
+    and the fuzz input, for the local account name, the test host's name,
+    home-directory paths and the employer's domain: no match.
+
+The `loaddir` golden was written with `-tuitest.update` and read, before
+and after D23: four commands in path order, with the slash names,
+titles, descriptions, dangers, argument hints and schemas the rules give,
+including `"x-cli": {"rest": true}` on the three files that use
+`$ARGUMENTS`.
+
+**Benchmarks.** The development host was heavily loaded during this step
+(load averages 76 to 91). `BenchmarkLookup`, whose code did not change,
+ran from 33 to 103 ns/op. HEAD (Step 4) and this tree were run
+alternately on a scratch export. Over eight pairs of
+`BenchmarkDispatchLoop`, HEAD ran 444–812 ns/op and the tree 486–1473,
+with medians near 654 and 675. Over four pairs of `BenchmarkAvailable`,
+HEAD ran 16878–35397 and the tree 17317–39207. No difference due to the
+code is visible. Step 4's figures (238 ns/op, 16 µs) were taken on an
+idle host, and these do not replace them.
+
+#### Mutations (Rule 4)
+
+Each on a scratch copy of the tree; every failure is an assertion, none a
+compile error. All sixteen killed: the step's five, one for each of
+D14–D23 (D13 has none: the getter's signature is checked by the
+compiler), and one for the writer's fix.
+
+| Mutation | Failing line |
+| :--- | :--- |
+| a built-in loses a slash clash | `sources_test.go:51: conflicts [], want [{ID:user.review Slash:review Renamed:user:review Holder:builtin.review …}]` |
+| unknown front-matter keys are ignored | `loaddir_test.go:137: unknown.md: "", want an error naming the file and ":3:"` |
+| a command without `danger` defaults to `ReadOnly` | `loaddir_test.go:182: user.x is read-only, want mutating` |
+| `ReplaceSource` keeps the old commands | `sources_test.go:121: conflicts [{ID:user.b … Err:command: user.b is taken by user's command}]` |
+| `!{…}` is expanded | `frontmatter_test.go:14: expand: …` (the text differs) |
+| D14: a name that is not a segment is refused, not mapped | `sources_test.go:187: commands: [{ID:mcp.github. …` |
+| D15: a command that cannot load is dropped silently | `sources_test.go:148: 0 refusals, want 5: []` |
+| D16: a loaded file's slash name is always prefixed | `loaddir_test.go:43: tuitest: loaddir …: line 4 differs` |
+| D17: placeholder properties are lowercased | `loaddir_test.go:43: tuitest: loaddir …: line 8 differs` |
+| D18: placeholders are not positional | `loaddir_test.go:43: tuitest: loaddir …: line 10 differs` |
+| D19: `Register` refuses a name a loaded command holds | `sources_test.go:78: command: builtin.deploy: slash name "deploy" is taken by project.deploy` |
+| D20: `Watch` sends no `ConflictMsg` | `sources_test.go:55: Watch sent [{2}], want a ConflictMsg with …` |
+| D21: a forward sends its slash name, not the agent's | `sources_test.go:254: "/plan-mode step one" sent [/plan-mode step one], want "/Plan Mode step one"` |
+| D22: a doubly taken name is taken anyway | `sources_test.go:100: a double clash: [… Renamed:user:x …], want the name dropped` |
+| D23: a `$ARGUMENTS` file refuses stray words | `loaddir_test.go:73: "/notes 100 or so": null, command: arguments: "100" is one positional value too many; want {}` |
+| the writer leaves a space-ended value unquoted | `frontmatter_test.go:56: "---\ndescription:\" \"\n---" re-serialised as … which does not parse` |
+
+Because this step changed `registry.go`, `dispatch.go` and `slash.go`,
+Step 3's eleven, Step 4's thirteen and Step 4's two single-layer
+mutations were run again: all killed. Two of Step 3's anchors moved onto
+the `draft`. "`Version` is not bumped on `Remove`" now replaces
+`r.publish(old, d)`. "A write changes the published snapshot in place"
+now starts the draft's entries on the old snapshot's array,
+`s.entries[:0]`, and fails `TestSnapshotsUnderRace` under the race
+detector. Step 2's set was not rerun: nothing under `when/` changed.

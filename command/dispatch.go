@@ -128,9 +128,17 @@ func (r *Registry) execute(ctx context.Context, inv *Invocation) outcome {
 	return o
 }
 
-// forwardText is a Forward command as the agent reads it: "/name args".
+// forwardText is a Forward command as the agent reads it: "/name args",
+// with the agent's own name from Meta["acp"] when FromACP kept it
+// (docs/decisions/0006-MADR-command-registry.md A6), else the slash name,
+// else the ID.
 func forwardText(inv *Invocation) string {
 	name := inv.Command.Slash
+	if acp, ok := inv.Command.Meta[metaACP].(map[string]any); ok {
+		if n, ok := acp["name"].(string); ok && n != "" {
+			name = n
+		}
+	}
 	if name == "" {
 		name = string(inv.Command.ID)
 	}

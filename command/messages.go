@@ -37,10 +37,13 @@ type ConflictMsg struct {
 type QuitRequestMsg struct{}
 
 // Conflict is a loaded command whose slash name was taken: it asked for
-// Slash, which Holder has, and was given Renamed.
+// Slash, which Holder has, and was given Renamed, or no slash name when
+// Renamed is empty. When Err is set, the command was not loaded at all,
+// and Err says why (docs/decisions/0006-MADR-command-registry.md A6).
 type Conflict struct {
 	ID      ID
 	Slash   string
 	Renamed string
 	Holder  ID
+	Err     error
 }

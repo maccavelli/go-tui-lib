@@ -103,6 +103,7 @@ type prop struct {
 // JSON Schema has no keyword for.
 type cliInfo struct {
 	Arg         bool   `json:"arg,omitzero"`
+	Rest        bool   `json:"rest,omitzero"` // on an object: stray slash words are allowed (A6)
 	Short       string `json:"short,omitzero"`
 	Placeholder string `json:"placeholder,omitzero"`
 	Group       string `json:"group,omitzero"`

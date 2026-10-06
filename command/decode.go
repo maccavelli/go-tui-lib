@@ -35,6 +35,7 @@ type rule struct {
 	minLen, maxLen *int
 	secret         bool
 	arg            bool
+	rest           bool // x-cli rest: a slash line may hold more words (A6)
 	items, addl    *rule
 	props          []prule // in document order
 	required       []string
@@ -105,7 +106,8 @@ func (r *rule) scalars(kw map[string]jsontext.Value) error {
 		}
 	}
 	var cli struct {
-		Arg bool `json:"arg"`
+		Arg  bool `json:"arg"`
+		Rest bool `json:"rest"`
 	}
 	for name, dst := range map[string]any{
 		"enum": &r.enum, "minimum": &r.min, "maximum": &r.max,
@@ -118,7 +120,7 @@ func (r *rule) scalars(kw map[string]jsontext.Value) error {
 			}
 		}
 	}
-	r.arg = cli.Arg
+	r.arg, r.rest = cli.Arg, cli.Rest
 	return nil
 }
 
