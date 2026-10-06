@@ -16,7 +16,7 @@ stable API.
 
 ## Status
 
-- **The current release is `v0.3.0`.** `v0` means the API may still
+- **The current release is `v0.4.0`.** `v0` means the API may still
   change.
 - **Multi-pane workspaces, since `v0.1.0`.** `layout` arranges panes: a main
   pane with a sidebar on either side, a bottom pane, a footer, responsive
@@ -30,6 +30,13 @@ stable API.
   tmux, with a reason for every answer and a doctor report; `termsvc` sends
   notifications, clipboard writes and links that suit the terminal;
   `termcap/termcaptest` tests a program against fake terminals.
+- **Commands, since `v0.4.0`.** `command` defines each action once, with
+  its arguments as JSON Schema, its danger and its availability, and runs
+  it from a key, a slash line or an agent, behind a gate the program
+  controls; it loads command files, MCP prompts and ACP commands, and
+  exports the commands to an agent as MCP tools. `when` evaluates
+  availability in VS Code's when-clause grammar, `command/cli` runs the
+  same commands from the shell, and `workspace` publishes its own.
 - **The stack is Charm v2:** `charm.land/bubbletea/v2`,
   `charm.land/lipgloss/v2` and `charm.land/bubbles/v2`, with
   `github.com/charmbracelet/colorprofile` and
@@ -53,6 +60,7 @@ repository as it is now.
 | see what is in this repository today | [architecture.md](docs/architecture.md) |
 | build a main pane with a sidebar, a bottom pane and a footer | [the workspace guide](docs/guides/building-workspaces.md) |
 | learn what the terminal supports, and send notifications, copies and links | [the terminal capabilities guide](docs/guides/terminal-capabilities.md) |
+| define commands once, for keys, slash lines, agents and the shell | [the commands guide](docs/guides/commands.md) |
 | know which Charm version to use, and what may be imported | [AGENTS.md, Dependencies](AGENTS.md#dependencies) |
 | know the rules every TUI package follows | [AGENTS.md, TUI conventions](AGENTS.md#tui-conventions) |
 | contribute: checks, records and commit rules | [AGENTS.md](AGENTS.md) |

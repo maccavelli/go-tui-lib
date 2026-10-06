@@ -64,7 +64,12 @@ it was when they were written
 | see what the Kilo, Grok Build, opencode and codex TUIs add beyond the planned records | [0003-REPORT, §8](reports/0003-REPORT-agent-tui-ecosystem-research.md#8-second-pass-the-kilo-grok-build-opencode-and-codex-tuis) |
 | know which terminals need which workarounds | [0003-REPORT, §9](reports/0003-REPORT-agent-tui-ecosystem-research.md#9-per-terminal-quirks-the-sources-work-around) |
 | see the candidate packages after 0009, and the modules they would need | [0003-REPORT, §11](reports/0003-REPORT-agent-tui-ecosystem-research.md#11-candidates-from-the-second-pass) |
-| see the planned command registry, and how agents and the shell run commands | [0006-MADR](decisions/0006-MADR-command-registry.md) |
+| add a command, with its arguments, danger and availability | [guides/commands.md](guides/commands.md#define-a-command) |
+| run a command from a key or `Update`, and react to its result | [guides/commands.md](guides/commands.md#run-commands-from-your-program) |
+| let an agent drive the TUI over MCP, safely | [guides/commands.md](guides/commands.md#let-an-agent-drive-the-program) |
+| load the user's and the project's command files, or an agent's commands | [guides/commands.md](guides/commands.md#command-files) |
+| run the same commands from the shell | [guides/commands.md](guides/commands.md#run-commands-from-the-shell) |
+| know why the command registry is built this way | [0006-MADR](decisions/0006-MADR-command-registry.md) |
 | see the planned keymap and `keybindings.json` format | [0007-MADR](decisions/0007-MADR-keymap-engine.md) |
 | see the planned command palette and fuzzy matcher | [0008-MADR](decisions/0008-MADR-command-palette.md) |
 | see how streamed Markdown, frames and untrusted text will be handled | [0009-MADR](decisions/0009-MADR-streaming-content-engine.md) |

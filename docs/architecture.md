@@ -11,14 +11,18 @@ planned (Modules, below).
   package named after it. There is no root package. Helpers shared between
   packages go under `internal/`.
 - **Go 1.27.1**, with no `toolchain` line.
-- **Eight packages,** and four internal ones, for multi-pane terminal
-  workspaces, terminal capabilities and services, and the foundations
-  every package uses.
+- **Eleven packages,** and four internal ones, for multi-pane terminal
+  workspaces, terminal capabilities and services, a command registry run
+  from keys, the shell and agents, and the foundations every package
+  uses.
 
 ## Packages
 
 ```text
- workspace     Bubble Tea pane host       → layout, theme, glyph, internal/cells; bubbletea, lipgloss, bubbles/key, bubbles/help
+ command/cli   commands from the shell    → command, when; x/ansi, flag
+ workspace     Bubble Tea pane host       → layout, theme, glyph, internal/cells, command, when; bubbletea, lipgloss, bubbles/key, bubbles/help
+ command       the command registry       → when; bubbletea
+ when          availability expressions   → standard library
  internal/cells  the reused frame buffer  → layout; ultraviolet, x/ansi
  termsvc       terminal services          → termcap; bubbletea, x/ansi
  termcap       capabilities, the probe    → internal/termevent; bubbletea, x/ansi, colorprofile
@@ -33,10 +37,13 @@ planned (Modules, below).
 
 | Package | What it holds |
 | :--- | :--- |
+| `when` | `Parse` and `MustParse` → `Expr` (`Eval`, `String`, `Keys`), VS Code's when-clause grammar with RE2 regexes; `Check` against `Keys`; `Context`, `Map`, `Layered`, `Value`; typed `Key[T]` |
+| `command` | `Command`, `ID`, `New[A]` and its options, `SchemaOf` (JSON Schema 2020-12 from Kong-aligned tags), `ArgError`; `Registry` (`Register`, `ReplaceSource`, `Lookup`, `Slash`, `ParseSlash`, `All`, `Available`, `Watch`, `Dispatch`, `Run`, `Cancel`); the policy, `Gate`, `Decision`, `Auditor`, `SlogAuditor`; `LoadDir`, `FromMCPPrompts`, `FromACP`; `MCPTools`, `CallMCP`, `ACPCommands`, `Manifest`; `WithLoop` and `LoopMsg`; the messages |
+| `command/cli` | `Run`: commands as shell subcommands with flags from their schemas, `--args`, `--json`, `--yes`, the verbs `list`, `describe`, `schema` and `help`, and exit codes 0 to 3 |
 | `glyph` | `Set` (4 border styles, separators with a cross and four tees, focus marker, ellipsis, scroll, bullet, badge brackets), `Unicode()`, `ASCII()`, `For(utf8)`; every glyph one cell |
 | `theme` | `Palette` for dark, light and unknown backgrounds; `LightDarkColor` and `ProfileColor`; `Styles`; `New(profile, background, glyphs)` with `WithPalette` and `WithPaletteFor`; `FromDark`; `Border(style)` |
 | `layout` | `Rect`, `Size` (fixed, percent, ratio, fill; min, max, shrink order), `Node` (`Pane`, `Split`, `Responsive`, or a custom node), `Solve` → `Plan`; `State` (JSON); the sidebar presets |
-| `workspace` | `Pane` and its optional interfaces; `Workspace` (routing, focus, chrome, resize, zoom, hide, overlays, cursor, `View`, `help.KeyMap`, the width method, a following theme, `Panes`, `PaneAs`); `Wrap`; `KeyMap` |
+| `workspace` | `Pane` and its optional interfaces; `Workspace` (routing, focus, chrome, resize, zoom, hide, overlays, cursor, `View`, `help.KeyMap`, the width method, a following theme, `SetBackground`, `Panes`, `PaneAs`, `WhenContext`); `Wrap`; `KeyMap`; `Commands` and the context keys |
 | `internal/cells` | `Frame`: a reused cell buffer that draws strings into rectangles with a chosen width method |
 | `termcap` | `Prober` (one batch of queries ended by DA1, a deadline, tea's own replies observed, mode 2031 and its reset, `IsReplyFragment`); `Caps` of `Fact`s with origin and reason; `FromEnv` and `Identity`; the keyboard, link and notification views; `TmuxQuery`; `Report` and `Findings` |
 | `termcap/termcaptest` | `Terminal`, a scripted fake terminal; `Profile` and seven profiles; `Run` |
@@ -46,6 +53,21 @@ planned (Modules, below).
 | `tuitest` | `Golden` across {colour, no colour} × {UTF-8, ASCII} × widths; `Text` for a single file; `Annotate` |
 
 - **`layout` has no Charm import,** so its solver can serve any front end.
+- **Imports point downward.** `when` imports only the standard library,
+  so the keymap and any front end can use it. `command` imports `when`
+  and Bubble Tea, for `tea.Cmd` and `tea.Msg` only. `workspace` imports
+  both to publish its commands and context keys; `command` never imports
+  `workspace`. `command/cli` uses the standard `flag` package, and no
+  module the root does not already require
+  ([0006-MADR](decisions/0006-MADR-command-registry.md) §1).
+- **The registry reads lock-free.** Each write publishes a new immutable
+  snapshot behind an `atomic.Pointer`; `Lookup`, `Available` and the
+  exports read one, from any goroutine. A `Loop` command runs on the
+  program's event loop, through `Dispatch` from `Update`, or through
+  `WithLoop`'s `LoopMsg` when an agent's goroutine calls `Run` (A7).
+- **The registry speaks no protocol.** `MCPTool`, `MCPCallResult` and
+  `ACPCommand` are plain structs with MCP 2026-07-28's and ACP's field
+  names; no SDK is imported, and the host owns the transport.
 - **`workspace` draws each frame into one reused buffer,**
   `internal/cells.Frame`: the panes, then the separators, then the overlays,
   each into its rectangle. It records those rectangles, top first, and a
@@ -125,7 +147,8 @@ scripts/
   go-fuzz.sh                fuzzes each fuzz target of a package in turn
   go-fuzz_test.sh           its offline test
 glyph/ theme/ layout/ workspace/ tuitest/ termcap/ termsvc/
-                            the packages; goldens under each testdata/golden/
+when/ command/              the packages; goldens under each testdata/golden/
+command/cli/                commands from the shell
 termcap/termcaptest/        fake terminals for tests
 internal/cells/             the reused frame buffer, an ultraviolet importer
 internal/termevent/         pass-through events, the other ultraviolet importer
@@ -138,7 +161,7 @@ docs/
   decisions/                MADR and PLAN records
   reports/                  REPORT records
   guides/                   how-to guides: workspaces, terminal
-                            capabilities, releasing
+                            capabilities, commands, releasing
 ```
 
 ## Dependencies
@@ -204,8 +227,9 @@ docs/
     `tea.View`'s `AltScreen`, however the field is reached.
   - It reads each package's files for the host's `GOOS`; CI's three
     operating systems cover the rest.
-- **`make fuzz`** fuzzes `layout`'s fuzz target for `FUZZTIME` (default
-  20s).
+- **`make fuzz`** fuzzes each fuzz target of `layout`, `when` and
+  `command` for `FUZZTIME` (default 20s): `FuzzSolve`, `FuzzParse`,
+  `FuzzParseSlash` and `FuzzFrontMatter`.
 - **`scripts/go-precheck.sh`** runs, for each module that owns a given
   file (every module when none is given), in the module's directory:
   `gofmt` on its files; with `GOWORK=off`, the same three golangci-lint
@@ -238,8 +262,8 @@ docs/
     - **Linux and macOS:** `go test -race`;
     - **Linux:** `go test -shuffle=on -count=2` and `LC_ALL=C go test`.
   - **`gates`** (Linux):
-    - the fuzz script's test, then `make fuzz`, uploading the corpus as an
-      artifact on failure;
+    - the fuzz script's test, then `make fuzz`, uploading the three
+      packages' corpora as an artifact on failure;
     - `go vet` for `freebsd/amd64`, `openbsd/amd64` and `linux/386`, per
       module;
     - `make vet`, `gofmt`, `make tidy-check`, and `make lint` (with
@@ -255,6 +279,14 @@ docs/
 - **Standard panes** (log tail, metrics view, scrolling text and
   Markdown), **overlay widgets** (dialog, picker, palette, toast), a **help
   footer** and **`updatetea`.** Each is its own record.
+- **The keymap engine and the command palette**
+  ([0007-MADR](decisions/0007-MADR-keymap-engine.md),
+  [0008-MADR](decisions/0008-MADR-command-palette.md)), which bind keys to
+  command IDs and list the registry's commands. The workspace's own key
+  bindings stay until the keymap moves them onto these IDs.
+- **The Cobra and Kong front ends,** `command/cobracmd` and
+  `command/kongcmd`, nested modules that require a published root
+  (0006-PLAN Steps 10 and 11).
 - **Terminal modes and inline scrollback** (`termmode`, `inline`): mode
   plans, teardown, restore bytes and the Windows console helpers, and the
   per-terminal scrollback strategy. Each is a later record; until then tea

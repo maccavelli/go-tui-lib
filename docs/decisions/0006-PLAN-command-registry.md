@@ -1850,3 +1850,105 @@ anchors in `workspace` only, which this step does not change.
 | D32: an object flag is not read as JSON | `cli_test.go:162: exit 2 "app: command: argument /state: is a string, not object …"` |
 | D33: an unavailable command exits 2 | `cli_test.go:267: "tools later": exit 2, want 1` |
 | D34: `--json` without a value prints the text | `cli_test.go:195: --json with no value: "\"hello\"\n", want null` |
+
+### Step 9: documentation, and the root release `v0.4.0`
+
+No deviation: the step's text named every file.
+
+#### What was written
+
+* `docs/guides/commands.md` (new): defining a command with `New` and the
+  tags; kinds, danger, the gate and the audit; dispatching from `Update`,
+  `Run`, and `WithLoop` with `LoopMsg`; availability and `when`; slash
+  commands; command files and their front matter; MCP prompts and ACP
+  commands, and slash-name clashes; exporting to an agent, with what an
+  MCP server still owns under 2026-07-28 (the `tools/list` envelope with
+  `resultType`, `ttlMs` and `cacheScope`, and
+  `notifications/tools/list_changed` on a `subscriptions/listen` stream);
+  the workspace's commands, `WhenContext` and `SetBackground`; and
+  `command/cli`. Each claim was checked against the exported API
+  (`go doc -short` of `command`, `when`, `command/cli` and the new
+  `workspace` names) and the code; the envelope fields against the
+  `schema.ts` recorded in Step 6.
+* `docs/architecture.md`: eleven packages; `when`, `command` and
+  `command/cli` in the package graph and table; `workspace`'s new imports
+  and names; why imports point downward, why reads are lock-free, and why
+  no protocol SDK is imported; the tree; `make fuzz`'s four targets and
+  CI's three corpora; the keymap, the palette and the front ends under
+  "What is not here".
+* `docs/README.md`: five "I want to…" rows into the guide, and the
+  MADR's row reworded from "the planned command registry".
+* `README.md`: Status names `v0.4.0` and the commands, and the "I want
+  to…" table links the guide.
+* Fixed before the checks: the guide's example first bound `alt+z`, which
+  the workspace already uses, and its shell example ran a workspace
+  command, which the shell is not offered.
+
+#### Checks
+
+* Rule 3: `gofmt -l` silent; `make lint` exit 0 ("0 issues." for
+  `GOOS=linux`, `darwin` and `windows`); `GOWORK=off go test -race`,
+  `-shuffle=on -count=2` and under `LC_ALL=C`, each 16 packages `ok`;
+  `go mod tidy -diff` silent; `make fuzz FUZZTIME=20s` exit 0 ("ran clean"
+  in `./layout`, `./when`, and two targets in `./command`); `make vuln`
+  "No vulnerabilities found."; `markdownlint-cli2` on `README.md`,
+  `docs/README.md`, `docs/architecture.md` and the guide: 0 issues; the
+  relative-link check of those and this pair: 0 broken; the identifier
+  scan of the diff and the guide: no match.
+* `make release-check`: exit 0, "go-precheck: 128 file(s) clean in 1
+  module(s) (gofmt, golangci-lint, go vet, go test, go mod tidy,
+  govulncheck)."
+* Windows test host, go1.27.1 windows/amd64, on a copy of the tree: `make
+  pre-add-check`, `make lint` and `make vuln` exit 0, and `GOWORK=off go
+  test -count=3 -shuffle=on ./...` exit 0.
+* `git diff v0.3.0 -- go.mod go.sum`: empty. The root module's
+  requirements are unchanged from `v0.3.0`, and it names neither Cobra nor
+  Kong.
+
+#### Release notes for `v0.4.0`
+
+`v0.4.0` adds a command registry: one definition of each action, run from
+a key, a slash line, the shell or an agent. Nothing that `v0.3.0` exported
+changes, and no module is added.
+
+* **`when` (new):** availability expressions in VS Code's when-clause
+  grammar: `!`, `&&`, `||`, comparisons, `=~` with RE2 regexes, and
+  `in`. It parses at most 4 KiB, nests at most 64 deep, and has typed
+  keys and `Check`, which reports a typo at load.
+* **`command` (new):**
+  * `New[A]` builds a command whose arguments are a Go struct: JSON
+    Schema 2020-12 from Kong-aligned tags, checked and strictly decoded.
+  * `Registry` holds the commands in lock-free snapshots, and runs them
+    from `Update` (`Dispatch`) or to completion (`Run`). The default
+    policy lets agents run only read-only and UI commands, and the shell
+    destructive ones only when confirmed, unless the program's `Gate`
+    allows.
+  * It audits every request through `slog`, with secret arguments
+    masked.
+  * It loads Markdown command files through an `fs.FS`, MCP prompts and
+    ACP commands, and renames slash-name clashes.
+  * It exports the commands as MCP 2026-07-28 tools and results, ACP
+    available commands, and a manifest.
+  * `WithLoop` runs an agent's call on the program's event loop.
+* **`command/cli` (new):** the same commands as shell subcommands:
+  * words or dotted IDs, flags from the schemas, `--args`, `--json` and
+    `--yes`;
+  * the verbs `list`, `describe`, `schema` and `help`;
+  * exit codes 0 to 3.
+* **`workspace`:**
+  * `Commands` publishes thirteen built-in commands: focus, zoom, toggle,
+    resize, layouts, state, panes, overlay and theme.
+  * `WhenContext` gives the keys their `When` reads, with the
+    `Contexter` interface and typed keys.
+  * `SetBackground` pins the theme's background, or returns to following
+    the terminal.
+* **Docs:** [guides/commands.md](../guides/commands.md).
+
+#### The release
+
+Left to the owner, as Rule 8 and AGENTS.md say: commit this step, push,
+and with CI green tag `v0.4.0`. Then the agent runs the consumer smoke
+test of [releasing.md](../guides/releasing.md#the-consumer-smoke-test)
+against `v0.4.0`, importing `command`, `when` and `command/cli`, and
+records it here. The step is done when the tag exists and the smoke test
+builds.
