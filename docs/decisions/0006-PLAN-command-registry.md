@@ -1,6 +1,6 @@
 ---
 status: in-progress
-date: 2026-10-05
+date: 2026-10-06
 associated-madr: "0006-MADR-command-registry.md"
 ---
 # Implement the command registry (`when`, `command`, `command/cli`, and the Cobra and Kong front ends)
@@ -1952,3 +1952,25 @@ test of [releasing.md](../guides/releasing.md#the-consumer-smoke-test)
 against `v0.4.0`, importing `command`, `when` and `command/cli`, and
 records it here. The step is done when the tag exists and the smoke test
 builds.
+
+**After the release (2026-10-06).** The owner committed and pushed this
+step (`33974e6`), CI was green, and the owner tagged `v0.4.0` (annotated)
+on it. The agent ran the releasing guide's consumer smoke test against the
+tag, in a scratch module outside the repository, with no `go.work` in
+effect (`go env GOWORK` empty) and `GOPROXY` at its default:
+
+* The program imports `command`, `when` and `command/cli`. It parses a
+  `when` expression and evaluates it, registers a `ReadOnly` command made
+  with `command.New`, and hands its arguments to `cli.Run`.
+* `go mod init`, `go get github.com/maccavelli/go-tui-lib@v0.4.0`
+  ("go: downloading github.com/maccavelli/go-tui-lib v0.4.0"), `go mod
+  tidy`, `go build ./...` and `go vet ./...`: each exit 0. `go.mod`
+  requires `github.com/maccavelli/go-tui-lib v0.4.0`.
+* Run: the `when` line printed `mode == 'shell' && !busy`, the keys
+  `[mode busy]` and `eval: true`; `list` printed the three commands and
+  exited 0; `greet world` printed `hello world`, and with `--json`
+  `{"greeting":"hello world"}`, each exit 0; an unknown command printed
+  `smoke: unknown command "nosuch"` and exited 2, the usage-error code.
+
+The tag exists and the smoke test builds, so Step 9 is done. Steps 10 and
+11 may start: each requires the published `v0.4.0`.
