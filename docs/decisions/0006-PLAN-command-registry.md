@@ -2224,3 +2224,34 @@ Left to the owner: commit this step, push, and with CI green tag
 [releasing.md](../guides/releasing.md#the-consumer-smoke-test) against
 it, and records it here. The step is done when the tag exists and the
 smoke test builds.
+
+**After the release (2026-10-06).** The owner committed this step
+(`8c8de7c`), ran the disclosure guard over the outgoing commits through
+the agent (exit 0, no finding), pushed, and with CI green tagged
+`command/cobracmd/v0.1.0` (annotated) on `8c8de7c` and pushed the tag.
+The agent ran the releasing guide's consumer smoke test against it, in a
+scratch module outside the repository, with no `go.work` in effect (`go
+env GOWORK` empty) and `GOPROXY` at its default:
+
+* The program imports `command`, `command/cobracmd` and
+  `command/cobracmd/docs`. It registers a `ReadOnly` command made with
+  `command.New`, builds the tree with `cobracmd.New`, and runs its
+  arguments with `cobracmd.Run`, or writes the root's man page with
+  `docs.Man`.
+* `go mod init`, `go get
+  github.com/maccavelli/go-tui-lib/command/cobracmd@v0.1.0` ("go:
+  downloading github.com/maccavelli/go-tui-lib/command/cobracmd v0.1.0"),
+  `go mod tidy`, `go build ./...` and `go vet ./...`: each exit 0.
+  `go.mod` requires `github.com/maccavelli/go-tui-lib v0.4.0` and
+  `github.com/maccavelli/go-tui-lib/command/cobracmd v0.1.0`, with Cobra
+  `v1.10.2` and pflag `v1.0.10` indirect.
+* Run: `greet one world` printed `hello world`; `greet.one world --json`
+  printed `{"greeting":"hello world"}`; `list` listed the commands;
+  `completion bash` wrote the script for `smoke`; each exit 0. `nosuch`
+  printed `smoke: unknown command "nosuch"` and exited 2. `man` wrote a
+  page headed `.TH "SMOKE" "1" "Oct 2026"`.
+* `go list -deps` of the program finds three packages of go-md2man,
+  blackfriday and yaml; of `command/cobracmd` alone, none: only an
+  importer of `cobracmd/docs` compiles them, as A1 says.
+
+The tag exists and the smoke test builds, so Step 10 is done.
