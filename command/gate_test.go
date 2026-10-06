@@ -164,6 +164,38 @@ func TestAlways(t *testing.T) {
 	}
 }
 
+// TestRequestGate: a request's own gate is asked instead of the
+// registry's, its answers are not remembered, and remembered answers do
+// not override it (A9).
+func TestRequestGate(t *testing.T) {
+	registryGate := answer(AllowAlways, nil)
+	r := dangerRegistry(t, WithGate(registryGate))
+	run := func(g Gate, id ID) error {
+		t.Helper()
+		_, err := r.Run(t.Context(), Request{ID: id, Origin: OriginCLI, Caller: "sh", Gate: g})
+		return err
+	}
+	own := answer(RejectOnce, nil)
+	if err := run(own, "destructive"); !errors.Is(err, ErrRefused) || own.calls != 1 || registryGate.calls != 0 {
+		t.Errorf("the request's gate refusing: %v; it was asked %d, the registry's %d", err, own.calls, registryGate.calls)
+	}
+	always := answer(AllowAlways, nil)
+	if err := run(always, "destructive"); err != nil || always.calls != 1 {
+		t.Errorf("the request's gate allowing: %v", err)
+	}
+	if err := run(nil, "destructive"); err != nil || registryGate.calls != 1 {
+		t.Errorf("the request gate's AllowAlways was remembered: the registry's gate was asked %d times", registryGate.calls)
+	}
+	// The registry's gate said AllowAlways, which is now remembered; a
+	// request's own gate is still asked, and refuses.
+	if err := run(own, "destructive"); !errors.Is(err, ErrRefused) || own.calls != 2 {
+		t.Errorf("a remembered answer overrode the request's gate: %v", err)
+	}
+	if err := run(own, "ui"); err != nil || own.calls != 2 {
+		t.Errorf("the request's gate was asked about a command the policy does not ask about: %v", err)
+	}
+}
+
 func TestDecisionACPKind(t *testing.T) {
 	for d, want := range map[Decision]string{
 		AllowOnce: "allow_once", AllowAlways: "allow_always", RejectOnce: "reject_once", RejectAlways: "reject_always", 0: "",

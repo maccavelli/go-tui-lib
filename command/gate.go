@@ -70,32 +70,43 @@ type policy struct {
 	always map[alwaysKey]Decision
 }
 
-// decide is the policy's answer for inv: AllowOnce when it does not ask,
-// a remembered answer, or the gate's. A refusal is an error wrapping
+// decide is the policy's answer for inv: AllowOnce when it does not ask;
+// else the request's own gate's, when it has one; else a remembered
+// answer, or the registry's gate's. A refusal is an error wrapping
 // ErrRefused.
-func (p *policy) decide(ctx context.Context, inv *Invocation) (Decision, error) {
+func (p *policy) decide(ctx context.Context, inv *Invocation, own Gate) (Decision, error) {
 	if !asks(inv.Command.Danger, inv.Origin) {
 		return AllowOnce, nil
+	}
+	if own != nil {
+		d, err := own.Decide(ctx, inv)
+		return verdict(inv, d, err)
 	}
 	key := alwaysKey{inv.Command.ID, inv.Caller}
 	p.mu.Lock()
 	d, ok := p.always[key]
 	p.mu.Unlock()
-	if !ok {
-		if p.gate == nil {
-			return RejectOnce, fmt.Errorf("%w: %s %s from %s needs a gate, and there is none",
-				ErrRefused, inv.Command.Danger, inv.Command.ID, inv.Origin)
-		}
-		var err error
-		d, err = p.gate.Decide(ctx, inv)
-		if err != nil {
-			return RejectOnce, fmt.Errorf("%w: %s: the gate failed: %w", ErrRefused, inv.Command.ID, err)
-		}
-		if d == AllowAlways || d == RejectAlways {
-			p.mu.Lock()
-			p.always[key] = d
-			p.mu.Unlock()
-		}
+	if ok {
+		return verdict(inv, d, nil)
+	}
+	if p.gate == nil {
+		return RejectOnce, fmt.Errorf("%w: %s %s from %s needs a gate, and there is none",
+			ErrRefused, inv.Command.Danger, inv.Command.ID, inv.Origin)
+	}
+	d, err := p.gate.Decide(ctx, inv)
+	if err == nil && (d == AllowAlways || d == RejectAlways) {
+		p.mu.Lock()
+		p.always[key] = d
+		p.mu.Unlock()
+	}
+	return verdict(inv, d, err)
+}
+
+// verdict is a gate's answer, or its error, as the policy's: anything but
+// AllowOnce or AllowAlways refuses.
+func verdict(inv *Invocation, d Decision, err error) (Decision, error) {
+	if err != nil {
+		return RejectOnce, fmt.Errorf("%w: %s: the gate failed: %w", ErrRefused, inv.Command.ID, err)
 	}
 	if !d.allows() {
 		if d != RejectAlways {

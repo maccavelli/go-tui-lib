@@ -128,7 +128,7 @@ func (r *Registry) admit(ctx context.Context, req Request) (*entry, *Invocation,
 		}
 		inv.Args = args
 	}
-	d, err := r.policy.decide(ctx, inv)
+	d, err := r.policy.decide(ctx, inv, req.Gate)
 	if err != nil {
 		return e, nil, d, err
 	}

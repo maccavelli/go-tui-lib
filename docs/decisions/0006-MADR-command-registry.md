@@ -627,7 +627,8 @@ func Run(ctx context.Context, r *command.Registry, args []string,
 * **Exit codes:** 0 success, 1 the command failed, 2 a usage or argument
   error, 3 refused by the gate.
 * **A shell invocation is `Origin: CLI`.** `Destructive` commands ask
-  `WithConfirm`, and without it need `--yes`. There is no event loop, so
+  `WithConfirm`, and without it need `--yes`. (*A9: through a per-request
+  `Request.Gate`.*) There is no event loop, so
   `Result.Cmd` is ignored, and commands without `Surfaces&CLI` are not
   listed.
 * **How a program offers both.** A program such as pi-go builds one
@@ -1454,6 +1455,53 @@ leave these open.
 each the recommendation. The alternatives were: `State().Hidden`, the
 panes the user hid; an argument error for focus and resize only; tree
 order with hidden panes last; for item 4, separator IDs only.
+
+### A9 (2026-10-06): the shell's confirmation, object flags, an unavailable command, and `--json` without a value
+
+*Status: accepted (2026-10-06).* Found before writing Step 8 of
+[0006-PLAN-command-registry.md](0006-PLAN-command-registry.md), recorded
+there as deviations D31–D34. The first was found while building Step 3
+and left open for this step.
+
+**Found.**
+
+1. §10 has `Destructive` commands from the shell ask `WithConfirm` or need
+   `--yes`, and §7 has the policy ask the registry's `Gate`. `cli.Run`
+   receives a registry whose gate `NewRegistry` fixed, so neither
+   `--yes` nor `WithConfirm` can approve one request.
+2. §10 makes each schema property a flag and repeats a flag for an array,
+   but says nothing of an object or map property, such as
+   `workspace.state.set`'s `state`.
+3. §10's exit codes are 0 success, 1 failed, 2 usage or argument error and
+   3 refused; a command whose `When` is false fits none plainly.
+4. §10's `--json` prints `Result.Value`; a command may return text only.
+
+**Decided.**
+
+1. **`command.Request` gains `Gate Gate`.** When it is set, the policy asks
+   it instead of the registry's gate, for that request only, and neither
+   reads nor stores a remembered `AllowAlways` or `RejectAlways`. The
+   policy still decides whether to ask, and the audit still records the
+   origin and the decision. `cli.Run` sets a gate that allows when
+   `--yes` was given or `WithConfirm` says yes, and refuses otherwise.
+   `CallMCP` never sets it.
+2. **An object or map property's flag takes JSON:**
+   `--state '{"zoom":"logs"}'`. Scalars and arrays of scalars stay plain.
+3. **A command whose `When` is false exits 1,** as a failure: it depends
+   on state, not on how it was called. A command not offered on the CLI
+   surface is unknown to the shell, and exits 2.
+4. **`--json` always prints `Result.Value`**, `null` when there is none,
+   so a script that reads stdout always gets JSON.
+
+**Changed.** §10's confirmation note, annotated in place.
+
+**Owner questions for A9.** *Answered 2026-10-06* (picked from options),
+each the recommendation. The alternatives were:
+
+1. a gate carried in the context, or the CLI building its own registry;
+2. object properties only through `--args`;
+3. exit 2, as a usage error;
+4. the text as a JSON string.
 
 ## More Information
 

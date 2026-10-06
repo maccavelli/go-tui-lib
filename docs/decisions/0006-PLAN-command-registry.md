@@ -652,7 +652,10 @@ only.
 int`; `Option`, `WithName(string)`, `WithConfirm(func(prompt string)
 bool)`, `WithContext(when.Context)`, `WithWidth(int)`; the exit-code
 constants `ExitOK = 0`, `ExitFailed = 1`, `ExitUsage = 2`,
-`ExitRefused = 3`.
+`ExitRefused = 3`. (*D31: and, in `command`, `Request.Gate`, with its
+policy and a test, `TestRequestGate`, in `command/gate_test.go`. D32: an
+object property's flag takes JSON. D33: a command whose `When` is false
+exits 1. D34: `--json` prints `null` without a value.*)
 
 **Build:** word and dotted forms; a flag per schema property, an array
 repeating its flag; `--args`, `--json`, `--yes`; the verbs `list`,
@@ -1089,6 +1092,7 @@ deviation when its step starts, unless the owner decides it sooner:
 * **`--yes` and the gate (Step 8).** `command/cli` receives a registry
   whose gate was fixed by `NewRegistry`, so `--yes` and `WithConfirm` have
   no way to approve a `Destructive` request from the shell for one call.
+  (*Resolved in Step 8 as D31, MADR A9: `Request.Gate`.*)
 
 ### Step 4: arguments, and the registry's own commands
 
@@ -1723,3 +1727,126 @@ eleven killed: the step's six, one for each of D27–D30, and one for the
 | D29: `workspace.panes` ignores the focus ring | `commands_test.go:226: with a focus ring: panes = [session metrics logs footer], want [logs metrics session footer]` |
 | D30: a split's name is not resolved | `commands_test.go:234: command: argument /split: is not a resizable split on screen` |
 | `SetBackground` changes a `WithTheme` workspace | `background_test.go:85: 0 on a WithTheme workspace returned a command` |
+
+### Step 8: `command/cli`
+
+#### Deviations
+
+Found before any Step 8 code was written; MADR amendment A9 records the
+decisions. Each was asked with options, and the owner picked the
+recommendation on 2026-10-06.
+
+* **D31: how `--yes` and `WithConfirm` reach the policy** (Step 3's open
+  item). `command.Request` gains `Gate`, a per-request gate the policy
+  asks instead of the registry's. Added to the step: `command/handler.go`,
+  `command/gate.go`, and `TestRequestGate` in `command/gate_test.go`.
+* **D32: an object or map property's flag.** It takes JSON.
+* **D33: a command whose `When` is false.** Exit 1.
+* **D34: `--json` with no value.** It prints `null`.
+
+#### What was built
+
+* `command/cli/cli.go`: the package documentation, `Run`, `Option`,
+  `WithName`, `WithConfirm`, `WithContext`, `WithWidth`, `ExitOK`,
+  `ExitFailed`, `ExitUsage`, `ExitRefused`, the verbs and the
+  confirmation gate. `command/cli/flags.go`: reading a schema's
+  properties in document order, and parsing flags and positionals with
+  the standard `flag` package, as MADR §1 says. `command/cli/help.go`:
+  plain ASCII help, wrapped with `x/ansi` at the width.
+  `command/cli/example_test.go`: `ExampleRun`. In `command` (D31):
+  `Request.Gate`; `decide` asks a request's gate when it has one, and the
+  shared refusal logic moved into `verdict`. No other exported name.
+* Choices inside the listed names:
+  * `WithName`'s default is `app`: the package reads no process state,
+    so it cannot take the program's name itself.
+  * `Run` gathers its output, and writes stdout and then stderr once each
+    when the command ends. A write that fails makes the exit code
+    `ExitFailed`. This follows `termcap.Report`'s pattern, and is what
+    `errcheck` asks for.
+  * A command is named by the longest run of leading words that, joined
+    with dots, is an ID offered on the CLI surface. The rest are its
+    arguments. The dotted ID works too.
+  * Flags take one or two dashes, `--name value` or `--name=value`, as
+    `flag` reads them. A boolean takes no value. A short name from
+    `x-cli` is a second flag. Positionals may come between flags. A
+    property named like one of the shell's own flags (`args`, `json`,
+    `yes`, `help`, `h`) is a usage error, not a silent clash. `--args`
+    gives the object first, and flags and positionals are set over it.
+  * Running with no arguments writes the registry's help to stderr and
+    exits 2; `help` writes it to stdout and exits 0. `list` lists what
+    `Available` gives for the CLI surface in the shell's context, and
+    `list --json` the manifest of the same commands. `describe` writes a
+    command's `ManifestCommand` as JSON, and `schema` its arguments
+    schema, `{"type":"object"}` when it has none. Help lists every
+    command offered on the CLI that is not hidden, whatever its `When`,
+    grouped by category, with commands without one under `Other`, last.
+  * A refused destructive command adds "pass --yes to run it" to the
+    error, and the confirmation's prompt names the command and its
+    danger. The caller recorded for a shell request is the program's
+    name.
+* Tests beyond the table: `TestExitCodes` (D33), `TestVerbs`, and
+  `TestRequestGate` (D31) in `command`.
+* Found while building:
+  * The registry help's second usage line, one line for every verb, was
+    80 columns at a 60-column width. Each verb now has its own line, and
+    the command columns line up across categories.
+  * Two test expectations were wrong: `--json` writes the value with its
+    json tags, and the example's help wraps at the default 80 columns.
+  * Lint: `errcheck` on every `Fprintf` to an `io.Writer`, hence the
+    gathered output; `goconst` (type-name constants); an unused helper;
+    revive's `confusing-naming` (`set` beside `Set`, now `assign`);
+    `gocritic`'s `typeDefFirst`.
+
+#### Checks (Rule 3)
+
+1. `gofmt -l command`: no output.
+2. `make pre-add-check FILES="<the five command/cli files and
+   command/handler.go, gate.go, dispatch.go, gate_test.go>"`: exit 0,
+   "go-precheck: 9 file(s) clean in 1 module(s) (gofmt, golangci-lint, go
+   vet, go test, go mod tidy, govulncheck)."
+3. `make lint`: exit 0; `go fix -diff` silent, and "0 issues." for
+   `GOOS=linux`, `darwin` and `windows`.
+4. `GOWORK=off go test -race -count=1 ./...`: exit 0, 16 packages `ok`,
+   `command/cli` among them; `internal/conformance` passes with it in its
+   scan.
+5. `GOWORK=off go test -shuffle=on -count=2 ./...`: exit 0, 16 packages
+   `ok`.
+6. `LC_ALL=C GOWORK=off go test -count=1 ./...`: exit 0, 16 packages `ok`.
+7. `GOWORK=off go mod tidy -diff`: exit 0, no output.
+8. No fuzz target in this step.
+9. Windows test host, go1.27.1 windows/amd64, on a copy of the tree:
+   `make pre-add-check` exit 0 ("128 file(s) clean in 1 module(s)"),
+   `make lint` exit 0, `make vuln` exit 0 ("No vulnerabilities found."),
+   `GOWORK=off go test -count=3 -shuffle=on ./command/cli/` exit 0.
+10. `markdownlint-cli2` on `docs/README.md`: 0 issues (the configuration
+    excludes MADR and PLAN files); the relative-link check of
+    `docs/README.md` and this pair: 0 broken.
+11. Identifier scan of the diff, `command/cli/` and its goldens, for the
+    local account name, the test host's name, home-directory paths and
+    the employer's domain: no match.
+
+The six goldens, `help-registry`, `help-resize` and `help-echo` at 60 and
+100 columns, were written with `-tuitest.update`, each was read in full,
+and each line was checked to fit its width. `TestHelpGolden` also fails
+on any byte outside ASCII.
+
+#### Mutations (Rule 4)
+
+Each on a scratch copy of the tree; every failure is an assertion. All
+eight killed: the step's four and one for each of D31–D34. Because this
+step changed `command/gate.go`, `dispatch.go` and `handler.go`, Step 3's
+eleven, Step 4's thirteen and two single-layer mutations, Step 5's
+sixteen and Step 6's nine ran again: all killed. Step 3's "`AllowAlways`
+is not remembered" anchor moved into the new `decide`. Step 7's set
+anchors in `workspace` only, which this step does not change.
+
+| Mutation | Failing line |
+| :--- | :--- |
+| `--yes` is not required | `cli_test.go:203: without --yes: exit 0, stdout "deleted notes.txt\n", stderr ""` |
+| a usage error exits 1 | `cli_test.go:181: tools echo --name x --on=maybe: exit 1, …; want exit 2 naming "argument /on"` |
+| hidden commands are listed | `cli_test.go:127: tuitest: help-registry.60 …: line 21 differs` |
+| `--json` writes `Result.Text` | `cli_test.go:189: --json: "\"moved sidebar\"\n"` |
+| D31: a request's own gate is ignored | `gate_test.go:180: the request's gate refusing: <nil>; it was asked 0, the registry's 1` |
+| D32: an object flag is not read as JSON | `cli_test.go:162: exit 2 "app: command: argument /state: is a string, not object …"` |
+| D33: an unavailable command exits 2 | `cli_test.go:267: "tools later": exit 2, want 1` |
+| D34: `--json` without a value prints the text | `cli_test.go:195: --json with no value: "\"hello\"\n", want null` |

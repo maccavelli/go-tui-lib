@@ -1,0 +1,30 @@
+  6|Usage:
+ 35|  app <command> [arguments] [flags]
+ 19|  app list [--json]
+ 24|  app describe <command>
+ 22|  app schema <command>
+ 22|  app help [<command>]
+  0|
+ 15|Files commands:
+ 33|  files delete      Delete a file
+  0|
+ 19|Workspace commands:
+ 60|  workspace resize  Moves a named split's separator by delta
+ 60|                    cells, as far as the panes' sizes allow.
+  0|
+ 15|Other commands:
+ 60|  command describe  Describes one command: its ID, arguments
+ 38|                    schema and danger.
+ 57|  command list      Lists the commands the caller can run
+ 58|                    now: not hidden, offered where it asks
+ 55|                    from, and available in its context.
+ 38|  tools echo        Echo the arguments
+ 24|  tools fail        Fail
+ 27|  tools later       Not yet
+ 29|  tools text        Say hello
+  0|
+ 24|Flags for every command:
+ 47|  --args JSON  the arguments as one JSON object
+ 47|  --json       print the result's value as JSON
+ 55|  --yes        run a destructive command without asking
+ 38|  -h, --help   show the command's help
