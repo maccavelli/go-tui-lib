@@ -1,0 +1,23 @@
+  6|## app
+  0|
+ 18|Run app's commands
+  0|
+  3|```
+ 11|app [flags]
+  3|```
+  0|
+ 11|### Options
+  0|
+  3|```
+ 27|  -h, --help   help for app
+  3|```
+  0|
+ 12|### SEE ALSO
+  0|
+ 54|* [app command](app_command.md)	 - The command commands
+ 82|* [app completion](app_completion.md)	 - Generate the completion script for a shell
+ 62|* [app describe](app_describe.md)	 - Describe a command as JSON
+ 61|* [app list](app_list.md)	 - List the commands you can run now
+ 66|* [app schema](app_schema.md)	 - Print a command's arguments schema
+ 60|* [app workspace](app_workspace.md)	 - The workspace commands
+  0|

@@ -1,0 +1,14 @@
+  6|[1mUsage:[m
+ 43|  app tools level low|high [VALUE~] [flags]
+  0|
+ 24|Say something at a level
+  0|
+ 10|[1mArguments:[m
+ 20|  [38;2;135;175;255mlow|high[m  how loud
+ 23|  [38;2;135;175;255mVALUE[m     what to say
+  0|
+  6|[1mFlags:[m
+ 39|  [38;2;135;175;255m--level low|high[m  how loud (required)
+ 49|  [38;2;135;175;255m--words VALUE[m     what to say (repeat for more)
+  0|
+ 10|Danger: ui

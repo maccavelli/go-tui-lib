@@ -1,0 +1,30 @@
+  6|[1mUsage:[m
+ 35|  app <command> [arguments] [flags]
+ 19|  app list [--json]
+ 24|  app describe <command>
+ 22|  app schema <command>
+ 22|  app help [<command>]
+ 41|  app completion bash|zsh|fish|powershell
+  0|
+ 15|[1mFiles commands:[m
+ 33|  files delete      Delete a file
+  0|
+ 19|[1mWorkspace commands:[m
+ 94|  workspace resize  Moves a named split's separator by delta cells, as far as the panes' sizes
+ 26|                    allow.
+  0|
+ 15|[1mOther commands:[m
+ 79|  command describe  Describes one command: its ID, arguments schema and danger.
+ 96|  command list      Lists the commands the caller can run now: not hidden, offered where it asks
+ 55|                    from, and available in its context.
+ 38|  tools echo        Echo the arguments
+ 24|  tools fail        Fail
+ 27|  tools later       Not yet
+ 44|  tools level       Say something at a level
+ 29|  tools text        Say hello
+  0|
+ 24|[1mFlags for every command:[m
+ 47|  --args JSON  the arguments as one JSON object
+ 47|  --json       print the result's value as JSON
+ 55|  --yes        run a destructive command without asking
+ 38|  -h, --help   show the command's help

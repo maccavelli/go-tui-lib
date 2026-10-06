@@ -2,8 +2,8 @@
 
 `go-tui-lib` is the repository of the Go module
 `github.com/maccavelli/go-tui-lib`: a library of terminal-UI packages on
-the Charm v2 stack. It has no binary. Nested adapter modules beside it are
-planned (Modules, below).
+the Charm v2 stack. It has no binary. Nested adapter modules beside it
+carry the dependencies the root must not (Modules, below).
 
 ## What it is
 
@@ -99,13 +99,13 @@ planned (Modules, below).
 
 ## Modules
 
-The root module is the only one today. 0010-MADR
+0010-MADR
 ([0010-MADR-nested-adapter-modules.md](decisions/0010-MADR-nested-adapter-modules.md))
 plans three nested modules, each an adapter with one dependency the root
-must not carry:
+must not carry. `command/cobracmd` is built; the other two are planned:
 
 ```text
- command/cobracmd   (planned)   → root vX.Y.Z, published; Cobra, pflag
+ command/cobracmd               → root v0.4.0, published; Cobra, pflag
  command/kongcmd    (planned)   → root vX.Y.Z, published; Kong
  stream/glamourmd   (planned)   → root vX.Y.Z, published; glamour
  .                  (root)      → the Charm v2 stack; never an adapter
@@ -149,6 +149,9 @@ scripts/
 glyph/ theme/ layout/ workspace/ tuitest/ termcap/ termsvc/
 when/ command/              the packages; goldens under each testdata/golden/
 command/cli/                commands from the shell
+command/cobracmd/           the Cobra front end, a nested module with its
+                            own go.mod; docs/ beneath it writes man and
+                            Markdown pages
 termcap/termcaptest/        fake terminals for tests
 internal/cells/             the reused frame buffer, an ultraviolet importer
 internal/termevent/         pass-through events, the other ultraviolet importer
@@ -284,9 +287,8 @@ docs/
   [0008-MADR](decisions/0008-MADR-command-palette.md)), which bind keys to
   command IDs and list the registry's commands. The workspace's own key
   bindings stay until the keymap moves them onto these IDs.
-- **The Cobra and Kong front ends,** `command/cobracmd` and
-  `command/kongcmd`, nested modules that require a published root
-  (0006-PLAN Steps 10 and 11).
+- **The Kong front end,** `command/kongcmd`, a nested module that
+  requires a published root (0006-PLAN Step 11).
 - **Terminal modes and inline scrollback** (`termmode`, `inline`): mode
   plans, teardown, restore bytes and the Windows console helpers, and the
   per-terminal scrollback strategy. Each is a later record; until then tea

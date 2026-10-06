@@ -1,0 +1,14 @@
+  6|[1mUsage:[m
+ 24|  app tools echo [flags]
+  0|
+ 18|Echo the arguments
+  0|
+  6|[1mFlags:[m
+ 37|  [38;2;135;175;255m--name TEXT[m       a name (required)
+ 27|  [38;2;135;175;255m--n N[m             a count
+ 28|  [38;2;135;175;255m--on[m              a switch
+ 38|  [38;2;135;175;255m--mode fast|slow[m  how (default fast)
+ 44|  [38;2;135;175;255m--tags VALUE[m      labels (repeat for more)
+ 32|  [38;2;135;175;255m--state JSON[m      a map (JSON)
+  0|
+ 10|Danger: ui

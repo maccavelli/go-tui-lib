@@ -55,7 +55,7 @@ The repository holds more than one Go module
 | Module | Directory | Tags |
 | :--- | :--- | :--- |
 | `github.com/maccavelli/go-tui-lib` | `.` | `vX.Y.Z` |
-| `github.com/maccavelli/go-tui-lib/command/cobracmd` (planned) | `command/cobracmd` | `command/cobracmd/vX.Y.Z` |
+| `github.com/maccavelli/go-tui-lib/command/cobracmd` | `command/cobracmd` | `command/cobracmd/vX.Y.Z` |
 | `github.com/maccavelli/go-tui-lib/command/kongcmd` (planned) | `command/kongcmd` | `command/kongcmd/vX.Y.Z` |
 | `github.com/maccavelli/go-tui-lib/stream/glamourmd` (planned) | `stream/glamourmd` | `stream/glamourmd/vX.Y.Z` |
 

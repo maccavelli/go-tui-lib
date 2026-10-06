@@ -1,0 +1,8 @@
+  6|[1mUsage:[m
+ 18|  app list [flags]
+  0|
+ 79|Lists the commands you can run now, by category, or with --json their manifest.
+  0|
+  6|[1mFlags:[m
+ 27|  -h, --help  help for list
+ 56|  --json      print the manifest of the commands as JSON

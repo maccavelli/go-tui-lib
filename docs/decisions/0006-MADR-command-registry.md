@@ -914,17 +914,25 @@ the items below supersede them where they differ.
     segment, and `Aliases` holds the command's slash aliases. The registry's
     categories become Cobra groups, added with `AddGroup` before any child,
     because Cobra panics on an undefined `GroupID` (`command.go:1205-1210`).
+    (*A10: Cobra checks groups at `Execute`, not when a child is added; it
+    panics on a group never added, and a group added twice is listed
+    twice.*)
     `Annotations` carries the ID, the danger level and the surfaces.
-    `Hidden` and `Deprecated` come from the command.
+    `Hidden` and `Deprecated` come from the command. (*A10: a hidden
+    command is in the tree with `Hidden` set; `command.Command` has no
+    deprecation, so nothing sets `Deprecated`.*)
   * **Flags come from the JSON Schema** through pflag. An enum is a custom
     `pflag.Value` with `FixedCompletions`, because pflag has no enum type
     (REPORT §6). A required property is `MarkFlagRequired`. Positional
     properties set `Args`. Where the schema expresses them, mutually
     exclusive and required-together properties use
-    `MarkFlagsMutuallyExclusive` and `MarkFlagsRequiredTogether`.
+    `MarkFlagsMutuallyExclusive` and `MarkFlagsRequiredTogether`. (*A10:
+    no `MarkFlagRequired`, the registry reports a missing argument; and
+    `SchemaOf` expresses neither relation, so neither is marked.*)
   * **Completion comes from the registry:** `ValidArgsFunction` and
     `RegisterFlagCompletionFunc` serve enums and the registry's completion
-    providers. Scripts for bash, zsh, fish and PowerShell come from Cobra's
+    providers. (*A10: the registry has no completion providers; enums
+    and command names are completed.*) Scripts for bash, zsh, fish and PowerShell come from Cobra's
     generators, written to the caller's writer.
   * **The same verbs, flags and exit codes as `command/cli`:** `--args`,
     `--json`, `--yes`, `list`, `describe`, `schema`, and exit codes 0, 1, 2
@@ -1502,6 +1510,73 @@ each the recommendation. The alternatives were:
 2. object properties only through `--args`;
 3. exit 2, as a usage error;
 4. the text as a JSON string.
+
+### A10 (2026-10-06): the Cobra front end against the built registry
+
+*Status: accepted (2026-10-06).* Found before writing Step 10 of
+[0006-PLAN-command-registry.md](0006-PLAN-command-registry.md), recorded
+there as deviations D35–D40, by reading `command` at `v0.4.0` and
+command/cli, and by probing Cobra v1.10.2 in a scratch module.
+
+**Found.**
+
+1. A1 has `Hidden` come from the command, and the PLAN's Step 10 test
+   says "no hidden … command in the tree". `command/cli` runs a hidden
+   command and does not list it.
+2. A1 makes a required property `MarkFlagRequired`. Cobra checks required
+   flags before `RunE`, so `--args '{"name":"x"}'`, and a positional
+   property given as its flag, would be refused; `command/cli` accepts
+   both.
+3. A1 maps three things the `v0.4.0` registry does not have:
+   `command.Command` has no deprecation, the registry has no completion
+   providers, and `SchemaOf` writes no mutually exclusive or
+   required-together relation.
+4. `command/cli` runs a command by words or by its dotted ID; A1 says
+   nothing of the dotted form, and a Cobra tree is words only.
+5. A1 says groups are added before any child "because Cobra panics on an
+   undefined `GroupID`". In a probe, a group added after its child and
+   before `Execute` works: Cobra checks groups in `ExecuteC`
+   (`checkCommandGroups`), and panics only on a group never added. A
+   group added twice is listed twice in Cobra's help.
+6. A1 gives `cobracmd` `command/cli`'s verbs, and does not say what
+   `Mount` does when the program's parent already has a child of that
+   name, or of a name a registry command takes. Cobra refuses neither.
+
+**Decided.**
+
+1. **A hidden command is in the tree with `Hidden` set:** it runs, and
+   is neither listed nor completed, as in `command/cli`. A command not
+   offered on the CLI surface is not in the tree.
+2. **No `MarkFlagRequired`.** The registry's check reports a missing
+   argument as an `ArgError`, exit 2, as in `command/cli`; help still
+   says "required".
+3. **None of the three is built.** Completion serves enums, of flags and
+   of positionals, and command names. A later record that adds a
+   deprecation, completion providers or schema relations to `command`
+   adds their Cobra mapping with them.
+4. **`Run` turns a dotted ID into words:** before it executes, a word
+   that is the ID of a registry command in the tree, read from its
+   annotation, is replaced by the ID's segments. `describe`, `schema` and
+   `help` take either form, as in `command/cli`.
+5. **The fact is corrected** as item 5 says. Groups are still added
+   before the children, and a group the parent already has is not added
+   again.
+6. **`Mount` adds the verbs** beside the registry's top-level commands,
+   and returns an error naming every child name or alias of the parent
+   that one of them would take, before it changes the parent.
+
+**Changed.** A1's tree, flags and completion bullets, annotated in place.
+
+**Owner questions for A10.** *Answered 2026-10-06* (picked from options),
+each the recommendation. The alternatives were:
+
+1. hidden commands left out of the tree;
+2. `MarkFlagRequired` as A1 says, with `--args` unable to supply a
+   required property;
+3. adding the three to `command` first, in a root `v0.5.0`;
+4. words only, or a hidden root-level twin for each dotted ID;
+5. only the mutation "a category's group is never added";
+6. `Mount` adding no verbs, or skipping a verb whose name is taken.
 
 ## More Information
 

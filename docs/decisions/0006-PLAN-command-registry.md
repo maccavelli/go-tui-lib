@@ -734,9 +734,13 @@ mutation is killed.
   `WithWidth`; in `docs`, `Man(w io.Writer, root *cobra.Command, date
   time.Time) error` and `Markdown(w io.Writer, root *cobra.Command) error`.
 * **Build:** MADR A1's tree, flags, completion, verbs, exit codes, help and
-  rules, as written there.
+  rules, as written there. (*A10, D35–D40: a hidden command is in the
+  tree, hidden; no `MarkFlagRequired`; no deprecation, completion
+  providers or flag relations; `Run` takes a dotted ID; `Mount` adds the
+  verbs and refuses a clash.*)
 * **Tests:** the shared front-end cases agree with `command/cli`; no
-  hidden or non-CLI command in the tree; nested commands and groups;
+  hidden or non-CLI command in the tree (*D35: no non-CLI command in the
+  tree, and a hidden one hidden*); nested commands and groups;
   `Mount` beside a program's own commands; an enum flag refuses and
   completes; golden help across 0001-MADR §6's matrix at 60 and 100
   columns; golden completion scripts for bash, zsh, fish and PowerShell;
@@ -745,7 +749,9 @@ mutation is killed.
   process works and registers no completion twice.
 * **Mutations:** a flag's type from the Go field instead of the schema;
   `Destructive` without `--yes`; `Run` without `SetArgs`; a group added
-  after its children; depguard allowing Cobra in the root.
+  after its children (*D39: survives in Cobra; replaced by "a category's
+  group is never added" and "`Mount` adds a group the parent already
+  has"*); depguard allowing Cobra in the root.
 * **Checks:** Rule 3, in the module's directory with `GOWORK=off`, and
   the tests again in workspace mode; `scripts/go-modules.sh --check`.
 * **The release:** the owner commits, pushes and tags
@@ -1974,3 +1980,247 @@ effect (`go env GOWORK` empty) and `GOPROXY` at its default:
 
 The tag exists and the smoke test builds, so Step 9 is done. Steps 10 and
 11 may start: each requires the published `v0.4.0`.
+
+### Step 10: `command/cobracmd`, the Cobra front end
+
+#### Before the first file
+
+Read on 2026-10-06, with `GOWORK=off`, from the module proxy:
+
+* **Versions.** `go list -m -versions`: the newest `github.com/spf13/cobra`
+  is `v1.10.2` (2025-12-03) and the newest `github.com/spf13/pflag`
+  `v1.0.10` (2025-09-02), the versions 0010-MADR §5 named.
+* **`go.mod`s.** Cobra `v1.10.2`: `go 1.15`, requiring
+  `github.com/cpuguy83/go-md2man/v2 v2.0.6`,
+  `github.com/inconshreveable/mousetrap v1.1.0`,
+  `github.com/spf13/pflag v1.0.9` and `go.yaml.in/yaml/v3 v3.0.4`.
+  pflag `v1.0.10`: `go 1.12`, no requirement. go-md2man `v2.0.6`: `go
+  1.12`, requiring `github.com/russross/blackfriday/v2 v2.1.0`.
+* **Licences,** from each module's licence file: Cobra Apache-2.0;
+  pflag BSD-3-Clause; mousetrap Apache-2.0; go-md2man MIT; blackfriday
+  BSD-2-Clause; `go.yaml.in/yaml/v3` MIT and Apache-2.0 (its `NOTICE`).
+* **`govulncheck`.** The module does not exist before its first file, so
+  a scratch module outside the repository stood in for it: a program
+  importing `cobra`, `cobra/doc`, `pflag`, and `command`, `when`, `theme`
+  and `glyph` at `v0.4.0`, built with `go mod tidy`. `GOWORK=off
+  govulncheck ./...`: "No vulnerabilities found." The check runs again in
+  the module itself under Rule 3.
+* **Cobra, probed** in a second scratch module: a group added after its
+  child and before `Execute` works; a group never added panics at
+  `Execute` ("group id 'g' is not defined for subcommand 'app leaf'"); a
+  group added twice is listed twice; a command with children and no `Run`
+  prints its help to stdout and returns no error, given no argument or an
+  unknown one; a shorthand given to two flags panics ("unable to redefine
+  'x' shorthand"); `-4` after a positional is an unknown shorthand.
+  `completions.go:38` still keeps flag completions in a process-wide map,
+  and `RegisterFlagCompletionFunc` refuses a second registration for one
+  flag (`completions.go:178`), as A1 says.
+
+#### Deviations
+
+Found before any Step 10 code was written; MADR amendment A10 records the
+decisions. Each was asked with options, and the owner picked the
+recommendation on 2026-10-06.
+
+* **D35: hidden commands.** In the tree, with `Hidden` set. The test
+  becomes "no non-CLI command in the tree, and a hidden one is hidden,
+  and runs".
+* **D36: required properties.** No `MarkFlagRequired`; the registry
+  reports a missing argument, exit 2.
+* **D37: deprecation, completion providers, flag relations.** None is
+  built; the registry has none of them.
+* **D38: dotted IDs.** `Run` turns a dotted ID into its words.
+* **D39: the group mutation.** It survives in Cobra, so it is replaced
+  by "a category's group is never added" and "`Mount` adds a group the
+  parent already has"; A1's wording is corrected.
+* **D40: `Mount` and the verbs.** `Mount` adds them, and a name clash is
+  an error before the parent changes.
+
+#### What was built
+
+* **The module.** `command/cobracmd/go.mod`: `module
+  github.com/maccavelli/go-tui-lib/command/cobracmd`, `go 1.27.1`,
+  requiring `github.com/maccavelli/go-tui-lib v0.4.0`,
+  `github.com/spf13/cobra v1.10.2` and `github.com/spf13/pflag v1.0.10`,
+  and directly `github.com/charmbracelet/colorprofile v0.4.3` and
+  `github.com/charmbracelet/x/ansi v0.11.8`, which the root already
+  requires (0001-MADR A3); no `replace`. `go.sum`. `go work use
+  ./command/cobracmd`.
+* **The package.** `cobracmd.go`: the package documentation, `Option`
+  and the six options, `New`, `Mount`, `Run`, the tree, the
+  annotations, the confirmation gate and the exit codes. `flags.go`:
+  reading a schema's properties as `command/cli` does, copied, because a
+  nested module cannot reach `command/cli`'s unexported code; and the
+  pflag values. `help.go`: the verbs `list`, `describe` and `schema`, the
+  help command, and help drawn with the theme. `complete.go`: the
+  completion command and the completion functions. `docs/docs.go`: `Man`
+  and `Markdown`.
+* **Exported names,** checked with `go doc -short`: `New`, `Mount`,
+  `Run`, `Option`, `WithName`, `WithConfirm`, `WithContext`,
+  `WithTheme`, `WithGlyphs`, `WithWidth`; in `docs`, `Man` and
+  `Markdown`. No other.
+* **Tests.** `frontend_test.go`: `TestSharedFrontEndCases`, 51 command
+  lines run through `command/cli` and this package, comparing the exit
+  code, stdout, whether stderr is empty, and the arguments each command
+  ran with. `cobracmd_test.go`: `TestTree` (no non-CLI command in the
+  tree, a hidden one hidden and runnable, the annotations, `Use`,
+  aliases and flags), `TestGroups`, `TestMount` (beside a program's own
+  commands, by ID below the root, a clash refused with the parent
+  unchanged, a group the parent has not added twice), `TestEnumFlag` (an
+  enum flag refuses, and flags, positionals and `describe` complete),
+  `TestHelpGolden`, `TestHelpDefaults`, `TestCompletionScripts`,
+  `TestExitCodesAndNamespaces`, `TestRunsAreIndependent`,
+  `TestDestructiveNeedsYes`, `TestNoProcessState` (no `os.Args`, and
+  nothing on the process's stdout or stderr through a pipe),
+  `TestWriteFails`, `TestSecondNew` (three trees in one process, each
+  completing), `TestBrokenSchema` and `TestNilArguments`.
+  `example_test.go`: `ExampleNew` and `ExampleMount`. `docs/docs_test.go`:
+  `TestPagesGolden` (each page twice, equal, with no generated-by line,
+  and the caller's `DisableAutoGenTag` left as it was) and
+  `TestNilArguments`.
+* **Goldens,** all read: 56 help files (the program, a namespace, three
+  registry commands, a destructive one and a verb, each across {colour,
+  no colour} × {UTF-8, ASCII} × {60, 100}); the four completion scripts;
+  the man and Markdown pages of the root and of `workspace resize`. A
+  script compared every colour file, with its escapes removed, against
+  its no-colour twin, and every UTF-8 file against its ASCII twin: they
+  differ only in the escapes and in the ellipsis, and no ASCII file has a
+  non-ASCII rune.
+* **Docs.** `AGENTS.md`'s module table and `docs/architecture.md`'s
+  Modules section, tree and "What is not here" no longer call the module
+  planned. `README.md` said "The planned Cobra, Kong and glamour
+  adapters"; it now names `command/cobracmd` as built.
+* **Choices inside the listed names:**
+  * The exit codes are `command/cli`'s constants, which this package
+    imports; it exports none of its own.
+  * The defaults are `command/cli`'s: the name `app` and a width of 80,
+    at least 40. The default theme is built for no terminal
+    (`colorprofile.NoTTY`, an unknown background, ASCII glyphs), so help
+    is plain ASCII as `command/cli`'s is. `WithGlyphs` replaces the
+    theme's glyphs.
+  * Help follows `command/cli`'s layout. Headings take the theme's
+    title style, the left column its accent, and a destructive command's
+    danger line its warning style, which also says in words that it asks
+    first. A property's `x-cli` group heads its flags, as in
+    `command/cli`, though Cobra itself groups only commands. A repeated
+    positional ends in the glyph table's ellipsis: `…`, or `~` in ASCII.
+  * The root and each namespace run: with no word they write their help
+    to stderr and exit 2, and with an unknown word they exit 2, as
+    `command/cli` does. Cobra's default prints help and exits 0. `New`'s
+    root has its own help command for the same reason: Cobra's prints the
+    program's help for an unknown topic and exits 0.
+  * A namespace's short description is `The <word> commands`. It is
+    hidden when every command below it is, and in a group when every
+    visible command below it shares one category.
+  * A slash alias becomes a Cobra alias unless it names a sibling or
+    something already taken, or holds a space or a dot.
+  * A property named like one of the shell's flags, or a schema that
+    cannot be read, leaves the rest of the tree whole: that command alone
+    exits 2 when it runs, as in `command/cli`. A short name is kept only
+    when it is one ASCII letter other than `h`, and not taken.
+  * An enum flag refuses a value when it is parsed, and a positional enum
+    when Cobra checks the arguments; both report the `ArgError` and exit
+    2.
+  * `Run` writes to the caller's writers as output comes, where
+    `command/cli` gathers it, so a program's own long-running command
+    streams; a write that fails still makes the exit code 1. `Run` takes
+    nil arguments as none, since Cobra reads `os.Args` for nil.
+  * An error from a command the program built itself is exit 1. A flag
+    error of a command this package built is exit 2.
+  * `Mount` also refuses `help` and `completion` when the parent is a
+    root, the names Cobra adds there. It sets the help and flag-error
+    functions of the commands it adds, and leaves the parent's alone.
+  * `docs` writes the page of the command it is given, in section 1,
+    with Cobra's own link names; it sets `DisableAutoGenTag` for that
+    page and puts it back.
+* **Found while building:**
+  * Cobra's default `completion` command keeps the writer of the run
+    that creates it (`completions.go`, `out := c.OutOrStdout()`).
+    `TestCompletionScripts` ran `completion bash`, then `completion zsh`,
+    on one tree, and zsh's script went to the first run's buffer: stdout
+    `""`. `New` turns Cobra's off (`CompletionOptions.DisableDefaultCmd`)
+    and adds its own, which calls the same generators with the run's
+    writer. A1's "Scripts … come from Cobra's generators, written to the
+    caller's writer" holds; the package documentation tells a program
+    that mounts into its own root.
+  * Cobra keeps every flag's value and `Changed` between executions, so
+    `--yes` in one run approved the next. `Run` clears the flags of the
+    commands `New` and `Mount` built before each run.
+  * The man page showed a boolean property as `--quiet[=]`; its flag's
+    default now reads `false`.
+  * `x/ansi.Wordwrap` breaks at a hyphen: at 60 columns, `list`'s help
+    wraps `--json` as `--` and `json`. `command/cli`'s help uses the same
+    wrap and does the same. It is left as it is here, so that both front
+    ends wrap alike, and is open for a later record.
+  * Lint: `errcheck` on `fmt.Fprintf` to the help page (now `printf` on
+    its embedded `strings.Builder`); `goconst` (`bool`, `JSON`);
+    `nilerr` in the arguments check, which leaves a broken command to
+    `RunE` (restructured); `gofmt`'s alignment; `go fix`'s
+    `errors.AsType`.
+
+#### Checks (Rule 3)
+
+1. `gofmt -l command/cobracmd`: silent.
+2. `make pre-add-check FILES="<the 9 Go files>"` in a scratch clone with
+   the step staged, because `scripts/go-modules.sh --check` reads the
+   index and the agent stages nothing in the tree: exit 0, "go-precheck:
+   9 file(s) clean in 1 module(s) (gofmt, golangci-lint, go vet, go test,
+   go mod tidy, govulncheck)", which includes the nested module's checks
+   of no `replace` and a release version of the root.
+3. `make lint`: exit 0, "0 issues." for `GOOS=linux`, `darwin` and
+   `windows` in each of the two modules, after `make modernize`.
+4. `GOWORK=off go test -race -count=1 ./...`: the root 16 packages `ok`,
+   `command/cobracmd` 2.
+5. `GOWORK=off go test -shuffle=on -count=2 ./...`: the same.
+6. `LC_ALL=C GOWORK=off go test -count=1 ./...`: the same.
+7. `GOWORK=off go mod tidy -diff`: silent in both modules. The tests
+   again in workspace mode: both modules `ok`. `GOWORK=off govulncheck
+   ./...` in `command/cobracmd`: "No vulnerabilities found."; `make
+   vuln`: the same for both modules. `scripts/go-modules.sh --check` and
+   `make release-check` in the staged clone: exit 0, "go-precheck: 137
+   file(s) clean in 2 module(s)". `internal/conformance`:
+   `TestNoPackageOwnsTheTerminal/command/cobracmd` passes.
+8. No fuzz target was added.
+9. Windows test host, on a copy of the tree, go1.27.1 windows/amd64:
+   `make pre-add-check`: exit 0, "go-precheck:
+   137 file(s) clean in 2 module(s)"; `make lint`: exit 0, "0 issues."
+   for each module and target; `make vuln`: exit 0, "No vulnerabilities
+   found." in both modules; in `command/cobracmd`, `GOWORK=off go test
+   -count=3 -shuffle=on ./...`: both packages `ok`, and the tests in
+   workspace mode: both `ok`.
+10. `markdownlint-cli2 --config .markdownlint-cli2.jsonc` on `AGENTS.md`,
+    `README.md`, `docs/README.md` and `docs/architecture.md`: 0 issues;
+    the relative-link check of those and this pair: 0 broken.
+11. The identifier scan of the diff and the new module, for the local
+    account name, the host names and real-machine paths: no match.
+
+#### Mutations (Rule 4)
+
+Each on a scratch copy of the tree; every one killed. S10-1's "type from
+the Go field" has no field to read here, since the package sees only the
+schema: the mutation ignores the schema's type instead.
+
+| Mutation | Test | Failing line |
+| :--- | :--- | :--- |
+| S10-1: every value parsed as a string, ignoring the schema's type | `TestSharedFrontEndCases` | `"workspace resize --split sidebar --delta 4": exit 2, command/cli 0` |
+| S10-2: `Destructive` runs without `--yes` | `TestDestructiveNeedsYes` | `without --yes: exit 0, stdout "deleted notes.txt\n"` |
+| S10-3: `Run` without `SetArgs` | `TestNoProcessState` | `list ran something else: exit 0 "hello\n"` |
+| S10-4 (D39): a category's group never added | `TestGroups` | `the root's groups are []`, then Cobra's `panic: group id 'Files' is not defined for subcommand 'app files'` |
+| S10-5 (D39): `Mount` adds a group the parent has | `TestMount` | `the program's group Workspace is there 2 times` |
+| S10-6: `Run` clears no flag | `TestRunsAreIndependent` | `--yes outlived its run: exit 0` |
+| S10-7 (D38): no dotted ID | `TestSharedFrontEndCases` | `"workspace.resize --args …": exit 2, command/cli 0` |
+| S10-8 (D35): a hidden command left out | `TestTree` | `a hidden command is missing, or not hidden: <nil>` |
+| S10-9 (D36): a required property `MarkFlagRequired` | `TestSharedFrontEndCases` | `"workspace resize sidebar 4": exit 1, command/cli 0` |
+| S10-10 (D40): `Mount` changes the parent before a clash | `TestMount` | `a failed Mount changed the program's commands` |
+| S10-11: depguard allows Cobra in the root | `golangci-lint` on a root package importing Cobra | real config: `import 'github.com/spf13/cobra' is not allowed from list 'cobra'`; with the `cobra` rule removed, no depguard finding |
+
+No earlier step's mutation anchors moved: Step 10 changes no root Go
+file.
+
+#### The release
+
+Left to the owner: commit this step, push, and with CI green tag
+`command/cobracmd/v0.1.0`. Then the agent runs the consumer smoke test of
+[releasing.md](../guides/releasing.md#the-consumer-smoke-test) against
+it, and records it here. The step is done when the tag exists and the
+smoke test builds.
