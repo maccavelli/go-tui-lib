@@ -51,8 +51,8 @@ type Request struct {
 	Caller  string
 	Context when.Context // the context When is evaluated in; nil is empty
 	// Gate, when set, is asked instead of the registry's gate, for this
-	// request only, and its answers are not remembered: how the shell's
-	// --yes approves one command
-	// (docs/decisions/0006-MADR-command-registry.md A9).
+	// request only, and its answers are not remembered: how a program's
+	// own command line approves one command, from its --yes flag or a
+	// prompt (docs/decisions/0006-MADR-command-registry.md A9).
 	Gate Gate
 }

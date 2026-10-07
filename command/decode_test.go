@@ -20,8 +20,8 @@ func mustNew[A any](t testing.TB, id ID, run func(context.Context, *Invocation, 
 }
 
 type strictArgs struct {
-	Name  string `json:"name" required:"" enum:"a,b"`
-	Delta int    `json:"delta" required:"" schema:"min=-5,max=5"`
+	Name  string `json:"name" enum:"a,b"`
+	Delta int    `json:"delta" schema:"min=-5,max=5"`
 	Inner struct {
 		X int `json:"x"`
 	} `json:"inner,omitzero"`
@@ -149,8 +149,8 @@ func (l *auditLog) Audit(r Record) { *l = append(*l, r) }
 
 func TestAuditMasksSecrets(t *testing.T) {
 	type args struct {
-		User   string `json:"user" required:""`
-		Token  string `json:"token" required:"" schema:"secret"`
+		User   string `json:"user"`
+		Token  string `json:"token" schema:"secret"`
 		Nested struct {
 			Key string `json:"key" schema:"secret"`
 		} `json:"nested,omitzero"`

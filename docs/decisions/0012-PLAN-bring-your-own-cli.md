@@ -432,3 +432,113 @@ No deviation.
 Once this step is on `main`, the agent checks `go get …@latest` of both
 modules from a scratch module again. Step 2 found that `kongcmd@latest`
 fell back to a pseudo-version of `main`'s head.
+
+**After the push (2026-10-07).**
+
+* **Commit and push:** at the owner's request in that turn ("Commit and
+  push"), the agent committed this step on `main` as `7fe52e6` (`git add
+  -A`, `git commit --no-edit`). It ran the disclosure guard (exit 0, no
+  finding) and pushed `bde54d0..7fe52e6`.
+* **CI** on `7fe52e6`: run 37591447004, success in all 5 jobs (the test matrix now holds the root module alone, where it held three).
+* **`go list -m <module>@latest`**, from a scratch module:
+  * **With `GOPROXY=direct`:** "no matching versions for query
+    \"latest\"" for both modules. `main` no longer holds them, and every
+    release is retracted, so a fresh resolution finds nothing.
+  * **Through `proxy.golang.org`:** both modules still answer with the
+    cached pseudo-version of the commit that held them,
+    `v0.0.0-20261007070813-bde54d0b41f4`. The proxy caches `@latest`
+    answers, so this is the cache's, not the source's.
+  * **What stays:** that pseudo-version stays fetchable, as every version
+    the proxy has seen does. Its `go.mod` carries the `// Deprecated:`
+    comment, so the go command reports it deprecated.
+  * **Next check:** the close-out (Step 7) checks the proxy's `@latest`
+    again and records what it answers then.
+
+Step 3 is done.
+
+### Step 4: the root's API change
+
+No deviation.
+
+#### What was built
+
+* **`command/cli/` deleted:** `cli.go`, `flags.go`, `help.go`,
+  `cli_test.go`, `example_test.go` and its six goldens, 12 files.
+* **A12's check deleted:** `command/kongname.go`; in `command/args.go`
+  the call and the documentation paragraph, and the `reflect` import it
+  needed.
+* **`command/args_test.go`** now holds `TestNewTakesJSONRule` alone.
+  Three structs are each accepted by `New`, and each schema says what
+  the `json` tag says:
+  * a flag the `json` tag makes required, with no other tag;
+  * an `omitzero` positional with no `optional:""`;
+  * a `json` name Kong would spell otherwise (`max_items`).
+* **The tags A12 added, removed:** `workspace/commands.go`
+  (`zoomArg.Pane`'s `optional:""`, `stateArg.State`'s `required:""`),
+  `command/decode_test.go` (four `required:""`) and
+  `command/export_test.go` (one `optional:""`). No `required:""` or
+  `optional:""` tag remains in the tree.
+* **Comments reworded:**
+  * `SurfaceCLI` and `OriginCLI` are "the program's own command line",
+    the first citing 0012-MADR;
+  * `Request.Gate`'s comment says how "a program's own command line
+    approves one command, from its --yes flag or a prompt".
+
+  The package documentation's "the shell", and `schema.go`'s "aligned
+  with Kong's" tag vocabulary, still hold, and stay.
+* **Exported names:** package `command/cli` removed. `go doc -short
+  ./command` and `./workspace` are identical before and after.
+
+#### Checks (Rule 2)
+
+* `gofmt -l command workspace`: silent.
+* **The root, with `GOWORK=off`:** `go test -race`, `-shuffle=on
+  -count=2` and `LC_ALL=C` each gave 15 packages `ok`, one fewer, since
+  `command/cli` is gone. The tests in workspace mode gave 15 `ok`. `go
+  mod tidy -diff` was silent.
+* **`make lint`:** exit 0, "0 issues." for the three targets. **`make
+  vuln`:** exit 0.
+* **`make fuzz FUZZTIME=20s`:** exit 0, "ran clean" in `./layout`,
+  `./when` and `./command`.
+* **The goldens:** none changed but `command/cli`'s six, deleted.
+* **A scratch clone with the step staged:** `scripts/go-modules.sh
+  --check` exit 0; `make pre-add-check` exit 0 ("7 file(s) clean in 1
+  module(s)"); `make release-check` exit 0 ("124 file(s) clean in 1
+  module(s)").
+* **The Windows test host,** on a copy of the files that exist:
+  go1.27.1 windows/amd64, `make pre-add-check` exit 0 ("124 file(s) clean
+  in 1 module(s)"), `make lint` and `make vuln` exit 0, and `GOWORK=off
+  go test -count=3 -shuffle=on ./...` exit 0, 15 `ok`.
+* **The identifier scan** of the diff: no match.
+
+#### Mutations (Rule 3)
+
+| Mutation | Test | Failing line |
+| :--- | :--- | :--- |
+| S4-1: `New` checks Kong agreement again | `TestNewTakesJSONRule` | `a flag required by its json tag: New refused it: command: t.cmd: Name: Kong does not require it` |
+| S4-2: the `json` rule ignores `omitzero` | `TestNewTakesJSONRule` | `a positional with omitzero: "pane" required true, want false` |
+
+`command/command.go`, `command/args.go` and `workspace/commands.go` hold
+anchors of 0006's Steps 3, 4 and 7, whose sets ran again against this
+tree, all killed: Step 3's 11, Step 4's 13 and its layers' 2, and Step
+7's 11. Step 8's set anchored in `command/cli`, which is gone; it is
+retired with the package. Step 11a's and Steps 10's and 11's sets
+anchored in code that 0012 removed, and are retired with it.
+
+#### Release notes for `v0.6.0`
+
+`v0.6.0` makes go-tui-lib a TUI layer a program stacks on its own Go
+CLI (0012-MADR).
+
+* **Removed: `command/cli`.** A program's own command line, whether
+  `flag`, Cobra, Kong or another, runs a registry command by calling
+  `Registry.Run` with `command.OriginCLI`. The commands guide shows how.
+* **Changed: `command.New[A]` no longer checks agreement with Kong**
+  (`v0.5.0`'s 0006-MADR A12). The `json` tag alone decides a property's
+  name and whether it is required, as `SchemaOf` does. A `required:""`,
+  `optional:""` or `name:""` tag added for `v0.5.0` is now ignored, and
+  may be removed.
+* **Retired: `command/cobracmd` and `command/kongcmd`.** They are
+  deprecated and retracted at `v0.1.1`, and no longer in the repository.
+* **Unchanged:** every other exported name. No module is added or
+  removed from the root's `go.mod`.

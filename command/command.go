@@ -170,7 +170,7 @@ const (
 	SurfaceKey Surface = 1 << iota
 	SurfacePalette
 	SurfaceSlash
-	SurfaceCLI
+	SurfaceCLI // the program's own command line (docs/decisions/0012-MADR-bring-your-own-cli.md)
 	SurfaceAgent
 
 	AllSurfaces = SurfaceKey | SurfacePalette | SurfaceSlash | SurfaceCLI | SurfaceAgent
@@ -276,7 +276,7 @@ const (
 	OriginMouse                     // a click; needs SurfaceKey
 	OriginPalette                   // the command palette
 	OriginSlash                     // a slash command
-	OriginCLI                       // the shell
+	OriginCLI                       // the program's own command line
 	OriginAgent                     // an agent's tool call
 	OriginProgram                   // the program itself; When applies, Surfaces do not
 )

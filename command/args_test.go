@@ -2,128 +2,62 @@ package command
 
 import (
 	"context"
-	"strings"
+	json "encoding/json/v2"
+	"slices"
 	"testing"
 )
 
-// build is New of A, with a run function that does nothing.
-func build[A any]() error {
-	_, err := New("t.cmd", "T", func(context.Context, *Invocation, A) (Result, error) { return Result{}, nil }, WithDanger(UI))
-	return err
-}
-
 type (
+	// A flag the json tag makes required, with no other tag.
 	requiredFlag struct {
 		Name string `json:"name"`
 	}
-	requiredFlagFixed struct {
-		Name string `json:"name" required:""`
-	}
+	// A positional the json tag makes optional, with no other tag.
 	optionalArg struct {
 		Pane string `json:"pane,omitzero" arg:""`
 	}
-	optionalArgFixed struct {
-		Pane string `json:"pane,omitzero" arg:"" optional:""`
-	}
-	requiredOmitted struct {
-		Name string `json:"name,omitzero" required:""`
-	}
-	requiredOptionalArg struct {
-		Pane string `json:"pane" arg:"" optional:""`
-	}
+	// A json name that is not a kebab-case spelling of the Go name.
 	snakeName struct {
 		MaxItems int `json:"max_items,omitzero"`
 	}
-	snakeNameFixed struct {
-		MaxItems int `json:"max_items,omitzero" name:"max_items"`
-	}
-	bothTags struct {
-		Name string `json:"name" required:"" optional:""`
-	}
-	argWithDefault struct {
-		Mode string `json:"mode" arg:"" enum:"a,b" default:"a"`
-	}
-	pointerFlag struct {
-		N *int `json:"n"`
-	}
-	embedded struct {
-		requiredFlagFixed
-		Extra bool `json:"extra,omitzero"`
-	}
-	embeddedWrong struct {
-		requiredFlag
-	}
-	nestedRequired struct {
-		Inner struct {
-			Name string `json:"name"`
-		} `json:"inner,omitzero"`
-	}
-	ownSchemaArgs struct {
-		Whatever string `json:"x_y"`
-	}
 )
 
-func (ownSchemaArgs) JSONSchema() Schema {
-	return Schema(`{"type":"object","properties":{"x_y":{"type":"string"}}}`)
-}
-
-func TestNewAgreesWithKong(t *testing.T) {
+// TestNewTakesJSONRule shows that New decides a property's name and
+// whether it is required by the json tag alone, as SchemaOf does: a
+// program's own CLI reads its arguments however it likes
+// (docs/decisions/0012-MADR-bring-your-own-cli.md).
+func TestNewTakesJSONRule(t *testing.T) {
 	for name, c := range map[string]struct {
-		build func() error
-		fix   string // the tag the error names; "" for a struct New accepts
+		build    func() (Command, error)
+		property string
+		required bool
 	}{
-		"a required flag without required":    {build[requiredFlag], `add required:""`},
-		"an optional positional":              {build[optionalArg], `add optional:""`},
-		"required beside omitzero":            {build[requiredOmitted], `remove required:""`},
-		"optional on a required positional":   {build[requiredOptionalArg], `remove optional:""`},
-		"a json name Kong spells differently": {build[snakeName], `add name:"max_items"`},
-		"required and optional together":      {build[bothTags], `required:"" and optional:"" together`},
-		"an embedded struct's field":          {build[embeddedWrong], `add required:""`},
-		"a required flag, fixed":              {build[requiredFlagFixed], ""},
-		"an optional positional, fixed":       {build[optionalArgFixed], ""},
-		"a json name, fixed":                  {build[snakeNameFixed], ""},
-		"a positional with a default":         {build[argWithDefault], ""},
-		"a pointer flag":                      {build[pointerFlag], ""},
-		"an embedded struct, fixed":           {build[embedded], ""},
-		"a nested object's fields":            {build[nestedRequired], ""},
-		"a type with its own schema":          {build[ownSchemaArgs], ""},
-		"no arguments":                        {build[NoArgs], ""},
+		"a flag required by its json tag": {newOf[requiredFlag], "name", true},
+		"a positional with omitzero":      {newOf[optionalArg], "pane", false},
+		"a json name in another spelling": {newOf[snakeName], "max_items", false},
 	} {
-		err := c.build()
-		switch {
-		case c.fix == "" && err != nil:
-			t.Errorf("%s: %v", name, err)
-		case c.fix != "" && (err == nil || !strings.Contains(err.Error(), c.fix)):
-			t.Errorf("%s: %v, want an error naming %s", name, err, c.fix)
+		c0, err := c.build()
+		if err != nil {
+			t.Errorf("%s: New refused it: %v", name, err)
+			continue
 		}
-	}
-	// SchemaOf is unchanged: it still describes a struct New refuses.
-	for name, f := range map[string]func() (Schema, error){
-		"requiredFlag": SchemaOf[requiredFlag], "optionalArg": SchemaOf[optionalArg], "snakeName": SchemaOf[snakeName],
-	} {
-		if _, err := f(); err != nil {
-			t.Errorf("SchemaOf[%s]: %v", name, err)
+		var schema struct {
+			Properties map[string]any `json:"properties"`
+			Required   []string       `json:"required"`
+		}
+		if err := json.Unmarshal(c0.Args, &schema); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if _, ok := schema.Properties[c.property]; !ok {
+			t.Errorf("%s: no property %q in %s", name, c.property, c0.Args)
+		}
+		if got := slices.Contains(schema.Required, c.property); got != c.required {
+			t.Errorf("%s: %q required %v, want %v (%s)", name, c.property, got, c.required, c0.Args)
 		}
 	}
 }
 
-func TestKongName(t *testing.T) {
-	for goName, want := range map[string]string{
-		"N":          "n",
-		"Name":       "name",
-		"MaxItems":   "max-items",
-		"PaneID":     "pane-id",
-		"HTTPServer": "http-server",
-		"ID":         "id",
-		"X2":         "x-2",
-		"Base64Data": "base-64-data",
-		"AB":         "ab",
-		"ABc":        "a-bc",
-		"Max_Items":  "max-_-items",
-		"Ünïcode":    "ünïcode",
-	} {
-		if got := kongName(goName); got != want {
-			t.Errorf("kongName(%q) = %q, want %q", goName, got, want)
-		}
-	}
+// newOf is New of A, with a run function that does nothing.
+func newOf[A any]() (Command, error) {
+	return New("t.cmd", "T", func(context.Context, *Invocation, A) (Result, error) { return Result{}, nil }, WithDanger(UI))
 }
