@@ -1,6 +1,0 @@
- 25|# fish completion for app
- 22|function _app_complete
- 53|    set -l words (commandline -opc) (commandline -ct)
- 50|    $words[1] __complete $words[2..-1] 2>/dev/null
-  3|end
- 39|complete -c app -f -a '(_app_complete)'

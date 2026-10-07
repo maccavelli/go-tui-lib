@@ -333,3 +333,102 @@ Left to the owner:
 The agent then checks the retraction through the proxy and records it
 here. The step is done when the go command reports each module
 deprecated and each version retracted.
+
+**After the release (2026-10-07).**
+
+* **Commit:** at the owner's request in that turn ("Commit to main"),
+  the agent committed this step on `main` as `bde54d0`, with `git commit
+  --no-edit`.
+* **Disclosure guard:** run over the outgoing commits, exit 0 and no
+  finding.
+* **Push and tags:** at the owner's request ("You can to main, then push
+  the tags"), the agent pushed `main` (`11d8758..bde54d0`) and waited
+  for CI on `bde54d0`, which succeeded in all 11 jobs. It then tagged
+  `command/cobracmd/v0.1.1` and `command/kongcmd/v0.1.1`, annotated, on
+  `bde54d0`, with each tag's name as its message, and pushed both.
+
+From a scratch module outside the repository, with no `go.work` and
+`GOPROXY` at its default:
+
+* **`go list -m -versions`** of each module lists no version.
+  **`go list -m -retracted -versions`** lists `v0.1.0 v0.1.1` for each.
+* **A consumer pinned to `v0.1.0`** of both gets, from `go list -m -u`:
+  `…/command/cobracmd v0.1.0 (retracted) (deprecated)` and
+  `…/command/kongcmd v0.1.0 (retracted) (deprecated)`. With `-json`,
+  `Retracted` carries the reason, "go-tui-lib no longer ships a Kong
+  front end (0012-MADR).", and `Deprecated` the `go.mod` comment.
+* **`go get …/command/cobracmd@latest`** failed: "module
+  github.com/maccavelli/go-tui-lib@latest found (v0.5.0), but does not
+  contain package github.com/maccavelli/go-tui-lib/command/cobracmd".
+* **`go get …/command/kongcmd@latest`** resolved a pseudo-version of
+  `main`'s head instead, `v0.0.0-20261007070813-bde54d0b41f4`.
+  * **Why:** with every release retracted, the go command falls back to
+    the default branch's head, and `bde54d0` still holds the module.
+  * **Fix:** Step 3 removes the directory from `main`, after which
+    `@latest` has no commit with the module to resolve. Step 3 checks
+    this again.
+
+Both modules are reported deprecated and every release retracted, so
+Step 2 is done.
+
+### Step 3: the modules removed
+
+No deviation.
+
+#### What was built
+
+* **The two directories** were removed from the tree, 154 tracked files,
+  and `go work edit -dropuse` dropped both from `go.work`, which now
+  lists `.` alone. The deletions are for the owner to stage, or the
+  agent when asked.
+* **`.golangci.yml`:**
+  * `github.com/spf13/cobra`, `github.com/spf13/pflag` and
+    `github.com/alecthomas/kong` joined the `forbidden` rule, beside fang,
+    each with "go-tui-lib imports no CLI framework; a program brings its
+    own (docs/decisions/0012-MADR-bring-your-own-cli.md)";
+  * the one-module `cobra` and `kong` rules were removed;
+  * the comment above the remaining one-module rule, glamour's, now says
+    "a nested module's dependency".
+* **`AGENTS.md`'s Dependencies:** a paragraph refuses the three in every
+  module, citing 0012-MADR. The nested-module sentence names glamour
+  alone. The module table changes in Step 5.
+
+#### Checks (Rule 2)
+
+* **The root, with `GOWORK=off`:** `go test -race`, `-shuffle=on
+  -count=2` and `LC_ALL=C` each gave 16 packages `ok`. The tests in
+  workspace mode gave 16 `ok`. `go mod tidy -diff` was silent.
+* **`make lint`:** exit 0, "0 issues." for the three targets. **`make
+  vuln`:** exit 0.
+* **`internal/conformance`:** `TestNoPackageOwnsTheTerminal/.` passes,
+  and it finds no nested module.
+* **A scratch clone with the step staged** (`rsync --delete`, so the
+  deletions are mirrored; 154 `D` and 4 `M`):
+  `scripts/go-modules.sh --check` exit 0; `make pre-add-check` exit 0
+  ("no Go files to check", since the step deletes Go files and changes
+  none); `make release-check` exit 0 ("go-precheck: 130 file(s) clean in
+  1 module(s)"). In the tree, before staging, the check reports the two
+  `go.mod` files as tracked and not in `go.work`, as expected.
+* **The Windows test host,** on a copy of the files that exist,
+  go1.27.1 windows/amd64:
+  * `make pre-add-check` exit 0 ("130 file(s) clean in 1 module(s)");
+  * `make lint` and `make vuln` exit 0;
+  * `GOWORK=off go test -count=3 -shuffle=on ./...` exit 0, 16 `ok`.
+
+  The first attempt sent `git ls-files`'s list, which still names the
+  deleted files, and tar stopped on them. The transfer now sends only
+  files that exist.
+* **`AGENTS.md`:** markdownlint 0 issues; the link check 0 broken. **The
+  identifier scan** of the diff: no match.
+
+#### Mutation (Rule 3)
+
+| Mutation | Check | Result |
+| :--- | :--- | :--- |
+| S3-1: the three `forbidden` entries removed | golangci-lint on a scratch copy with a root package, and a package under a recreated `command/cobracmd/`, each importing Cobra and Kong | real config: 4 depguard findings, among them `command/cobracmd/leak/leak.go:5:2: import 'github.com/spf13/cobra' is not allowed from list 'forbidden'` under the formerly exempt path; the entries removed: 0 findings. Killed |
+
+#### Left to do after the push
+
+Once this step is on `main`, the agent checks `go get …@latest` of both
+modules from a scratch module again. Step 2 found that `kongcmd@latest`
+fell back to a pseudo-version of `main`'s head.

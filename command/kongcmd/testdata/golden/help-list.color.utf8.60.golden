@@ -1,7 +1,0 @@
-  6|[1mUsage:[m
- 18|  app list [flags]
-  0|
- 33|List the commands you can run now
-  0|
-  6|[1mFlags:[m
- 52|  [38;2;135;175;255m--json[m  print the manifest of the commands as JSON

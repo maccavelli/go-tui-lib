@@ -34,12 +34,16 @@ the MCP go-sdk (`github.com/modelcontextprotocol/go-sdk`) or
 `depguard` in `.golangci.yml` refuses each of these, so `make lint`, the
 pre-add check and CI fail on them.
 
+Never import a CLI framework (`github.com/spf13/cobra`,
+`github.com/spf13/pflag` or `github.com/alecthomas/kong`), in any module:
+go-tui-lib is a TUI layer, and a program brings its own CLI
+(`docs/decisions/0012-MADR-bring-your-own-cli.md`). depguard refuses them
+everywhere.
+
 Each nested module's list is
 `docs/decisions/0010-MADR-nested-adapter-modules.md` §5, and depguard keeps
-each dependency in its one module: `github.com/spf13/cobra` and
-`github.com/spf13/pflag` in `command/cobracmd` only,
-`github.com/alecthomas/kong` in `command/kongcmd` only, and
-`charm.land/glamour/v2` in `stream/glamourmd` only.
+each dependency in its one module: `charm.land/glamour/v2` in
+`stream/glamourmd` only.
 
 `go.mod` and `go.sum` change with the code that needs them: a requirement is
 added in the commit that adds its first import, and removed in the commit that
