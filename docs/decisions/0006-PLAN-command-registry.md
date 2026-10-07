@@ -1,6 +1,6 @@
 ---
-status: in-progress
-date: 2026-10-06
+status: complete
+date: 2026-10-07
 associated-madr: "0006-MADR-command-registry.md"
 ---
 # Implement the command registry (`when`, `command`, `command/cli`, and the Cobra and Kong front ends)
@@ -2735,3 +2735,107 @@ scratch module outside the repository, with no `go.work` in effect and
 
 The tag exists and the smoke test builds, so Step 11 is done. Step 12,
 the close-out, is next.
+
+### Step 12: close-out
+
+Verification, item by item, on 2026-10-07, against the tree at `6f6e083`
+(Step 11's record, the last commit), with every gate run again rather
+than read from the steps' records.
+
+* **Every step's mutations are killed, and each earlier set again after a
+  later change moves its anchors.** At their steps, every set was killed,
+  and Steps 4's and 7's ran again after Step 11a moved their anchors.
+  At the close, every set ran again against the closing tree on scratch
+  copies: Step 2's 7 and its fuzz check's 1, Step 3's 11, Step 4's 13 and
+  its layers' 2, Step 5's 16, Step 6's 9, Step 7's 11, Step 8's 8, Step
+  10's 10, Step 11a's 6 and Step 11's 10, 104 in all, every one killed,
+  no anchor stale; and the two depguard experiments, S10-11 and S11-11,
+  each killed (the real config refuses the import; with its rule removed,
+  no depguard finding). Step 9 had no mutation; Step 1 wrote records.
+* **Rule 3's checks are clean at every step, on the macOS development
+  host and the Windows test host.** Each step's record holds its checks.
+  At the close, on macOS: `make release-check` exit 0 ("go-precheck: 147
+  file(s) clean in 3 module(s)"); `make lint` exit 0, nine "0 issues."
+  (three targets, three modules); `make vuln` exit 0, "No
+  vulnerabilities found." in each module; `GOWORK=off go test` with
+  `-race`, with `-shuffle=on -count=2`, and under `LC_ALL=C`, in each
+  module: the root 16 packages `ok`, `command/cobracmd` 2,
+  `command/kongcmd` 1; the tests in workspace mode, all `ok`; `go mod
+  tidy -diff` silent in each module; `scripts/go-modules.sh --check` exit
+  0. On the Windows test host, on a copy of the tree:
+  go1.27.1 windows/amd64, `make pre-add-check` exit 0 ("go-precheck: 147
+  file(s) clean in 3 module(s)"), `make lint` exit 0, `make vuln` exit 0,
+  and `GOWORK=off go test -count=3 -shuffle=on ./...` in each module:
+  exit 0, the root 16 packages `ok`, `command/cobracmd` 2,
+  `command/kongcmd` 1.
+* **`make fuzz` covers `layout`, `when` and `command`, and CI's `gates`
+  job runs it.** `make fuzz FUZZTIME=20s`: exit 0, "1 fuzz targets ran
+  clean in ./layout", "1 … in ./when", "2 … in ./command"
+  (`FuzzFrontMatter`, `FuzzParseSlash`). `.github/workflows/ci.yml`'s
+  `gates` job runs `make fuzz`.
+* **The root `go.mod` is unchanged from `v0.3.0` through `v0.4.0`, and
+  never names Cobra or Kong; `go mod tidy -diff` is clean in every
+  module.** `git diff --stat v0.3.0 v0.5.0 -- go.mod go.sum` and `git diff
+  --stat v0.5.0 HEAD -- go.mod go.sum`: empty, so it is unchanged through
+  `v0.5.0` too; `cobra`, `pflag`, `kong` and `glamour` occur in neither
+  file. Tidy: above.
+* **Each nested `go.mod` requires a published root, has no `replace`, and
+  passes every gate of 0010-MADR §4 with `GOWORK=off` and in workspace
+  mode.** `command/cobracmd` requires `v0.4.0` and `command/kongcmd`
+  `v0.5.0`; neither has a `replace`. Both passed `make release-check`,
+  whose nested-module check refuses a `replace` or a pseudo-version, and
+  their tests ran in both modes, above.
+* **depguard keeps Cobra and pflag in `command/cobracmd`, Kong in
+  `command/kongcmd`, and refuses the Charm v1 paths, mcplib, the MCP
+  go-sdk and go-llmprovider-sdk everywhere.** `.golangci.yml` denies each
+  of them, and fang and ultraviolet beside them; S10-11 and S11-11 show
+  the Cobra and Kong rules biting.
+* **`internal/conformance` finds nothing in `when`, `command`,
+  `command/cli`, `cobracmd` and `kongcmd`.** `GOWORK=off go test -v -run
+  TestNoPackageOwnsTheTerminal ./internal/conformance/`: `PASS` for `.`,
+  the root module's every package, `when`, `command` and `command/cli`
+  among them, and for `command/cobracmd` and `command/kongcmd`.
+* **The shared front-end cases pass in all three front ends.**
+  `command/cli`'s own tests of those requests pass;
+  `command/cobracmd`'s `TestSharedFrontEndCases`, 51 lines against
+  `command/cli`, passes; `command/kongcmd`'s, 49 lines, passes, with
+  `TestKongNativeDifferences` pinning the six lines D42 makes differ.
+* **The MCP field names match 2026-07-28's schema, and the ACP ones the
+  ACP pages, as recorded in Step 6.** Step 6 recorded the comparison;
+  `TestMCPFieldNames` and `TestACPFieldNames` pass at the close.
+* **The consumer smoke test builds against `v0.4.0`,
+  `command/cobracmd/v0.1.0`, `v0.5.0` and `command/kongcmd/v0.1.0`.**
+  Each is recorded after its release (Steps 9, 10, 11a and 11), every
+  one from a scratch module outside the repository with no `go.work`.
+* **The identifier scan finds nothing, and CI is green after each push.**
+  `git grep` of the committed tree for the local account name, the host
+  names and the work domain: no match; for real-machine home paths:
+  nothing but a URL, a third-party source path and a `/home/u`
+  placeholder in an older test. Each step's diff was scanned before its
+  commit. CI (`gh run list`) concluded `success` on every push's head:
+  `8c8de7c` (Step 10), `d8b7ff7` (Step 11a, and again for the `v0.5.0`
+  tag), `88cbfc2` (Step 11), and every earlier step's. Records-only
+  commits went out inside those pushes, whose head CI ran, since a newer
+  push cancels an older run of one ref. `6f6e083` and this step are not
+  yet pushed; CI runs when the owner pushes them.
+
+Every Verification item holds, and every step is done: this PLAN is
+`complete`. The owner tagged `v0.4.0`, `command/cobracmd/v0.1.0`,
+`v0.5.0` and `command/kongcmd/v0.1.0`. The decisions taken on the way are
+MADR amendments A3 to A12 and deviations D1 to D47, each recorded where it
+arose.
+
+Open after this PLAN, for later records rather than this one:
+
+* `x/ansi.Wordwrap` breaks at a hyphen, so `command/cli`'s and the front
+  ends' help can wrap `--json` as `--` and `json` (Step 10).
+* `command` has no deprecation, completion providers or flag relations,
+  which A1 mapped to Cobra (D37), and no settings store; `kongcmd`'s
+  `Resolver` reads `config.*` context keys until the configuration record
+  supplies them (D41).
+* The fish completion script was read, not run: fish is installed on
+  neither test host (Step 11).
+* The keymap engine and the palette
+  ([0007-PLAN-keymap-engine.md](0007-PLAN-keymap-engine.md),
+  [0008-PLAN-command-palette.md](0008-PLAN-command-palette.md)), out of
+  this PLAN's scope.
