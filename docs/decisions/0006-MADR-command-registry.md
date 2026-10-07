@@ -881,7 +881,9 @@ the items below supersede them where they differ.
   * **Enums follow Kong's rule:** a scalar `enum` field must be required
     or have a `default` (`tag.go:326-329`). `SchemaOf` returns an error
     for one that is neither, so a struct the registry accepts is one Kong
-    accepts.
+    accepts. (*A12: accepts, but reads differently on required and names;
+    `New[A]` now refuses an argument struct that Kong would read
+    differently.*)
   * **§4's example becomes:**
 
     ```go
@@ -983,7 +985,9 @@ the items below supersede them where they differ.
     `sep`, `hidden`, `group`, and nested `cmd` fields for dotted IDs. Each
     field carries custom `id` and `danger` tags, which Kong keeps readable.
     This was run in probes: values decode, enums are checked, nested
-    commands select (REPORT §8).
+    commands select (REPORT §8). (*A11: Kong-native, so `--args` cannot
+    supply a required or positional property; a command that is also a
+    parent becomes its own hidden default child.*)
   * **Dispatch is the adapter's.** A `StructOf` type has no methods, so
     `kong.Context.Run` cannot find one (REPORT §8). `Run` calls `Parse`,
     then dispatches from `ctx.Selected()` through the registry, as
@@ -1000,15 +1004,18 @@ the items below supersede them where they differ.
   * **Settings.** `Resolver` is the Kong form of configuration, Kong's
     answer to Viper: it lets a Kong program fill flags from the values a
     later configuration record stores. No `env` tag is generated unless the
-    program asks, because `env` reads the process environment.
+    program asks, because `env` reads the process environment. (*A11: until
+    that record, from the `config.*` keys of `WithContext`.*)
   * **Completion** is generated in this module from the registry, for
     bash, zsh, fish and PowerShell, written to the caller's writer, with
-    no further module (0010-MADR Q2, answered 2026-10-02).
+    no further module (0010-MADR Q2, answered 2026-10-02). (*A11: scripts
+    that ask the program, through `__complete`.*)
   * **The same verbs, flags and exit codes as `command/cli`.**
   * **Rules** (0010-MADR §6, REPORT §8):
     * Every parser the adapter builds or mounts into gets `kong.Name`,
       because the default is `os.Args[0]`, and `kong.Writers` with the
-      caller's writers.
+      caller's writers. (*A11: the caller passes them; `Parser` discards
+      output until it does. A name clash fails `kong.New`.*)
     * Its `Exit` panics a sentinel that `Run` recovers into an exit code.
       An `Exit` that returns lets Kong keep parsing after `--help`; this
       was observed in a probe, where `--help` printed help and `Parse`
@@ -1577,6 +1584,155 @@ each the recommendation. The alternatives were:
 4. words only, or a hidden root-level twin for each dotted ID;
 5. only the mutation "a category's group is never added";
 6. `Mount` adding no verbs, or skipping a verb whose name is taken.
+
+### A11 (2026-10-06): the Kong front end against the built registry
+
+*Status: accepted (2026-10-06).* Found before writing Step 11 of
+[0006-PLAN-command-registry.md](0006-PLAN-command-registry.md), recorded
+there as deviations D41–D46, by reading `command` and `when` at `v0.4.0`
+and by probing Kong v1.16.1 in a scratch module.
+
+**Found.**
+
+1. A1's `Resolver` gives values "from the registry's settings", and A1
+   leaves them to "a later configuration record". The registry at
+   `v0.4.0` has no settings.
+2. A Kong-native grammar refuses what `command/cli` accepts: `--args`
+   supplying a required property, and a positional property given as its
+   flag. Kong refuses an enum that is neither required nor defaulted
+   ("enum value is only valid if it is either required or has a valid
+   default value"), and splits a slice flag's value at commas.
+3. A1 has completion "generated in this module from the registry", and
+   does not say whether a script holds the commands or asks for them.
+4. A1 has every parser get `kong.Writers` "with the caller's writers",
+   and none of the listed names takes a writer; Kong's default is the
+   process's standard streams.
+5. Kong cannot mix a command's positional arguments with children ("can't
+   mix positional arguments and branching arguments"), and a parent given
+   alone wants a child. `workspace.focus` takes a pane and is the parent
+   of `workspace.focus.next` and `workspace.focus.prev`.
+6. Kong accepts two commands of one name without an error, and the first
+   wins; `Options` returns no error to report a clash with.
+
+**Decided.**
+
+1. **`Resolver` reads the `config.*` keys of the `when.Context` given
+   with `WithContext`:** a flag `x` takes `config.x`'s value, as VS Code
+   offers its settings as `config.*` keys of the when-clause context. A
+   flag given on the command line wins. The configuration record later
+   supplies these keys, as a layer of the context.
+2. **The grammar is Kong-native:** a required property is `required`, a
+   positional one an `arg`, required unless it is not required in the
+   schema, an enum has Kong's `enum` with its `default` or `required`,
+   and slices split at Kong's `,`. `--args` therefore cannot supply a
+   required or positional property, and a positional property is not a
+   flag; the shared cases leave those requests out and assert the
+   difference.
+3. **Completion asks the program:** small fixed scripts for each shell
+   run `prog __complete <words>`, and `Run` answers from the parser's
+   model and the registry.
+4. **The caller passes `kong.Writers`,** among `Parser`'s options or in
+   its own `kong.New` beside `Options`. `Parser` puts writers that
+   discard first, so nothing reaches a standard stream until it does.
+5. **A command that is also a parent becomes a hidden child of its own
+   name with `default:"withargs"`.** In a probe, `workspace focus logs`,
+   `workspace focus --pane logs` and `workspace focus next` each selected
+   the right command. A real child named like its parent is an error.
+6. **A `PostBuild` hook fails `kong.New`** with an error naming every
+   command name or alias that two commands share, in `Options` and in
+   `Parser`, as D40 decided for Cobra.
+
+**Changed.** A1's grammar, settings, completion and rules bullets,
+annotated in place.
+
+**Owner questions for A11.** *Answered 2026-10-06* (picked from options).
+Items 1 and 3 to 6 are the recommendation. Item 2 is not: the
+recommendation was a grammar that mirrors `command/cli` (no `required`,
+optional positionals with hidden flag twins, the adapter checking enums,
+`sep:"none"`), and the owner chose the Kong-native grammar. The other
+alternatives were:
+
+1. leaving `Resolver` out until the configuration record, or a new
+   `WithSettings` option;
+3. static scripts that hold the commands;
+4. a new `WithWriters` option;
+5. refusing a registry with such a command;
+6. no check, as Kong does.
+
+### A12 (2026-10-06): an argument struct reads the same in Kong
+
+*Status: accepted (2026-10-06).* Found while writing Step 11 of
+[0006-PLAN-command-registry.md](0006-PLAN-command-registry.md), recorded
+there as deviation D47, and executed as its Step 11a.
+
+**Found.** A1 aligned the tags so that one argument struct drives the
+registry's schema and a Kong grammar, and its enum rule makes a struct the
+registry accepts one Kong accepts. Accepted is not read alike. In a probe
+of Kong v1.16.1 reading the test fixtures directly:
+
+1. **Required.** `SchemaOf` makes a field required unless it has
+   `omitzero` or `omitempty`, is a pointer, or has a default. Kong makes a
+   flag required only with `required:""`, and a positional required
+   unless it has `optional:""` or a default (`tag.go:262-275`). So
+   ``Name string `json:"name"` `` is required in the schema and optional
+   in Kong, and ``Words []string `json:"words,omitzero" arg:""` `` the
+   reverse.
+2. **Names.** `SchemaOf` names a property by its `json` name, which strict
+   decoding needs. Kong names a field by its `name:""` tag, or else its Go
+   name split at case changes, joined with dashes and lowercased
+   (`kong.go:93-95`, `camelcase.go`): `json:"max_items"` on `MaxItems` is
+   `max_items` to the registry and `max-items` to Kong.
+
+Enums, defaults and positional order agree. Through `kongcmd`, which
+builds its grammar from the schema, all five agree by construction.
+
+A census of the tree's argument structs found 14 fields the rules below
+refuse: `workspace`'s `zoomArg.Pane` (an optional positional without
+`optional:""`) and `stateArg.State` (a required flag without
+`required:""`), and twelve in test fixtures of `command`, `command/cli`
+and `command/cobracmd`.
+
+**Decided.**
+
+1. **A disagreement is an error.** `required:""` and `optional:""` count
+   as Kong counts them, and the `json` rule stays. A top-level field whose
+   requiredness by the `json` rule differs from Kong's is an error that
+   names the tag to add or remove.
+2. **So is a name.** A top-level field whose `json` name differs from
+   Kong's name for it, its `name:""` tag or else its Go name in Kong's
+   spelling, is an error that names the `name:""` tag to add. `command`
+   spells names as Kong does without importing it; a `kongcmd` test
+   checks the spelling against Kong's own model.
+3. **`New[A]` checks, `SchemaOf` does not.** The check covers the
+   top-level fields of an argument struct, the ones Kong reads as flags
+   and positionals. `SchemaOf`'s output is unchanged, so output schemas,
+   which Kong never parses, and nested objects, which it reads only as
+   JSON text, keep `v0.4.0`'s behaviour.
+4. **The release is `v0.5.0`:** `New[A]` refuses structs `v0.4.0`
+   accepted. `command/kongcmd/v0.1.0` requires `v0.5.0`;
+   `command/cobracmd/v0.1.0` keeps `v0.4.0`, which it builds against.
+
+**Consequences.**
+
+* Good, because a struct `New[A]` accepts reads the same in the registry,
+  `command/cli`, Cobra and Kong, as A1 meant.
+* Bad, because an author writes `required:""`, `optional:""` or `name:""`
+  where the `json` tag already says it, and a struct that worked in
+  `v0.4.0` can fail `New[A]` in `v0.5.0`. The error names the fix.
+* Bad, because Kong's name spelling is copied, not imported; a later Kong
+  could change it, which the `kongcmd` test would show.
+
+**Owner questions for A12.** *Answered 2026-10-06* (picked from options).
+D47 was not the recommendation: the recommendation was to test both ways
+and record the gaps, with no root change, and the owner chose to teach the
+registry Kong's tags. Q1 to Q4 then took the recommendation. The
+alternatives were:
+
+* D47: test both ways and record the gaps; test through the adapter only;
+* Q1: Kong's tags overriding the `json` rule; Kong's rule alone;
+* Q2: leaving names alone;
+* Q3: `v0.4.1`;
+* Q4: the check in `SchemaOf`, top-level or for every struct.
 
 ## More Information
 

@@ -43,6 +43,10 @@ Associated MADR: [0006-MADR-command-registry.md](0006-MADR-command-registry.md)
     did by reference.
 
   The text this revision replaces is in git at `4c6261e`.
+* **2026-10-06.** MADR amendment A12 (D47, found while writing Step 11):
+  Step 11a, a root change and the root release `v0.5.0`, comes before
+  Step 11's module, which then requires `v0.5.0`. The Goal, the Scope
+  table and Verification name the new release.
 
 ## Goal
 
@@ -51,11 +55,12 @@ with the workspace's built-in commands, so that one definition per action
 serves keys, the palette, slash commands, help, the shell and agents; then
 ship the Cobra and Kong front ends as the nested modules
 `command/cobracmd` and `command/kongcmd`, each at `v0.1.0` (MADR §1–§11,
-A1, A2).
+A1, A2), with the root's `v0.5.0` between them, in which `New[A]` refuses
+an argument struct Kong would read differently (A12).
 
 Done means every item under Verification holds, CI is green on the pushed
-tree, and the owner has tagged `v0.4.0`, `command/cobracmd/v0.1.0` and
-`command/kongcmd/v0.1.0`.
+tree, and the owner has tagged `v0.4.0`, `command/cobracmd/v0.1.0`,
+`v0.5.0` and `command/kongcmd/v0.1.0`.
 
 ## Scope
 
@@ -87,6 +92,7 @@ tree, and the owner has tagged `v0.4.0`, `command/cobracmd/v0.1.0` and
 | 8 | `command/cli/` | the standard-library front end | `v0.4.0` |
 | 9 | `README.md`, `docs/` | documentation; the root release | `v0.4.0` |
 | 10 | `command/cobracmd/`, `go.work`, docs | the Cobra front end, a nested module | `command/cobracmd/v0.1.0` |
+| 11a | `command/`, `workspace/`, the `command/cli` and `command/cobracmd` test fixtures, docs | `New[A]` agrees with Kong (A12) | `v0.5.0` |
 | 11 | `command/kongcmd/`, `go.work`, docs | the Kong front end, a nested module | `command/kongcmd/v0.1.0` |
 | 12 | `docs/` | close-out | — |
 
@@ -758,9 +764,50 @@ mutation is killed.
   `command/cobracmd/v0.1.0`; the agent runs the smoke test against it.
 * **Done when:** the tag exists and the smoke test builds.
 
+### Step 11a: `New[A]` agrees with Kong, and the root release `v0.5.0`
+
+**Starts when** the owner approves this step (A12, D47). Step 11's
+uncommitted module waits in the tree, outside `go.work`, until it is done.
+
+* **Files:** `command/args.go` (`New` calls the check);
+  `command/kongname.go` (new: Kong's name spelling and the check);
+  `command/args_test.go`; `workspace/commands.go` (`zoomArg.Pane` gains
+  `optional:""`, `stateArg.State` `required:""`); the test fixtures the
+  check refuses, in `command`, `command/cli` and `command/cobracmd`;
+  `docs/guides/commands.md` (the tags section states the rule); this
+  PLAN's record.
+* **Exported names:** none. `New`'s documentation states the rule.
+* **Build:** for each top-level field of `A` that `SchemaOf` makes a
+  property, compute requiredness by the `json` rule and by Kong's
+  (`required:""` for a flag; for a positional, required unless
+  `optional:""` or a default), and Kong's name (`name:""`, or the Go name
+  split at case changes, joined with dashes, lowercased); a difference is
+  an error from `New` naming the field and the tag to add or remove. The
+  spelling is written here from Kong's documented behaviour, not copied
+  from its source. `SchemaOf` is unchanged.
+* **Tests** (`command/args_test.go`): `TestNewAgreesWithKong`: a required
+  flag without `required:""`, an optional positional without
+  `optional:""`, `required:""` beside `omitzero`, and a `json` name Kong
+  spells differently are each refused with the fix named; the same
+  structs with the fix, a positional with a default, a pointer flag and
+  an embedded struct are accepted; `SchemaOf` of a refused struct still
+  succeeds. `TestKongName`: a table of Go names, among them acronyms,
+  digits and single letters (`MaxItems`, `PaneID`, `HTTPServer`, `X2`,
+  `N`), and their spellings.
+* **Mutations:** the required check skipped; a positional's default not
+  counted; the name check skipped; the spelling not lowercasing (or not
+  splitting an acronym before a word).
+* **Checks:** Rule 3; `make release-check`; and `command/cobracmd`'s
+  tests in workspace mode against the changed root.
+* **The release:** release notes for `v0.5.0` in the record; the owner
+  commits, pushes, and with CI green tags `v0.5.0`; the agent runs the
+  consumer smoke test against it.
+* **Done when:** `v0.5.0` is tagged and the smoke test builds.
+
 ### Step 11: `command/kongcmd`, the Kong front end
 
-**Starts when** `v0.4.0` is tagged; it does not wait for Step 10.
+**Starts when** `v0.4.0` is tagged; it does not wait for Step 10. (*A12:
+its module requires `v0.5.0`, so it is finished after Step 11a.*)
 
 * **Before the first file,** record the newest
   `github.com/alecthomas/kong` and its `go.mod`, each licence, and
@@ -776,11 +823,18 @@ mutation is killed.
   `WithName`, `WithConfirm`, `WithContext`, `WithTheme`, `WithGlyphs`,
   `WithWidth`.
 * **Build:** MADR A1's mounting, grammars, dispatch, groups, help,
-  settings, completion and rules, as written there.
+  settings, completion and rules, as written there. (*A11, D41–D46:
+  `Resolver` from `config.*` context keys; a Kong-native grammar;
+  completion through `__complete`; the caller's `kong.Writers`; a
+  command that is also a parent as its own hidden default child; a name
+  clash fails `kong.New`.*)
 * **Tests:** golden completion scripts for each shell; the shared
-  front-end cases; one struct, two readers (`SchemaOf` and the Kong
+  front-end cases (*D42: less the requests a Kong-native grammar refuses,
+  which are asserted apart*); one struct, two readers (`SchemaOf` and the Kong
   grammar agree on names, required fields, enums, defaults and positional
-  order); nested `cmd` selection; `--help` returns 0 and parsing stops;
+  order) (*D47: read directly by Kong and through the adapter, for
+  structs `New` accepts; and `command`'s name spelling against Kong's
+  model*); nested `cmd` selection; `--help` returns 0 and parsing stops;
   mounting beside a program's own grammar, with `handled` false for its
   commands; help at the option's width whatever `$COLUMNS` says, golden
   across the matrix at 60 and 100 columns; no standard stream and no
@@ -810,8 +864,10 @@ mutation is killed.
   runs it.
 * The root `go.mod` is unchanged from `v0.3.0` through `v0.4.0`, and never
   names Cobra or Kong; `go mod tidy -diff` is clean in every module.
-* Each nested `go.mod` requires `v0.4.0`, has no `replace`, and passes
-  every gate of 0010-MADR §4 with `GOWORK=off` and in workspace mode.
+* Each nested `go.mod` requires a published root, `command/cobracmd`
+  `v0.4.0` and `command/kongcmd` `v0.5.0` (A12), has no `replace`, and
+  passes every gate of 0010-MADR §4 with `GOWORK=off` and in workspace
+  mode.
 * depguard keeps Cobra and pflag in `command/cobracmd`, Kong in
   `command/kongcmd`, and refuses the Charm v1 paths, mcplib, the MCP
   go-sdk and go-llmprovider-sdk everywhere.
@@ -821,7 +877,7 @@ mutation is killed.
 * The MCP field names match 2026-07-28's schema, and the ACP ones the ACP
   pages, as recorded in Step 6.
 * The consumer smoke test builds against `v0.4.0`,
-  `command/cobracmd/v0.1.0` and `command/kongcmd/v0.1.0`.
+  `command/cobracmd/v0.1.0`, `v0.5.0` and `command/kongcmd/v0.1.0`.
 * The identifier scan finds nothing, and CI is green after each push.
 
 ## Rollout and Rollback
@@ -2255,3 +2311,71 @@ env GOWORK` empty) and `GOPROXY` at its default:
   importer of `cobracmd/docs` compiles them, as A1 says.
 
 The tag exists and the smoke test builds, so Step 10 is done.
+
+### Step 11: `command/kongcmd`, the Kong front end
+
+#### Before the first file
+
+Read on 2026-10-06, with `GOWORK=off`, from the module proxy:
+
+* **Version.** The newest `github.com/alecthomas/kong` is `v1.16.1`
+  (2026-08-09), the version 0010-MADR §5 named.
+* **`go.mod`s.** Kong `v1.16.1`: `go 1.20`, requiring
+  `github.com/alecthomas/assert/v2 v2.11.0` and
+  `github.com/alecthomas/repr v0.5.2`, and indirectly
+  `github.com/hexops/gotextdiff v1.0.3`, all three used only by Kong's
+  tests. `assert/v2 v2.11.0`: `go 1.18`, requiring `repr v0.4.0` and
+  `gotextdiff v1.0.3`. `repr v0.5.2`: `go 1.18`, no requirement. In a
+  consumer they reach `go.sum` and nothing that is compiled.
+* **Licences,** from each module's licence file: Kong MIT; assert/v2
+  MIT; repr MIT; gotextdiff BSD-3-Clause.
+* **`govulncheck`,** in a scratch module standing in for the new one: a
+  program importing `kong`, and `command`, `command/cli`, `when`, `theme`
+  and `glyph` at `v0.4.0`. `GOWORK=off govulncheck ./...`: "No
+  vulnerabilities found."
+* **Kong, probed** in a second scratch module: a `reflect.StructOf`
+  grammar mounts as a `DynamicCommand`, and its custom `id` tag reads back
+  from `ctx.Selected()`; the parse's `Path` holds each flag and positional
+  given, and a resolved flag marked `Resolved`, but no default; an `arg`
+  and a flag may share a name; an enum neither required nor defaulted
+  fails `kong.New`; a command cannot mix positional arguments with
+  children, and `default:"withargs"` on a hidden child selects it; a
+  parent given alone wants a child; two commands of one name raise no
+  error; `--help` under an `Exit` that panics stops the parse, and under
+  one that returns the parse goes on and fails ("unknown flag --bogus");
+  a slice flag splits at commas unless `sep:"none"`; a resolver's value
+  loses to the command line; `-4` is an unknown flag; Kong interpolates
+  `${…}` in help, defaults and enums, and `$$` is a dollar.
+
+#### Deviations
+
+Found before any Step 11 code was written; MADR amendment A11 records the
+decisions. Each was asked with options on 2026-10-06; the owner picked
+the recommendation for all but D42.
+
+* **D41: `Resolver`'s source.** The `config.*` keys of `WithContext`'s
+  context; the command line wins.
+* **D42: the grammar.** Kong-native, the owner's choice over the
+  recommendation (a grammar mirroring `command/cli`). The shared cases
+  leave out `--args` supplying a required or positional property and a
+  positional property given as its flag, and a test asserts that
+  `kongcmd` refuses each with exit 2 where `command/cli` accepts it.
+* **D43: completion.** Scripts that ask the program through
+  `__complete`.
+* **D44: writers.** The caller's `kong.Writers`; `Parser` discards until
+  given them.
+* **D45: a command that is also a parent.** Its own hidden default child.
+* **D46: name clashes.** A `PostBuild` hook fails `kong.New`.
+* **D47: one struct, two readers.** Found while writing Step 11's
+  tests. Read directly, Kong and `SchemaOf` disagree on requiredness
+  (Kong's `required:""` and `optional:""`) and on names Kong spells
+  differently (`max_items`, `max-items`); through the adapter all five
+  agree. The recommendation was to test both ways and record the gaps.
+  The owner chose to teach the registry Kong's tags (MADR A12, its Q1 to
+  Q4 answered as recommended): Step 11a, a root change released as
+  `v0.5.0`, after which this module requires `v0.5.0`.
+
+Step 11's code (`command/kongcmd/`: `kongcmd.go`, `grammar.go`,
+`help.go`, `resolver.go`, `complete.go`, `go.mod`, `go.sum`) is written
+and builds against `v0.4.0`, and has no tests yet. It stays uncommitted and
+out of `go.work` until Step 11a is released.
