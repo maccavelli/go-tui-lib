@@ -5,7 +5,8 @@
 // nothing sets tea.View's AltScreen. Library code also never reads the
 // process's environment, never exits and never starts a process
 // (docs/decisions/0014-MADR-native-integration-api.md W0.5), except where
-// allowed lists a file.
+// allowed lists a file. And no two public packages export a type of the
+// same name, unless docs/glossary.md says the clash is deliberate (W0.3).
 //
 // The scan type-checks each package with go/types and the source importer,
 // and resolves every identifier to the object it denotes. A renamed or dot
@@ -50,6 +51,10 @@ type violation struct {
 	pos  token.Position
 	rule string
 }
+
+// declared is one exported type name of a public package, by the package's
+// path relative to the repository root.
+type declared struct{ pkg, name string }
 
 // stderrLog is every function of package log that writes to standard error
 // through the standard logger, or hands that logger or its writer out.
@@ -204,7 +209,7 @@ func check(fset *token.FileSet, files []*ast.File, info *types.Info) []violation
 
 // typeCheck parses files, which are package importPath's, and type-checks
 // them with imp. src, when not nil, holds a file's source by its name.
-func typeCheck(t *testing.T, fset *token.FileSet, imp types.Importer, importPath string, names []string, src map[string]string) ([]*ast.File, *types.Info) {
+func typeCheck(t *testing.T, fset *token.FileSet, imp types.Importer, importPath string, names []string, src map[string]string) ([]*ast.File, *types.Info, *types.Package) {
 	t.Helper()
 	var files []*ast.File
 	for _, name := range names {
@@ -220,10 +225,11 @@ func typeCheck(t *testing.T, fset *token.FileSet, imp types.Importer, importPath
 	}
 	info := &types.Info{Uses: map[*ast.Ident]types.Object{}}
 	conf := types.Config{Importer: imp}
-	if _, err := conf.Check(importPath, fset, files, info); err != nil {
+	pkg, err := conf.Check(importPath, fset, files, info)
+	if err != nil {
 		t.Fatalf("type-checking %s: %v", importPath, err)
 	}
-	return files, info
+	return files, info, pkg
 }
 
 // sourceImporter returns the source importer. cgo is off, as in every
@@ -287,8 +293,9 @@ func modules(t *testing.T, root string) []string {
 }
 
 // scanModule type-checks every package of the module in dir, and returns
-// every breach and the packages it read, as paths relative to root.
-func scanModule(t *testing.T, root, dir string) ([]violation, []string) {
+// every breach, the packages it read, as paths relative to root, and the
+// exported type names of its public packages.
+func scanModule(t *testing.T, root, dir string) ([]violation, []string, []declared) {
 	t.Helper()
 	t.Chdir(dir)
 	mod := modulePath(t, dir)
@@ -296,6 +303,7 @@ func scanModule(t *testing.T, root, dir string) ([]violation, []string) {
 	imp := sourceImporter(fset)
 	var out []violation
 	var read []string
+	var decl []declared
 	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -331,19 +339,27 @@ func scanModule(t *testing.T, root, dir string) ([]violation, []string) {
 		for i, f := range bp.GoFiles {
 			names[i] = filepath.Join(p, f)
 		}
-		files, info := typeCheck(t, fset, imp, importPath, names, nil)
+		files, info, pkg := typeCheck(t, fset, imp, importPath, names, nil)
 		out = append(out, check(fset, files, info)...)
 		fromRoot, err := filepath.Rel(root, p)
 		if err != nil {
 			return err
 		}
-		read = append(read, filepath.ToSlash(fromRoot))
+		rootRel := filepath.ToSlash(fromRoot)
+		read = append(read, rootRel)
+		if pkg != nil && !slices.Contains(strings.Split(rootRel, "/"), "internal") {
+			for _, name := range pkg.Scope().Names() {
+				if tn, ok := pkg.Scope().Lookup(name).(*types.TypeName); ok && tn.Exported() {
+					decl = append(decl, declared{pkg: rootRel, name: name})
+				}
+			}
+		}
 		return nil
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return out, read
+	return out, read, decl
 }
 
 // allowed is every breach the rules permit, by file relative to the
@@ -404,7 +420,7 @@ func TestNoPackageOwnsTheTerminal(t *testing.T) {
 		}
 		want = append(want, mustRead(t, root, dir)...)
 		t.Run(filepath.ToSlash(rel), func(t *testing.T) {
-			found, pkgs := scanModule(t, root, dir)
+			found, pkgs, _ := scanModule(t, root, dir)
 			read = append(read, pkgs...)
 			for _, v := range found {
 				r, _ := filepath.Rel(root, v.pos.Filename)
@@ -431,6 +447,56 @@ func TestNoPackageOwnsTheTerminal(t *testing.T) {
 	for key := range allowed {
 		if !used[key] {
 			t.Errorf("allowed lists %s %q, which the scan no longer finds", key[0], key[1])
+		}
+	}
+}
+
+// sharedNames is every exported type name that more than one public package
+// may declare, with the exact packages that do, sorted, as docs/glossary.md
+// explains. "*" allows any package: each package's own option type
+// (docs/decisions/0014-MADR-native-integration-api.md W0.3).
+var sharedNames = map[string][]string{
+	"Option":  {"*"},
+	"Context": {"layout", "when"},
+	"Kind":    {"command", "when"},
+	"Origin":  {"command", "termcap"},
+	"Pane":    {"layout", "workspace"},
+}
+
+// TestNoTypeNameMeansTwoThings fails when two public packages export a type
+// of the same name, unless sharedNames holds the name and its exact
+// packages (docs/decisions/0014-PLAN-api-policy-gates.md Step 3).
+func TestNoTypeNameMeansTwoThings(t *testing.T) {
+	root := repoRoot(t)
+	by := map[string][]string{}
+	n := 0
+	for _, dir := range modules(t, root) {
+		_, _, decl := scanModule(t, root, dir)
+		for _, d := range decl {
+			by[d.name] = append(by[d.name], d.pkg)
+			n++
+		}
+	}
+	if n == 0 {
+		t.Fatal("the scan collected no exported type name")
+	}
+	for name, pkgs := range by {
+		if len(pkgs) < 2 {
+			continue
+		}
+		slices.Sort(pkgs)
+		allow, ok := sharedNames[name]
+		switch {
+		case !ok:
+			t.Errorf("%s is exported by %v: one name, one meaning (docs/glossary.md)", name, pkgs)
+		case slices.Equal(allow, []string{"*"}):
+		case !slices.Equal(allow, pkgs):
+			t.Errorf("%s is exported by %v, and sharedNames allows %v", name, pkgs, allow)
+		}
+	}
+	for name, allow := range sharedNames {
+		if len(by[name]) < 2 {
+			t.Errorf("sharedNames lists %s %v, which fewer than two public packages export", name, allow)
 		}
 	}
 }
@@ -528,7 +594,7 @@ func f(os struct{ Stdout io.Writer }, l *log.Logger, sl *slog.Logger, h slog.Han
 			}
 			name := filepath.Join(dir, "planted"+strconv.Itoa(i)+".go")
 			src := "package planted\n" + c.src + "\n"
-			files, info := typeCheck(t, fset, imp, "example.com/planted"+strconv.Itoa(i), []string{name}, map[string]string{name: src})
+			files, info, _ := typeCheck(t, fset, imp, "example.com/planted"+strconv.Itoa(i), []string{name}, map[string]string{name: src})
 			got := map[string]int{}
 			for _, v := range check(fset, files, info) {
 				got[v.rule]++

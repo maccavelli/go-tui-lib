@@ -580,3 +580,71 @@ All in `internal/conformance/conformance_test.go`:
   * `GOWORK=off go test -count=3 -shuffle=on ./...` 15 `ok`;
   * the conformance tests pass, with `syscall.ForkExec` skipped.
 * **The identifier scan of the diff:** no match.
+
+### Step 3: the collision check and the glossary
+
+The owner approved it on 2026-10-07 ("proceed"), after Step 2 was
+committed as `7e8f09c` and pushed.
+
+No deviation. The PLAN's table described `layout.Context` as "a layout's
+breakpoints and facts". Its documentation says it "carries the state and
+collects the plan while a tree is arranged", and the glossary uses that
+(`go doc ./layout Context`).
+
+#### What was built
+
+* **`internal/conformance/conformance_test.go`:**
+  * `typeCheck` returns the `*types.Package` it used to discard;
+  * `scanModule` also returns every exported `*types.TypeName` of each
+    public package (no `internal` path element), aliases included;
+  * **`TestNoTypeNameMeansTwoThings`** fails on any name two or more
+    public packages export, unless `sharedNames` holds the name and its
+    exact, sorted packages;
+  * `"*"` allows `Option` in any package;
+  * an entry fewer than two packages export is stale, and fails;
+  * a scan that collects no name fails.
+* **`sharedNames`** holds `Option` (any), `Context` (layout, when),
+  `Kind` (command, when), `Origin` (command, termcap) and `Pane` (layout,
+  workspace). The test passes, so these are exactly today's clashes.
+* **`docs/glossary.md`** has four parts:
+  * the five deliberate names, with their meaning in each package from
+    `go doc`;
+  * the names the accepted records reserve:
+    * `launch`'s ten names;
+    * `glyph.Tier`;
+    * `command`'s `Verdict`, `Format`, `Param`, `PanicError` and
+      `LoadOption`;
+    * `workspace`'s `PlainViewer` and `GlyphThemeBuilder`;
+  * the names 0007–0009 must not take: `Context`, `Origin`, `Conflict`,
+    `Policy`;
+  * the rule for a new name.
+
+  Step 6 links it.
+
+#### Checks
+
+* **Mutations, on scratch copies.** All killed:
+  * S3-1, `theme` exports `Pane`: "Pane is exported by [layout theme
+    workspace], and sharedNames allows [layout workspace]";
+  * S3-2, the `Context` entry removed: "Context is exported by [layout
+    when]: one name, one meaning";
+  * S3-3, a stale `Widget` entry: "sharedNames lists Widget [layout
+    theme], which fewer than two public packages export";
+  * S3-4, `typeCheck` returns no package: "the scan collected no
+    exported type name".
+    * Its first form did not compile ("declared and not used: pkg"), so
+      it did not reach the assertion.
+    * It was rewritten to compile, and run again.
+* **Lint and the pre-add check:**
+  * `make lint`: three "0 issues.";
+  * `make pre-add-check FILES=…`: "1 file(s) clean";
+  * `make release-check`: "124 file(s) clean".
+* **The tests,** with `GOWORK=off`: `-race`, `-shuffle=on -count=2` and
+  `LC_ALL=C` each gave 15 `ok`, and so did workspace mode.
+* **`docs/glossary.md`:** markdownlint 0 issues; the link check 0 broken.
+* **The Windows test host,** go1.27.1 windows/amd64:
+  * `make pre-add-check` "124 file(s) clean";
+  * `make lint` and `make vuln` exit 0;
+  * `GOWORK=off go test -count=3 -shuffle=on ./...` 15 `ok`;
+  * the three conformance tests pass, with `syscall.ForkExec` skipped.
+* **The identifier scan of the diff:** no match.
