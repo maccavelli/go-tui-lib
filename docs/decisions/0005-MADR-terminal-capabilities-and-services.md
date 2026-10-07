@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-02
+date: 2026-10-05
 decision-makers: owner
 consulted: 0003-REPORT-agent-tui-ecosystem-research.md; Charm v2 sources (bubbletea v2.0.10, ultraviolet at the commit go.sum pins, x/ansi v0.11.8); crush's capability layer as a design reference
 informed: pi-go; go-core-lib

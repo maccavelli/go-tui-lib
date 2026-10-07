@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-02
+date: 2026-10-04
 decision-makers: owner
 consulted: the v0.1.0 audit in 0003-REPORT-agent-tui-ecosystem-research.md §1; Charm v2 sources (lipgloss v2.0.6, bubbletea v2.0.10, bubbles v2.2.1, ultraviolet at the pinned pseudo-version); the Go 1.27.1 toolchain
 informed: pi-go

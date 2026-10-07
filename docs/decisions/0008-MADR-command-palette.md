@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-02
+date: 2026-10-07
 decision-makers: owner
 consulted: 0003-REPORT-agent-tui-ecosystem-research.md (§3, §4, §7); Textual's command palette; crush, toad and codex sources; fzf's and sahilm/fuzzy's scoring; Charm v2 APIs (bubbles v2.2.1, lipgloss v2.0.6, x/ansi v0.11.8)
 informed: pi-go
@@ -536,6 +536,62 @@ Every answer is the recommendation, so the decision text is unchanged.
 * **Q4. A `.gitignore` reader.** Recommended: not here. The file provider
   takes a `PathFilter`, and a reader is a later record. The alternative is
   a small reader here, which is more code to own.
+
+## Amendments
+
+### A1 (2026-10-07): the width method's source, and the registry after 0006 A4 to A6
+
+*Status: accepted (2026-10-07).* Found by the documentation audit of
+[0011-MADR-docs-accuracy-after-v0-5-0.md](0011-MADR-docs-accuracy-after-v0-5-0.md),
+carried out by [0011-PLAN-docs-accuracy-after-v0-5-0.md](0011-PLAN-docs-accuracy-after-v0-5-0.md), finding F32. Each fact was re-checked against the tree
+on 2026-10-07. The design stands. What changes is the facts it rests on.
+
+**Found.**
+
+1. **The width method's source.** The Context credits the width method,
+   "the 2027 alignment", to
+   [0002-PLAN-harden-workspace-v0-1-1.md](0002-PLAN-harden-workspace-v0-1-1.md).
+   * That PLAN lists the width method as out of scope (its "Out of
+     scope").
+   * It came with
+     [0004-MADR-integrate-charm-v2-and-go-1-27.md](0004-MADR-integrate-charm-v2-and-go-1-27.md)
+     §3: the workspace's `ansi.Method`, WcWidth until the terminal reports
+     mode 2027, then GraphemeWidth.
+2. **§4–§6 predate 0006's amendments A4 to A6.** §5's command provider,
+   §4's `Hit` and §6's argument prompts were written before
+   [0006-MADR-command-registry.md](0006-MADR-command-registry.md) A4 to A6:
+   * **A4.**
+     * `Dispatch` and `Run` refuse a zero `Origin`.
+     * A command is offered by surface, and the palette's are
+       `command.OriginPalette` and `command.SurfacePalette`.
+     * `Danger`'s zero value means "not declared".
+   * **A5.**
+     * A secret property is `"writeOnly": true`.
+     * `arg`, `short`, `placeholder`, `group` and `hidden` live in one
+       `"x-cli"` annotation.
+   * **A6.**
+     * MCP prompts load as commands of kind `Prompt`, and ACP commands as
+       kind `Forward`.
+     * Running one sends `command.PromptMsg` for the program to pass to
+       its agent.
+
+**Corrected.**
+
+1. **Widths.** Spans, `Cells` and highlights measure with the workspace's
+   method, as 0004-MADR §3 defines it.
+2. **The command provider** lists
+   `Registry.Available(ctx, command.SurfacePalette)`. Its `Hit.Run`
+   dispatches with `Origin: command.OriginPalette`.
+3. **`Hit.Danger`** is the command's. A hit that is not a command, such as
+   a file or a pane, leaves it zero, and the palette draws no danger for
+   it.
+4. **Argument prompts:**
+   * a `writeOnly` property is entered masked, and is never kept in the
+     recents;
+   * `x-cli.placeholder` is the prompt's placeholder;
+   * `x-cli.hidden` skips the property.
+5. **`Prompt` and `Forward` commands are listed** like any other. When
+   one runs, the palette passes its `PromptMsg` through to the program.
 
 ## More Information
 

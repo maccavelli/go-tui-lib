@@ -1,6 +1,6 @@
 ---
 status: proposed
-date: 2026-10-02
+date: 2026-10-07
 associated-madr: "0009-MADR-streaming-content-engine.md"
 ---
 # Implement the streaming content engine
@@ -36,6 +36,15 @@ to be complete.
 whose Phases 2–6 run after `v0.1.5`. Nothing in this PLAN's steps
 changes. Step 7 still waits for 0010-PLAN's tooling phases. This PLAN
 stays proposed until the owner approves its execution.
+
+*2026-10-07, for MADR amendment A3:*
+
+* [0010-PLAN-nested-adapter-modules.md](0010-PLAN-nested-adapter-modules.md)
+  is complete, so Step 7's precondition is met.
+* The theme revision that Step 7's renderer cache and the code caches
+  are keyed by is the MADR's owner question Q9. It is answered before the
+  first step that builds one.
+* `workspace/render.go`'s `local` is now at `:460`.
 
 ## Goal
 

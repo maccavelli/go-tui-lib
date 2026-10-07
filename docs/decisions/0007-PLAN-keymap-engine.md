@@ -1,6 +1,6 @@
 ---
 status: proposed
-date: 2026-10-02
+date: 2026-10-07
 associated-madr: "0007-MADR-keymap-engine.md"
 ---
 # Implement the keymap engine
@@ -17,6 +17,23 @@ Associated MADR: [0007-MADR-keymap-engine.md](0007-MADR-keymap-engine.md)
   owner accepted A1 and answered Q6 and Q7 with the recommendations, so
   Steps 9–11 are in scope.
 * This PLAN stays `proposed` until the owner approves execution.
+
+*Revised 2026-10-07, for MADR amendment A2.* The steps it touches:
+
+* **Prerequisites:**
+  * [0006-PLAN-command-registry.md](0006-PLAN-command-registry.md) is
+    complete. The names it shipped differ from the MADR's, and A2 records
+    them.
+  * [0005-PLAN-terminal-capabilities-and-services.md](0005-PLAN-terminal-capabilities-and-services.md)
+    is complete too.
+* **Step 7:**
+  * the workspace's defaults bind the real IDs of A2;
+  * a matched key is dispatched with `Origin: command.OriginKey`;
+  * the bindings for focus by index and directional resize wait on the
+    MADR's owner question Q8, which is answered before Step 7 starts.
+* **Step 8:** the guides describe the bindings Q8's answer gives.
+* **Step 9:** `glyph.Set` gains the modifier and arrow glyphs, each one
+  cell wide with an ASCII twin, before the labels that draw them.
 
 ## Goal
 

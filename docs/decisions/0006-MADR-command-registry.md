@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-02
+date: 2026-10-07
 decision-makers: owner
 consulted: 0003-REPORT-agent-tui-ecosystem-research.md (opencode, gemini-cli, codex, crush, toad, Textual, VS Code, k9s, lazygit, gh-dash); MCP specification 2025-11-25, and 2026-07-28 for amendment A2; Agent Client Protocol; Go 1.27.1 standard library; for amendment A1, 0010-REPORT-nested-modules-and-adapter-sources.md (Cobra v1.10.2, pflag v1.0.10, fang v2.0.1 and Kong v1.16.1 at source)
 informed: pi-go

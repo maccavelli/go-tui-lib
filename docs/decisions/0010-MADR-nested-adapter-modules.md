@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-02
+date: 2026-10-07
 decision-makers: owner
 consulted: 0010-REPORT-nested-modules-and-adapter-sources.md (the Go module reference, toolchain and workspace documentation, the Go Modules wiki, precedent repositories, and the sources of Cobra v1.10.2, fang v2.0.1, Kong v1.16.1 and glamour v2.0.1); 0001-MADR-scaffold-charm-tui-library.md §3 and §6
 informed: pi-go

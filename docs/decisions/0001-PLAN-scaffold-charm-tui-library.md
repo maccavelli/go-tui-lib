@@ -1,6 +1,6 @@
 ---
 status: complete
-date: 2026-10-01
+date: 2026-10-03
 associated-madr: "0001-MADR-scaffold-charm-tui-library.md"
 ---
 # Implement the go-tui-lib Go 1.27.1 Charm v2 library scaffold

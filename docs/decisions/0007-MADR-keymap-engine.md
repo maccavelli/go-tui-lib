@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-02
+date: 2026-10-07
 decision-makers: owner
 consulted: 0003-REPORT-agent-tui-ecosystem-research.md (§3, §4, §6, §7; §8, §9 and §11 for amendment A1); Charm v2 APIs (bubbletea v2.0.10, bubbles v2.2.1, the ultraviolet revision in go.sum); VS Code keybindings and when-clause documentation; codex, gemini-cli and opencode keymap sources
 informed: pi-go; go-core-lib
@@ -310,7 +310,7 @@ func (k *Keymap) Rules() iter.Seq[Rule]                      // effective rules,
   rules from last to first (VS Code's bottom to top). The first rule whose
   keys match and whose `when` holds wins.
 * **Contexts come from the focus path,** not from `when`. A pane names its
-  contexts through an optional interface (§8), and a pane can push a mode,
+  contexts through an optional interface (§9; *A2: was "§8"*), and a pane can push a mode,
   such as vim normal mode, as a context. `when` stays for state that a
   context cannot express, such as `inputEmpty` or `agentBusy`.
 * **`Keymap` is immutable after `Build`** and safe for concurrent reads. A
@@ -895,6 +895,91 @@ long as `termcap` stays a leaf package that performs no I/O at import.
   I/O at import. The alternative keeps §1's "no `termcap` import": each
   program converts 0005's facts into `KeyFacts` itself, a few lines that
   every program repeats.
+
+### A2 (2026-10-07): facts gone stale since this record was written
+
+*Status: accepted (2026-10-07)* for the corrections. The default bindings
+for focus by index and directional resize are owner question Q8, open
+until this record is executed. Found by the documentation audit of
+[0011-MADR-docs-accuracy-after-v0-5-0.md](0011-MADR-docs-accuracy-after-v0-5-0.md),
+carried out by [0011-PLAN-docs-accuracy-after-v0-5-0.md](0011-PLAN-docs-accuracy-after-v0-5-0.md), finding F31. Each fact was re-checked against the tree
+on 2026-10-07.
+
+**Found.**
+
+1. **§9's command IDs are not the workspace's.**
+   * `workspace.Commands` registers `workspace.focus` (with a pane ID),
+     `.focus.next`, `.focus.prev`, `workspace.zoom`, `workspace.toggle`,
+     `workspace.resize` (with a split and a delta), `.layout.use`,
+     `.layout.reset`, `.state.get`, `.state.set`, `workspace.panes`,
+     `workspace.overlay.close` and `workspace.theme.set`
+     (`go doc ./workspace Commands`; `workspace/commands.go:129-330`).
+   * No `workspace.focus.pane` takes an index, and no
+     `workspace.resize.left`, `.right`, `.up` or `.down` exists.
+   * So `alt+1` … `alt+9` and `alt+shift+arrows` have no command to bind.
+     §9's rows for them, and its mapping of `FocusPane[i]`, cannot be
+     executed as written.
+2. **`glyph.Table` does not exist.**
+   * The package's type is `glyph.Set` (`go doc ./glyph`).
+   * It holds borders, separators, the focus marker, the ellipsis, scroll,
+     bullet and badge glyphs.
+   * It has none of the modifier glyphs (`⌥ ⌘ ⌃ ⇧`) or arrow glyphs
+     (`↑ ↓ ← →`) that A1's labels draw.
+3. **§3's "(§8)"** for the optional interface that names a pane's contexts
+   is §9, where `KeyContexter` is defined under "Focus path".
+4. **`KeyMapper` is read.** The Context says nothing reads it. Since
+   `v0.2.0` the workspace's `help.KeyMap` reads it for the short and full
+   help (`workspace/help.go:52`).
+5. **A request needs an origin.** §1 says the program passes the matched
+   ID and `args` to `Dispatch`. `Dispatch` also refuses a request whose
+   `Origin` is zero
+   ([0006-MADR-command-registry.md](0006-MADR-command-registry.md) A4). A
+   key binding's origin is `command.OriginKey`, which a command must offer
+   on `SurfaceKey`.
+6. **0006 is complete.**
+   * [0006-PLAN-command-registry.md](0006-PLAN-command-registry.md) is
+     complete, and `command` has shipped since `v0.4.0`.
+   * The PLAN's rule applies: "If 0006's final names differ from those in
+     the MADR, this PLAN is amended to match". Items 1 and 5 are those
+     differences.
+
+**Corrected.**
+
+1. **§9's table** binds the workspace's real IDs where one exists:
+   * `workspace.focus.next`, `.focus.prev`;
+   * `workspace.zoom`;
+   * `workspace.overlay.close`.
+
+   The rows for focus by index and for the four resize directions wait on
+   Q8.
+2. **The labels and `Shortcut`** take a `glyph.Set`. The modifier and
+   arrow glyphs are added to `glyph.Set` before the labels are written,
+   each one cell wide and with an ASCII twin (rule 3).
+3. **"(§8)" reads "(§9)".**
+4. **The Context's `KeyMapper` bullet** describes `v0.1.x`. §9's move
+   keeps the help reading the bindings, through the engine.
+5. **A matched key is dispatched** with `Origin: command.OriginKey`.
+
+**Owner question Q8.** Open until this record is executed: how the keys
+for focus by index and directional resize reach a command.
+
+* **A. Add two commands to `workspace`:**
+  * focus by index, with `{"index": n}`;
+  * a directional resize that moves the nearest resizable separator, with
+    `{"direction": "left|right|up|down"}`.
+
+  The defaults then bind as §9's table did, and today's key behaviour
+  (`docs/guides/building-workspaces.md`, "Keys and the mouse") carries
+  over unchanged.
+* **B. Bind the keys to the existing IDs:**
+  * `alt+n` becomes `workspace.focus` with the n-th pane's ID, which the
+    program computes;
+  * `workspace.resize` needs a split and a delta that a key cannot know,
+    so the resize keys stay workspace bindings outside the engine.
+
+The names chosen are checked against
+[0014-MADR-native-integration-api.md](0014-MADR-native-integration-api.md)'s
+glossary, whose W4 PLAN also amends this record's other names.
 
 ## More Information
 

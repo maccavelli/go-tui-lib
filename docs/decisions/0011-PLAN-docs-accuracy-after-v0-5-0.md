@@ -300,3 +300,43 @@ edit.
 * The relative-link check on the four guides: 0 broken.
 * The identifier scan of the diff: no match.
 * No Go file, `go.mod` or `go.sum` changed.
+
+### Step 4: the records
+
+The owner approved it on 2026-10-07 ("Commit to main then proceed"),
+after Step 3 was committed as `c79e140`.
+
+No deviation.
+
+#### What changed
+
+Each finding was re-checked against the tree at `c79e140`.
+
+| # | Re-checked | Now |
+| :--- | :--- | :--- |
+| F30 | 0001-PLAN's last phase is 2026-10-03; 0004-MADR's last amendment 2026-10-04 (A2); 0005-MADR's 2026-10-05 (A5); 0006-MADR's and 0010-MADR's 2026-10-07 (A13, A3). 0009's last revision was 2026-10-03, and today's A3 supersedes it | each `date` is its record's last amendment or revision. 0007-MADR, 0007-PLAN, 0008-MADR, 0009-MADR and 0009-PLAN, amended today, are `2026-10-07` |
+| F31 | §9's IDs `workspace.focus.pane` and `workspace.resize.left` and its siblings are not registered (`go doc ./workspace Commands`); `glyph.Table` does not exist and `glyph.Set` has no modifier or arrow glyph (`go doc ./glyph Set`); "(§8)" names §9's `KeyContexter`; `KeyMapper` is read by `workspace/help.go:52`, shipped in `v0.2.0` (`git tag --contains`); `Dispatch` refuses a zero `Origin` (`go doc ./command Origin`); 0006-PLAN is complete | 0007-MADR A2, accepted for the corrections, with owner question Q8 on the bindings for focus by index and directional resize, open; §3's "(§8)" annotated in place; 0007-PLAN's revision names the prerequisites and Steps 7, 8 and 9 |
+| F32 | the Context credits the width method to 0002-PLAN-harden, which lists it as out of scope (`:61`); it came with 0004-MADR §3; `OriginPalette`, `SurfacePalette`, `Available(c, s)`, the `Prompt` and `Forward` kinds and `PromptMsg` exist (`go doc ./command`) | 0008-MADR A1, accepted |
+| F33 | `local` is at `workspace/render.go:460-478`; More Information credits the width method to 0002-PLAN-harden; 0010-PLAN is `complete`; no theme revision exists, only the workspace's unexported `themeGen` (`workspace/workspace.go:144`, `:310`) | 0009-MADR A3, accepted for the corrections, with owner question Q9 on the theme revision's source, open; 0009-PLAN's revision says Step 7's precondition is met |
+
+`docs/README.md`'s rows for 0007, 0008 and 0009 name the new amendments
+and the open questions.
+
+#### Checks
+
+* **markdownlint,** through renamed copies of the eleven changed records.
+  * No issue in what this step wrote.
+  * Ten issues remain in 0005-MADR (MD029), 0006-MADR (MD029) and
+    0010-MADR (MD010, hard tabs in a code block). The same ten are in
+    `HEAD`'s copies, and this step changed only those records' `date`
+    lines. Completed records' bodies are out of this PLAN's scope.
+  * `docs/README.md`: 0 issues.
+* **The relative-link check:** two reports, both in text inside backticks
+  on lines this step did not touch, which the checker reads as links:
+  * 0001-PLAN:652 quotes a test's planted link to a missing file;
+  * 0009-MADR:388 quotes goose's rule for a link target not yet closed.
+
+  Nothing else is broken.
+* **The citation checker:** 284 of 284 resolve.
+* **The identifier scan of the diff:** no match.
+* **No Go file, `go.mod` or `go.sum` changed.**

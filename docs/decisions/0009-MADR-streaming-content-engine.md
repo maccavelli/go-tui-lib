@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-02
+date: 2026-10-07
 decision-makers: owner
 consulted: 0003-REPORT-agent-tui-ecosystem-research.md (§3 agent TUIs, §5 terminal standards); crush, codex, gemini-cli, goose and aider source; Charm v2 APIs (bubbletea v2.0.10, lipgloss v2.0.6, bubbles v2.2.1, x/ansi v0.11.8); charm.land/glamour/v2 v2.0.1; for amendment A2, 0010-REPORT-nested-modules-and-adapter-sources.md (§2, §9, §10)
 informed: pi-go
@@ -963,6 +963,51 @@ text above is kept as it was decided.
 adapter's `go.mod` then requires that release, and the owner tags
 `stream/glamourmd/v0.1.0` after it, in the order 0010-MADR §3 sets. The
 root release itself gains no requirement.
+
+### A3 (2026-10-07): moved lines, the width method's source, a met precondition, and the theme revision
+
+*Status: accepted (2026-10-07)* for the corrections. The theme revision's
+source is owner question Q9, open until a step keys a cache by it. Found
+by the documentation audit of
+[0011-MADR-docs-accuracy-after-v0-5-0.md](0011-MADR-docs-accuracy-after-v0-5-0.md),
+carried out by [0011-PLAN-docs-accuracy-after-v0-5-0.md](0011-PLAN-docs-accuracy-after-v0-5-0.md), finding F33. Each fact was re-checked against the tree
+on 2026-10-07.
+
+**Found.**
+
+1. **`local` has moved.** It is at `workspace/render.go:460-478`. The
+   Context cites `:274-291`, and §6 cites `:274`.
+2. **The width method's source.** More Information credits the
+   width-method alignment to
+   [0002-PLAN-harden-workspace-v0-1-1.md](0002-PLAN-harden-workspace-v0-1-1.md).
+   It came with
+   [0004-MADR-integrate-charm-v2-and-go-1-27.md](0004-MADR-integrate-charm-v2-and-go-1-27.md)
+   §3, as
+   [0008-MADR-command-palette.md](0008-MADR-command-palette.md) A1 also
+   records.
+3. **Step 7's precondition is met.**
+   * Step 7 of [0009-PLAN-streaming-content-engine.md](0009-PLAN-streaming-content-engine.md)
+     waits for the tooling phases of
+     [0010-PLAN-nested-adapter-modules.md](0010-PLAN-nested-adapter-modules.md),
+     which is complete.
+   * [0012-MADR-bring-your-own-cli.md](0012-MADR-bring-your-own-cli.md)
+     has since retired the two command adapters. `stream/glamourmd`
+     stays planned under 0010, with its depguard rule.
+4. **No "theme revision" exists.** A1 and A2 key caches by one, but
+   `theme.Theme` has none. The workspace keeps an unexported generation,
+   raised on every theme change (`workspace/workspace.go:144`, `:310`).
+
+**Corrected.** Items 1 to 3, as above.
+
+**Owner question Q9.** Open until a step keys a cache by it: where the
+theme revision comes from.
+
+* **A.** `workspace` exports its generation, and gives it to panes, for
+  example in `SizeMsg` or in a message of its own.
+* **B.** `theme.Theme` gains a comparable fingerprint of its palette and
+  profile.
+* **C.** `stream` compares the theme it was last given with the new one,
+  and drops its caches on a change, with no revision at all.
 
 ## More Information
 
