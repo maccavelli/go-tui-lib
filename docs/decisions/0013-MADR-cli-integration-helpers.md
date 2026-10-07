@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-10-07
 decision-makers: owner
 consulted: 0001-MADR-scaffold-charm-tui-library.md (§3, §6), 0005-MADR-terminal-capabilities-and-services.md (§1), 0006-MADR-command-registry.md, 0012-MADR-bring-your-own-cli.md (Decision Outcome item 7), Bubble Tea v2.0.10 and colorprofile v0.4.3 sources, gh, gum, huh, glow, mods, wish, fzf, Ink, Textual, Trogon, clig.dev, no-color.org, force-color.org
@@ -999,7 +999,7 @@ W1 makes this record the integration surface for every common Go CLI
 framework. Its evidence is
 [0014-REPORT-api-assessment-and-integration-research.md](../reports/0014-REPORT-api-assessment-and-integration-research.md).
 Where this amendment and the Decision Outcome above differ, this amendment
-holds. The record stays `proposed`.
+holds. The owner accepted this record, with A1, on 2026-10-07 ("accepted, write the actionable and comprehensive plans").
 
 #### A1.1 Two holes in the fallback, closed
 
@@ -1198,6 +1198,23 @@ func (e *ExitError) ExitCode() int
 [0013-PLAN-cli-integration-helpers.md](0013-PLAN-cli-integration-helpers.md)
 was written before this amendment. It is revised to match once A1 is
 accepted, and its revision names each change.
+
+#### A1.6 (2026-10-07, while planning): two names
+
+* **`Mode` becomes `Choice`.**
+  * `command` already exports `Mode`, for `Loop` and `Async`
+    (`command/command.go:199-205`), and 0014-MADR W0.3's collision check
+    would refuse a second.
+  * The flag type is therefore `launch.Choice`, with `ChoiceAuto`,
+    `ChoiceTUI` and `ChoicePlain`, and `Config.Mode` is `Config.Choice`.
+  * The flag stays `--mode`: `Flags.Mode`, of type `Choice`.
+  * Nothing else in A1.2 changes.
+* **`Filter` becomes `WithFilter`,** under 0014-MADR W0.4's naming rule
+  (0014-MADR A1.4).
+* **`Decision` exists in two packages for now.** `command` exports one
+  (`command/gate.go:11`), which 0014-MADR W4 renames to `Verdict`. The
+  collision check allows both until W4 removes the old name in `v0.10.0`,
+  through a dated allowlist entry.
 
 ## More Information
 

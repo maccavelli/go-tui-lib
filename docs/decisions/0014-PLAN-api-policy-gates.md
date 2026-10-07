@@ -1,0 +1,496 @@
+---
+status: proposed
+date: 2026-10-07
+associated-madr: "0014-MADR-native-integration-api.md"
+---
+# Implement W0: the API diff gate, conformance bans, the collision check, the glossary, the framework-example harness and the conventions
+
+Associated MADR: [0014-MADR-native-integration-api.md](0014-MADR-native-integration-api.md),
+workstream W0. This is the first of the record's PLANs. The others are:
+
+* [0013-PLAN-cli-integration-helpers.md](0013-PLAN-cli-integration-helpers.md),
+  for W1;
+* [0014-PLAN-component-native-forms.md](0014-PLAN-component-native-forms.md),
+  for W2;
+* [0014-PLAN-hardening.md](0014-PLAN-hardening.md), for W3;
+* [0014-PLAN-canonicalization.md](0014-PLAN-canonicalization.md), for W4.
+
+## Goal
+
+Before any API changes, the repository can tell when one goes wrong:
+
+* **The API diff gate.** An incompatible change against the previous tag
+  fails `make apicheck`, `make release-check` and CI, unless it is listed.
+* **Conformance.**
+  * It asserts every package was read.
+  * It refuses reading the environment, exiting and spawning in library
+    code.
+* **The collision check.** Two public packages cannot export the same type
+  name unless the glossary says the clash is deliberate.
+* **The framework examples.** The guide's tier-1 examples for stdlib
+  `flag`, cobra, kong and urfave/cli v3 compile and run in a temporary
+  module, and the guide's excerpts match them.
+* **The conventions.** `AGENTS.md` states:
+  * deprecation, options, enums, errors, hooks, constructors and the
+    environment;
+  * stability lines;
+  * the toolchain floor.
+
+No exported API changes in this PLAN.
+
+## Scope
+
+### Facts this PLAN starts from (2026-10-07)
+
+| Fact | Where it was read |
+| :--- | :--- |
+| `golang.org/x/exp@latest` is `v0.0.0-20261007180756-3d68b386da03`; `apidiff -m -w` exports a module's API, and `-incompatible old new` compares them, in about 1 s and 0.3 s | a probe in a scratch copy |
+| `apidiff` exits 0 even when it reports incompatible changes; exit 1 means a load or write error, and 2 bad usage | `cmd/apidiff/main.go:58,63,68,271` at that version |
+| its lines are stable: `- ./when.ListValue: removed`, `- package github.com/maccavelli/go-tui-lib/command/cli: removed`; internal packages are skipped with "Ignoring internal package" on stderr | probes: a planted removal; `v0.5.0` against `v0.6.0` |
+| in workspace mode a nested module's packages leak into the root's export; with `GOWORK=off` they do not | probe with a planted `stream/probe` module |
+| `gorelease` exits 0 on an incompatible change in `v0` | probe |
+| the previous tag is `git tag --merged HEAD --no-contains HEAD -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname \| head -1`: `v0.6.0` on `HEAD`, `v0.5.0` with `v0.6.0` checked out | probe |
+| CI's checkout fetches no tags (no `fetch-depth`) | `.github/workflows/ci.yml:96` |
+| `GOPROXY=off` breaks `go run tool@version`; a `file://` proxy over the module cache works | probe |
+| the Makefile loops modules through `scripts/go-modules.sh` (`Makefile:24-33`); tool pins live at `Makefile:10-12`; `help` pads names to 12 characters (`:114`) | `Makefile` |
+| `scripts/go-precheck.sh` has a per-module subshell (234-277), a once-only check (282-286), a summary line (289), and the skip switch `GO_PRECHECK_SKIP_VULN` (49, 112-113) | `scripts/go-precheck.sh` |
+| CI's `gates` job runs fuzz, vet/gofmt/tidy/modernize/lint, govulncheck and shellcheck/markdownlint/actionlint in that order (`ci.yml:92-173`); script tests run as steps (`:38`, `:110`) | `.github/workflows/ci.yml` |
+| conformance finds modules (`modules()` 234-257), scans with `build.Default.ImportDir` (`scanModule()` 261-317), discards the `*types.Package` (`typeCheck()` 177-197, at 193), checks `forbidden()` (71-109) and `check()` (142-173); the must-read list is a constant (346); plants are type-checked in memory (356-433) | `internal/conformance/conformance_test.go` |
+| a prototype of the bans passed its plants and found exactly one use in the tree: `tuitest/tuitest.go:127`, `os.Getenv(updateEnv)` | a probe in a scratch copy |
+| exported type names declared in more than one public package: `Context` (layout, when), `Kind` (command, when), `Option` (command, termcap, theme, workspace), `Origin` (command, termcap), `Pane` (layout, workspace) | a scratch AST scan |
+| no glossary exists; no package states its stability | search; the package doc comments, line 1 of each package's main file |
+| `go.mod:3` and `go.work:1` say `go 1.27.1`, with no `toolchain` line; go1.27.1 is the newest patch | `go.mod`, `go.work`, the toolchain list |
+| the commands guide's CLI examples (flag, cobra, kong) are in "Run commands from your own CLI" | `docs/guides/commands.md:297-375` |
+| `go-modules.sh` (79) and conformance's `skipDir` (230-232) skip `testdata`; golangci-lint skips it by default | the scripts; golangci-lint's defaults |
+| depguard refuses cobra, pflag and kong in `$all` files | `.golangci.yml:55-60` |
+
+### Preconditions
+
+* **0011 is complete.** Its Step 3 edits `docs/guides/commands.md`, which
+  this PLAN's Step 5 edits too.
+
+### In scope
+
+| Step | Paths | Delivers |
+| :--- | :--- | :--- |
+| 1 | this PLAN, `docs/README.md` | approval |
+| 2 | `internal/conformance/conformance_test.go` | the must-read list from `go list`; the bans, with an allowlist |
+| 3 | `internal/conformance/`; `docs/glossary.md` | the collision check and its allowlist; the glossary |
+| 4 | `scripts/go-apicheck.sh`, `scripts/go-apicheck_test.sh`, `scripts/apicheck.allow`; `Makefile`; `scripts/go-precheck.sh`; `.github/workflows/ci.yml` | the API diff gate |
+| 5 | `testdata/frameworks/`; `scripts/go-examples.sh`, `scripts/go-examples_test.sh`; `Makefile`; `scripts/go-precheck.sh`; `.github/workflows/ci.yml`; `docs/guides/commands.md` | the framework-example harness, and the guide's excerpts tied to it |
+| 6 | `AGENTS.md`; each package's documentation; `docs/architecture.md`; `docs/README.md`; `README.md` | the conventions, stability lines, toolchain floor and documents |
+| 7 | this PLAN, the MADR, `docs/README.md` | close-out |
+
+### Out of scope
+
+* **Any exported API change,** and fixing the 22 enums that lack text
+  forms (W2, W4). This PLAN only writes the rule.
+* **Renaming the five colliding names.** The glossary records them as
+  deliberate. Renaming any of them is a W4 decision that needs the owner.
+* **A release.** These gates ship inside `v0.7.0` with W1.
+
+## Implementation Steps
+
+### Rules
+
+1. **A step starts when the previous one is committed.** The agent
+   commits on `main` only when the owner asks in that turn, with `git
+   commit --no-edit`. The owner pushes.
+2. **Checks.**
+   * **For a step that changes Go, scripts, CI or configuration:**
+     * `gofmt -l`;
+     * `make pre-add-check`;
+     * `make lint`, all three targets;
+     * with `GOWORK=off`: `go test -race -count=1 ./...`,
+       `-shuffle=on -count=2` and `LC_ALL=C`;
+     * the tests in workspace mode;
+     * `go mod tidy -diff`, `make vuln` and
+       `scripts/go-modules.sh --check`;
+     * `make release-check`;
+     * shellcheck v0.11.0 on changed scripts;
+     * actionlint v1.7.12 on changed workflows;
+     * the Windows test host on a copy of the tree.
+   * **For every step:**
+     * markdownlint and the link checker;
+     * the citation checker;
+     * the identifier scan of the diff.
+3. **Mutations** run on a scratch copy, or in a throwaway repository under
+   a temporary directory for the script tests. Each must fail its named
+   check.
+4. **Anything unplanned stops the step,** recorded as a dated deviation.
+
+### Step 1: records
+
+* **This PLAN, approved by the owner.**
+* **`docs/README.md`:** a row for each 0014 PLAN.
+
+**Done when** the owner approves.
+
+### Step 2: conformance reads every package, and bans the environment, exit and spawn
+
+**The must-read list.**
+
+* The constant (`conformance_test.go:346`) is replaced. For each module
+  from `modules()`, the test runs
+  `GOWORK=off go list -f '{{if .GoFiles}}{{.Dir}}{{end}}' ./...` in the
+  module's directory and maps each directory to a root-relative path.
+* The test fails if any of those paths is missing from what the scan
+  read, or if the list is empty.
+* The test is a test, so running `go list` is not library code.
+
+**The bans,** added to `forbidden()` and `check()`. Each rule's text is
+the message the scan prints:
+
+| Use | Rule |
+| :--- | :--- |
+| `os.Getenv`, `os.LookupEnv`, `os.Environ`, `os.ExpandEnv` | "reads the environment with os.X" |
+| `syscall.Getenv` | "reads the environment with syscall.Getenv" |
+| `os.Exit` | "calls os.Exit" |
+| `os.StartProcess`; `syscall.Exec`, `syscall.ForkExec`, `syscall.StartProcess` | "starts a process with X" |
+| any package-level object of `os/exec` | "uses os/exec.X" |
+| an import of `os/exec`, blank imports included (an `*ast.ImportSpec` case in `check()`) | "imports os/exec" |
+| `tea.Exec`, `tea.ExecProcess` (Bubble Tea v2's path) | "hands the terminal to a process with tea.X" |
+
+The last row enforces the owner's rule that the library spawns no process
+([0003-REPORT](../reports/0003-REPORT-agent-tui-ecosystem-research.md)
+§11.5). A program may still call these itself.
+
+**The allowlist** is a table in the test, keyed by root-relative file and
+rule, never by line:
+
+| File | Rule | Why |
+| :--- | :--- | :--- |
+| `tuitest/tuitest.go` | reads the environment with os.Getenv | `TUITEST_UPDATE`, the golden update switch; `tuitest` runs only under `go test` |
+
+An allowlist entry that matches nothing fails the test, so a stale entry
+cannot linger.
+
+**Plants,** in `TestScanFindsEachRule`'s table (356-411). Each is one case
+with its expected rule counts:
+
+* each environment read, including through an alias and as a function
+  value;
+* `os.Exit`;
+* `os.StartProcess`;
+* `exec.CommandContext` with an `*exec.Cmd` variable;
+* `import _ "os/exec"`;
+* `syscall.ForkExec`;
+* `tea.ExecProcess`.
+
+**Mutations:**
+
+| Name | Change, on a scratch copy | Must fail |
+| :--- | :--- | :--- |
+| S2-1 | `glyph/glyph.go` calls `os.Getenv("X")` | `TestNoPackageOwnsTheTerminal` |
+| S2-2 | `when` imports `_ "os/exec"` | `TestNoPackageOwnsTheTerminal` |
+| S2-3 | the scan skips the `when` directory | the must-read assertion |
+| S2-4 | the `tuitest` allowlist entry is removed | `TestNoPackageOwnsTheTerminal` on `tuitest/tuitest.go` |
+| S2-5 | an allowlist entry for a file with no such use is added | the stale-entry assertion |
+| S2-6 | the `os.Exit` case is removed from `forbidden()` | `TestScanFindsEachRule` |
+
+**Done when** Rule 2's checks are clean and S2-1 to S2-6 fail as named.
+
+### Step 3: the collision check and the glossary
+
+**The check:** `TestNoTypeNameMeansTwoThings`, in `internal/conformance`.
+
+* `typeCheck` returns the `*types.Package` it now discards (193).
+* For every public package of every module (no `internal` path element,
+  no test files), the test collects the exported `*types.TypeName`
+  objects of the package scope, aliases included.
+* It fails on any name that appears in two or more packages, unless the
+  name and its exact package set are in the allowlist. A new package with
+  an allowed name still fails.
+* The allowlist is a table in the test. It mirrors the glossary's
+  "deliberate" entries:
+
+  | Name | Packages | Glossary line |
+  | :--- | :--- | :--- |
+  | `Option` | any package | each package's option type (MADR W0.3) |
+  | `Context` | `layout`, `when` | a layout's breakpoints and facts; the values a when-clause reads |
+  | `Kind` | `command`, `when` | a command's kind; a when-value's type |
+  | `Origin` | `command`, `termcap` | where a request came from; where a fact came from |
+  | `Pane` | `layout`, `workspace` | a layout node; a pane component |
+
+* 0013's PLAN adds `Decision` (`command`, `launch`) when `launch` lands,
+  dated for removal in `v0.10.0` (0013-MADR A1.6).
+* A stale allowlist entry fails the test.
+
+**`docs/glossary.md`.** One line per exported concept whose name is
+collision-prone. The deliberate entries are the five above, each with:
+
+* the meaning in each package;
+* the rule "qualified by package, never added to".
+
+Then the names reserved by accepted records:
+
+* `launch`: `Choice`, `Config`, `Target`, `Reason`, `Decision`,
+  `Streams`, `Flags`, `Restorer`, `ExitError`;
+* `command.Verdict` (W4);
+* `glyph.Tier` (W1).
+
+Then the names 0007–0009 must not take: `Context`, `Origin`, `Conflict`,
+`Policy`. W4's amendments of those records pick their names from here.
+The file ends with the rule: a new exported name is checked against this
+glossary in the record that introduces it.
+
+**Mutations:**
+
+| Name | Change, on a scratch copy | Must fail |
+| :--- | :--- | :--- |
+| S3-1 | `theme` exports `type Pane struct{}` | `TestNoTypeNameMeansTwoThings` |
+| S3-2 | the `Context` entry is removed | `TestNoTypeNameMeansTwoThings` |
+| S3-3 | an entry for a name no package exports is added | the stale-entry assertion |
+| S3-4 | `typeCheck` returns nil | the test's must-check-something assertion |
+
+**Done when** Rule 2's checks are clean, S3-1 to S3-4 fail, and the
+glossary is linked (Step 6).
+
+### Step 4: the API diff gate
+
+**`scripts/go-apicheck.sh`,** written in the style of `go-fuzz.sh` and
+`go-modules.sh`.
+
+* **The tool.** `APIDIFF_VERSION` comes from the Makefile; the default is
+  `v0.0.0-20261007180756-3d68b386da03`. The command is `go run
+  golang.org/x/exp/cmd/apidiff@$APIDIFF_VERSION`. It is never added to
+  `go.mod`.
+* **For each module** from `scripts/go-modules.sh`, in its directory with
+  `GOWORK=off`:
+  1. **The tag prefix:** `v` for the root, `<dir>/v` for a nested module.
+  2. **The base:** `git tag --merged HEAD --no-contains HEAD -l
+     '<prefix>[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -1`. If there
+     is none, print `apicheck: <module>: no previous tag, skipped` and go
+     on.
+  3. **Export the base:** `git archive <tag> <dir>` into a temporary
+     directory, then `apidiff -m -w old.api <module path>` there.
+  4. **Export the tree:** `apidiff -m -w new.api <module path>`.
+  5. **Compare:** `apidiff -m -incompatible old.api new.api`. A non-zero
+     exit is a failure (a load or usage error).
+  6. **Judge the output,** each stdout line against `scripts/apicheck.allow`:
+     * a line not listed is printed, and the script fails;
+     * a listed line that apidiff no longer prints is stale, is printed,
+       and the script fails.
+* **`scripts/apicheck.allow`** holds comment lines (`#`) and entries
+  `<module dir><TAB><apidiff line>`.
+  * Each block starts with `# <PLAN filename> <step>`, naming the PLAN
+    that allows the change.
+  * It is empty today.
+  * A release's close-out removes its entries. The base moves to the new
+    tag, which turns them stale and so forces the clean-up.
+* **The skip switch** is `GO_PRECHECK_SKIP_APICHECK=1`, for offline work,
+  like `GO_PRECHECK_SKIP_VULN`.
+* **Exit codes:** 0 clean or skipped; 1 an unlisted or stale line; 2 a
+  tool or git failure.
+
+**`scripts/go-apicheck_test.sh`,** on throwaway repositories in a
+temporary directory, with `GOPROXY` pointed at the module cache:
+
+* no previous tag gives a skip;
+* an unchanged API is clean;
+* an addition is clean;
+* a removal fails;
+* the same removal, listed, is clean;
+* a stale listed line fails;
+* a tag on `HEAD` compares against the tag before it;
+* a nested module uses its own prefix;
+* a failing `apidiff` gives exit 2.
+
+**Wiring:**
+
+* **`Makefile`:**
+  * `APIDIFF_VERSION ?= v0.0.0-20261007180756-3d68b386da03` beside the
+    tool pins (10-12);
+  * `apicheck` in `.PHONY`;
+  * `apicheck: ## Fails on an incompatible API change since the previous
+    tag, per module`, which runs `./scripts/go-apicheck.sh`.
+* **`scripts/go-precheck.sh`:**
+  * in the no-file-list branch (230-232, the `release-check` path), after
+    `go-modules.sh --check`, run `./scripts/go-apicheck.sh` unless
+    skipped;
+  * the summary (289) names it.
+* **`.github/workflows/ci.yml`:**
+  * `gates`' checkout (96) gets `fetch-depth: 0`;
+  * after govulncheck (150), a step `apicheck` runs
+    `./scripts/go-apicheck_test.sh` then `make apicheck`;
+  * the comment cites this PLAN.
+
+**Mutations:**
+
+| Name | Change | Must fail |
+| :--- | :--- | :--- |
+| S4-1 | the script judges `apidiff`'s exit code, not its output | the removal case in `go-apicheck_test.sh` |
+| S4-2 | the stale-line check is removed | its test case |
+| S4-3 | `--no-contains HEAD` is dropped | the tag-on-`HEAD` case |
+| S4-4 | `GOWORK=off` is dropped | the nested-module case |
+| S4-5 | on a scratch copy of the real tree, `when.ListValue` is unexported | `make apicheck` |
+
+**Done when**:
+
+* Rule 2's checks are clean;
+* the mutations fail as named;
+* `make apicheck` on the real tree is clean against `v0.6.0`;
+* CI shows the new step green on the push.
+
+### Step 5: the framework-example harness
+
+**The programs,** under `testdata/frameworks/`, which the go command,
+`go-modules.sh` and golangci-lint all skip:
+
+* **`go.mod.tmpl`,** the module `example.com/frameworks`. It requires the
+  root by `replace` to `@ROOT@`, and pins:
+  * cobra v1.10.2 (with pflag v1.0.10);
+  * kong v1.16.1;
+  * urfave/cli/v3 v3.14.0.
+
+  **`go.sum`** is committed beside it.
+* **`flag/main.go`, `cobra/main.go`, `kong/main.go`, `urfave/main.go`:**
+  the commands guide's "Run commands from your own CLI" programs, each
+  complete and runnable, on a registry holding a `session.save`
+  Destructive command. urfave/cli v3 is new to the guide, as tier 1 asks.
+* **Region markers.** Each program marks the code the guide shows with
+  `// guide:<name>` and `// guide:end`.
+* **`cases.txt`.** One case per line: `<framework> <args…> => <exit> <stdout
+  substring>`. For each framework:
+  * `save notes` refused, exit 1;
+  * `save --yes notes` saved, exit 0;
+  * a bad flag, exit 2 for flag and kong, 1 for cobra and urfave,
+    recorded as measured in this step.
+
+**`scripts/go-examples.sh`:**
+
+1. Copy `testdata/frameworks` into a temporary directory, and write
+   `go.mod` from the template with `@ROOT@` set to the repository root.
+2. With `GOWORK=off`, `go build ./...` and `go vet ./...`.
+3. Run every case and compare.
+4. `--check-guide`: every fenced Go block in `docs/guides/*.md` preceded
+   by `<!-- from: testdata/frameworks/<file>#<name> -->` must equal that
+   region, byte for byte, after removing the markers.
+
+The skip switch is `GO_PRECHECK_SKIP_EXAMPLES=1`, for offline work.
+Exit codes: 0, 1 a failed case or excerpt, 2 a build or tool failure.
+
+**`scripts/go-examples_test.sh`,** in a temporary directory:
+
+* a passing case;
+* a case with a wrong exit;
+* an excerpt that differs by one byte;
+* a missing region.
+
+**Wiring:**
+
+* **`Makefile`:** `examples: ## Builds and runs the framework examples
+  in a temporary module`. The name is eight characters, inside `help`'s
+  12.
+* **`go-precheck.sh`:** the release-check branch runs it unless skipped.
+* **CI `gates`:** a step after `apicheck` running the test script, then
+  `make examples`.
+* **`docs/guides/commands.md`:**
+  * each framework block gains its `<!-- from: … -->` line;
+  * a urfave/cli v3 block is added;
+  * the text says the examples are compiled and run on every release.
+* **`AGENTS.md`, Dependencies,** gains a sentence. The framework examples
+  under `testdata/frameworks` build in a temporary module outside the
+  repository's modules. That module may require the tier-1 frameworks
+  that 0014-MADR names; the library's modules never do.
+
+**Mutations:**
+
+| Name | Change | Must fail |
+| :--- | :--- | :--- |
+| S5-1 | the cobra program saves without `--yes` | its case |
+| S5-2 | one byte of the guide's kong excerpt changes | `--check-guide` |
+| S5-3 | the excerpt's `from` line names a missing region | `--check-guide` |
+| S5-4 | the script ignores the exit status | the wrong-exit test |
+
+**Done when** Rule 2's checks are clean, the mutations fail, and CI's
+`examples` step is green.
+
+### Step 6: conventions, stability lines, toolchain floor, documents
+
+* **`AGENTS.md`,** a new section "API conventions" after "TUI
+  conventions". It holds:
+  1. **Deprecation (MADR W0.1):**
+     * one minor release with the old name as a wrapper, alias or
+       constant, marked `// Deprecated: use X`;
+     * a renamed field keeps both fields, read new-then-old;
+     * release notes list both.
+  2. **The API diff gate:** `make apicheck` and `scripts/apicheck.allow`,
+     whose entries are cleaned at release.
+  3. **Names:** the glossary, and the collision check.
+  4. **Options:** `With…`, `Without…`, `On…`, over opaque option types for
+     new code. The existing ones change in W4.
+  5. **Enums:** `String`, `MarshalText`, `UnmarshalText` through
+     `internal/enum`.
+  6. **Errors:** `Err…` sentinels, typed errors with `Unwrap`, and
+     `ExitCode() int` on an error that ends a CLI.
+  7. **Hooks:** an interface with a `…Func` adapter.
+  8. **Constructors:** `NewX`, and `MustNewX` for programming errors.
+  9. **The environment:** `termcap.Env` only. Library code never reads
+     the process's environment, never exits and never spawns
+     (conformance enforces it).
+  10. **Stability lines.**
+  11. **The toolchain floor:** it moves only by a record, to the newest
+      patch of a supported release.
+* **Stability lines.** Each package's documentation ends with
+  `// Stability: stable. Exported names change only through the
+  deprecation policy in AGENTS.md, "API conventions".`, placed before
+  the `package` clause in:
+  * `command/command.go`, `glyph/glyph.go`, `layout/layout.go`;
+  * `termcap/termcap.go`, `termcap/termcaptest/termcaptest.go`;
+  * `termsvc/termsvc.go`, `theme/theme.go`, `tuitest/tuitest.go`;
+  * `when/when.go`, `workspace/workspace.go`.
+
+  Internal packages get `// Stability: internal.`
+* **`docs/architecture.md`:**
+  * "Tooling": the targets `apicheck` and `examples`, the scripts, the CI
+    steps;
+  * "Tree": `docs/glossary.md`, `testdata/frameworks/`;
+  * "What is not here": the `make apicheck` line, which said it waits for
+    `v1`, goes.
+* **`docs/README.md`:** "I want to…" rows for the glossary, the API
+  conventions and the framework examples.
+* **`README.md`:** the "I want to…" table gains the glossary.
+
+**Mutation S6-1:** a scratch copy drops the stability line from
+`when/when.go`. A test, `TestEveryPackageStatesStability` in
+`internal/conformance`, reads each package's doc comment, and must fail.
+
+**Done when** Rule 2's checks are clean, S6-1 fails, and every link
+resolves.
+
+### Step 7: close-out
+
+* **Verification,** item by item.
+* **This PLAN `complete`.** No release; these gates ship in `v0.7.0`.
+
+## Verification
+
+* **Conformance:**
+  * the must-read list comes from `go list`, and the bans and their
+    allowlist hold (S2-1 to S2-6);
+  * no package uses the environment, `os.Exit` or a process, except the
+    listed `tuitest` switch.
+* **The collision check** holds, with five deliberate names and the
+  glossary (S3-1 to S3-4).
+* **`make apicheck`** is clean against `v0.6.0`; its test script passes;
+  S4-1 to S4-5 fail as named; CI runs it with tags.
+* **The four tier-1 framework programs** build and pass their cases, and
+  the guide's excerpts match them (S5-1 to S5-4).
+* **`AGENTS.md` states the conventions.** Every package states its
+  stability (S6-1).
+* **Rule 2's checks are clean at every step,** on macOS and the Windows
+  test host, and CI is green.
+
+## Rollout and Rollback
+
+* **Rollout:**
+  * one commit per step;
+  * no tag;
+  * nothing a consumer imports changes.
+* **Rollback:** each step is one commit to revert. Reverting Step 4 or 5
+  also removes its CI step.
+
+## Execution Record
+
+Not started.

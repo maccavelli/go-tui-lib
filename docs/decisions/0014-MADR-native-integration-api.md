@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-10-07
 decision-makers: owner
 consulted: 0014-REPORT-api-assessment-and-integration-research.md, 0003-REPORT-agent-tui-ecosystem-research.md (§11), 0012-MADR-bring-your-own-cli.md, 0013-MADR-cli-integration-helpers.md, Codex, Grok, goose, opencode, Kilo Code and Pi sources, the Go CLI frameworks' sources
@@ -216,7 +216,7 @@ designs.
 | `workspace` | `WithGlyphs`, `WithProfile`, `WithBackground`, `WithSize`; the first theme built through the builder; an optional `PlainViewer` interface and `RenderPlain(width)`; help styles from the glyph set | I3, I4, I13 |
 | `termcap` | `EnvCaps(env, goos) Caps`, the environment's facts without a program | I10 |
 | `termsvc` | byte-returning forms of a notification and a copy; context-aware backends | I11, H6 |
-| `glyph`, `theme` | `glyph.Tier` (Unicode, legacy console, ASCII) and `For(Tier)`, with `For(bool)` kept; enum text forms | I9, L1 |
+| `glyph`, `theme` | `glyph.Tier` (Unicode, legacy console, ASCII) and `Tier.Set()` (A1.2), with `For(bool)` kept; enum text forms | I9, L1 |
 | `tuitest` | `Case.Profile()` and `Case.Glyphs()`; an assertion that every line fits the width in cells | C9 |
 
 The CP437 glyphs themselves, the theme roles and the golden matrix's
@@ -247,7 +247,8 @@ legacy row belong to theme v2.
 
 * **Renames** (W0.1 transition):
   * `command.Decision` becomes `Verdict`, with the gate's constants;
-  * `Request.Context` and `Invocation.Context` become `When`;
+  * `Request.Context` and `Invocation.Context` become `WhenContext`
+    (A1.1; the text first said `When`);
   * `termcap.New` becomes `NewProber`;
   * `layout`'s preset options become `With…`;
   * `workspace`'s `On…` and `With…` follow W0.4.
@@ -394,9 +395,57 @@ programme:
   library's API is built on it, and a renderer of our own repeats work the
   `inline` record can do on top of Bubble Tea.
 
+## Amendments
+
+### A1 (2026-10-07): corrections found while writing the PLANs
+
+The owner accepted this record on 2026-10-07. Writing its PLANs found five
+places where the text could not be built as written, or where a name
+clashed. Each is corrected here; the rest of the record stands.
+
+1. **`Request.Context` and `Invocation.Context` become `WhenContext`, not
+   `When`** (W4, the owner's answer).
+   * `When` already names a when-expression string:
+     * `Command.When` (`command/command.go:89`);
+     * `WithWhen(expr)` (`command/args.go:93`);
+     * `layout.Rule.When` (`layout/layout.go:154`);
+     * and the planned 0007 and 0008 rules.
+   * `workspace` already calls the `when.Context` concept `WhenContext()`
+     (`workspace/context.go:12,52`).
+   * The owner chose `WhenContext` over `When` and over keeping `Context`.
+2. **`glyph.For(Tier)` cannot exist beside `For(bool)`** (W2).
+   * Go has no overloading.
+   * A generic `For[T bool | Tier]` compiles, but `apidiff` reports a
+     function turning generic as incompatible, because `f := glyph.For`
+     stops compiling.
+   * The tier's glyph set is therefore `Tier.Set()`, and `For(bool)`
+     stays.
+3. **The loop's done channel stays inside `command`** (W2). `Attach`
+   returns only `detach`. The fallback to the caller happens inside `Run`,
+   so a program never needs the channel.
+4. **0013's `Filter` option is `WithFilter`,** under W0.4's naming rule.
+   It is also the fourth exported `Filter` among the accepted and planned
+   records.
+5. **H11's package variables** are deprecated in `v0.8.0` with W3, and
+   removed in `v0.9.0`. A variable cannot become a function of the same
+   name, so W0.1's one-minor transition is the only route.
+
+**The exit statuses of `command`'s errors** (W2), which the record left
+open, follow 0006-MADR §10's codes:
+
+| Error | Status |
+| :--- | ---: |
+| `ErrUnknown` | 2 |
+| `*ArgError` | 2 |
+| `ErrUnavailable` | 1 |
+| `ErrRefused` | 3 |
+| `ErrPanicked` | 2, matching 0013 §9's panic status |
+
 ## More Information
 
 ### Owner answers, 2026-10-07
+
+The owner accepted this record on 2026-10-07: "accepted, write the actionable and comprehensive plans".
 
 Picked from options, each the recommendation:
 
