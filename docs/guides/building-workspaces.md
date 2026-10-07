@@ -191,6 +191,8 @@ func (l list) Update(msg tea.Msg) (workspace.Pane, tea.Cmd) {
     }
     return l, nil
 }
+
+func (l list) View(width, height int) string { return strings.Join(l.items, "\n") }
 ```
 
 The first pane is told in `ws.Init()`. Focus moves on the focus keys, a
@@ -259,6 +261,10 @@ default uses alt with them; avoid them when you rebind. (`v0.1.0` used
 Rebind any of them with `SetKeys`, remove one with `Unbind`, and pass the
 result with `WithKeyMap`.
 
+The same actions are also commands, `workspace.Commands(ws)`, for a
+palette, slash lines and agents: see
+[the workspace's commands](commands.md#the-workspaces-commands).
+
 The workspace is a `help.KeyMap`, so a help footer is one call:
 
 ```go
@@ -287,8 +293,11 @@ layout squeezed by a small window comes back when the window grows.
 ## Overlays
 
 ```go
-ws.Push(workspace.Overlay{ID: "permission", Pane: dialog, Width: 40, Height: 7, Modal: true})
+return m, ws.Push(workspace.Overlay{ID: "permission", Pane: dialog, Width: 40, Height: 7, Modal: true})
 ```
+
+`Push` returns a `tea.Cmd` that tells the overlay its size and moves the
+focus, so `Update` returns it rather than dropping it.
 
 - **Modal.** A modal overlay takes every key and mouse event until it is
   closed, as a permission dialog or a picker does.

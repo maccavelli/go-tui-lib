@@ -23,21 +23,26 @@ program brings its own
 The struct is the schema:
 
 ```go
-type resizeArgs struct {
-    Split string `json:"split" arg:"" help:"the split whose separator moves" placeholder:"SPLIT"`
-    Delta int    `json:"delta" arg:"" help:"cells to give the pane before it" schema:"min=-200,max=200"`
+type searchArgs struct {
+    Query string `json:"query" arg:"" help:"the text to find" placeholder:"TEXT"`
+    Limit int    `json:"limit,omitzero" help:"the most matches to list" schema:"min=1,max=200"`
     Quiet bool   `json:"quiet,omitzero" short:"q" group:"Output" help:"say less"`
 }
 
-resize, err := command.New("layout.resize", "Move a split",
-    func(ctx context.Context, inv *command.Invocation, a resizeArgs) (command.Result, error) {
-        return command.Result{Text: "moved " + a.Split, Cmd: ws.Resize(a.Split, a.Delta)}, nil
+search, err := command.New("session.search", "Search the session",
+    func(ctx context.Context, inv *command.Invocation, a searchArgs) (command.Result, error) {
+        hits := transcript.Find(a.Query, a.Limit) // your program's own search
+        return command.Result{Text: fmt.Sprintf("%d matches", len(hits)), Value: hits}, nil
     },
-    command.WithDanger(command.UI),
-    command.WithSlash("resize"),
-    command.WithDescription("Moves a named split's separator."),
+    command.WithDanger(command.ReadOnly),
+    command.WithSlash("search"),
+    command.WithDescription("Finds text in the session's transcript."),
 )
 ```
+
+The slash name `search` is free: `workspace.Commands` takes `close`,
+`focus`, `layout`, `next`, `panes`, `prev`, `resize`, `theme`, `toggle`
+and `zoom`, and two commands with one slash name cannot both register.
 
 - **An ID** is dotted and lowercase, each segment `[a-z0-9][a-z0-9-]*`,
   at most 128 bytes, so it is also a valid MCP tool name.
@@ -96,7 +101,7 @@ resize, err := command.New("layout.resize", "Move a split",
 
 ```go
 r := command.NewRegistry(command.WithGate(dialog), command.WithLoop(program.Send))
-if err := r.Register(resize); err != nil { … }
+if err := r.Register(search); err != nil { … }
 if err := r.Register(workspace.Commands(ws)...); err != nil { … }
 
 func (m *model) Init() tea.Cmd { return tea.Batch(m.ws.Init(), m.r.Watch()) }
@@ -275,7 +280,7 @@ TUI:
 | `workspace.zoom` | `zoom` | zooms a pane, the focused one by default, or restores |
 | `workspace.toggle` | `toggle` | hides or shows a pane |
 | `workspace.resize` | `resize` | moves a split: `sidebar:0`, or `sidebar` when it has one separator (A8) |
-| `workspace.layout.use` | `layout` | switches to a layout named in `WithLayouts` |
+| `workspace.layout.use` | `layout` | switches to a layout named in `WithLayouts`; registered only when `WithLayouts` is given |
 | `workspace.layout.reset` | — | no zoom, nothing hidden, no moved splits |
 | `workspace.state.get`, `.state.set` | — | reads or replaces the layout state |
 | `workspace.panes` | `panes` | every pane, shown and hidden, with title, rectangle and focus |

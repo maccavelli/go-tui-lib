@@ -13,7 +13,7 @@ clipboard writes and links that suit it. Three packages do the work:
 
 Why they are built this way is in
 [0005-MADR](../decisions/0005-MADR-terminal-capabilities-and-services.md),
-with its amendments A1 to A4. The examples `ExampleProber` and
+with its amendments A1 to A5. The examples `ExampleProber` and
 `ExampleReport` compile with the package
 (`go doc -all github.com/maccavelli/go-tui-lib/termcap`).
 
@@ -85,8 +85,9 @@ exits.
 ## What arrives
 
 - **`termcap.CapsMsg`, once,** when DA1 answers, or when the deadline
-  (`WithTimeout`, 2 s by default) fires first, and never before tea's
-  colour profile has arrived. `Caps.Complete` and `Caps.TimedOut` say
+  (`WithTimeout`, 2 s by default) fires first. DA1's answer waits for
+  tea's colour profile; the deadline does not, so a message the deadline
+  sends may come before it. `Caps.Complete` and `Caps.TimedOut` say
   which.
 - **`termcap.ColorSchemeMsg{Dark}`** each time the terminal reports a
   change after the probe, followed by a fresh background query, so a
@@ -116,12 +117,12 @@ features; turning the protocol off belongs to a later record (MADR A4).
 | :--- | :--- |
 | `WithTimeout(d)` | waits `d` for DA1; 2 s by default |
 | `WithQuery(q)` | adds a query of your own, after the built-in ones and before DA1 |
-| `WithoutHeuristic()` | sends the gated queries (XTVERSION, OSC 99, Kitty graphics, the palette) to every terminal, Apple Terminal and unknown SSH peers included |
+| `WithoutHeuristic()` | sends the gated queries (XTVERSION, OSC 99, Kitty graphics, the foreground (OSC 10), the palette) to every terminal, Apple Terminal and unknown SSH peers included |
 | `WithOverride(f)` | sets facts you know better; set them with origin `Override` |
 | `WithoutColorSchemeUpdates()` | never subscribes to mode 2031 |
 | `WithoutBackgroundRequest()` | never asks for the background |
 | `WithDisabled()` | sends nothing; the first `tea.EnvMsg` delivers the environment's facts |
-| `WithAppearanceEnv(name)` | reads light or dark from `name`, or `LC_` + `name` over SSH |
+| `WithAppearanceEnv(name)` | reads light or dark from `LC_` + `name`, which a default sshd forwards, and from `name`, which wins when both are set |
 | `WithAppearanceHook(f)` | asks the desktop, through your function |
 | `WithConsoleHost(f)` | asks Windows whether this is the classic console |
 | `WithGOOS(goos)` | reads the identity for another OS: a test, or a wish server |

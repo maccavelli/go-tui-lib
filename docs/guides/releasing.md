@@ -10,6 +10,14 @@ is in [0010-REPORT](../reports/0010-REPORT-nested-modules-and-adapter-sources.md
 
 Tags and pushes are the owner's. Nothing below runs without that.
 
+Before every push, the disclosure guard runs over the outgoing commits
+(AGENTS.md, Identifiers), and is never bypassed with `--no-verify`:
+
+```bash
+echo "refs/heads/main $(git rev-parse HEAD) refs/heads/main $(git rev-parse origin/main)" |
+  python3 ~/.global-git-hooks/github-disclosure.py pre-push origin "$(git remote get-url origin)"
+```
+
 ## The rules
 
 - **A tag names one module.** The root's tags are `vX.Y.Z`. A nested
@@ -36,11 +44,11 @@ Tags and pushes are the owner's. Nothing below runs without that.
    workspace:
 
    ```bash
-   mkdir -p stream/glamourmd && cd stream/glamourmd
-   go mod init github.com/maccavelli/go-tui-lib/stream/glamourmd
-   GOWORK=off go get github.com/maccavelli/go-tui-lib@vX.Y.Z
-   cd ../..
-   go work use ./stream/glamourmd
+   mkdir -p <dir>
+   (cd <dir> &&
+     go mod init github.com/maccavelli/go-tui-lib/<dir> &&
+     GOWORK=off go get github.com/maccavelli/go-tui-lib@vX.Y.Z)
+   go work use ./<dir>
    ```
 
 3. If it brings a dependency only it may import, add a depguard rule to
@@ -52,8 +60,8 @@ Tags and pushes are the owner's. Nothing below runs without that.
 ## Release the root alone
 
 1. `make release-check`, `make lint` and `make vuln` pass.
-2. The owner pushes `main`, and CI passes: every `test (<module>, <os>)`
-   entry, `modules` and `gates`.
+2. The disclosure guard passes, the owner pushes `main`, and CI passes:
+   every `test (<module>, <os>)` entry, `modules` and `gates`.
 3. The owner tags the commit CI passed, and pushes the tag:
 
    ```bash
@@ -70,7 +78,8 @@ adapter" shows.
 ## Release an adapter alone
 
 1. The adapter's `go.mod` already requires a published root tag.
-2. `make release-check` passes, and CI passes on the pushed commit.
+2. `make release-check` passes, the disclosure guard passes before the
+   push, and CI passes on the pushed commit.
 3. The owner tags it with the directory prefix, and pushes the tag:
 
    ```bash
@@ -146,8 +155,14 @@ func main() {}
 EOF
 go get github.com/maccavelli/go-tui-lib/stream/glamourmd@vA.B.C
 go mod tidy
+test -z "$(go env GOWORK)"
+go vet ./...
 go build ./...
+go run .
 ```
+
+`go env GOWORK` must be empty, so that no workspace stands in for the
+published version, and the program is vetted and run, not only built.
 
 The program comes first and `go mod tidy` is not optional: `go get` of a
 module path records the module, not the `go.sum` entries of the packages

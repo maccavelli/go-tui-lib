@@ -242,3 +242,61 @@ edit:
   resolve.
 * The identifier scan of the diff: no match.
 * No Go file changed.
+
+### Step 3: the guides
+
+The owner approved it on 2026-10-07 ("proceed").
+
+#### Deviations
+
+* **D1 (2026-10-07): the `list` example completed.**
+  * **Found:** the compile check of every guide example failed on
+    `docs/guides/building-workspaces.md`'s `list` pane in "Focus". It
+    defines `Update` but no `View`, so `return l, nil` fails with "list
+    does not implement workspace.Pane (missing method View)". The defect
+    predates this PLAN and is not among F18–F29.
+  * **Asked,** with two options: complete the example, or mark it an
+    excerpt and have the check supply `View`.
+  * **The owner chose** to complete it, the recommendation. It gains
+    `func (l list) View(width, height int) string { return
+    strings.Join(l.items, "\n") }`.
+  * **Files:** none beyond the guide this step already edits.
+
+#### What changed
+
+Each finding was re-checked against the tree at `0369ca7` before the
+edit.
+
+| # | Re-checked | Now |
+| :--- | :--- | :--- |
+| F18 | `commands.md`'s first example registered `layout.resize` with the slash name `resize`. `workspace.Commands` takes `resize`, and a scratch run refused it: `command: workspace.resize: slash name "resize" is taken by layout.resize`. It also passed a split name to `ws.Resize`, which takes a separator ID | a read-only `session.search` with the slash name `search`, which no workspace command takes, and a note listing the workspace's slash names. The registration line follows |
+| F19 | "A1 to A13", which 0012 Step 5 wrote; 0006-MADR has A1 to A13 | unchanged |
+| F20 | dropped (the first revision) | — |
+| F21 | `workspace.layout.use` is appended only when `WithLayouts` gives layouts (`workspace/commands.go:51-53`) | the table row says so |
+| F22 | `deliver` holds the message for tea's profile unless `TimedOut` (`termcap/prober.go:511-523`) | DA1's answer waits for the profile; the deadline does not |
+| F23 | 0005-MADR has A1 to A5 | "A1 to A5" |
+| F24 | the foreground query is `Gated` (`termcap/prober.go:564`) | the list names the foreground (OSC 10) |
+| F25 | `LC_` + name and name are both read, the plain name last (`termcap/env.go:77-85`) | read always; the plain name wins when both are set |
+| F26 | every `git tag -a` has `-m`, which 0012 Step 5 wrote | unchanged |
+| F27 | the smoke test stopped at `go build` | `test -z "$(go env GOWORK)"`, `go vet ./...` and `go run .`, with a sentence on why |
+| F28 | no disclosure guard; "Add a module" named `stream/glamourmd` | the guard's command after the owner's paragraph, and in the two release procedures; "Add a module" uses `<dir>` |
+| F29 | `ws.Push` returns a `tea.Cmd` (`go doc ./workspace Workspace.Push`), and the example dropped it; no pointer to the workspace's commands | `return m, ws.Push(…)` with a sentence on why; a paragraph in "Keys and the mouse" links the commands guide's "The workspace's commands" |
+
+#### Checks
+
+* **The F18 proof,** in a scratch module that replaces the root with the
+  tree. The new example, verbatim, registers beside
+  `workspace.Commands(ws)`: 16 commands. It runs by its slash line
+  (`/search hello limit=1` gives "1 matches") and through `Dispatch`
+  ("2 matches"). The old example, in the same program, is refused as
+  above, so the proof fails when the finding holds.
+* **Every Go example in the guides compiles.** A scratch module holds
+  each of the 22 blocks as its own `main` package, verbatim, with stubs
+  only for what a block leaves undefined; the two `{ … }` placeholders
+  become `{ panic(err) }`. `go vet` passes on 22 of 22. Before D1 it
+  failed on the `list` block, so the check is seen to fail on a broken
+  example.
+* markdownlint on the four guides: 0 issues.
+* The relative-link check on the four guides: 0 broken.
+* The identifier scan of the diff: no match.
+* No Go file, `go.mod` or `go.sum` changed.
