@@ -35,7 +35,10 @@ it was when they were written
 | 0011 | PLAN | [Implement the documentation pass after `v0.5.0`](decisions/0011-PLAN-docs-accuracy-after-v0-5-0.md) | in-progress |
 | 0012 | MADR | [Make go-tui-lib a TUI layer a program stacks on its own Go CLI, and retire the library's CLI front ends](decisions/0012-MADR-bring-your-own-cli.md) | accepted |
 | 0012 | PLAN | [Retire the CLI front ends: retract the adapters, remove `command/cli` and A12's check, release `v0.6.0`](decisions/0012-PLAN-bring-your-own-cli.md) | complete |
-| 0013 | MADR | [Add a `launch` package that decides between a TUI and plain output, and runs the TUI on the program's own streams](decisions/0013-MADR-cli-integration-helpers.md) | proposed |
+| 0013 | MADR | [Add a `launch` package that decides between a TUI and plain output, and runs the TUI on the program's own streams](decisions/0013-MADR-cli-integration-helpers.md) | proposed; A1 proposed |
+| 0013 | PLAN | [Implement the `launch` package: decide, run with fallback, draw once, map the exit, release `v0.7.0`](decisions/0013-PLAN-cli-integration-helpers.md) | proposed; to be revised for the MADR's A1 |
+| 0014 | MADR | [Make go-tui-lib's API natively integrable from any Go CLI: native types and component forms, hardening, and canonicalization during `v0`](decisions/0014-MADR-native-integration-api.md) | proposed |
+| 0014 | REPORT | [An API assessment of `v0.6.0`, and how Go CLIs and agent tools integrate a TUI](reports/0014-REPORT-api-assessment-and-integration-research.md) | — |
 
 ## I want to…
 
@@ -76,6 +79,8 @@ it was when they were written
 | run the same commands from my own CLI (`flag`, Cobra, Kong) | [guides/commands.md](guides/commands.md#run-commands-from-your-own-cli) |
 | know why go-tui-lib ships no CLI front end | [0012-MADR](decisions/0012-MADR-bring-your-own-cli.md) |
 | see the planned helpers that start the TUI from my CLI, or print plainly when no one is at a terminal | [0013-MADR](decisions/0013-MADR-cli-integration-helpers.md) |
+| see how the API will grow to fit any Go CLI framework natively, and the hardening and renames planned before `v1` | [0014-MADR](decisions/0014-MADR-native-integration-api.md) |
+| see how flag, Cobra, Kong, urfave/cli and agent tools such as Codex, Grok and Pi integrate a TUI, and what the API assessment found | [0014-REPORT](reports/0014-REPORT-api-assessment-and-integration-research.md) |
 | know why the command registry is built this way | [0006-MADR](decisions/0006-MADR-command-registry.md) |
 | see the planned keymap and `keybindings.json` format | [0007-MADR](decisions/0007-MADR-keymap-engine.md) |
 | see the planned command palette and fuzzy matcher | [0008-MADR](decisions/0008-MADR-command-palette.md) |
