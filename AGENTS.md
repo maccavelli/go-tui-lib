@@ -48,6 +48,12 @@ Each nested module's list is
 each dependency in its one module: `charm.land/glamour/v2` in
 `stream/glamourmd` only.
 
+The framework examples under `testdata/frameworks` build in a temporary
+module outside the repository's modules (`make examples`). That module may
+require the tier-1 frameworks
+`docs/decisions/0014-MADR-native-integration-api.md` names (Cobra, Kong and
+urfave/cli); the library's modules never do.
+
 `go.mod` and `go.sum` change with the code that needs them: a requirement is
 added in the commit that adds its first import, and removed in the commit that
 removes its last. `go mod tidy -diff` is clean at every commit, in every

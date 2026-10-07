@@ -16,7 +16,7 @@ FLEET_LINT_CFG := .golangci.yml
 # (docs/decisions/0014-PLAN-api-policy-gates.md Step 4).
 APIDIFF_VERSION ?= v0.0.0-20261007180756-3d68b386da03
 
-.PHONY: all help test test-sum fmt vet lint modernize tidy tidy-check vuln fuzz apicheck pre-add-check release-check
+.PHONY: all help test test-sum fmt vet lint modernize tidy tidy-check vuln fuzz apicheck examples pre-add-check release-check
 
 all: help
 
@@ -104,6 +104,12 @@ fuzz: ## Fuzzes every layout, when and command fuzz target for FUZZTIME each (de
 # scripts/apicheck.allow lists it (docs/decisions/0014-PLAN-api-policy-gates.md Step 4).
 apicheck: ## Fails on an incompatible API change since the previous tag, per module
 	@APIDIFF_VERSION=$(APIDIFF_VERSION) ./scripts/go-apicheck.sh
+
+# The framework examples under testdata/frameworks, built against the tree in
+# a temporary module of their own, run, and compared with the guides'
+# excerpts (docs/decisions/0014-PLAN-api-policy-gates.md Step 5).
+examples: ## Builds and runs the framework examples in a temporary module
+	@./scripts/go-examples.sh
 
 # The pre-add rule (AGENTS.md). scripts/go-precheck.sh is the one
 # implementation; the agent gate at `git commit` runs the same file.

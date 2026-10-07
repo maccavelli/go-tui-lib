@@ -752,3 +752,169 @@ was committed as `475d6ac`.
   * `make lint` and `make vuln` exit 0;
   * `GOWORK=off go test -count=3 -shuffle=on ./...` gave 15 `ok`.
 * **The identifier scan of the diff:** no match.
+
+### Step 5: the framework-example harness
+
+The owner approved it on 2026-10-07 ("approved proceed"), after Step 4 was
+committed as `3d3fa98`.
+
+#### Deviations
+
+Four were found before anything was written. Each was asked, and the
+owner chose the recommendation each time.
+
+* **D4 (2026-10-07): an excerpt is compared after dedenting, with leading
+  tabs as four spaces.**
+  * **Found:** the PLAN says an excerpt equals its region "byte for byte,
+    after removing the markers". The programs are gofmt'd, so they
+    indent with tabs, and the regions sit inside function bodies. The
+    guide's Go blocks indent with four spaces, and markdownlint's MD010
+    (on; `.markdownlint-cli2.jsonc` does not override it) forbids hard
+    tabs in code blocks.
+  * **Chosen:** `--check-guide` removes the region's common leading tabs,
+    writes each remaining leading tab as four spaces, then compares byte
+    for byte. MD010 stays on.
+  * **Not chosen:** tabs in the guide with MD010 off for code blocks,
+    which loosens a lint rule to fit the check.
+* **D5 (2026-10-07): the precheck formats a `testdata` Go file, and runs
+  the examples gate for one under `testdata/frameworks`.**
+  * **Found:** with a file list, `go-precheck.sh` passes each file's
+    directory to `go vet` and `go test`. In a scratch clone,
+    `testdata/frameworks/cobra/main.go` failed both with "no required
+    module provides package github.com/spf13/cobra". The machine-wide
+    agent gate runs the same check on each commit, so it would refuse
+    the commit. No Go file is tracked under `testdata` today.
+  * **Chosen:** a file with a `testdata` path element is gofmt'd and left
+    out of the vet and test packages, since the go command ignores
+    `testdata`. When a file under `testdata/frameworks` is given, the
+    precheck also runs `go-examples.sh`, unless
+    `GO_PRECHECK_SKIP_EXAMPLES=1`.
+  * **Not chosen:** gofmt only, which would leave the examples to the
+    release check and CI.
+* **D6 (2026-10-07): a case names the stream it matches.**
+  * **Found:** the PLAN's case matches a stdout substring. A refusal is an
+    error, written to stderr, so the refused case could test only its
+    exit status.
+  * **Chosen:** `<framework> <args…> => <exit> stdout|stderr <substring>`.
+  * **Not chosen:** matching stdout and stderr together, which would pass
+    a result written to the wrong stream.
+* **D7 (2026-10-07): `go-examples.sh --update` refreshes `go.sum`.**
+  * **Found:** the committed `testdata/frameworks/go.sum` holds the
+    root's requirements too, through the `replace`. A change to the
+    root's `go.mod` (0013 adds `golang.org/x/term`) breaks the examples'
+    build with a missing `go.sum` entry.
+  * **Chosen:** `--update` runs `go mod tidy` in the temporary module and
+    writes `go.sum` back, as `-tuitest.update` rewrites a golden file.
+    `go.mod.tmpl` is written back too, with `@ROOT@` restored, since its
+    indirect requirements change with `go.sum`. The diff is read before
+    it is committed. The build failure names the command.
+  * **Not chosen:** a manual copy, described in the failure message.
+
+#### What was built
+
+* **`testdata/frameworks/`:**
+  * `go.mod.tmpl`, module `example.com/frameworks`, written by `go mod
+    tidy`. It requires cobra v1.10.2, kong v1.16.1 and urfave/cli/v3
+    v3.14.0; pflag v1.0.10 comes in through cobra, as an indirect
+    requirement. The root is replaced by `@ROOT@`. Each pin is that
+    module's latest release (`go list -m -versions`);
+  * `go.sum`, beside it;
+  * `flag/`, `cobra/`, `kong/` and `urfave/`, each a complete program:
+    * the guide's `yesGate`, `runCLI` and `saveArgs`;
+    * a registry holding `session.save`, `Destructive`, offered on
+      `SurfaceCLI`, whose handler prints `saved <name>`;
+    * a `main` around the guide's lines;
+  * regions: `flag/main.go` holds `runcli` and `flag`; the others hold
+    `cobra`, `kong` and `urfave`;
+  * `cases.txt`, with three cases for each framework (D6).
+* **The exit statuses measured** for a bad flag (`save --bogus notes`):
+  * `flag` 2 (`flag.ExitOnError`);
+  * `kong` 80, Kong's own status for a parse error, where the PLAN
+    expected 2;
+  * `cobra` 1 and `urfave` 1, from the programs' `os.Exit(1)` on an
+    error.
+
+  The PLAN asked for them to be recorded as measured. A refused save
+  exits 1 in all four, with "refused: session.save" on stderr. `--yes`
+  exits 0 with "saved notes" on stdout.
+* **`scripts/go-examples.sh`:**
+  * the PLAN's four steps, with D4, D6 and D7. Steps 1 to 4 are the
+    default, and `--check-guide` runs step 4 alone;
+  * a region's blank lines at either end are dropped. gofmt puts a blank
+    line before a top-level `// guide:end`, and the PLAN's "byte for
+    byte" did not foresee it. This was found by gofmt in this step;
+  * the build writes the programs into a temporary directory. A plain
+    `go build ./...` of a single main package writes its binary into
+    the module, where it collided with the program's directory. The new
+    test found this in this step;
+  * it also fails on a `from` line that no Go block follows, a reference
+    outside `testdata/frameworks`, a missing file, a region with no
+    `// guide:end`, a case naming no program, and a stream other than
+    stdout or stderr.
+* **`scripts/go-examples_test.sh`:** the PLAN's four cases and five more,
+  19 assertions in all, on throwaway trees whose one program needs no
+  module, so no network:
+  * the substring in the other stream;
+  * a `from` line with no block;
+  * `--check-guide` neither builds nor runs, and a build failure exits 2
+    and names `--update`;
+  * `--update` keeps `@ROOT@`;
+  * the skip switch.
+* **Wiring:**
+  * `Makefile`: `examples` in `.PHONY`, and the target;
+  * `go-precheck.sh`, as D5 describes: the examples run on the
+    release-check path, or when a file list names a file under
+    `testdata/frameworks`, unless skipped. The summary ends with
+    `examples`;
+  * CI `gates`: a step `examples` after `apicheck`;
+  * `docs/guides/commands.md`:
+    * the five framework blocks carry their `from` lines;
+    * a urfave/cli v3 block was added;
+    * the opening names urfave/cli;
+    * the last bullet says the examples are compiled and run before
+      every release, and what the cases check;
+  * `AGENTS.md`, Dependencies: the sentence the PLAN gives.
+
+#### Checks
+
+* **Mutations, on scratch clones and copies.** All killed:
+  * S5-1, `cobra` saves without `--yes` (`yesGate(true)`): "cobra save
+    notes => 1 stderr refused: session.save: exit 0, want 1";
+  * S5-2, a space in the guide's `kong.Parse(&cli)`: `--check-guide`
+    exits 1 with the diff, "-kctx := kong.Parse(&cli)" against
+    "+kctx := kong.Parse(&cli )";
+  * S5-3, the kong `from` line names `#kong-cli`: `has no region
+    "// guide:kong-cli"`;
+  * S5-4, the exit status ignored: "a wrong exit fails: want 1, got 0".
+* **D5's precheck wiring,** on the scratch clones:
+  * before the change, `go-precheck.sh testdata/frameworks/cobra/main.go`
+    failed in vet and test ("no required module provides package
+    github.com/spf13/cobra");
+  * after it, the same command exits 0, ending "(…, examples)";
+  * with S5-1 applied, it exits 1 and shows the failed case.
+* **On the tree:**
+  * `make examples`: "12 case(s) run", "5 excerpt(s) checked", "clean";
+  * `./scripts/go-examples_test.sh`: "19 passed, 0 failed";
+  * shellcheck 0.11.0 on `scripts/*.sh`, actionlint v1.7.12,
+    markdownlint and the relative-link check: clean;
+  * `make release-check`: "124 file(s) clean in 1 module(s) (…,
+    apicheck, examples)". The four programs are untracked until they are
+    committed, so this count leaves them out. The clone's precheck
+    covered them;
+  * `make lint`: three "0 issues.";
+  * `make vuln`: "No vulnerabilities found.";
+  * `go mod tidy -diff`: clean;
+  * with `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    each gave 15 `ok`, and so did workspace mode.
+* **The Windows test host,** go1.27.1 windows/amd64, with the history
+  from a bundle of `main` and its tags:
+  * `go-examples_test.sh` gave "19 passed, 0 failed";
+  * `make examples` was clean, so the `cygpath` path in the `replace`
+    works;
+  * `make pre-add-check FILES=testdata/frameworks/cobra/main.go` gave "1
+    file(s) clean … examples";
+  * `make pre-add-check` gave "124 file(s) clean … apicheck, examples";
+  * `make lint` and `make vuln` exit 0;
+  * `GOWORK=off go test -count=3 -shuffle=on ./...` gave 15 `ok`.
+* **The identifier scan of the diff and the new files:** no match.
+* **Not yet seen:** CI's `examples` step, which runs on the push.

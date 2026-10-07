@@ -35,7 +35,16 @@
 # incompatible API change since each module's previous tag that
 # scripts/apicheck.allow does not list
 # (docs/decisions/0014-PLAN-api-policy-gates.md Step 4). A file list skips
-# it: the API belongs to the whole module, not to the files.
+# it: the API belongs to the whole module, not to the files. And
+# scripts/go-examples.sh, which builds and runs the framework examples under
+# testdata/frameworks and checks the guides' excerpts of them, on the
+# release-check path and whenever a file list names a file under
+# testdata/frameworks (Step 5, deviation D5).
+#
+# A Go file under a testdata directory is gofmt'd, but its directory is not
+# given to go vet or go test: the go command ignores testdata, and the
+# framework examples there import modules no module of this repository
+# requires.
 #
 # Usage:
 #   scripts/go-precheck.sh [file.go ...]
@@ -53,10 +62,19 @@
 #   GOLANGCI_LINT=<path>      golangci-lint binary (default: $(go env GOPATH)/bin)
 #   GO_PRECHECK_SKIP_VULN=1   skip govulncheck (offline work)
 #   GO_PRECHECK_SKIP_APICHECK=1  skip the API diff gate (offline work)
+#   GO_PRECHECK_SKIP_EXAMPLES=1  skip the framework examples (offline work)
 set -uo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT" || exit 1
+
+# Whether the framework examples run: on a whole-tree run, or when a file
+# under testdata/frameworks is given.
+examples_run=0
+[ "$#" -eq 0 ] && examples_run=1
+for f in "$@"; do
+  case "${f#./}" in testdata/frameworks/*) examples_run=1 ;; esac
+done
 
 # Collect the Go files to check.
 files=()
@@ -230,6 +248,7 @@ while IFS= read -r m; do
     while IFS= read -r d; do
       [ -n "$d" ] && pkgs+=("./$d")
     done < <(for f in "${mfiles[@]}"; do
+      case "/${f#./}" in */testdata/*) continue ;; esac
       d="$(dirname "$f")"
       if [ "$m" = "." ]; then echo "$d"; elif [ "$d" = "$m" ]; then echo "."; else echo "${d#"$m"/}"; fi
     done | sort -u)
@@ -256,14 +275,17 @@ while IFS= read -r m; do
     fi
 
     # go vet and go test, over the packages the files belong to. AGENTS.md
-    # requires both on the touched packages.
-    if ! vet_out="$(go vet "${pkgs[@]}" 2>&1)"; then
-      show "go vet ($m)" "$vet_out"
-      fail 1
-    fi
-    if ! test_out="$(go test "${pkgs[@]}" 2>&1)"; then
-      show "go test ($m)" "$test_out" 40
-      fail 1
+    # requires both on the touched packages. Files under testdata alone
+    # leave no package.
+    if [ "${#pkgs[@]}" -gt 0 ]; then
+      if ! vet_out="$(go vet "${pkgs[@]}" 2>&1)"; then
+        show "go vet ($m)" "$vet_out"
+        fail 1
+      fi
+      if ! test_out="$(go test "${pkgs[@]}" 2>&1)"; then
+        show "go test ($m)" "$test_out" 40
+        fail 1
+      fi
     fi
     if ! tidy_out="$(go mod tidy -diff 2>&1)"; then
       show "go mod tidy -diff ($m)" "$tidy_out" 40
@@ -272,7 +294,7 @@ while IFS= read -r m; do
     [ "$have_vuln" = 1 ] && vuln
 
     # 3. go test in workspace mode, against the tree's other modules.
-    if ! ws_out="$(GOWORK="$REPO_ROOT/go.work" go test "${pkgs[@]}" 2>&1)"; then
+    if [ "${#pkgs[@]}" -gt 0 ] && ! ws_out="$(GOWORK="$REPO_ROOT/go.work" go test "${pkgs[@]}" 2>&1)"; then
       show "go test, workspace mode ($m)" "$ws_out" 40
       fail 1
     fi
@@ -308,7 +330,25 @@ if [ "$#" -eq 0 ]; then
   fi
 fi
 
+# Once: the framework examples build, run as their cases say, and match the
+# guides' excerpts.
+examples=""
+if [ "$examples_run" = 1 ]; then
+  if [ "${GO_PRECHECK_SKIP_EXAMPLES:-0}" = "1" ]; then
+    echo "examples: skipped (GO_PRECHECK_SKIP_EXAMPLES=1)" >&2
+  else
+    ex_out="$("$REPO_ROOT/scripts/go-examples.sh" 2>&1)"
+    ex_rc=$?
+    if [ "$ex_rc" -ne 0 ]; then
+      show "examples" "$ex_out"
+      fail "$ex_rc"
+    else
+      examples=", examples"
+    fi
+  fi
+fi
+
 if [ "$failed" -eq 0 ]; then
-  echo "go-precheck: $checked_files file(s) clean in $checked_modules module(s) (gofmt, golangci-lint, go vet, go test, go mod tidy, govulncheck$apicheck)."
+  echo "go-precheck: $checked_files file(s) clean in $checked_modules module(s) (gofmt, golangci-lint, go vet, go test, go mod tidy, govulncheck$apicheck$examples)."
 fi
 exit "$failed"

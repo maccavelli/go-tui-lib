@@ -1,0 +1,25 @@
+# The framework examples' cases, which scripts/go-examples.sh runs
+# (docs/decisions/0014-PLAN-api-policy-gates.md Step 5, deviation D6):
+#
+#   <framework> <args…> => <exit> stdout|stderr <substring>
+#
+# The framework is the program's directory. The substring is the rest of the
+# line, matched literally in the stream named. A bad flag's exit status is
+# each framework's own, as measured: 2 for flag, 80 for kong, 1 for cobra and
+# urfave.
+
+flag save notes => 1 stderr refused: session.save
+flag save --yes notes => 0 stdout saved notes
+flag save --bogus notes => 2 stderr flag provided but not defined: -bogus
+
+cobra save notes => 1 stderr refused: session.save
+cobra save --yes notes => 0 stdout saved notes
+cobra save --bogus notes => 1 stderr unknown flag: --bogus
+
+kong save notes => 1 stderr refused: session.save
+kong save --yes notes => 0 stdout saved notes
+kong save --bogus notes => 80 stderr unknown flag --bogus
+
+urfave save notes => 1 stderr refused: session.save
+urfave save --yes notes => 0 stdout saved notes
+urfave save --bogus notes => 1 stderr flag provided but not defined: -bogus

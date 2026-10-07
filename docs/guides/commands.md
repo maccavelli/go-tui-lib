@@ -302,10 +302,12 @@ TUI:
 ## Run commands from your own CLI
 
 go-tui-lib is a TUI layer: your program keeps its own command line, in the
-standard `flag` package, Cobra, Kong or anything else, and adds the TUI
-beside it. A CLI handler runs a registry command by calling `Run` with
-`command.OriginCLI`, so the gate and the audit trail apply as they do to
-a key or an agent:
+standard `flag` package, Cobra, Kong, urfave/cli or anything else, and adds
+the TUI beside it. A CLI handler runs a registry command by calling `Run`
+with `command.OriginCLI`, so the gate and the audit trail apply as they do
+to a key or an agent:
+
+<!-- from: testdata/frameworks/flag/main.go#runcli -->
 
 ```go
 // yesGate approves a command that asks, when --yes was given.
@@ -341,6 +343,8 @@ type saveArgs struct {
 
 With the standard `flag` package:
 
+<!-- from: testdata/frameworks/flag/main.go#flag -->
+
 ```go
 switch os.Args[1] {
 case "save":
@@ -355,6 +359,8 @@ case "save":
 ```
 
 With Cobra:
+
+<!-- from: testdata/frameworks/cobra/main.go#cobra -->
 
 ```go
 var yes bool
@@ -371,6 +377,8 @@ save.Flags().BoolVar(&yes, "yes", false, "approve without asking")
 
 With Kong, the registry's argument struct can be the subcommand's grammar:
 
+<!-- from: testdata/frameworks/kong/main.go#kong -->
+
 ```go
 var cli struct {
     Yes  bool     `help:"approve without asking"`
@@ -380,6 +388,29 @@ var cli struct {
 kctx := kong.Parse(&cli)
 if kctx.Command() == "save <name>" {
     kctx.FatalIfErrorf(runCLI(ctx, r, "session.save", cli.Save, cli.Yes))
+}
+```
+
+With urfave/cli v3:
+
+<!-- from: testdata/frameworks/urfave/main.go#urfave -->
+
+```go
+app := &cli.Command{
+    Name: "pi",
+    Commands: []*cli.Command{{
+        Name:      "save",
+        Usage:     "Save the session",
+        ArgsUsage: "NAME",
+        Flags:     []cli.Flag{&cli.BoolFlag{Name: "yes", Usage: "approve without asking"}},
+        Action: func(ctx context.Context, c *cli.Command) error {
+            return runCLI(ctx, r, "session.save", saveArgs{Name: c.Args().First()}, c.Bool("yes"))
+        },
+    }},
+}
+if err := app.Run(context.Background(), os.Args); err != nil {
+    fmt.Fprintln(os.Stderr, err)
+    os.Exit(1)
 }
 ```
 
@@ -397,9 +428,12 @@ if kctx.Command() == "save <name>" {
   `max-items`), and requiredness from its own `required:""` and
   `optional:""`, which the registry does not read. Give a shared struct
   the tags Kong needs.
-- **These examples compile** against the library, with the frameworks
-  your program already requires. The library itself imports none of
-  them.
+- **These examples are compiled and run** before every release. Each is
+  cut from a complete program under `testdata/frameworks`, which
+  `make examples` builds against the library in a module of its own and
+  runs: without `--yes` the save is refused, with it the save runs, and a
+  bad flag exits with the framework's own status. The library itself
+  imports none of the frameworks.
 
 ## What the library never does
 

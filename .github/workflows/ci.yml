@@ -160,6 +160,14 @@ jobs:
         run: |
           ./scripts/go-apicheck_test.sh
           make apicheck
+      # The framework examples build in a temporary module, run as
+      # testdata/frameworks/cases.txt says, and match the guides' excerpts
+      # (docs/decisions/0014-PLAN-api-policy-gates.md Step 5).
+      - name: examples
+        shell: bash
+        run: |
+          ./scripts/go-examples_test.sh
+          make examples
       # Scripts, Markdown and workflows are checked as the pre-add gate and
       # the records require (go-selfupdate-lib docs/decisions/0003-MADR-remediate-debugging-pass-findings.md D9).
       # shellcheck is pinned to the release the pre-add hosts use (the
