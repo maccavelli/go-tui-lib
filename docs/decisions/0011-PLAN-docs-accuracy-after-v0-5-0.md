@@ -21,6 +21,16 @@ Associated MADR: [0011-MADR-docs-accuracy-after-v0-5-0.md](0011-MADR-docs-accura
     F15 (the Cobra or Kong rows).
   * **Kept:** the other findings. They are re-checked against the tree
     0012 leaves, since their line numbers move.
+* **2026-10-07, resumed.**
+  [0012-PLAN-bring-your-own-cli.md](0012-PLAN-bring-your-own-cli.md) is
+  complete at `v0.6.0`.
+  * **Resolved by 0012 Step 5,** on lines that step rewrote: F2, F19 and
+    F26. Steps 2 to 4 here check them again rather than edit them.
+  * **Dropped,** as the pause said: F4, F9's adapters table, F15 and F20,
+    and the mention of A12 in F1.
+  * **F1** becomes "the current release is `v0.6.0`", which 0012 wrote.
+  * The other findings stand, against the tree at `6bf8fad`. This PLAN
+    awaits the owner's approval, as before.
 
 ## Goal
 

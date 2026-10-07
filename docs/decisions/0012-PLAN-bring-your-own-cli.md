@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: complete
 date: 2026-10-07
 associated-madr: "0012-MADR-bring-your-own-cli.md"
 ---
@@ -631,3 +631,113 @@ No deviation.
 
 `v0.6.0` follows in Step 6: the owner commits this step, the agent runs
 the disclosure guard, and with CI green the tag is made on that commit.
+
+### Step 6: the release
+
+* **Commit and push:** at the owner's request ("commit and push"), the
+  agent committed Step 5 as `6bf8fad`. It ran the disclosure guard over
+  `60ed13e` (Step 4) and `6bf8fad` (exit 0, no finding), and pushed
+  `7fe52e6..6bf8fad`.
+* **CI** on `6bf8fad`: success in all 5 jobs.
+* **The tag:** the owner tagged `v0.6.0` (annotated, message `v0.6.0`)
+  on `6bf8fad` and pushed it; `git ls-remote` shows the tag and
+  `v0.6.0^{}` at `6bf8fad`.
+
+**The consumer smoke test,** from a scratch module outside the
+repository, with no `go.work` and `GOPROXY` at its default:
+
+* **The program:**
+  * imports `command`, `workspace`, `when`, `layout`, `theme` and
+    `glyph`;
+  * registers `workspace.Commands` of a workspace;
+  * registers `session.save`: `Destructive`, with `When` set, and an
+    argument struct whose one flag the `json` tag makes required and
+    which has no Kong tag, which `v0.5.0`'s `New` refused;
+  * runs it from its own `flag` handler through `Registry.Run`, with
+    `OriginCLI` and a per-request gate that `--yes` opens.
+* **The build:** `go mod init`, `go get
+  github.com/maccavelli/go-tui-lib@v0.6.0` ("go: downloading
+  github.com/maccavelli/go-tui-lib v0.6.0"), `go mod tidy`, `go build`
+  and `go vet ./...`, each exit 0. `go.mod` requires
+  `github.com/maccavelli/go-tui-lib v0.6.0`.
+* **The run:**
+  * without `-yes`: `command: refused: session.save: the gate said
+    reject_once`, exit 1;
+  * with `-yes`: `saved notes (16 commands)`, exit 0. That is the
+    workspace's 12 (`layout.use` needs `WithLayouts`), the registry's
+    own 3, and the program's.
+* **`go get github.com/maccavelli/go-tui-lib/command/cli@v0.6.0`:** "go:
+  module github.com/maccavelli/go-tui-lib@v0.6.0 found, but does not
+  contain package github.com/maccavelli/go-tui-lib/command/cli".
+* **`go list -m all` and `go.sum`** of the consumer name no Cobra, pflag
+  or Kong.
+
+The tag exists and the smoke test builds and runs, so Step 6 is done.
+
+### Step 7: close-out
+
+Verification, item by item, on 2026-10-07, against `6bf8fad` (`v0.6.0`).
+Every gate was run again rather than read from the steps' records.
+
+* **The retracted adapters.**
+  * `command/cobracmd/v0.1.1` and `command/kongcmd/v0.1.1` exist (Step 2).
+  * Through the proxy, `go list -m -versions` lists no version of either
+    module, and `go list -m -retracted -versions` lists `v0.1.0 v0.1.1`
+    for each.
+  * A consumer pinned to `v0.1.0` gets `(retracted) (deprecated)` from
+    `go list -m -u`.
+  * With `GOPROXY=direct`, `@latest` finds "no matching versions".
+  * **Observed, outside the repository's reach:** the proxy still answers
+    `@latest` with the pseudo-version of `bde54d0`, the last commit that
+    held the modules. Its `go.mod` carries the `// Deprecated:` comment,
+    so the go command reports it deprecated.
+* **`main` holds no `command/cobracmd`, `command/kongcmd` or
+  `command/cli`, and `go.work` lists `.` alone.** `git ls-files` of the
+  three directories finds 0 files, and `scripts/go-modules.sh --check`
+  exits 0.
+* **depguard refuses Cobra, pflag and Kong in every package.** S3-1, run
+  again at the close, was killed: four depguard findings with the real
+  config, in a root package and under a recreated `command/cobracmd/`;
+  none with the three entries removed.
+* **`v0.6.0`'s exported API is `v0.5.0`'s less package `command/cli`.**
+  `git archive` of both tags, `go list ./...` and `go doc -short` of every
+  public package: the package lists differ by `./command/cli` alone, and
+  the API diff is its eight lines. `New[A]` takes the `json` rule
+  (`TestNewTakesJSONRule`; S4-1 and S4-2 killed in Step 4).
+* **Rule 2's checks are clean at every step, on macOS and the Windows
+  test host.** Each step's record holds its checks. At the close, on
+  macOS:
+  * `make release-check` exit 0 ("go-precheck: 124 file(s) clean in 1
+    module(s)");
+  * `make lint` exit 0, three "0 issues."; `make vuln` exit 0;
+  * with `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    each gave 15 packages `ok`; the tests in workspace mode, 15 `ok`;
+    `go mod tidy -diff` was silent.
+
+  On the Windows test host:
+  go1.27.1 windows/amd64, `make pre-add-check` exit 0 ("124 file(s) clean
+  in 1 module(s)"), `make lint` and `make vuln` exit 0, and `GOWORK=off
+  go test -count=3 -shuffle=on ./...` exit 0, 15 `ok`.
+* **The commands guide's examples for `flag`, Cobra and Kong compile.**
+  Extracted from the guide again at the close, they vet. Each framework
+  refuses the destructive command without `--yes` and runs it with it.
+* **The consumer smoke test builds and runs against `v0.6.0`** (Step 6).
+* **The identifier scan finds nothing, and CI is green after each push.**
+  * Each step's diff was scanned: no match.
+  * CI concluded `success` on each push's head: `bde54d0`, `7fe52e6` and
+    `6bf8fad`, the last twice, once for `main` and once for the `v0.6.0`
+    tag.
+  * `376106e` and `60ed13e` went out inside those pushes.
+
+Every Verification item holds: this PLAN is `complete`. Its deviation is
+D1, the package-doc notice dropped for the `go.mod` deprecation.
+[0011-PLAN-docs-accuracy-after-v0-5-0.md](0011-PLAN-docs-accuracy-after-v0-5-0.md)
+resumes, re-scoped, by a revision there.
+
+**Open after this PLAN:**
+
+* **Integration helpers for a program's own CLI,** for a later record
+  (MADR, Decision Outcome item 7). For example, launching the TUI from a
+  subcommand with the caller's streams, or choosing interactive or plain
+  output.
+* **The proxy's cached `@latest` answer** for the two retired modules.
