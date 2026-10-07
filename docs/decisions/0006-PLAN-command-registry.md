@@ -2500,3 +2500,28 @@ and with CI green tag `v0.5.0`. Then the agent runs the consumer smoke
 test against `v0.5.0`, and records it here; the step is done when the
 tag exists and the smoke test builds. Step 11 then moves
 `command/kongcmd`'s requirement to `v0.5.0` and resumes.
+
+**After the release (2026-10-06).** The owner committed this step
+(`d8b7ff7`), ran the disclosure guard over the outgoing commits through
+the agent (exit 0, no finding), pushed, and with CI green tagged `v0.5.0`
+(annotated) on `d8b7ff7` and pushed the tag. The agent ran the releasing
+guide's consumer smoke test against it, in a scratch module outside the
+repository, with no `go.work` in effect and `GOPROXY` at its default:
+
+* The program imports `command`, `command/cli`, `workspace`, `layout`,
+  `theme` and `glyph`. It registers `workspace.Commands` of a workspace,
+  whose two argument structs gained tags in this step, beside a command
+  of its own with `required:""`, and calls `command.New` once with a
+  struct the check must refuse.
+* `go mod init`, `go get github.com/maccavelli/go-tui-lib@v0.5.0` ("go:
+  downloading github.com/maccavelli/go-tui-lib v0.5.0"), `go mod tidy`,
+  `go build ./...` and `go vet ./...`: each exit 0; `go.mod` requires
+  `github.com/maccavelli/go-tui-lib v0.5.0`.
+* Run: the refused struct gave `command: t.refused: arguments:
+  main.refused.Name: the schema requires it, and Kong does not: add
+  required:"", or make it omitzero`; the workspace's thirteen commands
+  and the program's registered, and `greet --name world` printed `hello
+  world` and exited 0.
+
+The tag exists and the smoke test builds, so Step 11a is done. Step 11
+resumes: `command/kongcmd` requires `v0.5.0`.
