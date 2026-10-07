@@ -1,6 +1,12 @@
+// Deprecated: go-tui-lib no longer ships a CLI front end. A program's own
+// CLI calls command.Registry.Run with command.OriginCLI instead; see
+// docs/decisions/0012-MADR-bring-your-own-cli.md.
 module github.com/maccavelli/go-tui-lib/command/cobracmd
 
 go 1.27.1
+
+// go-tui-lib no longer ships a Cobra front end (0012-MADR).
+retract [v0.1.0, v0.1.1]
 
 require (
 	github.com/charmbracelet/colorprofile v0.4.3

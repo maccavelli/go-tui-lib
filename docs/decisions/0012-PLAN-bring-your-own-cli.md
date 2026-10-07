@@ -98,7 +98,8 @@ go-tui-lib is a TUI layer for a Go program that brings its own CLI.
   end; see 0012-MADR.`
 * **`command/kongcmd/go.mod`:** the same, naming Kong.
 * **Each package's documentation** gains a `Deprecated:` paragraph, which
-  `go doc` and editors show.
+  `go doc` and editors show. (*D1: not added. The `go.mod` deprecation and
+  retraction carry the notice.*)
 * **Checks:** Rule 2, in both modules. `go mod tidy -diff` must stay
   clean, and the gates must accept a `retract` directive.
 * **The release:**
@@ -262,4 +263,73 @@ Verification, item by item; this PLAN `complete`, with its row; and the
 
 ## Execution Record
 
-Not started.
+### Step 2: the retracting versions
+
+#### Deviations
+
+* **D1 (2026-10-07): no package-doc `Deprecated:` paragraph.**
+  * **Found:** with the paragraph in `cobracmd`'s package
+    documentation, `make lint` failed in all three targets with
+    `command/cobracmd/docs/docs_test.go:13:2: SA1019:
+    github.com/maccavelli/go-tui-lib/command/cobracmd is deprecated: …
+    (staticcheck)`. The `docs` package's test imports `cobracmd`.
+  * **Asked**, with options: the `go.mod` deprecation alone, or the
+    package paragraphs as well with `docs_test.go` rewritten to build its
+    own Cobra tree. A `//nolint` or a lint exclusion was not offered: it
+    would be a workaround.
+  * **The owner chose** the `go.mod` deprecation alone, the
+    recommendation. `go get`, `go list -m -u` and gopls report a
+    module's `// Deprecated:` line and its retraction; the modules leave
+    `main` in Step 3.
+  * **Files:** the three package paragraphs added in this step were
+    removed again. No test changed.
+
+#### What was built
+
+* **`command/cobracmd/go.mod` and `command/kongcmd/go.mod`:**
+  * a `// Deprecated:` comment above `module`: "go-tui-lib no longer
+    ships a CLI front end. A program's own CLI calls
+    command.Registry.Run with command.OriginCLI instead; see
+    docs/decisions/0012-MADR-bring-your-own-cli.md.";
+  * `retract [v0.1.0, v0.1.1]`, with the reason as a comment ("go-tui-lib
+    no longer ships a Cobra front end (0012-MADR)", or Kong).
+* No Go file changed (D1).
+
+#### Checks (Rule 2)
+
+* `GOWORK=off go mod tidy -diff`: silent in both modules, the `retract`
+  directive kept.
+* `make lint`: exit 0, nine "0 issues." (three targets, three modules),
+  after D1.
+* `make vuln`: exit 0, "No vulnerabilities found." in each module.
+* `make release-check`: exit 0, "go-precheck: 147 file(s) clean in 3
+  module(s)". Its nested-module check, no `replace` and a release
+  version of the root, accepts the `retract` directive.
+* **Per module, with `GOWORK=off`:** `go test -race`, `-shuffle=on
+  -count=2` and `LC_ALL=C`. The root's 16 packages, `command/cobracmd`'s
+  2 and `command/kongcmd`'s 1 were all `ok`. The tests in workspace mode
+  were all `ok`.
+* `scripts/go-modules.sh --check`: exit 0.
+* **Windows test host, on a copy of the tree, go1.27.1 windows/amd64:**
+  * `make pre-add-check` exit 0 ("147 file(s) clean in 3 module(s)");
+  * `make lint` and `make vuln` exit 0;
+  * `GOWORK=off go test -count=3 -shuffle=on ./...` in each module exit
+    0: 16, 2 and 1 `ok`.
+* **This PLAN:** markdownlint, through a renamed copy, finds only the
+  asterisk lists the records use; the link check finds 0 broken; the
+  citation checker resolves 247 of 247.
+* **The identifier scan of the diff:** no match.
+
+#### The release
+
+Left to the owner:
+
+1. Commit this step.
+2. Run the disclosure guard through the agent, and push.
+3. With CI green, tag `command/cobracmd/v0.1.1` and
+   `command/kongcmd/v0.1.1` on that commit (annotated, `-m` with the
+   tag's name), and push both tags.
+
+The agent then checks the retraction through the proxy and records it
+here. The step is done when the go command reports each module
+deprecated and each version retracted.
