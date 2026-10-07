@@ -2703,3 +2703,35 @@ Left to the owner: commit this step, with `command/kongcmd/` and
 `command/kongcmd/v0.1.0`. Then the agent runs the consumer smoke test
 against it, and records it here; the step is done when the tag exists
 and the smoke test builds.
+
+**After the release (2026-10-06).** The owner committed this step
+(`88cbfc2`), ran the disclosure guard over the outgoing commits through
+the agent (exit 0, no finding), pushed, and with CI green tagged
+`command/kongcmd/v0.1.0` (annotated) on `88cbfc2` and pushed the tag. The
+agent ran the releasing guide's consumer smoke test against it, in a
+scratch module outside the repository, with no `go.work` in effect and
+`GOPROXY` at its default:
+
+* The program imports `command`, `command/kongcmd` and Kong. It
+  registers a `ReadOnly` command made with `command.New`, builds the
+  adapter with `kongcmd.New`, a parser with `Parser` and `kong.Writers`
+  of the process's streams, which a program may pass, and runs its
+  arguments with `Run`.
+* `go mod init`, `go get
+  github.com/maccavelli/go-tui-lib/command/kongcmd@v0.1.0` ("go:
+  downloading github.com/maccavelli/go-tui-lib/command/kongcmd v0.1.0"),
+  `go mod tidy`, `go build` and `go vet ./...`: each exit 0. `go.mod`
+  requires `github.com/maccavelli/go-tui-lib v0.5.0`,
+  `github.com/maccavelli/go-tui-lib/command/kongcmd v0.1.0` and
+  `github.com/alecthomas/kong v1.16.1`.
+* Run: `greet one world` printed `hello world`; `greet.one world --json`
+  printed `{"greeting":"hello world"}`; `list` listed the commands;
+  `__complete gr` answered `greet`; `--help` drew the program's help;
+  `completion bash` wrote the script for `smoke`; each exit 0. `nosuch`
+  exited 2.
+* Neither the consumer's `go.mod`, nor its `go.sum`, nor `go list -m all`
+  names Cobra, pflag or glamour: a program that imports one front end
+  compiles and downloads only that one (0010-MADR, A1).
+
+The tag exists and the smoke test builds, so Step 11 is done. Step 12,
+the close-out, is next.
