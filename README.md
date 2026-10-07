@@ -43,9 +43,10 @@ stable API.
   `github.com/charmbracelet/x/ansi`. The v1 `github.com/charmbracelet/…`
   paths are refused by lint.
 - **Go 1.27.1** is required.
-- **Adapters ship as their own modules.** The Cobra front end,
-  `command/cobracmd`, and the planned Kong and glamour adapters are nested
-  modules with their own tags, so the root module never requires them.
+- **Adapters ship as their own modules.** The Cobra and Kong front
+  ends, `command/cobracmd` and `command/kongcmd`, and the planned glamour
+  adapter are nested modules with their own tags, so the root module never
+  requires them.
 
 ## Documentation
 

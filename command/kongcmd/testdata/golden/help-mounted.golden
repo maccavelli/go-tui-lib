@@ -1,0 +1,19 @@
+  6|Usage:
+ 14|  prog [flags]
+ 16|  prog <command>
+  0|
+  9|Commands:
+ 19|  serve       Serve
+ 34|  command     The command commands
+ 32|  files       The files commands
+ 32|  tools       The tools commands
+ 36|  workspace   The workspace commands
+ 47|  list        List the commands you can run now
+ 40|  describe    Describe a command as JSON
+ 48|  schema      Print a command's arguments schema
+ 58|  help        Show the help of the program or of a command
+ 56|  completion  Generate the completion script for a shell
+  0|
+  6|Flags:
+ 42|  -h, --help  Show context-sensitive help.
+ 26|  --debug     debug output

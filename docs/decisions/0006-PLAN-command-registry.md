@@ -2525,3 +2525,181 @@ repository, with no `go.work` in effect and `GOPROXY` at its default:
 
 The tag exists and the smoke test builds, so Step 11a is done. Step 11
 resumes: `command/kongcmd` requires `v0.5.0`.
+
+### Step 11, resumed: `command/kongcmd`
+
+Resumed on the owner's go-ahead after `v0.5.0`: the module's requirement
+moved from `v0.4.0` to `v0.5.0` ("go: upgraded
+github.com/maccavelli/go-tui-lib v0.4.0 => v0.5.0"), and `go work use
+./command/kongcmd` put it back in the workspace.
+
+#### What was built
+
+* **The module.** `command/kongcmd/go.mod`: `module
+  github.com/maccavelli/go-tui-lib/command/kongcmd`, `go 1.27.1`,
+  requiring `github.com/maccavelli/go-tui-lib v0.5.0` and
+  `github.com/alecthomas/kong v1.16.1`, and directly
+  `github.com/charmbracelet/colorprofile` and
+  `github.com/charmbracelet/x/ansi`, which the root already requires; no
+  `replace`. `go.sum`.
+* **The package.** `kongcmd.go`: the package documentation, `Option` and
+  the six options, `Adapter`, `New`, `Options`, `Parser`, `Run`, the
+  values read from the parse's path, the confirmation gate, the exit
+  codes and the verbs. `grammar.go`: reading a schema's properties as
+  `command/cli` does, copied; the Kong-native grammar of each command
+  (D42), built with `reflect.StructOf`; the tree, with a command that is
+  also a parent as its own hidden default child (D45); the verbs'
+  grammars; the clash check (D46). `help.go`: the help printer, drawn
+  with the theme at the configured width, never Kong's printer.
+  `complete.go`: `__complete`'s answers and the four scripts (D43).
+  `resolver.go`: `Resolver` (D41).
+* **Exported names,** checked with `go doc`: `New`, `Adapter`,
+  `Adapter.Options`, `Adapter.Parser`, `Adapter.Run`, `Adapter.Resolver`,
+  `Option`, `WithName`, `WithConfirm`, `WithContext`, `WithTheme`,
+  `WithGlyphs`, `WithWidth`. No other.
+* **Tests.** `frontend_test.go`: `TestSharedFrontEndCases`, 49 command
+  lines run through `command/cli` and this package (exit code, stdout,
+  whether stderr is empty, the arguments each command ran with), and
+  `TestKongNativeDifferences`, the six lines D42 makes differ, each
+  pinned to its exit code: a positional property given as its flag (three
+  lines), `--args` supplying a positional or required property (two),
+  and a scalar flag given twice, whose last value Kong takes.
+  `kongcmd_test.go`: `TestOneStructTwoReaders` (the fixture's five
+  argument structs, among them one whose Go names are an acronym, an
+  acronym before a word, digits and one letter, read directly by Kong and
+  through the adapter: names, requiredness, choices, defaults and
+  positional order all equal the schema's; this is also the check of
+  `command`'s spelling against Kong's model that A12 promised),
+  `TestNestedSelection`, `TestHelpStopsParse` (`tools echo --help` with
+  the required `--name` missing exits 0, and nothing runs),
+  `TestMount` (a program's own command and flag, handled false; a
+  registry command, handled true; a program's own `list`, and an alias
+  the registry takes, each fail `kong.New` naming it), `TestHelpGolden`
+  (with `COLUMNS=20` set, no line wider than the case's width),
+  `TestHelpProgramNode`, `TestCompletionScripts`, `TestComplete`,
+  `TestNoProcessState` (`os.Args` set, the process's standard streams
+  piped, a parser given no writers: nothing reaches either stream),
+  `TestResolver` (a registry flag, a list and a program's own flag
+  filled from `config.*` keys; the command line wins), `TestNoEnvTag`,
+  `TestRunsAreIndependent`, `TestDestructiveNeedsYes`, `TestWriteFails`,
+  `TestBrokenCommand`, `TestChildNamedLikeParent` and `TestNilArguments`.
+  `example_test.go`: `ExampleAdapter_Parser`, and `ExampleAdapter_Options`,
+  whose program's own command runs from the returned context with the
+  registry and the run's context bound.
+* **Goldens,** all read: 64 help files (the program, a namespace, a
+  command that is also a parent, three registry commands, a destructive
+  one and a verb, across {colour, no colour} × {UTF-8, ASCII} × {60,
+  100}), the help of a program's own root with the registry mounted, and
+  the four completion scripts. The comparison script of Step 10 found
+  the colour and UTF-8 files differing from their twins only in escapes
+  and the ellipsis, and no ASCII file with a non-ASCII rune.
+* **The scripts, run.** A scratch Kong program (its `go.mod` replacing
+  `command/kongcmd` with the working tree, outside the repository) loaded
+  its bash script and called the completion function as bash does:
+  `to` gave `tools`, `tools echo --mo` `--mode`, `tools echo --mode `
+  `fast,slow`, `tools echo --mode s` `slow`. `zsh -n` accepted the zsh
+  script. fish is not installed on the development host; PowerShell
+  parsed its script on the Windows host (check 9).
+* **Docs.** `AGENTS.md`'s module table, `docs/architecture.md`'s Modules
+  section, tree and "What is not here", and `README.md` no longer call
+  the module planned.
+* **Choices inside the listed names:**
+  * The exit codes are `command/cli`'s constants. The defaults are
+    `command/cli`'s and `cobracmd`'s: the name `app`, a width of 80, at
+    least 40, a theme built for no terminal.
+  * `Options` sets `kong.Name`, the `Exit` that `Run` recovers, the help
+    printer, `kong.Bind` of the registry, the groups and the clash check;
+    `Run` binds the run's `context.Context` to the context it returns. A
+    program parses with `Run`: an `Exit` outside it would panic.
+  * `Run` reads the values from the parse's path, so a registry command
+    receives what the command line gave and what a resolver filled, and
+    the registry applies the schema's defaults, as with `command/cli`.
+  * An enum the schema neither requires nor defaults, which only a
+    hand-written schema can have, has no Kong `enum` tag, and the adapter
+    checks it.
+  * A property named like one of the shell's flags, or a schema that
+    cannot be read, leaves the rest of the grammar whole: that command
+    alone exits 2.
+  * A parse error, an unknown command among them, is exit 2, its message
+    on the parser's stderr.
+  * Help is the adapter's for every node: a registry command's, a
+    namespace's, `Parser`'s root, and any other node, a verb or a
+    program's own command, from Kong's model.
+  * `__complete` answers with Kong's model: flags after a dash, a flag's
+    choices after it, else the commands below and the next positional's
+    choices; hidden nodes and flags are left out, and the shell filters
+    by what was typed.
+* **Found while building:**
+  * The registry's own commands (`command.list`, `command.describe`) are
+    a `command` namespace in the grammar; two test expectations had
+    missed it.
+  * `--help --bogus` fails in Kong's scan, before the help hook, so it
+    does not show an `Exit` that returns; `tools echo --help`, whose
+    required flag is missing, does: with the mutation, help is printed
+    and the parse goes on to fail.
+  * `Parser`'s root help first fell to the generic page: Kong keeps the
+    grammar's target as the struct, not a pointer to it.
+  * Lint: `go fix`'s `maps.Copy`; `goconst` on Kong's tag keys (now
+    constants); `errcheck` on a type assertion.
+
+#### Checks (Rule 3)
+
+1. `gofmt -l command/kongcmd`: silent.
+2. `make pre-add-check FILES="<the 8 Go files>"` in a scratch clone with
+   the step staged, because `scripts/go-modules.sh --check` reads the
+   index: exit 0, "go-precheck: 8 file(s) clean in 1 module(s)".
+3. `make lint`: exit 0, "0 issues." for the three targets in each of the
+   three modules, after `make modernize`.
+4. `GOWORK=off go test -race -count=1 ./...`: the root 16 packages `ok`,
+   `command/cobracmd` 2, `command/kongcmd` 1.
+5. `GOWORK=off go test -shuffle=on -count=2 ./...`: the same.
+6. `LC_ALL=C GOWORK=off go test -count=1 ./...`: the same.
+7. `GOWORK=off go mod tidy -diff`: silent in all three modules. The
+   tests in workspace mode: all `ok`, `internal/conformance` among them,
+   which now type-checks `command/kongcmd` with it in `go.work`.
+   `GOWORK=off govulncheck ./...` in `command/kongcmd`: "No
+   vulnerabilities found." In the staged clone,
+   `scripts/go-modules.sh --check` and `make release-check` exit 0
+   ("go-precheck: 147 file(s) clean in 3 module(s)").
+8. No fuzz target was added.
+9. Windows test host, on a copy of the tree, go1.27.1 windows/amd64:
+   `make pre-add-check`: exit 0, "go-precheck: 147 file(s) clean in 3
+   module(s)"; `make lint`: exit 0, "0 issues." for each module and
+   target; `make vuln`: exit 0, "No vulnerabilities found." in each
+   module; in `command/kongcmd`, `GOWORK=off go test -count=3
+   -shuffle=on ./...` and the tests in workspace mode: `ok`. Windows
+   PowerShell and PowerShell 7 each parsed the PowerShell completion
+   script with `[System.Management.Automation.Language.Parser]::ParseFile`:
+   "parsed: no errors".
+10. `markdownlint-cli2` on `AGENTS.md`, `README.md` and
+    `docs/architecture.md`: 0 issues; the relative-link check of those and
+    this pair: 0 broken.
+11. The identifier scan of the diff and the new module: no match.
+
+#### Mutations (Rule 4)
+
+Each on a scratch copy of the tree; every one killed.
+
+| Mutation | Test | Failing line |
+| :--- | :--- | :--- |
+| S11-1: `Exit` returns instead of panicking | `TestHelpStopsParse` | `--help without a required flag: exit 2, stdout "Usage: …"` |
+| S11-2: dispatch from the first registry command, not `ctx.Selected()` | `TestSharedFrontEndCases` | `"workspace resize sidebar 4": exit 2, command/cli 0` |
+| S11-3: an enum's default dropped | `TestSharedFrontEndCases` | `<anonymous struct>.P3: enum value is only valid if it is either required or has a valid default value` |
+| S11-4: `kong.Writers` unset in `Parser` | `TestNoProcessState` | `a parser without writers wrote to the process's stdout: "hello\n…"` |
+| S11-5 (D41): `Resolver` resolves nothing | `TestResolver` | `settings: exit 0, {"mode":"fast","name":"x"}` |
+| S11-6 (D42): a required property not required | `TestOneStructTwoReaders` | `kinds through the adapter: …` |
+| S11-7 (D43): completion offers hidden commands | `TestComplete` | `"__complete " completes a hidden command` |
+| S11-8 (D45): no default child | `TestNestedSelection` | `"workspace focus logs": exit 2 … unexpected argument logs` |
+| S11-9 (D46): no clash check | `TestMount` | `a program with its own list: <nil>` |
+| S11-10: no dotted ID | `TestSharedFrontEndCases` | `"workspace.resize sidebar 4 --json": exit 2, command/cli 0` |
+| S11-11: depguard allows Kong in the root | `golangci-lint` on a root package importing Kong | real config: `import 'github.com/alecthomas/kong' is not allowed from list 'kong'`; with the `kong` rule removed, no depguard finding |
+
+Step 11 changes no root Go file, so no earlier set ran again.
+
+#### The release
+
+Left to the owner: commit this step, with `command/kongcmd/` and
+`go.work`; run the disclosure guard; push; and with CI green tag
+`command/kongcmd/v0.1.0`. Then the agent runs the consumer smoke test
+against it, and records it here; the step is done when the tag exists
+and the smoke test builds.

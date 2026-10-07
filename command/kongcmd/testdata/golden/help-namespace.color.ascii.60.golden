@@ -1,0 +1,9 @@
+  6|[1mUsage:[m
+ 45|  app workspace <command> [arguments] [flags]
+  0|
+ 19|[1mWorkspace commands:[m
+ 36|  [38;2;135;175;255mworkspace focus[m       Focus a pane
+ 43|  [38;2;135;175;255mworkspace focus next[m  Focus the next pane
+ 58|  [38;2;135;175;255mworkspace resize[m      Moves a named split's separator by
+ 57|                        delta cells, as far as the panes'
+ 36|                        sizes allow.

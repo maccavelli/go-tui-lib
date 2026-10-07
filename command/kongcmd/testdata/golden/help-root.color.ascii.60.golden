@@ -1,0 +1,36 @@
+  6|[1mUsage:[m
+ 35|  app <command> [arguments] [flags]
+ 19|  app list [--json]
+ 24|  app describe <command>
+ 22|  app schema <command>
+ 22|  app help [<command>]
+ 41|  app completion bash|zsh|fish|powershell
+  0|
+ 15|[1mFiles commands:[m
+ 37|  [38;2;135;175;255mfiles delete[m          Delete a file
+  0|
+ 19|[1mWorkspace commands:[m
+ 36|  [38;2;135;175;255mworkspace focus[m       Focus a pane
+ 43|  [38;2;135;175;255mworkspace focus next[m  Focus the next pane
+ 58|  [38;2;135;175;255mworkspace resize[m      Moves a named split's separator by
+ 57|                        delta cells, as far as the panes'
+ 36|                        sizes allow.
+  0|
+ 15|[1mOther commands:[m
+ 54|  [38;2;135;175;255mcommand describe[m      Describes one command: its ID,
+ 52|                        arguments schema and danger.
+ 57|  [38;2;135;175;255mcommand list[m          Lists the commands the caller can
+ 58|                        run now: not hidden, offered where
+ 58|                        it asks from, and available in its
+ 32|                        context.
+ 42|  [38;2;135;175;255mtools echo[m            Echo the arguments
+ 28|  [38;2;135;175;255mtools fail[m            Fail
+ 31|  [38;2;135;175;255mtools later[m           Not yet
+ 48|  [38;2;135;175;255mtools level[m           Say something at a level
+ 33|  [38;2;135;175;255mtools text[m            Say hello
+  0|
+ 24|[1mFlags for every command:[m
+ 47|  [38;2;135;175;255m--args JSON[m  the arguments as one JSON object
+ 47|  [38;2;135;175;255m--json[m       print the result's value as JSON
+ 55|  [38;2;135;175;255m--yes[m        run a destructive command without asking
+ 38|  [38;2;135;175;255m-h, --help[m   show the command's help

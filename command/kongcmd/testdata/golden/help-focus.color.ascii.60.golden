@@ -1,0 +1,12 @@
+  6|[1mUsage:[m
+ 34|  app workspace focus PANE [flags]
+  0|
+ 12|Focus a pane
+  0|
+ 10|[1mArguments:[m
+ 27|  [38;2;135;175;255mPANE[m  the pane (required)
+  0|
+ 10|Danger: ui
+  0|
+ 19|[1mWorkspace commands:[m
+ 43|  [38;2;135;175;255mworkspace focus next[m  Focus the next pane

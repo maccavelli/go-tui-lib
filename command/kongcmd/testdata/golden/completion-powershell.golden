@@ -1,0 +1,13 @@
+ 31|# PowerShell completion for app
+ 68|Register-ArgumentCompleter -Native -CommandName 'app' -ScriptBlock {
+ 56|    param($wordToComplete, $commandAst, $cursorPosition)
+102|    $words = @($commandAst.CommandElements | Select-Object -Skip 1 | ForEach-Object { $_.ToString() })
+ 33|    if ($wordToComplete -eq '') {
+100|        if ($PSVersionTable.PSVersion -lt [version]'7.3.0') { $words += '""' } else { $words += '' }
+  5|    }
+ 92|    & $commandAst.CommandElements[0].ToString() __complete @words 2>$null | ForEach-Object {
+ 41|        $value, $desc = $_ -split "`t", 2
+ 42|        if (-not $desc) { $desc = $value }
+101|        [System.Management.Automation.CompletionResult]::new($value, $value, 'ParameterValue', $desc)
+  5|    }
+  1|}

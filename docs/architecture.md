@@ -102,11 +102,12 @@ carry the dependencies the root must not (Modules, below).
 0010-MADR
 ([0010-MADR-nested-adapter-modules.md](decisions/0010-MADR-nested-adapter-modules.md))
 plans three nested modules, each an adapter with one dependency the root
-must not carry. `command/cobracmd` is built; the other two are planned:
+must not carry. `command/cobracmd` and `command/kongcmd` are built;
+`stream/glamourmd` is planned:
 
 ```text
  command/cobracmd               → root v0.4.0, published; Cobra, pflag
- command/kongcmd    (planned)   → root vX.Y.Z, published; Kong
+ command/kongcmd                → root v0.5.0, published; Kong
  stream/glamourmd   (planned)   → root vX.Y.Z, published; glamour
  .                  (root)      → the Charm v2 stack; never an adapter
 ```
@@ -152,6 +153,8 @@ command/cli/                commands from the shell
 command/cobracmd/           the Cobra front end, a nested module with its
                             own go.mod; docs/ beneath it writes man and
                             Markdown pages
+command/kongcmd/            the Kong front end, a nested module with its
+                            own go.mod
 termcap/termcaptest/        fake terminals for tests
 internal/cells/             the reused frame buffer, an ultraviolet importer
 internal/termevent/         pass-through events, the other ultraviolet importer
@@ -287,8 +290,6 @@ docs/
   [0008-MADR](decisions/0008-MADR-command-palette.md)), which bind keys to
   command IDs and list the registry's commands. The workspace's own key
   bindings stay until the keymap moves them onto these IDs.
-- **The Kong front end,** `command/kongcmd`, a nested module that
-  requires a published root (0006-PLAN Step 11).
 - **Terminal modes and inline scrollback** (`termmode`, `inline`): mode
   plans, teardown, restore bytes and the Windows console helpers, and the
   per-terminal scrollback strategy. Each is a later record; until then tea

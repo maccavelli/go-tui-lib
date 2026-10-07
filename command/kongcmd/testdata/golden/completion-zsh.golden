@@ -1,0 +1,22 @@
+ 12|#compdef app
+ 24|# zsh completion for app
+ 17|_app_complete() {
+ 18|    local -a items
+ 20|    local line value
+ 93|    for line in "${(@f)$("${words[1]}" __complete "${(@)words[2,CURRENT]}" 2>/dev/null)}"; do
+ 34|        [[ -z $line ]] && continue
+ 29|        value=${line%%$'\t'*}
+ 29|        value=${value//:/\\:}
+ 39|        if [[ $line == *$'\t'* ]]; then
+ 44|            items+=("$value:${line#*$'\t'}")
+ 12|        else
+ 29|            items+=("$value")
+ 10|        fi
+  8|    done
+ 28|    if (( ${#items} )); then
+ 29|        _describe 'app' items
+  8|    else
+ 14|        _files
+  6|    fi
+  1|}
+ 25|compdef _app_complete app

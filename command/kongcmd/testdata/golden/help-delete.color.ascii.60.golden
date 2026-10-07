@@ -1,0 +1,9 @@
+  6|[1mUsage:[m
+ 31|  app files delete TEXT [flags]
+  0|
+ 13|Delete a file
+  0|
+ 10|[1mArguments:[m
+ 27|  [38;2;135;175;255mTEXT[m  the file (required)
+  0|
+ 50|[38;2;255;215;95mDanger: destructive; it asks first, or needs --yes[m
