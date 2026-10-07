@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in-progress
 date: 2026-10-07
 associated-madr: "0014-MADR-native-integration-api.md"
 ---
@@ -493,4 +493,90 @@ resolves.
 
 ## Execution Record
 
-Not started.
+The owner approved execution on 2026-10-07 ("Commit to main and proceed",
+after 0011's close-out was committed as `5c6f4bc`). Step 1 is done: this
+PLAN was committed in `46f4c73`, and its row is in `docs/README.md`. The
+precondition holds: 0011 is complete.
+
+### Step 2: conformance reads every package, and bans the environment, exit and spawn
+
+#### Deviations
+
+* **D1 (2026-10-07): the `syscall.ForkExec` plant runs off Windows only.**
+  * **Found:** `syscall.ForkExec` does not exist on Windows (`GOOS=windows
+    go doc syscall ForkExec` fails; `Exec`, `StartProcess` and `Getenv`
+    exist). The conformance test runs on the Windows CI leg, where the
+    planted source would not type-check. The ban on the name is
+    unaffected.
+  * **Asked,** with two options:
+    * plant `syscall.StartProcess` everywhere, and keep the `ForkExec`
+      plant where it exists;
+    * plant `StartProcess` only.
+  * **The owner chose** the first, the recommendation. A plant case
+    carries a GOOS it skips on, and the `ForkExec` case skips `windows`.
+  * **Files:** none beyond this step's.
+
+#### What was built
+
+All in `internal/conformance/conformance_test.go`:
+
+* **The must-read list comes from `go list`.**
+  * `mustRead` runs `GOWORK=off go list -f '{{if .GoFiles}}{{.Dir}}{{end}}'
+    ./...` in each module.
+  * The test fails on any package it lists that the scan did not read, and
+    on an empty list.
+  * It now asserts 14 packages where the constant named 6.
+* **The bans,** in `forbidden`:
+  * `os.Getenv`, `LookupEnv`, `Environ` and `ExpandEnv`, and
+    `syscall.Getenv`;
+  * `os.Exit`;
+  * `os.StartProcess`, and `syscall.Exec`, `ForkExec` and `StartProcess`;
+  * any package-level object of `os/exec`;
+  * `tea.Exec` and `tea.ExecProcess`;
+  * and, in `check`, any import of `os/exec`, blank imports included.
+* **The allowlist,** keyed by root-relative file and rule:
+  * `tuitest/tuitest.go` reads the environment with `os.Getenv`;
+  * an entry that matches nothing fails the test.
+* **Ten plants:**
+  * the four environment reads;
+  * a read through an alias and as a function value;
+  * `os.Exit`;
+  * `os.StartProcess`;
+  * `os/exec` with an `*exec.Cmd`;
+  * a blank `os/exec`;
+  * `syscall.StartProcess` with `syscall.Getenv`;
+  * `syscall.ForkExec` (D1);
+  * `tea.ExecProcess`.
+* **The package documentation** names the new rules.
+* **`make lint`'s modernize step** turned the new `errors.As` into
+  `errors.AsType`.
+
+#### Checks
+
+* **Mutations, on scratch copies.** All killed, and run again after the
+  modernize change:
+  * S2-1, glyph calls `os.Getenv`: `glyph/glyph.go:12 reads the
+    environment with os.Getenv`;
+  * S2-2, a blank `os/exec` in `when`: `when/when.go:34 imports os/exec`;
+  * S2-3, the scan skips `when`: "the scan did not read when";
+  * S2-4, the `tuitest` entry removed: `tuitest/tuitest.go:127 reads the
+    environment with os.Getenv`;
+  * S2-5, a stale entry: `allowed lists glyph/glyph.go "calls os.Exit",
+    which the scan no longer finds`;
+  * S2-6, the `os.Exit` rule removed: the plant reports "found 0 times,
+    want 1".
+* **Lint and the pre-add check:**
+  * `make pre-add-check FILES=…`: "1 file(s) clean";
+  * `make lint`: exit 0, three "0 issues.", after the modernize change.
+    Before it, `make modernize` failed on `errors.As`;
+  * `make release-check`: "124 file(s) clean in 1 module(s)";
+  * `make vuln`: "No vulnerabilities found."
+* **The tests,** with `GOWORK=off`: `-race -count=1`, `-shuffle=on
+  -count=2` and `LC_ALL=C` each gave 15 `ok`, and so did workspace mode.
+* **The Windows test host,** on a copy of the tree, go1.27.1
+  windows/amd64:
+  * `make pre-add-check` "124 file(s) clean";
+  * `make lint` and `make vuln` exit 0;
+  * `GOWORK=off go test -count=3 -shuffle=on ./...` 15 `ok`;
+  * the conformance tests pass, with `syscall.ForkExec` skipped.
+* **The identifier scan of the diff:** no match.
