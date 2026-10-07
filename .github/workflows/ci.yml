@@ -93,7 +93,11 @@ jobs:
     needs: modules
     runs-on: ubuntu-24.04
     steps:
+      # The whole history and its tags: the API diff gate compares with each
+      # module's previous tag.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.work
@@ -148,6 +152,14 @@ jobs:
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
           GOVULNCHECK="$(go env GOPATH)/bin/govulncheck" make vuln
+      # An incompatible API change since a module's previous tag fails unless
+      # scripts/apicheck.allow lists it
+      # (docs/decisions/0014-PLAN-api-policy-gates.md Step 4).
+      - name: apicheck
+        shell: bash
+        run: |
+          ./scripts/go-apicheck_test.sh
+          make apicheck
       # Scripts, Markdown and workflows are checked as the pre-add gate and
       # the records require (go-selfupdate-lib docs/decisions/0003-MADR-remediate-debugging-pass-findings.md D9).
       # shellcheck is pinned to the release the pre-add hosts use (the

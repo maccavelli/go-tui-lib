@@ -648,3 +648,107 @@ collects the plan while a tree is arranged", and the glossary uses that
   * `GOWORK=off go test -count=3 -shuffle=on ./...` 15 `ok`;
   * the three conformance tests pass, with `syscall.ForkExec` skipped.
 * **The identifier scan of the diff:** no match.
+
+### Step 4: the API diff gate
+
+The owner approved it on 2026-10-07 ("proceed, i committed"), after Step 3
+was committed as `475d6ac`.
+
+#### Deviations
+
+* **D2 (2026-10-07): apidiff is installed once per run, not run with `go
+  run` per call.**
+  * **Found:** the PLAN's tool line is `go run
+    golang.org/x/exp/cmd/apidiff@$APIDIFF_VERSION`. The script calls
+    apidiff three times per module, and the tests need to inject a binary
+    of their own (the failing-apidiff case).
+  * **Built:** `GOBIN=<temp> GOWORK=off go install
+    golang.org/x/exp/cmd/apidiff@$APIDIFF_VERSION` once, into the run's
+    temporary directory, which the run removes. `APIDIFF=<path>` replaces
+    that binary. The version is the same Makefile pin, and nothing is
+    added to `go.mod`.
+  * **Asked;** the owner chose this form, the recommendation.
+* **D3 (2026-10-07): the test's `GOPROXY` reads the module cache first,
+  then the configured proxy.**
+  * **Found:** the PLAN says the test points `GOPROXY` at the module
+    cache. The throwaway modules need no module. apidiff does, and on a
+    CI runner with a cold cache a cache-only proxy cannot install it.
+  * **Built:** `GOPROXY=file://<GOMODCACHE>/cache/download,<go env
+    GOPROXY>`. A warm cache needs no network, and a cold one fetches
+    apidiff once. On Windows the cache path goes through `cygpath -m`.
+  * **Asked;** the owner chose this form, the recommendation.
+
+#### What was built
+
+* **`scripts/go-apicheck.sh`**, as the PLAN describes, with D2:
+  * the tag prefix is empty for the root and `<dir>/` for a nested
+    module. The pattern is `<prefix>v[0-9]*.[0-9]*.[0-9]*`;
+  * each module's base is extracted into a numbered directory (`base1`,
+    …), not one named after the module. The first form, `base-.`, ended
+    in a dot. Windows strips that dot from a path, so apidiff's `chdir`
+    failed there ("The system cannot find the file specified"), although
+    Git Bash's `mkdir` and `cd` accepted it. The Windows run found this,
+    and it was fixed within this step;
+  * `GO` names the go command, as in `go-modules.sh`.
+* **`scripts/apicheck.allow`:** the header comment only.
+* **`scripts/go-apicheck_test.sh`:**
+  * apidiff is installed once and passed to every case (D3);
+  * it has the PLAN's nine cases and one more, 19 assertions in all;
+  * the extra case moves a package from the root into a new nested
+    module. With `GOWORK=off` that is a removal from the root, and the
+    new module has no tag yet;
+  * a tag on `HEAD` is never the base, so each case that tags then adds a
+    commit.
+* **`Makefile`:** the `APIDIFF_VERSION` pin, `apicheck` in `.PHONY`, and
+  the `apicheck` target. `make help` lists it.
+* **`scripts/go-precheck.sh`:**
+  * with no file list, after `go-modules.sh --check`, it runs
+    `go-apicheck.sh` unless `GO_PRECHECK_SKIP_APICHECK=1`;
+  * a failure keeps the script's exit status;
+  * the summary ends with `apicheck` when it ran;
+  * the header and the Env list name it.
+* **`.github/workflows/ci.yml`:** the `gates` checkout has `fetch-depth:
+  0`. A step `apicheck` after govulncheck runs the test, then `make
+  apicheck`.
+
+#### Checks
+
+* **Mutations.** S4-1 to S4-4 ran on copies of the script in the
+  scratchpad, with the test pointed at each through `APICHECK`. S4-5 ran on
+  a scratch clone. All were killed, and all were run again after the base
+  directory fix:
+  * S4-1, the diff output not read: the removal, stale, tag-on-`HEAD` and
+    both nested cases fail ("a removal fails: want 1, got 0"), 10 of 19;
+  * S4-2, the stale check removed: "a stale entry fails: want 1, got 0";
+  * S4-3, `--no-contains HEAD` dropped: "a tag on HEAD compares with the
+    tag before: want 1, got 0";
+  * S4-4, `GOWORK=off` dropped from the module loop: both nested-module
+    cases exit 2, "found no packages for module example.com/r" (the base
+    holds `go.work`);
+  * S4-5, `when.ListValue` unexported in the clone: `make apicheck` fails
+    with ". - ./when.ListValue: removed". The unmutated clone is clean.
+* **The precheck wiring,** on the same mutated clone:
+  * `GO_PRECHECK_SKIP_VULN=1 ./scripts/go-precheck.sh` exits 1 and names
+    the change;
+  * with `GO_PRECHECK_SKIP_APICHECK=1` it exits 0 and says it skipped.
+* **On the tree:**
+  * `make apicheck`: "against v0.6.0, 0 incompatible change(s)", "clean";
+  * `./scripts/go-apicheck_test.sh`: "19 passed, 0 failed";
+  * shellcheck 0.11.0 on `scripts/*.sh` and actionlint v1.7.12: clean;
+  * `make release-check`, run again after the fix: "124 file(s) clean
+    in 1 module(s) (…, govulncheck, apicheck)";
+  * `make lint`: three "0 issues.";
+  * `make vuln`: "No vulnerabilities found.";
+  * with `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C` each
+    gave 15 `ok`, and so did workspace mode.
+* **The Windows test host,** go1.27.1 windows/amd64:
+  * the copy's history came from a bundle of `main` and its 15 tags, so
+    the gate had `v0.6.0` to compare with;
+  * the first run found the `base-.` defect above. Every tagged test
+    case exited 2, and so did `make apicheck`;
+  * after the fix, `go-apicheck_test.sh` gave "19 passed, 0 failed";
+  * `make apicheck`: "against v0.6.0, 0 incompatible change(s)";
+  * `make pre-add-check`: "124 file(s) clean ... apicheck";
+  * `make lint` and `make vuln` exit 0;
+  * `GOWORK=off go test -count=3 -shuffle=on ./...` gave 15 `ok`.
+* **The identifier scan of the diff:** no match.

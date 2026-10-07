@@ -11,8 +11,12 @@ GOLANGCI_LINT ?= $(GOPATH_BIN)/golangci-lint
 GOVULNCHECK   ?= $(or $(wildcard $(GOBIN)/govulncheck),$(GOPATH_BIN)/govulncheck,$(shell command -v govulncheck 2>/dev/null))
 GOTESTSUM     ?= $(or $(wildcard $(GOBIN)/gotestsum),$(GOPATH_BIN)/gotestsum,$(shell command -v gotestsum 2>/dev/null))
 FLEET_LINT_CFG := .golangci.yml
+# The API diff gate installs apidiff at this golang.org/x/exp version into a
+# temporary directory; it is never added to go.mod
+# (docs/decisions/0014-PLAN-api-policy-gates.md Step 4).
+APIDIFF_VERSION ?= v0.0.0-20261007180756-3d68b386da03
 
-.PHONY: all help test test-sum fmt vet lint modernize tidy tidy-check vuln fuzz pre-add-check release-check
+.PHONY: all help test test-sum fmt vet lint modernize tidy tidy-check vuln fuzz apicheck pre-add-check release-check
 
 all: help
 
@@ -95,6 +99,11 @@ fuzz: ## Fuzzes every layout, when and command fuzz target for FUZZTIME each (de
 	@./scripts/go-fuzz.sh -t $(FUZZTIME) -m 1 ./layout
 	@./scripts/go-fuzz.sh -t $(FUZZTIME) -m 1 ./when
 	@./scripts/go-fuzz.sh -t $(FUZZTIME) -m 1 ./command
+
+# The API diff gate: an incompatible change since the previous tag fails unless
+# scripts/apicheck.allow lists it (docs/decisions/0014-PLAN-api-policy-gates.md Step 4).
+apicheck: ## Fails on an incompatible API change since the previous tag, per module
+	@APIDIFF_VERSION=$(APIDIFF_VERSION) ./scripts/go-apicheck.sh
 
 # The pre-add rule (AGENTS.md). scripts/go-precheck.sh is the one
 # implementation; the agent gate at `git commit` runs the same file.

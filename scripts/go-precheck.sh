@@ -30,7 +30,12 @@
 #   4. for a module other than the root: no replace directive, and a
 #      requirement of the root, if any, on a release version (vX.Y.Z).
 # Then, once: scripts/go-modules.sh --check, which fails when go.work and the
-# tracked go.mod files disagree.
+# tracked go.mod files disagree; and, when no file list is given (the
+# `make release-check` path), scripts/go-apicheck.sh, which fails on an
+# incompatible API change since each module's previous tag that
+# scripts/apicheck.allow does not list
+# (docs/decisions/0014-PLAN-api-policy-gates.md Step 4). A file list skips
+# it: the API belongs to the whole module, not to the files.
 #
 # Usage:
 #   scripts/go-precheck.sh [file.go ...]
@@ -47,6 +52,7 @@
 # Env:
 #   GOLANGCI_LINT=<path>      golangci-lint binary (default: $(go env GOPATH)/bin)
 #   GO_PRECHECK_SKIP_VULN=1   skip govulncheck (offline work)
+#   GO_PRECHECK_SKIP_APICHECK=1  skip the API diff gate (offline work)
 set -uo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
@@ -285,7 +291,24 @@ if ! check_out="$("$REPO_ROOT/scripts/go-modules.sh" --check 2>&1)"; then
   fail 1
 fi
 
+# Once, for the whole tree: no unlisted incompatible API change.
+apicheck=""
+if [ "$#" -eq 0 ]; then
+  if [ "${GO_PRECHECK_SKIP_APICHECK:-0}" = "1" ]; then
+    echo "apicheck: skipped (GO_PRECHECK_SKIP_APICHECK=1)" >&2
+  else
+    api_out="$("$REPO_ROOT/scripts/go-apicheck.sh" 2>&1)"
+    api_rc=$?
+    if [ "$api_rc" -ne 0 ]; then
+      show "apicheck" "$api_out"
+      fail "$api_rc"
+    else
+      apicheck=", apicheck"
+    fi
+  fi
+fi
+
 if [ "$failed" -eq 0 ]; then
-  echo "go-precheck: $checked_files file(s) clean in $checked_modules module(s) (gofmt, golangci-lint, go vet, go test, go mod tidy, govulncheck)."
+  echo "go-precheck: $checked_files file(s) clean in $checked_modules module(s) (gofmt, golangci-lint, go vet, go test, go mod tidy, govulncheck$apicheck)."
 fi
 exit "$failed"
