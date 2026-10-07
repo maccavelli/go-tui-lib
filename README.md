@@ -5,18 +5,20 @@ Reusable Go code for terminal interfaces, built with
 [Lip Gloss](https://github.com/charmbracelet/lipgloss), and the rest of the
 [Charm](https://github.com/charmbracelet) stack.
 
-The packages here come from other TUI-enabled Go projects, extracted while
-those projects are worked through. The aim is to modularize and canonicalize
-as much of their TUI, UX, and UI as possible: one shared implementation of
-each interaction pattern, used by every program that needs it.
+go-tui-lib is a TUI layer for Go command-line programs. Bring your own
+CLI, whether the standard `flag` package, Cobra, Kong or anything else, and
+stack go-tui-lib on it: the same program then has a terminal UI beside its
+native command line. The library imports no CLI framework, owns neither
+the screen nor the signals, and writes only where the caller says
+([0012-MADR](docs/decisions/0012-MADR-bring-your-own-cli.md)).
 
-The repository starts without packages. Code lands as each source project is
-taken apart and the pieces that more than one program can use are given a
-stable API.
+The packages come from other TUI-enabled Go projects, extracted while those
+projects are worked through: one shared implementation of each interaction
+pattern, used by every program that needs it.
 
 ## Status
 
-- **The current release is `v0.4.0`.** `v0` means the API may still
+- **The current release is `v0.6.0`.** `v0` means the API may still
   change.
 - **Multi-pane workspaces, since `v0.1.0`.** `layout` arranges panes: a main
   pane with a sidebar on either side, a bottom pane, a footer, responsive
@@ -35,18 +37,20 @@ stable API.
   it from a key, a slash line or an agent, behind a gate the program
   controls; it loads command files, MCP prompts and ACP commands, and
   exports the commands to an agent as MCP tools. `when` evaluates
-  availability in VS Code's when-clause grammar, `command/cli` runs the
-  same commands from the shell, and `workspace` publishes its own.
+  availability in VS Code's when-clause grammar, and `workspace`
+  publishes its own. A program's own CLI runs the same commands through
+  `Registry.Run`.
 - **The stack is Charm v2:** `charm.land/bubbletea/v2`,
   `charm.land/lipgloss/v2` and `charm.land/bubbles/v2`, with
   `github.com/charmbracelet/colorprofile` and
   `github.com/charmbracelet/x/ansi`. The v1 `github.com/charmbracelet/…`
   paths are refused by lint.
 - **Go 1.27.1** is required.
-- **Adapters ship as their own modules.** The Cobra and Kong front
-  ends, `command/cobracmd` and `command/kongcmd`, and the planned glamour
-  adapter are nested modules with their own tags, so the root module never
-  requires them.
+- **No CLI front end, since `v0.6.0`.** `command/cli` is gone, and the
+  Cobra and Kong adapters, `command/cobracmd` and `command/kongcmd`, are
+  retracted at `v0.1.1`. An adapter a TUI needs, such as the planned
+  glamour one, is a nested module with its own tags, so the root module
+  never requires its dependency.
 
 ## Documentation
 
@@ -61,7 +65,7 @@ repository as it is now.
 | see what is in this repository today | [architecture.md](docs/architecture.md) |
 | build a main pane with a sidebar, a bottom pane and a footer | [the workspace guide](docs/guides/building-workspaces.md) |
 | learn what the terminal supports, and send notifications, copies and links | [the terminal capabilities guide](docs/guides/terminal-capabilities.md) |
-| define commands once, for keys, slash lines, agents and the shell | [the commands guide](docs/guides/commands.md) |
+| define commands once, for keys, slash lines, agents and your own CLI | [the commands guide](docs/guides/commands.md) |
 | know which Charm version to use, and what may be imported | [AGENTS.md, Dependencies](AGENTS.md#dependencies) |
 | know the rules every TUI package follows | [AGENTS.md, TUI conventions](AGENTS.md#tui-conventions) |
 | contribute: checks, records and commit rules | [AGENTS.md](AGENTS.md) |

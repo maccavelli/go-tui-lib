@@ -1,21 +1,21 @@
-# Commands, agents and the shell
+# Commands, agents and your CLI
 
 For a Bubble Tea v2 program that wants one definition of each action, run
-from a key, a palette, a slash line, the shell or an agent. Four packages
-do the work:
+from a key, a palette, a slash line, an agent or the program's own command
+line. Three packages do the work:
 
 - `command` holds the commands: their arguments as JSON Schema, their
   danger and availability, and the registry that runs them, gates them
   and exports them to agents.
 - `when` evaluates availability expressions, in VS Code's when-clause
   grammar.
-- `command/cli` runs the same commands as shell subcommands.
 - `workspace` publishes its own commands and context keys.
 
 Why they are built this way is in
 [0006-MADR](../decisions/0006-MADR-command-registry.md), with its
-amendments A1 to A9. `ExampleRun` in `command/cli` compiles with the
-package (`go doc -all github.com/maccavelli/go-tui-lib/command/cli`).
+amendments A1 to A13. The library ships no command-line front end: your
+program brings its own
+([0012-MADR](../decisions/0012-MADR-bring-your-own-cli.md)).
 
 ## Define a command
 
@@ -47,15 +47,6 @@ resize, err := command.New("layout.resize", "Move a split",
   in field order), `short`, `hidden`, `placeholder` and `group`; and
   `schema:"min=…,max=…,minLen=…,maxLen=…,secret"`. A scalar `enum` must
   be required or have a default.
-- **The struct reads the same in Kong,** since `v0.5.0` (A12). Kong
-  requires a flag only with `required:""`, and a positional unless it has
-  `optional:""` or a default, and it names a field by `name:""` or else
-  its Go name spelled with dashes (`MaxItems` is `max-items`). `New`
-  refuses a top-level field where these disagree with the `json` tag, and
-  its error names the tag to add or remove: a required flag takes
-  `required:""`, an `omitzero` positional `optional:""`, and
-  `json:"max_items"` takes `name:"max_items"`. `SchemaOf` does not check,
-  so an output type needs none of these.
 - **The schema** is JSON Schema 2020-12. `secret` is written as
   `"writeOnly": true`; `arg`, `short`, `placeholder`, `group` and `hidden`
   go in one `"x-cli"` object, which JSON Schema treats as an annotation
@@ -88,7 +79,8 @@ resize, err := command.New("layout.resize", "Move a split",
   (`command.WithGate`), typically your permission dialog. Without one, the
   request is refused. `AllowAlways` and `RejectAlways` are remembered per
   command and caller. A `Request` with its own `Gate` is asked instead,
-  for that request only (A9); that is how the shell's `--yes` works.
+  for that request only (A9); that is how your CLI's `--yes` approves
+  one command (see "Run commands from your own CLI").
 - **Every request is audited** when you pass `command.WithAuditor`.
   `command.SlogAuditor(logger)` writes a record per request to your
   logger, with `secret` values masked.
@@ -137,7 +129,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
   `ResultMsg`. An `Async` command runs inside the returned `tea.Cmd`,
   under a context `Cancel` and `CancelAll` reach; `WithExclusive` makes a
   new run cancel the last.
-- **`Run`** runs to completion and returns the `Result`, for the shell,
+- **`Run`** runs to completion and returns the `Result`, for your CLI,
   agents and tests. Under `WithLoop` it hands a `Loop` command to your
   `Update` as a `LoopMsg` and waits, so an agent's tool call, which
   arrives on its own goroutine, never touches your model off the loop
@@ -274,7 +266,8 @@ res := r.CallMCP(ctx, call.Name, call.Arguments, client.Name) // a tools/call re
 
 `workspace.Commands(ws, workspace.WithLayouts(layouts))` returns the
 workspace's own commands, closed over it, each run on the event loop and
-offered everywhere but the shell:
+offered everywhere but your CLI (`SurfaceCLI`), since they need the running
+TUI:
 
 | ID | Slash | Does |
 | :--- | :--- | :--- |
@@ -301,35 +294,107 @@ offered everywhere but the shell:
   `*command.ArgError`. The workspace's key bindings keep working beside
   the commands.
 
-## Run commands from the shell
+## Run commands from your own CLI
+
+go-tui-lib is a TUI layer: your program keeps its own command line, in the
+standard `flag` package, Cobra, Kong or anything else, and adds the TUI
+beside it. A CLI handler runs a registry command by calling `Run` with
+`command.OriginCLI`, so the gate and the audit trail apply as they do to
+a key or an agent:
 
 ```go
-func main() {
-    r := buildRegistry()
-    if len(os.Args) > 1 {
-        os.Exit(cli.Run(context.Background(), r, os.Args[1:], os.Stdout, os.Stderr,
-            cli.WithName("pi"), cli.WithConfirm(askOnTTY)))
+// yesGate approves a command that asks, when --yes was given.
+type yesGate bool
+
+func (y yesGate) Decide(context.Context, *command.Invocation) (command.Decision, error) {
+    if y {
+        return command.AllowOnce, nil
     }
-    runTUI(r)
+    return command.RejectOnce, nil
+}
+
+// runCLI runs a registry command from the program's own command line.
+func runCLI(ctx context.Context, r *command.Registry, id command.ID, args any, yes bool) error {
+    raw, err := json.Marshal(args)
+    if err != nil {
+        return err
+    }
+    res, err := r.Run(ctx, command.Request{
+        ID: id, Args: raw, Origin: command.OriginCLI, Caller: "pi", Gate: yesGate(yes),
+    })
+    if err != nil {
+        return err
+    }
+    fmt.Println(res.Text)
+    return nil
+}
+
+type saveArgs struct {
+    Name string `json:"name" arg:"" help:"the session's name"`
 }
 ```
 
-- **Words or IDs:** `pi session save` or `pi session.save`. The
-  workspace's own commands are not offered here: they need the running
-  TUI. Each argument is a flag, `--delta 4`; an array repeats it, and an object
-  takes JSON (A9). Positional arguments come in order. `--args` takes the
-  whole object as JSON, and `--json` prints the result's value, `null`
-  when there is none.
-- **Verbs:** `list` (`--json` for the manifest), `describe`, `schema` and
-  `help`. Help is plain ASCII at `WithWidth` (80 by default).
-- **A destructive command** asks `WithConfirm`, or without it needs
-  `--yes`. Only commands offered on `SurfaceCLI` are listed or run, and
-  `Result.Cmd` is ignored: there is no event loop.
-- **Exit codes:** `cli.ExitOK` 0; `cli.ExitFailed` 1, a failure or a
-  command whose `When` is false; `cli.ExitUsage` 2, an unknown command or
-  flag or a bad argument; `cli.ExitRefused` 3.
-- **`cli.Run` writes only to the writers you pass**, each once when the
-  command ends, and never exits the process.
+With the standard `flag` package:
+
+```go
+switch os.Args[1] {
+case "save":
+    fs := flag.NewFlagSet("save", flag.ExitOnError)
+    yes := fs.Bool("yes", false, "approve without asking")
+    _ = fs.Parse(os.Args[2:])
+    if err := runCLI(ctx, r, "session.save", saveArgs{Name: fs.Arg(0)}, *yes); err != nil {
+        fmt.Fprintln(os.Stderr, err)
+        os.Exit(1)
+    }
+}
+```
+
+With Cobra:
+
+```go
+var yes bool
+save := &cobra.Command{
+    Use:   "save NAME",
+    Short: "Save the session",
+    Args:  cobra.ExactArgs(1),
+    RunE: func(c *cobra.Command, a []string) error {
+        return runCLI(c.Context(), r, "session.save", saveArgs{Name: a[0]}, yes)
+    },
+}
+save.Flags().BoolVar(&yes, "yes", false, "approve without asking")
+```
+
+With Kong, the registry's argument struct can be the subcommand's grammar:
+
+```go
+var cli struct {
+    Yes  bool     `help:"approve without asking"`
+    Save saveArgs `cmd:"" help:"Save the session"`
+    TUI  struct{} `cmd:"" default:"1" help:"Run the TUI"`
+}
+kctx := kong.Parse(&cli)
+if kctx.Command() == "save <name>" {
+    kctx.FatalIfErrorf(runCLI(ctx, r, "session.save", cli.Save, cli.Yes))
+}
+```
+
+- **The policy treats `OriginCLI` as the shell:** a `Destructive` command
+  asks the gate. `yesGate` refuses it unless `--yes` was given, so the run
+  fails with `command: refused: session.save: the gate said
+  reject_once`; you could ask on the terminal instead.
+- **Only commands offered on `SurfaceCLI` run.** The workspace's own
+  commands are not, since they need the running TUI. `Result.Cmd` is a
+  TUI's effect, and is ignored here. `Result.Text` and `Result.Value` are
+  yours to print, as text or as JSON.
+- **A struct shared with Kong:** Kong reads `arg`, `help`, `default`,
+  `enum`, `short`, `hidden`, `placeholder` and `group` as the registry
+  does. It takes a field's name from its Go name (`MaxItems` is
+  `max-items`), and requiredness from its own `required:""` and
+  `optional:""`, which the registry does not read. Give a shared struct
+  the tags Kong needs.
+- **These examples compile** against the library, with the frameworks
+  your program already requires. The library itself imports none of
+  them.
 
 ## What the library never does
 

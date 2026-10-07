@@ -72,7 +72,8 @@ it was when they were written
 | run a command from a key or `Update`, and react to its result | [guides/commands.md](guides/commands.md#run-commands-from-your-program) |
 | let an agent drive the TUI over MCP, safely | [guides/commands.md](guides/commands.md#let-an-agent-drive-the-program) |
 | load the user's and the project's command files, or an agent's commands | [guides/commands.md](guides/commands.md#command-files) |
-| run the same commands from the shell | [guides/commands.md](guides/commands.md#run-commands-from-the-shell) |
+| run the same commands from my own CLI (`flag`, Cobra, Kong) | [guides/commands.md](guides/commands.md#run-commands-from-your-own-cli) |
+| know why go-tui-lib ships no CLI front end | [0012-MADR](decisions/0012-MADR-bring-your-own-cli.md) |
 | know why the command registry is built this way | [0006-MADR](decisions/0006-MADR-command-registry.md) |
 | see the planned keymap and `keybindings.json` format | [0007-MADR](decisions/0007-MADR-keymap-engine.md) |
 | see the planned command palette and fuzzy matcher | [0008-MADR](decisions/0008-MADR-command-palette.md) |
@@ -87,9 +88,9 @@ it was when they were written
 | make borders line up after emoji, or measure as the workspace does | [guides/building-workspaces.md](guides/building-workspaces.md#text-width) |
 | follow the terminal's light or dark theme, or keep my own colours | [guides/building-workspaces.md](guides/building-workspaces.md#chrome-and-theme) |
 | show a help footer for the workspace and the focused pane | [guides/building-workspaces.md](guides/building-workspaces.md#keys-and-the-mouse) |
-| know why Cobra, Kong and glamour are separate Go modules, and how they are released | [0010-MADR](decisions/0010-MADR-nested-adapter-modules.md) |
+| know why an adapter such as glamour is a separate Go module, and how it is released | [0010-MADR](decisions/0010-MADR-nested-adapter-modules.md) |
 | add a nested module to the repository | [guides/releasing.md](guides/releasing.md#add-a-module) |
 | release the root, an adapter, or a change that spans both | [guides/releasing.md](guides/releasing.md) |
 | know which gates run per module, and why with `GOWORK=off` | [AGENTS.md, Modules](../AGENTS.md#modules) |
-| use the command registry from Cobra or Kong | [0006-MADR, amendment A1](decisions/0006-MADR-command-registry.md#a1-2026-10-02-native-cobra-and-kong-front-ends-as-nested-modules) |
+| use the command registry from Cobra or Kong | [guides/commands.md](guides/commands.md#run-commands-from-your-own-cli) |
 | see what Cobra, fang, Kong and glamour do that the library's rules must answer | [0010-REPORT, §6–§10](reports/0010-REPORT-nested-modules-and-adapter-sources.md) |

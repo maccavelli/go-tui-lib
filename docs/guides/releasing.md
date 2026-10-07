@@ -1,8 +1,9 @@
 # Releasing
 
-This repository holds more than one Go module: the root,
-`github.com/maccavelli/go-tui-lib`, and nested adapter modules beside it,
-such as `command/kongcmd`. Each module is released on its own, with its own
+This repository can hold more than one Go module: the root,
+`github.com/maccavelli/go-tui-lib`, and, when an adapter needs a dependency
+the root must not carry, a nested module beside it, such as the planned
+`stream/glamourmd`. Each module is released on its own, with its own
 tags. Why it is built this way is in
 [0010-MADR](../decisions/0010-MADR-nested-adapter-modules.md); the evidence
 is in [0010-REPORT](../reports/0010-REPORT-nested-modules-and-adapter-sources.md).
@@ -12,9 +13,10 @@ Tags and pushes are the owner's. Nothing below runs without that.
 ## The rules
 
 - **A tag names one module.** The root's tags are `vX.Y.Z`. A nested
-  module's tags carry its directory: `command/kongcmd/v0.1.0`. Each module's
-  versions are independent and start at `v0`. A consumer writes the version
-  alone: `go get github.com/maccavelli/go-tui-lib/command/kongcmd@v0.1.0`.
+  module's tags carry its directory: `stream/glamourmd/v0.1.0`. Each
+  module's versions are independent and start at `v0`. A consumer writes
+  the version alone: `go get
+  github.com/maccavelli/go-tui-lib/stream/glamourmd@v0.1.0`.
 - **A published tag is never moved or deleted.** A proxy and the checksum
   database may already hold it. A mistake is fixed by a later version.
 - **An adapter requires a published root version.** Its `go.mod` names a
@@ -34,16 +36,16 @@ Tags and pushes are the owner's. Nothing below runs without that.
    workspace:
 
    ```bash
-   mkdir -p command/kongcmd && cd command/kongcmd
-   go mod init github.com/maccavelli/go-tui-lib/command/kongcmd
+   mkdir -p stream/glamourmd && cd stream/glamourmd
+   go mod init github.com/maccavelli/go-tui-lib/stream/glamourmd
    GOWORK=off go get github.com/maccavelli/go-tui-lib@vX.Y.Z
    cd ../..
-   go work use ./command/kongcmd
+   go work use ./stream/glamourmd
    ```
 
 3. If it brings a dependency only it may import, add a depguard rule to
-   `.golangci.yml` over `$all` less `!**/<dir>/**`, as the `cobra`, `kong`
-   and `glamour` rules do.
+   `.golangci.yml` over `$all` less `!**/<dir>/**`, as the `glamour` rule
+   does.
 4. Run `scripts/go-modules.sh --check` and `make release-check`. Both now
    cover the new module. Commit `go.work` with the module.
 
@@ -55,7 +57,7 @@ Tags and pushes are the owner's. Nothing below runs without that.
 3. The owner tags the commit CI passed, and pushes the tag:
 
    ```bash
-   git tag -a vX.Y.Z <commit>
+   git tag -a vX.Y.Z -m "vX.Y.Z" <commit>
    git push origin vX.Y.Z
    ```
 
@@ -72,8 +74,8 @@ adapter" shows.
 3. The owner tags it with the directory prefix, and pushes the tag:
 
    ```bash
-   git tag -a command/kongcmd/vA.B.C <commit>
-   git push origin command/kongcmd/vA.B.C
+   git tag -a stream/glamourmd/vA.B.C -m "stream/glamourmd/vA.B.C" <commit>
+   git push origin stream/glamourmd/vA.B.C
    ```
 
 4. Run the consumer smoke test for the adapter.
@@ -91,13 +93,41 @@ that is already published.
 2. **Then the adapter.** Move its requirement to the new tag:
 
    ```bash
-   cd command/kongcmd
+   cd stream/glamourmd
    GOWORK=off go get github.com/maccavelli/go-tui-lib@vX.Y.Z
    GOWORK=off go mod tidy
    ```
 
    The adapter's part lands, CI passes, and the owner tags
-   `command/kongcmd/vA.B.C`.
+   `stream/glamourmd/vA.B.C`.
+
+## Retire a module
+
+A published module cannot be withdrawn: the proxy and the checksum
+database keep every version. It is retired in two steps
+([0012-MADR](../decisions/0012-MADR-bring-your-own-cli.md)):
+
+1. **Deprecate and retract it.** Its `go.mod` gets a `// Deprecated:`
+   comment above `module`, saying what to use instead, and a `retract`
+   directive for every version, the new one included:
+
+   ```text
+   // Deprecated: <what to use instead>.
+   module github.com/maccavelli/go-tui-lib/<dir>
+
+   // <why>.
+   retract [v0.1.0, v0.1.1]
+   ```
+
+   CI passes, and the owner tags the new version, `<dir>/v0.1.1`, which
+   carries the retraction.
+2. **Then remove it** from `main`: the directory, its `go.work` entry and
+   its depguard rule. Its tags stay.
+
+Afterwards, `go list -m -u` shows a user of an old version `(retracted)
+(deprecated)`, and `go get <module>@latest` finds no version once `main`
+no longer holds the module. The module proxy may answer `@latest` from
+its cache for a while.
 
 ## The consumer smoke test
 
@@ -110,11 +140,11 @@ go mod init example.com/smoke
 cat >main.go <<'EOF'
 package main
 
-import _ "github.com/maccavelli/go-tui-lib/command/kongcmd"
+import _ "github.com/maccavelli/go-tui-lib/stream/glamourmd"
 
 func main() {}
 EOF
-go get github.com/maccavelli/go-tui-lib/command/kongcmd@vA.B.C
+go get github.com/maccavelli/go-tui-lib/stream/glamourmd@vA.B.C
 go mod tidy
 go build ./...
 ```

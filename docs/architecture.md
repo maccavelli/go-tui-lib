@@ -2,8 +2,10 @@
 
 `go-tui-lib` is the repository of the Go module
 `github.com/maccavelli/go-tui-lib`: a library of terminal-UI packages on
-the Charm v2 stack. It has no binary. Nested adapter modules beside it
-carry the dependencies the root must not (Modules, below).
+the Charm v2 stack, which a Go program stacks on its own command line
+to have a TUI beside it. It has no binary. A nested adapter module may sit
+beside it to carry a dependency the root must not; none is built (Modules,
+below).
 
 ## What it is
 
@@ -11,15 +13,17 @@ carry the dependencies the root must not (Modules, below).
   package named after it. There is no root package. Helpers shared between
   packages go under `internal/`.
 - **Go 1.27.1**, with no `toolchain` line.
-- **Eleven packages,** and four internal ones, for multi-pane terminal
+- **Ten packages,** and four internal ones, for multi-pane terminal
   workspaces, terminal capabilities and services, a command registry run
-  from keys, the shell and agents, and the foundations every package
-  uses.
+  from keys, slash lines, agents and the program's own CLI, and the
+  foundations every package uses.
+- **No CLI front end.** The program brings its own command line, and the
+  library imports no CLI framework
+  ([0012-MADR](decisions/0012-MADR-bring-your-own-cli.md)).
 
 ## Packages
 
 ```text
- command/cli   commands from the shell    → command, when; x/ansi, flag
  workspace     Bubble Tea pane host       → layout, theme, glyph, internal/cells, command, when; bubbletea, lipgloss, bubbles/key, bubbles/help
  command       the command registry       → when; bubbletea
  when          availability expressions   → standard library
@@ -39,7 +43,6 @@ carry the dependencies the root must not (Modules, below).
 | :--- | :--- |
 | `when` | `Parse` and `MustParse` → `Expr` (`Eval`, `String`, `Keys`), VS Code's when-clause grammar with RE2 regexes; `Check` against `Keys`; `Context`, `Map`, `Layered`, `Value`; typed `Key[T]` |
 | `command` | `Command`, `ID`, `New[A]` and its options, `SchemaOf` (JSON Schema 2020-12 from Kong-aligned tags), `ArgError`; `Registry` (`Register`, `ReplaceSource`, `Lookup`, `Slash`, `ParseSlash`, `All`, `Available`, `Watch`, `Dispatch`, `Run`, `Cancel`); the policy, `Gate`, `Decision`, `Auditor`, `SlogAuditor`; `LoadDir`, `FromMCPPrompts`, `FromACP`; `MCPTools`, `CallMCP`, `ACPCommands`, `Manifest`; `WithLoop` and `LoopMsg`; the messages |
-| `command/cli` | `Run`: commands as shell subcommands with flags from their schemas, `--args`, `--json`, `--yes`, the verbs `list`, `describe`, `schema` and `help`, and exit codes 0 to 3 |
 | `glyph` | `Set` (4 border styles, separators with a cross and four tees, focus marker, ellipsis, scroll, bullet, badge brackets), `Unicode()`, `ASCII()`, `For(utf8)`; every glyph one cell |
 | `theme` | `Palette` for dark, light and unknown backgrounds; `LightDarkColor` and `ProfileColor`; `Styles`; `New(profile, background, glyphs)` with `WithPalette` and `WithPaletteFor`; `FromDark`; `Border(style)` |
 | `layout` | `Rect`, `Size` (fixed, percent, ratio, fill; min, max, shrink order), `Node` (`Pane`, `Split`, `Responsive`, or a custom node), `Solve` → `Plan`; `State` (JSON); the sidebar presets |
@@ -57,9 +60,8 @@ carry the dependencies the root must not (Modules, below).
   so the keymap and any front end can use it. `command` imports `when`
   and Bubble Tea, for `tea.Cmd` and `tea.Msg` only. `workspace` imports
   both to publish its commands and context keys; `command` never imports
-  `workspace`. `command/cli` uses the standard `flag` package, and no
-  module the root does not already require
-  ([0006-MADR](decisions/0006-MADR-command-registry.md) §1).
+  `workspace` ([0006-MADR](decisions/0006-MADR-command-registry.md)
+  §1).
 - **The registry reads lock-free.** Each write publishes a new immutable
   snapshot behind an `atomic.Pointer`; `Lookup`, `Available` and the
   exports read one, from any goroutine. A `Loop` command runs on the
@@ -101,21 +103,21 @@ carry the dependencies the root must not (Modules, below).
 
 0010-MADR
 ([0010-MADR-nested-adapter-modules.md](decisions/0010-MADR-nested-adapter-modules.md))
-plans three nested modules, each an adapter with one dependency the root
-must not carry. `command/cobracmd` and `command/kongcmd` are built;
-`stream/glamourmd` is planned:
+puts an adapter with a dependency the root must not carry in a nested
+module. The Cobra and Kong front ends it planned, `command/cobracmd` and
+`command/kongcmd`, were built and released at `v0.1.0`, then retired by
+[0012-MADR](decisions/0012-MADR-bring-your-own-cli.md): retracted at
+`v0.1.1` and removed. `stream/glamourmd` is planned:
 
 ```text
- command/cobracmd               → root v0.4.0, published; Cobra, pflag
- command/kongcmd                → root v0.5.0, published; Kong
  stream/glamourmd   (planned)   → root vX.Y.Z, published; glamour
  .                  (root)      → the Charm v2 stack; never an adapter
 ```
 
 - **The dependency runs one way.** An adapter requires a published root
   version, with no `replace`; the root never requires an adapter. A
-  consumer of the root therefore never sees Cobra, Kong or glamour in its
-  `go.sum` or module graph (0010-REPORT §2).
+  consumer of the root therefore never sees an adapter's dependency in
+  its `go.sum` or module graph (0010-REPORT §2).
 - **Each module has its own tags:** `vX.Y.Z` for the root,
   `<dir>/vX.Y.Z` for an adapter. [guides/releasing.md](guides/releasing.md)
   has the procedure.
@@ -149,12 +151,6 @@ scripts/
   go-fuzz_test.sh           its offline test
 glyph/ theme/ layout/ workspace/ tuitest/ termcap/ termsvc/
 when/ command/              the packages; goldens under each testdata/golden/
-command/cli/                commands from the shell
-command/cobracmd/           the Cobra front end, a nested module with its
-                            own go.mod; docs/ beneath it writes man and
-                            Markdown pages
-command/kongcmd/            the Kong front end, a nested module with its
-                            own go.mod
 termcap/termcaptest/        fake terminals for tests
 internal/cells/             the reused frame buffer, an ultraviolet importer
 internal/termevent/         pass-through events, the other ultraviolet importer
@@ -188,12 +184,12 @@ docs/
   - `github.com/maccavelli/mcplib`;
   - `github.com/modelcontextprotocol/go-sdk`;
   - `github.com/maccavelli/go-llmprovider-sdk`;
-  - fang: `charm.land/fang/v2` and `github.com/charmbracelet/fang`.
-- **Kept to one module by `depguard`:** `github.com/spf13/cobra` and
-  `github.com/spf13/pflag` to `command/cobracmd`,
-  `github.com/alecthomas/kong` to `command/kongcmd`, and
-  `charm.land/glamour/v2` to `stream/glamourmd`. Each rule covers `$all`
-  less `!**/<dir>/**`.
+  - fang: `charm.land/fang/v2` and `github.com/charmbracelet/fang`;
+  - the CLI frameworks `github.com/spf13/cobra`, `github.com/spf13/pflag`
+    and `github.com/alecthomas/kong`
+    ([0012-MADR](decisions/0012-MADR-bring-your-own-cli.md)).
+- **Kept to one module by `depguard`:** `charm.land/glamour/v2` to
+  `stream/glamourmd`. The rule covers `$all` less `!**/<dir>/**`.
 - **Kept to two packages by `depguard`:** `github.com/charmbracelet/ultraviolet`
   to `internal/cells` and `internal/termevent` (with
   `internal/termevent/termeventtest` beneath it), test files included.
@@ -299,4 +295,9 @@ docs/
   `Query` values to `termcap`.
 - **`make apicheck`.** It needs a `v1` tag to compare against, and comes
   with the `v1` record.
+- **A CLI front end,** by design
+  ([0012-MADR](decisions/0012-MADR-bring-your-own-cli.md)). Helpers that
+  make stacking easier, such as launching the TUI from a program's own
+  subcommand, or choosing interactive or plain output, are a later
+  record.
 - **A release workflow, Dependabot, and any tag** other than the owner's.

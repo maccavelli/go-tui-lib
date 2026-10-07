@@ -542,3 +542,92 @@ CLI (0012-MADR).
   deprecated and retracted at `v0.1.1`, and no longer in the repository.
 * **Unchanged:** every other exported name. No module is added or
   removed from the root's `go.mod`.
+
+### Step 5: the documents
+
+No deviation.
+
+#### What was written
+
+* **`README.md`:**
+  * the opening says what the library is: a TUI layer for Go
+    command-line programs, stacked on the program's own CLI, citing this
+    record;
+  * the current release is `v0.6.0`;
+  * the Commands bullet says a program's own CLI runs the commands
+    through `Registry.Run`;
+  * the adapters bullet became "No CLI front end, since `v0.6.0`";
+  * the "I want to…" row reads "your own CLI".
+* **`AGENTS.md`:** the module table lists the root and the planned
+  `stream/glamourmd`.
+* **`docs/README.md`:** "run the same commands from my own CLI (`flag`,
+  Cobra, Kong)" and "use the command registry from Cobra or Kong" point
+  to the guide's new section. A row points to this record ("know why
+  go-tui-lib ships no CLI front end"). 0010's row speaks of "an adapter
+  such as glamour".
+* **`docs/architecture.md`:**
+  * the opening and "What it is": ten packages, and "No CLI front end";
+  * `command/cli` is gone from the package graph, the table, the imports
+    note and the tree, and the two adapters from the tree;
+  * the Modules section: the two front ends were built, released and
+    retired, and `stream/glamourmd` is planned;
+  * Dependencies: Cobra, pflag and Kong refused; glamour alone kept to
+    one module;
+  * "What is not here": a CLI front end, by design, and the integration
+    helpers as a later record.
+* **`docs/guides/commands.md`:**
+  * the title and opening name the program's own command line; three
+    packages; amendments A1 to A13, and this record;
+  * A12's paragraph is removed;
+  * "your CLI's `--yes`" replaces "the shell's", and `Run` is "for your
+    CLI";
+  * the workspace's commands are "offered everywhere but your CLI
+    (`SurfaceCLI`)";
+  * "Run commands from the shell" became "Run commands from your own
+    CLI": a `yesGate` and a `runCLI` helper calling `Registry.Run` with
+    `OriginCLI`, then a handler each for the standard `flag` package,
+    Cobra and Kong, the last using the registry's argument struct as its
+    grammar. Notes follow on the policy, the CLI surface, a struct
+    shared with Kong, and the frameworks being the program's.
+* **`docs/guides/releasing.md`:**
+  * its examples use `stream/glamourmd` where they used
+    `command/kongcmd`;
+  * the depguard step names the `glamour` rule alone;
+  * the two `git tag -a` lines carry `-m` with the tag's name;
+  * a new section, "Retire a module", gives Step 2's procedure, and what
+    the go command and the proxy show afterwards.
+* **Findings of [0011-PLAN-docs-accuracy-after-v0-5-0.md](0011-PLAN-docs-accuracy-after-v0-5-0.md)
+  resolved here,** on lines this step rewrote: F2 (README's opening),
+  F19 (the amendment range, now A1 to A13), F26 (`-m` on `git tag -a`),
+  and the moot F4, F9's adapters table, F15 and F20. 0011 re-checks them
+  when it resumes.
+
+#### Checks
+
+* **The guide's examples, verbatim.** The four Go blocks of "Run commands
+  from your own CLI" were extracted from the guide into a scratch module
+  outside the repository. Its `go.mod` replaces the root with the
+  working tree, and requires Cobra and Kong, which the library does not.
+  * The blocks were wrapped in function bodies.
+  * `go vet` passed: exit 0.
+  * A `Destructive` `session.save` was then run through each framework,
+    without and with `--yes`:
+    * `flag`, Cobra and Kong without `--yes`: exit 1, refused by the gate
+      ("command: refused: session.save: the gate said reject_once" in an
+      earlier scratch run);
+    * with `--yes`: exit 0, `saved notes`.
+* **markdownlint** on the six changed documents: 0 issues. **The
+  relative-link check:** 0 broken.
+* **A grep of the living documents** for `cobracmd`, `kongcmd`,
+  `command/cli` and A12 finds:
+  * README's and the architecture note's retirement notes;
+  * the index rows' record titles, which name what they decided.
+
+  Nothing else.
+* **The identifier scan** of the diff: no match.
+* No Go file, `go.mod` or golden changed in this step.
+
+#### The release
+
+`v0.6.0` follows in Step 6: the owner commits this step, the agent runs
+the disclosure guard, and with CI green the tag is made on that commit.
