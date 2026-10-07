@@ -13,7 +13,7 @@ below).
   package named after it. There is no root package. Helpers shared between
   packages go under `internal/`.
 - **Go 1.27.1**, with no `toolchain` line.
-- **Ten packages,** and four internal ones, for multi-pane terminal
+- **Ten packages,** and five internal ones, for multi-pane terminal
   workspaces, terminal capabilities and services, a command registry run
   from keys, slash lines, agents and the program's own CLI, and the
   foundations every package uses.
@@ -24,7 +24,7 @@ below).
 ## Packages
 
 ```text
- workspace     Bubble Tea pane host       → layout, theme, glyph, internal/cells, command, when; bubbletea, lipgloss, bubbles/key, bubbles/help
+ workspace     Bubble Tea pane host       → layout, theme, glyph, internal/cells, command, when; bubbletea, bubbles/key, bubbles/help, colorprofile, x/ansi
  command       the command registry       → when; bubbletea
  when          availability expressions   → standard library
  internal/cells  the reused frame buffer  → layout; ultraviolet, x/ansi
@@ -42,7 +42,7 @@ below).
 | Package | What it holds |
 | :--- | :--- |
 | `when` | `Parse` and `MustParse` → `Expr` (`Eval`, `String`, `Keys`), VS Code's when-clause grammar with RE2 regexes; `Check` against `Keys`; `Context`, `Map`, `Layered`, `Value`; typed `Key[T]` |
-| `command` | `Command`, `ID`, `New[A]` and its options, `SchemaOf` (JSON Schema 2020-12 from Kong-aligned tags), `ArgError`; `Registry` (`Register`, `ReplaceSource`, `Lookup`, `Slash`, `ParseSlash`, `All`, `Available`, `Watch`, `Dispatch`, `Run`, `Cancel`); the policy, `Gate`, `Decision`, `Auditor`, `SlogAuditor`; `LoadDir`, `FromMCPPrompts`, `FromACP`; `MCPTools`, `CallMCP`, `ACPCommands`, `Manifest`; `WithLoop` and `LoopMsg`; the messages |
+| `command` | `Command`, `ID`, `New[A]` and its options, `SchemaOf` (JSON Schema 2020-12 from Kong-aligned tags), `ArgError`; `Registry` (`NewRegistry` with `WithGate`, `WithAuditor`, `WithPrefixer` and `WithLoop`; `Register`, `ReplaceSource`, `Lookup`, `Slash`, `ParseSlash`, `All`, `Available`, `Watch`, `Dispatch`, `Run`, `Cancel`, `CancelAll`, `Remove`, `Version`); the policy, `Gate`, `Decision`, `Auditor`, `SlogAuditor`; `LoadDir`, `FromMCPPrompts`, `FromACP`; `MCPTools`, `CallMCP`, `ACPCommands`, `Manifest`; `WithLoop` and `LoopMsg`; the messages |
 | `glyph` | `Set` (4 border styles, separators with a cross and four tees, focus marker, ellipsis, scroll, bullet, badge brackets), `Unicode()`, `ASCII()`, `For(utf8)`; every glyph one cell |
 | `theme` | `Palette` for dark, light and unknown backgrounds; `LightDarkColor` and `ProfileColor`; `Styles`; `New(profile, background, glyphs)` with `WithPalette` and `WithPaletteFor`; `FromDark`; `Border(style)` |
 | `layout` | `Rect`, `Size` (fixed, percent, ratio, fill; min, max, shrink order), `Node` (`Pane`, `Split`, `Responsive`, or a custom node), `Solve` → `Plan`; `State` (JSON); the sidebar presets |
@@ -117,7 +117,9 @@ module. The Cobra and Kong front ends it planned, `command/cobracmd` and
 - **The dependency runs one way.** An adapter requires a published root
   version, with no `replace`; the root never requires an adapter. A
   consumer of the root therefore never sees an adapter's dependency in
-  its `go.sum` or module graph (0010-REPORT §2).
+  its `go.sum` or module graph
+  ([0010-REPORT-nested-modules-and-adapter-sources.md](reports/0010-REPORT-nested-modules-and-adapter-sources.md)
+  §2).
 - **Each module has its own tags:** `vX.Y.Z` for the root,
   `<dir>/vX.Y.Z` for an adapter. [guides/releasing.md](guides/releasing.md)
   has the procedure.
@@ -150,11 +152,13 @@ scripts/
   go-fuzz.sh                fuzzes each fuzz target of a package in turn
   go-fuzz_test.sh           its offline test
 glyph/ theme/ layout/ workspace/ tuitest/ termcap/ termsvc/
-when/ command/              the packages; goldens under each testdata/golden/
+when/ command/              the packages; goldens under testdata/golden/
+                            where a package renders
 termcap/termcaptest/        fake terminals for tests
 internal/cells/             the reused frame buffer, an ultraviolet importer
 internal/termevent/         pass-through events, the other ultraviolet importer
 internal/conformance/       the terminal-ownership scan (tests only)
+tuitest/internal/clash/     proves tuitest's -update flag does not clash (tests only)
 .claude/ .grok/ .opencode/  per-agent pointers to AGENTS.md
 opencode.json
 docs/
@@ -279,8 +283,9 @@ docs/
 ## What is not here
 
 - **Standard panes** (log tail, metrics view, scrolling text and
-  Markdown), **overlay widgets** (dialog, picker, palette, toast), a **help
-  footer** and **`updatetea`.** Each is its own record.
+  Markdown), **overlay widgets** (dialog, picker, palette, toast), a
+  help-footer pane beyond `workspace`'s `help.KeyMap`, and **`updatetea`.**
+  Each is its own record.
 - **The keymap engine and the command palette**
   ([0007-MADR](decisions/0007-MADR-keymap-engine.md),
   [0008-MADR](decisions/0008-MADR-command-palette.md)), which bind keys to

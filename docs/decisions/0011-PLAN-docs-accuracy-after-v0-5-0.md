@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in-progress
 date: 2026-10-07
 associated-madr: "0011-MADR-docs-accuracy-after-v0-5-0.md"
 ---
@@ -201,4 +201,44 @@ every Verification item holds.
 
 ## Execution Record
 
-Not started.
+The owner approved execution on 2026-10-07 ("proceed to 0011"). Step 1,
+the records, was committed as `376106e`. The PLAN resumed after
+[0012-PLAN-bring-your-own-cli.md](0012-PLAN-bring-your-own-cli.md), as its
+second revision says.
+
+### Step 2: the top-level documents
+
+No deviation.
+
+Each finding was re-checked against the tree at `6bf8fad` before the
+edit:
+
+* **F1 and F2:** already as their fixes say. 0012 wrote "The current
+  release is `v0.6.0`" and the new opening. A12's mention was dropped with
+  the check.
+* **F4 and F15:** dropped (the first revision). F9's adapters table was
+  dropped too; its `Registry` list stands.
+
+| # | Re-checked | Now |
+| :--- | :--- | :--- |
+| F3 | `README.md:23-29` dated the cell buffer, the width measurement and the following theme to `v0.1.0`; `internal/cells` is absent from `v0.1.0` and present in `v0.2.0` | "Since `v0.2.0` it draws into one reused cell buffer, measures text as Bubble Tea writes it, and follows the terminal's theme" |
+| F5 | `go list` shows ultraviolet imported by `internal/termevent` and `termeventtest`; `.golangci.yml`'s `ultraviolet` rule excludes `internal/cells` and `internal/termevent` | AGENTS.md names both, citing 0005-MADR §1 |
+| F6 | AGENTS.md: "A MADR and its PLAN share the same number and the same slug", "Never reuse a number" | a lone PLAN copies the MADR's slug, several PLANs take their own (0002-PLAN-harden as the example), a REPORT about a record takes its number (0010-REPORT as the example); "Never give a new decision a number already used" |
+| F7 | `go list -f '{{.Imports}}' ./workspace`: `bubbles/v2/help`, `bubbles/v2/key`, `bubbletea/v2`, `colorprofile`, `x/ansi`, no lipgloss | the graph lists those |
+| F8 | `go list ./...`: `internal/cells`, `internal/conformance`, `internal/termevent`, `internal/termevent/termeventtest`, `tuitest/internal/clash` | "five internal ones"; the tree names `tuitest/internal/clash/`, whose documentation says it proves tuitest's `-update` flag does not clash |
+| F9 | `go doc ./command Registry`: `NewRegistry` with `WithGate`, `WithAuditor`, `WithPrefixer`, `WithLoop`, and `CancelAll`, `Remove`, `Version` missing from the row | the row names them |
+| F10 | `workspace/help.go` implements `help.KeyMap` | "a help-footer pane beyond `workspace`'s `help.KeyMap`" |
+| F11 | `glyph`, `termsvc`, `tuitest` and `when` have no `testdata/golden` (the audit named three; `when` is the fourth) | "goldens under testdata/golden/ where a package renders" |
+| F12 | `docs/architecture.md:120` cited "0010-REPORT §2" by number | the full filename, linked |
+| F13 | 0001-MADR's A1 records facts and "The decision is unchanged"; A2 and A3 carry the owner's decisions | "accepted; A1–A3 recorded", not "accepted": A1 decides nothing |
+| F14 | "know why the gates fail on an empty module" | "once failed" |
+| F16 | "Decisions and their implementation plans" | "Decisions, their implementation plans, and reports" |
+| F17 | "after 0009" by number | the full filename, linked |
+
+**Checks:**
+
+* markdownlint on the four files: 0 issues.
+* The relative-link check: 0 broken. The citation checker: 247 of 247
+  resolve.
+* The identifier scan of the diff: no match.
+* No Go file changed.

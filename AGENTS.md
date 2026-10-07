@@ -21,8 +21,11 @@ amendment A3, which names the stack: `charm.land/bubbletea/v2`,
 `github.com/maccavelli/go-selfupdate-lib` (formerly `go-core-lib`).
 `docs/decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md` §1 adds
 `github.com/charmbracelet/ultraviolet`, which has no tagged release: only
-`internal/cells` may import it, at the version lipgloss's requirement
-selects, and depguard refuses it everywhere else. Any other module needs
+`internal/cells` and `internal/termevent` (with
+`internal/termevent/termeventtest` beneath it) may import it, at the
+version lipgloss's requirement selects, and depguard refuses it everywhere
+else (`docs/decisions/0005-MADR-terminal-capabilities-and-services.md`
+§1). Any other module needs
 its own MADR.
 
 Never import the Charm v1 paths `github.com/charmbracelet/bubbletea`,
@@ -171,10 +174,15 @@ docs/reports/NNNN-GATES-short-slug.md
 
 - `NNNN` is a zero-padded 4-digit number, one sequence across
   `docs/decisions/` and `docs/reports/`. A MADR and its PLAN share the same
-  number and the same slug.
+  number. A lone PLAN copies the MADR's slug; a MADR implemented as several
+  units of work carries several PLANs, each with a slug of its own
+  (`docs/decisions/0002-PLAN-harden-workspace-v0-1-1.md`). A REPORT about
+  an existing record takes that record's number
+  (`docs/reports/0010-REPORT-nested-modules-and-adapter-sources.md`); a
+  REPORT about nothing earlier takes the next.
 - **Next number** is the highest `NNNN` among all four kinds anywhere under
-  `docs/`, plus one. Never reuse a number, never renumber an existing record,
-  never leave a gap deliberately.
+  `docs/`, plus one. Never give a new decision a number already used,
+  never renumber an existing record, never leave a gap deliberately.
 - Cite records by full filename, never by number alone. Cite another
   repository's record by repository and filename; a relative link cannot reach
   it.

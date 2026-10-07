@@ -23,10 +23,11 @@ pattern, used by every program that needs it.
 - **Multi-pane workspaces, since `v0.1.0`.** `layout` arranges panes: a main
   pane with a sidebar on either side, a bottom pane, a footer, responsive
   folds and saved state. `workspace` hosts them in a Bubble Tea program,
-  with focus, resize, zoom, overlays, mouse and cursor, drawing into one
-  reused cell buffer, measuring text as Bubble Tea writes it, and following
-  the terminal's theme. `glyph`, `theme` and `tuitest` are the foundations
-  every package uses. pi-go's agent session is the first consumer.
+  with focus, resize, zoom, overlays, mouse and cursor. Since `v0.2.0` it
+  draws into one reused cell buffer, measures text as Bubble Tea writes
+  it, and follows the terminal's theme. `glyph`, `theme` and `tuitest` are
+  the foundations every package uses. pi-go's agent session is the first
+  consumer.
 - **Terminal capabilities and services, since `v0.3.0`.** `termcap`
   learns the terminal's capabilities from one probe, over SSH and inside
   tmux, with a reason for every answer and a doctor report; `termsvc` sends

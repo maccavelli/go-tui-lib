@@ -2,14 +2,14 @@
 
 ## Records
 
-Decisions and their implementation plans, in one numbered sequence.
+Decisions, their implementation plans, and reports, in one numbered sequence.
 go-core-lib was renamed go-selfupdate-lib at `v1.5.0`. Records name it as
 it was when they were written
 ([0001-MADR, A3](decisions/0001-MADR-scaffold-charm-tui-library.md#a3-2026-10-03-go-core-lib-is-now-go-selfupdate-lib)).
 
 | No. | Kind | Title | Status |
 | :--- | :--- | :--- | :--- |
-| 0001 | MADR | [Scaffold go-tui-lib as a Go 1.27.1 Charm v2 library to the go-core-lib standard, with honest gates until the first package lands](decisions/0001-MADR-scaffold-charm-tui-library.md) | accepted |
+| 0001 | MADR | [Scaffold go-tui-lib as a Go 1.27.1 Charm v2 library to the go-core-lib standard, with honest gates until the first package lands](decisions/0001-MADR-scaffold-charm-tui-library.md) | accepted; A1–A3 recorded |
 | 0001 | PLAN | [Implement the go-tui-lib Go 1.27.1 Charm v2 library scaffold](decisions/0001-PLAN-scaffold-charm-tui-library.md) | complete |
 | 0001 | REPORT | [TUI working example, fleet consumers and the planned packages](reports/0001-REPORT-tui-working-example-and-consumers.md) | — |
 | 0002 | MADR | [Build multi-pane terminal workspaces from a pure layout solver and a Bubble Tea pane host, with pi-go's agent session as the first consumer](decisions/0002-MADR-multi-pane-workspace-layouts.md) | accepted; A1, A2 accepted |
@@ -32,9 +32,10 @@ it was when they were written
 | 0010 | PLAN | [Implement the multi-module repository: go.work, per-module gates, and the release procedure](decisions/0010-PLAN-nested-adapter-modules.md) | complete |
 | 0010 | REPORT | [Nested modules, a committed go.work, and the adapters' upstream sources](reports/0010-REPORT-nested-modules-and-adapter-sources.md) | — |
 | 0011 | MADR | [Bring the living documents and the unexecuted records up to date after `v0.5.0`, correcting records only by amendment and front matter](decisions/0011-MADR-docs-accuracy-after-v0-5-0.md) | accepted |
-| 0011 | PLAN | [Implement the documentation pass after `v0.5.0`](decisions/0011-PLAN-docs-accuracy-after-v0-5-0.md) | proposed |
+| 0011 | PLAN | [Implement the documentation pass after `v0.5.0`](decisions/0011-PLAN-docs-accuracy-after-v0-5-0.md) | in-progress |
 | 0012 | MADR | [Make go-tui-lib a TUI layer a program stacks on its own Go CLI, and retire the library's CLI front ends](decisions/0012-MADR-bring-your-own-cli.md) | accepted |
 | 0012 | PLAN | [Retire the CLI front ends: retract the adapters, remove `command/cli` and A12's check, release `v0.6.0`](decisions/0012-PLAN-bring-your-own-cli.md) | complete |
+| 0013 | MADR | [Add a `launch` package that decides between a TUI and plain output, and runs the TUI on the program's own streams](decisions/0013-MADR-cli-integration-helpers.md) | proposed |
 
 ## I want to…
 
@@ -54,7 +55,7 @@ it was when they were written
 | test a component across colour, charset and width | [AGENTS.md, TUI conventions](../AGENTS.md#tui-conventions), rule 6 |
 | add a package | write its MADR and PLAN first: [AGENTS.md](../AGENTS.md#madr-and-plan-before-mutating-work) |
 | run the checks before committing | `make pre-add-check`; see [AGENTS.md, Pre-add checks](../AGENTS.md#pre-add-checks) |
-| know why the gates fail on an empty module | [0001-MADR, §8](decisions/0001-MADR-scaffold-charm-tui-library.md#8-push-and-identity) and [Consequences](decisions/0001-MADR-scaffold-charm-tui-library.md#consequences) |
+| know why the gates once failed on an empty module | [0001-MADR, §8](decisions/0001-MADR-scaffold-charm-tui-library.md#8-push-and-identity) and [Consequences](decisions/0001-MADR-scaffold-charm-tui-library.md#consequences) |
 | know where the TUI rules came from | [0001-MADR, §6](decisions/0001-MADR-scaffold-charm-tui-library.md#6-repository-conventions-for-tui-packages): ocp-login's records |
 | see what ocp-login's TUI design offers for extraction | [0001-REPORT, §1](reports/0001-REPORT-tui-working-example-and-consumers.md#1-the-working-example-ocp-login-by-pattern) |
 | know who will use this library | [0001-REPORT, §2 and §3](reports/0001-REPORT-tui-working-example-and-consumers.md#2-the-fleets-tui-programs) |
@@ -67,13 +68,14 @@ it was when they were written
 | know the order the planned packages land in | [0003-REPORT, §7](reports/0003-REPORT-agent-tui-ecosystem-research.md#7-candidates-and-what-the-owner-chose) |
 | see what the Kilo, Grok Build, opencode and codex TUIs add beyond the planned records | [0003-REPORT, §8](reports/0003-REPORT-agent-tui-ecosystem-research.md#8-second-pass-the-kilo-grok-build-opencode-and-codex-tuis) |
 | know which terminals need which workarounds | [0003-REPORT, §9](reports/0003-REPORT-agent-tui-ecosystem-research.md#9-per-terminal-quirks-the-sources-work-around) |
-| see the candidate packages after 0009, and the modules they would need | [0003-REPORT, §11](reports/0003-REPORT-agent-tui-ecosystem-research.md#11-candidates-from-the-second-pass) |
+| see the candidate packages after [0009-MADR-streaming-content-engine.md](decisions/0009-MADR-streaming-content-engine.md), and the modules they would need | [0003-REPORT, §11](reports/0003-REPORT-agent-tui-ecosystem-research.md#11-candidates-from-the-second-pass) |
 | add a command, with its arguments, danger and availability | [guides/commands.md](guides/commands.md#define-a-command) |
 | run a command from a key or `Update`, and react to its result | [guides/commands.md](guides/commands.md#run-commands-from-your-program) |
 | let an agent drive the TUI over MCP, safely | [guides/commands.md](guides/commands.md#let-an-agent-drive-the-program) |
 | load the user's and the project's command files, or an agent's commands | [guides/commands.md](guides/commands.md#command-files) |
 | run the same commands from my own CLI (`flag`, Cobra, Kong) | [guides/commands.md](guides/commands.md#run-commands-from-your-own-cli) |
 | know why go-tui-lib ships no CLI front end | [0012-MADR](decisions/0012-MADR-bring-your-own-cli.md) |
+| see the planned helpers that start the TUI from my CLI, or print plainly when no one is at a terminal | [0013-MADR](decisions/0013-MADR-cli-integration-helpers.md) |
 | know why the command registry is built this way | [0006-MADR](decisions/0006-MADR-command-registry.md) |
 | see the planned keymap and `keybindings.json` format | [0007-MADR](decisions/0007-MADR-keymap-engine.md) |
 | see the planned command palette and fuzzy matcher | [0008-MADR](decisions/0008-MADR-command-palette.md) |
