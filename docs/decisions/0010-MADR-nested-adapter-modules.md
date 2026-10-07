@@ -80,6 +80,8 @@ repository, which requires only published versions between its modules
 
 ### 1. The modules
 
+*(The two command adapters superseded by [0012-MADR-bring-your-own-cli.md](0012-MADR-bring-your-own-cli.md); `stream/glamourmd` stays.)*
+
 | Directory | Module path | Package | Requires (beyond the root) | First tag |
 | :--- | :--- | :--- | :--- | :--- |
 | `.` | `github.com/maccavelli/go-tui-lib` | (many) | 0001-MADR §3's stack only | `v0.x` as today |
@@ -206,6 +208,8 @@ use (
 
 ### 5. Dependencies
 
+*(Cobra, pflag and Kong superseded by [0012-MADR-bring-your-own-cli.md](0012-MADR-bring-your-own-cli.md), which refuses every CLI framework.)*
+
 AGENTS.md says no module may be required without a record that names it.
 This record names:
 
@@ -221,6 +225,8 @@ AGENTS.md already says, and `go mod tidy -diff` is clean at every commit in
 every module.
 
 ### 6. What each adapter must do about its upstream
+
+*(The Cobra and Kong rules superseded by [0012-MADR-bring-your-own-cli.md](0012-MADR-bring-your-own-cli.md).)*
 
 The APIs are decided in 0006-MADR amendment A1 and 0009-MADR amendment A2.
 This record fixes only the rules they must meet, from REPORT §6-§10:
@@ -398,6 +404,23 @@ PLAN.
 **Unchanged.** The test still runs in a scratch module outside the
 repository, after each tag, and still proves that the proxy resolves the
 tag. No released version is affected: `v0.2.0` builds for a consumer.
+
+### A3 (2026-10-07): the command adapters retired
+
+*Status: accepted (2026-10-07).*
+[0012-MADR-bring-your-own-cli.md](0012-MADR-bring-your-own-cli.md)
+retires `command/cobracmd` and `command/kongcmd`. Each gets a last
+version, `v0.1.1`, whose `go.mod` deprecates the module and retracts
+`[v0.1.0, v0.1.1]`. Then both leave `main`, and depguard refuses Cobra,
+pflag and Kong everywhere. It supersedes:
+
+* §1's two command adapters;
+* §5's Cobra, pflag and Kong;
+* §6's Cobra and Kong rules.
+
+The rest stands, for `stream/glamourmd`: the nested-module layout, the
+committed `go.work`, the per-module gates, the two-step release and the
+consumer smoke test.
 
 ## More Information
 

@@ -609,6 +609,8 @@ The registry itself contributes `command.list` and `command.describe`
 
 ### 10. `command/cli`: the same commands from the shell
 
+*(Superseded by [0012-MADR-bring-your-own-cli.md](0012-MADR-bring-your-own-cli.md).)*
+
 ```go
 // Run runs args (os.Args[1:] in a real program) against r, writing to
 // stdout and stderr, and returns an exit code. It never calls os.Exit.
@@ -797,6 +799,8 @@ accepted.
 ## Amendments
 
 ### A1 (2026-10-02): native Cobra and Kong front ends as nested modules
+
+*(Superseded by [0012-MADR-bring-your-own-cli.md](0012-MADR-bring-your-own-cli.md), except §4's tag vocabulary, which stays.)*
 
 *Status: accepted (2026-10-03).* Its steps are Steps 4, 10 and 11 of
 [0006-PLAN-command-registry.md](0006-PLAN-command-registry.md).
@@ -1520,6 +1524,8 @@ each the recommendation. The alternatives were:
 
 ### A10 (2026-10-06): the Cobra front end against the built registry
 
+*(Superseded by [0012-MADR-bring-your-own-cli.md](0012-MADR-bring-your-own-cli.md).)*
+
 *Status: accepted (2026-10-06).* Found before writing Step 10 of
 [0006-PLAN-command-registry.md](0006-PLAN-command-registry.md), recorded
 there as deviations D35–D40, by reading `command` at `v0.4.0` and
@@ -1586,6 +1592,8 @@ each the recommendation. The alternatives were:
 6. `Mount` adding no verbs, or skipping a verb whose name is taken.
 
 ### A11 (2026-10-06): the Kong front end against the built registry
+
+*(Superseded by [0012-MADR-bring-your-own-cli.md](0012-MADR-bring-your-own-cli.md).)*
 
 *Status: accepted (2026-10-06).* Found before writing Step 11 of
 [0006-PLAN-command-registry.md](0006-PLAN-command-registry.md), recorded
@@ -1661,6 +1669,8 @@ alternatives were:
 
 ### A12 (2026-10-06): an argument struct reads the same in Kong
 
+*(Superseded by [0012-MADR-bring-your-own-cli.md](0012-MADR-bring-your-own-cli.md).)*
+
 *Status: accepted (2026-10-06).* Found while writing Step 11 of
 [0006-PLAN-command-registry.md](0006-PLAN-command-registry.md), recorded
 there as deviation D47, and executed as its Step 11a.
@@ -1733,6 +1743,24 @@ alternatives were:
 * Q2: leaving names alone;
 * Q3: `v0.4.1`;
 * Q4: the check in `SchemaOf`, top-level or for every struct.
+
+### A13 (2026-10-07): superseded in part by 0012
+
+*Status: accepted (2026-10-07).*
+[0012-MADR-bring-your-own-cli.md](0012-MADR-bring-your-own-cli.md)
+makes go-tui-lib a TUI layer that a program stacks on its own Go CLI, and
+retires the library's CLI front ends. It supersedes in this record:
+
+* §10's `command/cli`;
+* A1's Cobra and Kong front ends and its "one conformance test for three
+  front ends";
+* A10 and A11 entirely;
+* A12 entirely.
+
+§4's tag vocabulary, as A1 aligned it, stays. So do the registry, the
+gate, the audit trail, `when`, the loaders and the exporters.
+`command.SurfaceCLI` and `command.OriginCLI` now mean the program's own
+CLI. Each superseded section carries a note; its text is kept as written.
 
 ## More Information
 
