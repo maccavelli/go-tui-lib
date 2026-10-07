@@ -39,18 +39,15 @@ has() { # name pattern: whether the last run's output matches
 	fi
 }
 
-# The go command reads modules from the module cache first, and the
-# configured proxy only for what the cache lacks: the throwaway modules need
-# nothing, and apidiff is fetched at most once.
-cache="$(go env GOMODCACHE)/cache/download"
-command -v cygpath >/dev/null 2>&1 && cache="/$(cygpath -m "$cache")"
-GOPROXY="file://$cache,$(go env GOPROXY)"
-export GOPROXY
-
+# apidiff is installed as go-apicheck.sh installs it, through the configured
+# proxy. The cases then run with GOPROXY=off: the throwaway modules require
+# nothing, so the go command must never need the network
+# (docs/decisions/0014-PLAN-api-policy-gates.md, deviation D9).
 version="$(sed -n 's/^APIDIFF_VERSION[[:space:]]*?=[[:space:]]*//p' "$ROOT/Makefile" | head -1)"
 GOBIN="$WORK/bin" GOWORK=off go install "golang.org/x/exp/cmd/apidiff@$version"
 APIDIFF_BIN="$WORK/bin/apidiff"
 [ -x "$APIDIFF_BIN.exe" ] && APIDIFF_BIN="$APIDIFF_BIN.exe"
+export GOPROXY=off
 
 g() { # git, as a throwaway identity
 	git -c user.name=apicheck -c user.email=apicheck@example.invalid -c commit.gpgsign=false -c tag.gpgsign=false "$@"

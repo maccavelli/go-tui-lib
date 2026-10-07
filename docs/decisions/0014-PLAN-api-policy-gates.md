@@ -1024,3 +1024,84 @@ Step 5 was committed as `9496aea`.
   * `GOWORK=off go test -count=3 -shuffle=on ./...` gave 15 `ok`;
   * `TestEveryPackageStatesStability` passes.
 * **The identifier scan of the diff:** no match.
+
+### Step 7: close-out
+
+The owner approved it on 2026-10-07 ("proceed, i committed and pushed"),
+after Step 6 was committed as `e826412` and pushed with Steps 3 to 5.
+
+#### Deviations
+
+* **D9 (2026-10-07): the API diff gate's test installs apidiff through the
+  configured proxy, and runs its cases with `GOPROXY=off`. This
+  supersedes D3.**
+  * **Found:** CI run `37703582070`, the first on `e826412`, failed in
+    `gates` at the `apicheck` step, on the test's install:
+    `go: golang.org/x/exp/cmd/apidiff@v0.0.0-20261007180756-3d68b386da03:
+    loading deprecation for golang.org/x/exp: no matching versions for
+    query "latest"`. Because of it, the `examples` step and the
+    shellcheck, markdownlint and actionlint step did not run. The test
+    jobs passed on all three operating systems.
+  * **Not reproduced on macOS,** with an empty module cache or after
+    replaying the job's golangci-lint and govulncheck installs into one.
+    CI's other `go install` steps use the plain proxy and pass. This
+    install alone put D3's `file://` module-cache proxy in front of the
+    configured one.
+  * **Asked,** with two options:
+    * install apidiff as `go-apicheck.sh` does, and run the cases with
+      `GOPROXY=off`;
+    * reproduce on Linux in a container first.
+  * **The owner chose** the first, the recommendation. A cold cache
+    needs the network for the install, as `make apicheck` already
+    does. `GOPROXY=off` proves that the cases need none.
+
+#### The fix, and its checks
+
+* **`scripts/go-apicheck_test.sh`:** the `file://` proxy chain and its
+  `cygpath` line are gone. apidiff is installed with the environment's
+  `GOPROXY`, and `GOPROXY=off` is exported for the cases.
+* **The test passes** from the developer's module cache, and from an
+  empty one with `GOTOOLCHAIN=local`: 19 passed, 0 failed.
+* **`GOPROXY=off` blocks the network.** With an empty cache, `go mod
+  download github.com/spf13/pflag@v1.0.10` under it fails with "module
+  lookup disabled by GOPROXY=off".
+* **S4-1 to S4-4, run again,** are all killed: 10, 2, 2 and 6 failed
+  assertions, as in Step 4.
+* **shellcheck 0.11.0** on `scripts/*.sh`: clean. **`make apicheck`:**
+  clean.
+* **The Windows test host,** on `e826412` plus the fix: the test gave 19
+  passed, and `make apicheck` was clean against `v0.6.0`.
+
+#### Verification, item by item
+
+Checked on `e826412` (Steps 2 to 6), with D9's fix where it applies:
+
+* **Conformance.** The four tests pass. `TestScanFindsEachRule` has 21
+  plant cases, and S2-1 to S2-6 were killed in Step 2. The must-read list
+  comes from `go list`. The only allowed breach is `tuitest`'s switch.
+* **The collision check** holds, with five deliberate names and the
+  glossary (S3-1 to S3-4, Step 3).
+* **`make apicheck`** is clean against `v0.6.0`, and its test passes
+  (S4-1 to S4-5, Step 4, with S4-1 to S4-4 run again under D9). CI runs it
+  with the full history. Its first CI run failed (D9); the fix's run is
+  below.
+* **The four tier-1 framework programs** build and pass their 12 cases,
+  and the 5 guide excerpts match them. The test gives 19 passed (S5-1 to
+  S5-4, Step 5).
+* **`AGENTS.md` states the conventions,** and every package states its
+  stability (S6-1 to S6-3, Step 6).
+* **Rule 2's checks** were clean at every step, on macOS and the Windows
+  test host. Each step's record lists them.
+* **Rollout:**
+  * one commit per step: `7e8f09c`, `475d6ac`, `3d3fa98`, `9496aea` and
+    `e826412`;
+  * no tag;
+  * nothing a consumer imports changed. Since `5c6f4bc`, every line
+    changed in a public package's Go files is a comment, so the API is
+    unchanged. The same filter reports 1,451 lines for `60ed13e`, which
+    removed code, so it is seen to fail.
+* **CI:** run `37703582070` on `e826412` passed its test jobs on Linux,
+  macOS and Windows, and failed in `gates` at `apicheck` (D9).
+  * **Open:** the run on the push of D9's fix must pass every job,
+    including `apicheck`, `examples` and the lint step that did not run.
+  * This PLAN stays `in-progress` until it does.
