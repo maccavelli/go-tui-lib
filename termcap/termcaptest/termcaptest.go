@@ -7,6 +7,9 @@
 // every escape sequence the program writes, and answers the queries its
 // Profile answers, in the order they were asked, as a terminal does. It
 // never touches a real terminal.
+//
+// Stability: stable. Exported names change only through the deprecation
+// policy in AGENTS.md, "API conventions".
 package termcaptest
 
 import (

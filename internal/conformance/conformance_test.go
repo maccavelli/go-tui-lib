@@ -6,7 +6,8 @@
 // process's environment, never exits and never starts a process
 // (docs/decisions/0014-MADR-native-integration-api.md W0.5), except where
 // allowed lists a file. And no two public packages export a type of the
-// same name, unless docs/glossary.md says the clash is deliberate (W0.3).
+// same name, unless docs/glossary.md says the clash is deliberate (W0.3);
+// and every package's documentation ends with its stability line (W0.6).
 //
 // The scan type-checks each package with go/types and the source importer,
 // and resolves every identifier to the object it denotes. A renamed or dot
@@ -21,6 +22,8 @@
 //
 // Files are read for the host's GOOS. CI runs this test on Linux, macOS and
 // Windows, so each operating system's files are scanned there.
+//
+// Stability: internal.
 package conformance
 
 import (
@@ -371,11 +374,11 @@ var allowed = map[[2]string]bool{
 	{"tuitest/tuitest.go", "reads the environment with os.Getenv"}: true,
 }
 
-// mustRead lists every package of the module in dir that has non-test code,
-// as go list sees it for this host, as paths relative to root.
-func mustRead(t *testing.T, root, dir string) []string {
+// goList runs go list -f format over the packages of the module in dir,
+// with GOWORK=off, and returns its non-empty lines.
+func goList(t *testing.T, dir, format string) []string {
 	t.Helper()
-	cmd := exec.Command("go", "list", "-f", "{{if .GoFiles}}{{.Dir}}{{end}}", "./...")
+	cmd := exec.Command("go", "list", "-f", format, "./...")
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "GOWORK=off")
 	out, err := cmd.Output()
@@ -385,13 +388,22 @@ func mustRead(t *testing.T, root, dir string) []string {
 		}
 		t.Fatalf("go list in %s: %v", dir, err)
 	}
-	var pkgs []string
+	var lines []string
 	for line := range strings.Lines(string(out)) {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
+		if line = strings.TrimRight(line, "\r\n"); strings.TrimSpace(line) != "" {
+			lines = append(lines, line)
 		}
-		rel, err := filepath.Rel(root, line)
+	}
+	return lines
+}
+
+// mustRead lists every package of the module in dir that has non-test code,
+// as go list sees it for this host, as paths relative to root.
+func mustRead(t *testing.T, root, dir string) []string {
+	t.Helper()
+	var pkgs []string
+	for _, line := range goList(t, dir, "{{if .GoFiles}}{{.Dir}}{{end}}") {
+		rel, err := filepath.Rel(root, strings.TrimSpace(line))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -498,6 +510,73 @@ func TestNoTypeNameMeansTwoThings(t *testing.T) {
 		if len(by[name]) < 2 {
 			t.Errorf("sharedNames lists %s %v, which fewer than two public packages export", name, allow)
 		}
+	}
+}
+
+// stableLine and internalLine end every package's documentation: a public
+// package is stable, and one under an internal directory is internal
+// (AGENTS.md, "API conventions";
+// docs/decisions/0014-PLAN-api-policy-gates.md Step 6).
+const (
+	stableLine   = `Stability: stable. Exported names change only through the deprecation policy in AGENTS.md, "API conventions".`
+	internalLine = "Stability: internal."
+)
+
+// TestEveryPackageStatesStability reads each package's documentation, test
+// packages' included, and fails unless it is in one file and its last
+// paragraph is the package's stability line.
+func TestEveryPackageStatesStability(t *testing.T) {
+	root := repoRoot(t)
+	n := 0
+	for _, dir := range modules(t, root) {
+		// The directory, then its non-test files, then its test files.
+		for _, line := range goList(t, dir, "{{.Dir}}\t{{join .GoFiles \" \"}}\t{{join .TestGoFiles \" \"}}") {
+			parts := strings.Split(line, "\t")
+			if len(parts) != 3 {
+				t.Fatalf("go list printed %q", line)
+			}
+			names := strings.Fields(parts[1])
+			if len(names) == 0 {
+				names = strings.Fields(parts[2]) // a package of tests alone
+			}
+			rel, err := filepath.Rel(root, parts[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			rel = filepath.ToSlash(rel)
+			n++
+			fset := token.NewFileSet()
+			var docs []string
+			for _, name := range names {
+				f, err := parser.ParseFile(fset, filepath.Join(parts[0], name), nil, parser.PackageClauseOnly|parser.ParseComments)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if f.Doc != nil {
+					docs = append(docs, f.Doc.Text())
+				}
+			}
+			want := stableLine
+			if slices.Contains(strings.Split(rel, "/"), "internal") {
+				want = internalLine
+			}
+			switch len(docs) {
+			case 0:
+				t.Errorf("%s has no package documentation; it must end %q", rel, want)
+				continue
+			case 1:
+			default:
+				t.Errorf("%s is documented in %d files; one holds it", rel, len(docs))
+				continue
+			}
+			paras := strings.Split(strings.TrimSpace(docs[0]), "\n\n")
+			if last := strings.Join(strings.Fields(paras[len(paras)-1]), " "); last != want {
+				t.Errorf("%s: its documentation ends %q, want %q", rel, last, want)
+			}
+		}
+	}
+	if n == 0 {
+		t.Fatal("go list found no package")
 	}
 }
 

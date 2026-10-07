@@ -58,6 +58,8 @@ it was when they were written
 | see a whole agent session | `ExampleWorkspace_agentSession` in `workspace/agent_test.go` |
 | know which Charm version to use | [0001-MADR, §3](decisions/0001-MADR-scaffold-charm-tui-library.md#3-toolchain-and-dependencies) |
 | know what this module may import, and what it never may | [AGENTS.md, Dependencies](../AGENTS.md#dependencies) |
+| name an exported type, option, error or hook, deprecate a name, or read a package's stability line | [AGENTS.md, API conventions](../AGENTS.md#api-conventions) |
+| know what a type name means, and which names are shared or reserved | [glossary.md](glossary.md) |
 | know who owns the screen, the output and ctrl+c | [AGENTS.md, TUI conventions](../AGENTS.md#tui-conventions) |
 | test a component across colour, charset and width | [AGENTS.md, TUI conventions](../AGENTS.md#tui-conventions), rule 6 |
 | add a package | write its MADR and PLAN first: [AGENTS.md](../AGENTS.md#madr-and-plan-before-mutating-work) |
@@ -81,6 +83,7 @@ it was when they were written
 | let an agent drive the TUI over MCP, safely | [guides/commands.md](guides/commands.md#let-an-agent-drive-the-program) |
 | load the user's and the project's command files, or an agent's commands | [guides/commands.md](guides/commands.md#command-files) |
 | run the same commands from my own CLI (`flag`, Cobra, Kong) | [guides/commands.md](guides/commands.md#run-commands-from-your-own-cli) |
+| see complete, tested programs on `flag`, Cobra, Kong and urfave/cli | `testdata/frameworks/`, built and run by `make examples` ([architecture.md, Tooling](architecture.md#tooling)) |
 | know why go-tui-lib ships no CLI front end | [0012-MADR](decisions/0012-MADR-bring-your-own-cli.md) |
 | see the planned helpers that start the TUI from my CLI, or print plainly when no one is at a terminal | [0013-MADR](decisions/0013-MADR-cli-integration-helpers.md) |
 | see how the API will grow to fit any Go CLI framework natively, and the hardening and renames planned before `v1` | [0014-MADR](decisions/0014-MADR-native-integration-api.md) |

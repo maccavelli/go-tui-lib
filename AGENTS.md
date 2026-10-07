@@ -112,6 +112,66 @@ whose record grants an exception says so in that record.
    ASCII} × at least two widths, with golden files under the package's
    `testdata/`. CI also runs the tests under `LC_ALL=C`.
 
+## API conventions
+
+Every exported name follows these rules
+(`docs/decisions/0014-MADR-native-integration-api.md` W0). A record that
+needs an exception says so.
+
+1. **Deprecation.** A renamed function, type or constant keeps its old name
+   for one minor release, as a wrapper, a type alias or a constant marked
+   `// Deprecated: use X`, and is removed in the next minor release. A
+   renamed struct field keeps both fields for that release, and the code
+   reads the new field, falling back to the old. Release notes list every
+   deprecation and every removal.
+2. **The API diff gate.** `make apicheck` compares each module's exported
+   API with its previous tag, and fails on an incompatible change that
+   `scripts/apicheck.allow` does not list. The PLAN that makes such a
+   change lists it there, in a block naming the PLAN. The release's
+   close-out removes the block: once the new tag is the base, apidiff no
+   longer reports the change, and a listed line it does not report fails
+   as stale.
+3. **Names.** One name means one thing. [docs/glossary.md](docs/glossary.md)
+   lists the names several packages share on purpose, and the names
+   accepted records reserve. A record checks each new exported type name
+   against it. `internal/conformance` fails when two public packages
+   export a type of the same name, unless the glossary and its
+   `sharedNames` list both allow it.
+4. **Options.** Option functions are named `With…`, `Without…` or `On…`,
+   and new code uses opaque option types. The option types that still
+   expose their structs become opaque in 0014's W4.
+5. **Enums.** An exported enum has `String`, `MarshalText` and
+   `UnmarshalText`, with stable lowercase tokens. 0014's W4 moves them
+   onto one `internal/enum` helper.
+6. **Errors.** Sentinels are `Err…` values. A typed error has `Unwrap` when
+   it wraps another. An error that ends a CLI has `ExitCode() int`.
+7. **Hooks.** A hook is an interface, with a `…Func` adapter.
+8. **Constructors.** `NewX` builds an `X`. `MustNewX`, which panics, exists
+   only where a failure is a programming error.
+9. **The environment.** Library code reads the environment only through a
+   `termcap.Env` the program gives it. It never reads the process's
+   environment, never exits and never starts a process. `internal/conformance`
+   enforces this. Its one allowed use is `tuitest`'s `TUITEST_UPDATE`
+   switch, since `tuitest` runs only under `go test`.
+10. **Stability lines.** Each package's documentation ends with its
+    stability line, as its last paragraph, in the file that holds the
+    package comment:
+    - a public package:
+
+      ```go
+      // Stability: stable. Exported names change only through the deprecation
+      // policy in AGENTS.md, "API conventions".
+      ```
+
+    - a package under an `internal` directory:
+      `// Stability: internal.`
+
+    `internal/conformance` fails on a package without it.
+11. **The toolchain floor.** The `go` line in each `go.mod`, today
+    1.27.1, moves only by a record. It moves to the newest patch of a
+    release Go still supports, and the record names the features that need
+    it.
+
 ## MADR and PLAN before mutating work
 
 **Whenever the user asks for an MADR and a plan, load the
@@ -215,18 +275,52 @@ given, or for every module when none is, in the module's directory:
 - `go test` once more in workspace mode;
 - for a nested module, no `replace` and a release version of the root.
 
-It ends with `scripts/go-modules.sh --check`. `make release-check` runs it
-over every module and file, before a tag. `golint` is not used: its checks
-are `revive`'s `exported`, `package-comments` and `var-naming` rules in
-`.golangci.yml`. A file that fails is not committed.
+A Go file under a `testdata` directory is formatted, but not given to
+`go vet` or `go test`. The go command ignores `testdata`, and the framework
+examples there import modules the library does not require.
+
+It ends with `scripts/go-modules.sh --check`. Then:
+
+- **With no file list** (`make release-check`, or `make pre-add-check`
+  without `FILES`), it runs the API diff gate, `scripts/go-apicheck.sh`.
+  `GO_PRECHECK_SKIP_APICHECK=1` skips it offline.
+- **With no file list, or one that names a file under
+  `testdata/frameworks`,** it runs the examples gate,
+  `scripts/go-examples.sh`. That gate builds the framework examples in a
+  temporary module, runs their cases, and compares the commands guide's
+  excerpts with them. `GO_PRECHECK_SKIP_EXAMPLES=1` skips it offline.
+
+`make release-check` runs it over every module and file, before a tag.
+`golint` is not used: its checks are `revive`'s `exported`,
+`package-comments` and `var-naming` rules in `.golangci.yml`. A file that
+fails is not committed.
 
 `internal/conformance` checks rules 1 and 2 of the TUI conventions on
 every package of every module. It type-checks each package and resolves
 every use, so a renamed import, a dot import or a method value hides
-nothing. Outside tests it fails on `os.Stdout` and `os.Stderr`,
-`fmt.Print`, `fmt.Printf` and `fmt.Println`, `log`'s standard logger,
-`log/slog`'s default logger, the `print` and `println` builtins,
-`signal.Notify`, and a write to `tea.View`'s `AltScreen`.
+nothing. Outside tests it fails on:
+
+- `os.Stdout` and `os.Stderr`;
+- `fmt.Print`, `fmt.Printf` and `fmt.Println`;
+- `log`'s standard logger and `log/slog`'s default logger;
+- the `print` and `println` builtins;
+- `signal.Notify`, and a write to `tea.View`'s `AltScreen`;
+- a read of the process's environment (`os.Getenv`, `os.LookupEnv`,
+  `os.Environ`, `os.ExpandEnv`, `syscall.Getenv`), except `tuitest`'s;
+- `os.Exit`;
+- starting a process: `os.StartProcess`, any use of `os/exec`,
+  `syscall.Exec`, `ForkExec` and `StartProcess`, and `tea.Exec` and
+  `tea.ExecProcess`.
+
+It also fails when:
+
+- two public packages export a type of the same name that
+  [docs/glossary.md](docs/glossary.md) does not allow;
+- a package's documentation does not end with its stability line ("API
+  conventions").
+
+`make apicheck` and `make examples` run the API diff gate and the examples
+gate alone.
 
 Golden files are rewritten with `go test ./<pkg>/ -tuitest.update`, or
 across packages with `TUITEST_UPDATE=1 go test ./...`, and read before they

@@ -9,6 +9,8 @@
 // a Layer draws with uv.NewStyledString(s).Draw. A Frame is the same buffer
 // without the layer and compositor around it, and with a width method the
 // caller sets, where lipgloss's canvas fixes grapheme widths.
+//
+// Stability: internal.
 package cells
 
 import (

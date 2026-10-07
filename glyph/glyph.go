@@ -5,6 +5,9 @@
 // (docs/decisions/0001-MADR-scaffold-charm-tui-library.md §6, rule 3). A
 // package never writes a glyph literal of its own: it reads the Set it was
 // given, which is Unicode() on a UTF-8 terminal and ASCII() elsewhere.
+//
+// Stability: stable. Exported names change only through the deprecation
+// policy in AGENTS.md, "API conventions".
 package glyph
 
 // Border is one border style: the same thirteen glyphs, in the same order, as

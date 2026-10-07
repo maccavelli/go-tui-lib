@@ -69,6 +69,7 @@ repository as it is now.
 | define commands once, for keys, slash lines, agents and your own CLI | [the commands guide](docs/guides/commands.md) |
 | know which Charm version to use, and what may be imported | [AGENTS.md, Dependencies](AGENTS.md#dependencies) |
 | know the rules every TUI package follows | [AGENTS.md, TUI conventions](AGENTS.md#tui-conventions) |
+| know what a type name means across the packages | [the glossary](docs/glossary.md) |
 | contribute: checks, records and commit rules | [AGENTS.md](AGENTS.md) |
 | add a module, or release one | [the releasing guide](docs/guides/releasing.md) |
 

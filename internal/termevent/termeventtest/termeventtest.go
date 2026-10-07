@@ -6,6 +6,8 @@
 // (docs/decisions/0005-MADR-terminal-capabilities-and-services.md A3).
 //
 // Each constructor builds an event termevent.Decode reads.
+//
+// Stability: internal.
 package termeventtest
 
 import (

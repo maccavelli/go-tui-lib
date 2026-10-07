@@ -21,6 +21,9 @@
 //
 // Colour never carries meaning alone: the focused pane's title is bold and
 // marked with glyph.Set.Focus as well as coloured.
+//
+// Stability: stable. Exported names change only through the deprecation
+// policy in AGENTS.md, "API conventions".
 package theme
 
 import (

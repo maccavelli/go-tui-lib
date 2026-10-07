@@ -15,6 +15,9 @@
 //   - the presets build the common arrangements, a main pane with a sidebar
 //     on either side, each with or without a bottom pane and a footer, as
 //     ordinary trees a program can change.
+//
+// Stability: stable. Exported names change only through the deprecation
+// policy in AGENTS.md, "API conventions".
 package layout
 
 import (

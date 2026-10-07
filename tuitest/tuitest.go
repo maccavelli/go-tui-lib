@@ -9,6 +9,9 @@
 // the cases a test names, run the tests with -tuitest.update, or with
 // TUITEST_UPDATE=1, which also works across ./..., or with the test binary's
 // own boolean -update flag when it defines one.
+//
+// Stability: stable. Exported names change only through the deprecation
+// policy in AGENTS.md, "API conventions".
 package tuitest
 
 import (

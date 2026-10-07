@@ -16,6 +16,9 @@
 // A pane needs only Update and View. Optional interfaces, found by type
 // assertion, add a title, a badge, focus callbacks, a minimum size, a
 // cursor, help bindings and change tracking.
+//
+// Stability: stable. Exported names change only through the deprecation
+// policy in AGENTS.md, "API conventions".
 package workspace
 
 import (

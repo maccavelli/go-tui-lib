@@ -28,6 +28,9 @@
 // whose canonical form is longer than MaxSource, so that every expression
 // Parse accepts round-trips. The package imports only the standard
 // library.
+//
+// Stability: stable. Exported names change only through the deprecation
+// policy in AGENTS.md, "API conventions".
 package when
 
 import (

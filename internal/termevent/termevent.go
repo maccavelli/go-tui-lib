@@ -9,6 +9,8 @@
 // ultraviolet type reaches an exported API
 // (docs/decisions/0005-MADR-terminal-capabilities-and-services.md §1 and
 // amendment A2). A depguard rule refuses the import anywhere else.
+//
+// Stability: internal.
 package termevent
 
 import (

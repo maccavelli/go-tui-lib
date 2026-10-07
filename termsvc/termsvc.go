@@ -8,6 +8,9 @@
 // clipboard or notifier is a hook the program supplies. Text from a
 // program, which may be an agent's, is stripped of control bytes before it
 // is encoded, so it cannot smuggle a sequence into the terminal.
+//
+// Stability: stable. Exported names change only through the deprecation
+// policy in AGENTS.md, "API conventions".
 package termsvc
 
 import (

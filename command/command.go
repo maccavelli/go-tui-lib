@@ -17,6 +17,9 @@
 //
 // Nothing here writes to the terminal or the process's streams. Output
 // leaves as a Result, a tea.Msg, or a record on the caller's logger.
+//
+// Stability: stable. Exported names change only through the deprecation
+// policy in AGENTS.md, "API conventions".
 package command
 
 import (

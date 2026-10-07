@@ -9,6 +9,9 @@
 //
 // A Prober learns the facts from one batch of queries that ends with DA1,
 // and delivers them as a CapsMsg.
+//
+// Stability: stable. Exported names change only through the deprecation
+// policy in AGENTS.md, "API conventions".
 package termcap
 
 import (

@@ -918,3 +918,109 @@ owner chose the recommendation each time.
   * `GOWORK=off go test -count=3 -shuffle=on ./...` gave 15 `ok`.
 * **The identifier scan of the diff and the new files:** no match.
 * **Not yet seen:** CI's `examples` step, which runs on the push.
+
+### Step 6: conventions, stability lines, toolchain floor, documents
+
+The owner approved it on 2026-10-07 ("Commit to main then proceed"), when
+Step 5 was committed as `9496aea`.
+
+#### Deviations
+
+* **D8 (2026-10-07): two stale descriptions of the gates are corrected
+  here.**
+  * **Found:** Step 6 names the documents it changes. Two it does not name
+    no longer describe the gates Steps 2, 4 and 5 built:
+    * `AGENTS.md`, "Pre-add checks": the precheck's steps and the
+      conformance paragraph;
+    * `docs/architecture.md`, "Tooling": the precheck and conformance
+      bullets.
+
+    Neither mentions the API diff gate, the examples gate, the `testdata`
+    rule (D5), the environment, exit and spawn bans, or the type-name
+    check.
+  * **Asked;** the owner chose to correct both in this step, the
+    recommendation.
+  * **Not chosen:** leaving them stale for a later record.
+
+#### What was built
+
+* **`internal/conformance`:**
+  * `TestEveryPackageStatesStability` lists every package of every module
+    with `go list`, test-only packages included. It reads the package
+    comment from the non-test files, or from the test files when there
+    are none (`internal/conformance` itself). It fails when:
+    * a package has no package comment;
+    * the comment is in more than one file;
+    * the comment's last paragraph, with its spaces collapsed, is not the
+      stability line. The line is stable for a public package, and
+      internal for one with an `internal` path element;
+  * `goList` now runs `go list` for both this test and `mustRead`;
+  * the package comment names the new check, and ends with `Stability:
+    internal.`.
+* **Stability lines,** as the last paragraph before the `package` clause:
+  * stable in the PLAN's ten files;
+  * internal in `internal/cells`, `internal/termevent`,
+    `internal/termevent/termeventtest` and `tuitest/internal/clash`
+    (`doc.go`), as well as `internal/conformance`. That makes five
+    internal packages; the PLAN said "internal packages" without listing
+    them.
+* **`AGENTS.md`:**
+  * "API conventions", after "TUI conventions", with the PLAN's eleven
+    items. Two describe work not yet done, and say so rather than
+    claiming it exists:
+    * `internal/enum` arrives in 0014's W4;
+    * the option types that still expose their structs become opaque
+      then;
+  * "Pre-add checks" (D8) now describes:
+    * the `testdata` rule;
+    * the API diff gate and the examples gate, with their skip switches;
+    * the conformance scan's environment, exit and spawn bans, its
+      type-name check and its stability-line check.
+* **`docs/architecture.md`:**
+  * "Tree": the five new scripts, `apicheck.allow`,
+    `testdata/frameworks/`, `docs/glossary.md`, and the conformance
+    scan's wider role;
+  * "Tooling": the `apicheck` and `examples` targets, each described;
+    the precheck's new steps (D8); the conformance bullets (D8); and the
+    CI steps, with the full-history checkout;
+  * "What is not here": the `make apicheck` line is gone.
+* **`docs/README.md`:** rows for the API conventions, the glossary and
+  the framework examples.
+* **`README.md`:** a row for the glossary.
+
+#### Checks
+
+* **Before the lines were added,** the new test failed on all 14
+  packages without one, each naming the paragraph it ended with.
+  `internal/conformance` passed, since its line went in with the test.
+* **Mutations, on scratch clones.** All killed:
+  * S6-1, `when/when.go` loses its line: "when: its documentation ends
+    … want \"Stability: stable. …\"";
+  * S6-2, an extra one: `internal/cells` takes the stable line:
+    "internal/cells: its documentation ends \"Stability: stable. …\",
+    want \"Stability: internal.\"";
+  * S6-3, an extra one: `glyph` gains a second documented file: "glyph is
+    documented in 2 files; one holds it".
+
+  The unmutated clone passes.
+* **`go doc ./when`** shows the line as the package text's last
+  paragraph.
+* **On the tree:**
+  * `make pre-add-check` over the 15 changed Go files: clean;
+  * `make release-check`: "128 file(s) clean in 1 module(s) (…,
+    apicheck, examples)". The four framework programs are now tracked;
+  * `make lint`: three "0 issues.";
+  * `make vuln`: "No vulnerabilities found.";
+  * with `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    each gave 15 `ok`, and so did workspace mode;
+  * markdownlint over the repository: 0 issues;
+  * the relative-link check over the six changed Markdown files: 142
+    links, none broken. The anchors `#api-conventions` and `#tooling`
+    exist.
+* **The Windows test host,** go1.27.1 windows/amd64:
+  * `make pre-add-check` gave "128 file(s) clean … apicheck, examples";
+  * the examples test, `make examples` and the file-list precheck pass;
+  * `make lint` and `make vuln` exit 0;
+  * `GOWORK=off go test -count=3 -shuffle=on ./...` gave 15 `ok`;
+  * `TestEveryPackageStatesStability` passes.
+* **The identifier scan of the diff:** no match.

@@ -151,19 +151,33 @@ scripts/
   go-modules_test.sh        its offline test
   go-fuzz.sh                fuzzes each fuzz target of a package in turn
   go-fuzz_test.sh           its offline test
+  go-apicheck.sh            the API diff gate: incompatible changes since
+                            each module's previous tag
+  go-apicheck_test.sh       its test, on throwaway repositories
+  apicheck.allow            the incompatible changes a PLAN allows
+  go-examples.sh            builds and runs the framework examples, and
+                            checks the guides' excerpts of them
+  go-examples_test.sh       its offline test
 glyph/ theme/ layout/ workspace/ tuitest/ termcap/ termsvc/
 when/ command/              the packages; goldens under testdata/golden/
                             where a package renders
 termcap/termcaptest/        fake terminals for tests
 internal/cells/             the reused frame buffer, an ultraviolet importer
 internal/termevent/         pass-through events, the other ultraviolet importer
-internal/conformance/       the terminal-ownership scan (tests only)
+internal/conformance/       the conformance scan: terminal ownership,
+                            environment, exit and spawn, type names,
+                            stability lines (tests only)
 tuitest/internal/clash/     proves tuitest's -update flag does not clash (tests only)
+testdata/frameworks/        the framework examples: programs on flag, Cobra,
+                            Kong and urfave/cli, built in a module of their
+                            own (go.mod.tmpl), and their cases
 .claude/ .grok/ .opencode/  per-agent pointers to AGENTS.md
 opencode.json
 docs/
   README.md                 record index and the "I want to…" table
   architecture.md           this file
+  glossary.md               one name, one meaning: the shared and reserved
+                            type names
   decisions/                MADR and PLAN records
   reports/                  REPORT records
   guides/                   how-to guides: workspaces, terminal
@@ -201,8 +215,8 @@ docs/
 ## Tooling
 
 - **`make` targets:** `test`, `test-sum`, `fmt`, `vet`, `lint`,
-  `modernize`, `tidy`, `tidy-check`, `vuln`, `fuzz`, `pre-add-check`,
-  `release-check`, `help`.
+  `modernize`, `tidy`, `tidy-check`, `vuln`, `fuzz`, `apicheck`,
+  `examples`, `pre-add-check`, `release-check`, `help`.
 - **Per module.** `test`, `vet`, `lint`, `modernize`, `tidy-check` and
   `vuln` run once in each module's directory with `GOWORK=off`, taking the
   list from `scripts/go-modules.sh`; a failure to list the modules fails
@@ -215,8 +229,7 @@ docs/
   -diff` exits 1 when it prints a diff.
 - **`make release-check`** runs the pre-add check over every module and
   file, before a tag.
-- **`internal/conformance`** is the terminal-ownership scan, run by
-  `go test`.
+- **`internal/conformance`** is the conformance scan, run by `go test`.
   - It finds every module by its `go.mod`, and type-checks each module's
     packages from that module's directory with `go/types` and the source
     importer (`importer.ForCompiler(fset, "source", nil)`), which resolves
@@ -231,6 +244,19 @@ docs/
     and their `Context` forms, `Log`, `LogAttrs` and `Default`; the
     `print` and `println` builtins; `signal.Notify`; and a write to
     `tea.View`'s `AltScreen`, however the field is reached.
+  - It also refuses a read of the process's environment, `os.Exit`, and
+    starting a process (`os.StartProcess`, `os/exec`, `syscall`'s `Exec`,
+    `ForkExec` and `StartProcess`, `tea.Exec` and `tea.ExecProcess`).
+    `allowed` lists the one exception, by file and rule: `tuitest`'s
+    `TUITEST_UPDATE` switch.
+  - The packages it must read come from `go list`, so a package it skips
+    fails the test.
+  - `TestNoTypeNameMeansTwoThings` fails when two public packages export
+    a type of the same name, unless `sharedNames` and
+    [glossary.md](glossary.md) allow it.
+  - `TestEveryPackageStatesStability` fails when a package's
+    documentation does not end with its stability line (AGENTS.md, "API
+    conventions").
   - It reads each package's files for the host's `GOOS`; CI's three
     operating systems cover the rest.
 - **`make fuzz`** fuzzes each fuzz target of `layout`, `when` and
@@ -241,10 +267,32 @@ docs/
   `gofmt` on its files; with `GOWORK=off`, the same three golangci-lint
   runs, `go vet` and `go test` on their packages, `go mod tidy -diff` and
   `govulncheck ./...`; `go test` again in workspace mode; and, for a
-  nested module, no `replace` and a release version of the root. It ends
-  with `scripts/go-modules.sh --check`. `make pre-add-check` runs it, and
-  so does the machine-wide agent gate before an agent `git commit` that
-  stages Go files.
+  nested module, no `replace` and a release version of the root. A Go
+  file under `testdata` is formatted, but not vetted or tested. It ends
+  with `scripts/go-modules.sh --check`, then:
+  - with no file list, the API diff gate;
+  - with no file list, or one naming a file under `testdata/frameworks`,
+    the examples gate.
+
+  `make pre-add-check` runs it, and so does the machine-wide agent gate
+  before an agent `git commit` that stages Go files.
+- **`make apicheck`** runs `scripts/go-apicheck.sh`. For each module it
+  takes the newest release tag merged into `HEAD` that does not contain
+  `HEAD`, so a tagged commit compares with the tag before it. It exports
+  that tag's API and the tree's with apidiff, installed at the
+  Makefile's `APIDIFF_VERSION` into a temporary directory and never added
+  to `go.mod`, and judges apidiff's output against
+  `scripts/apicheck.allow`. An unlisted incompatible change fails, and so
+  does a listed one apidiff no longer reports. A module with no tag is
+  skipped.
+- **`make examples`** runs `scripts/go-examples.sh`:
+  - it copies `testdata/frameworks` into a temporary module, whose
+    `go.mod` comes from `go.mod.tmpl` with a `replace` of the root;
+  - it builds and vets the programs, and runs `cases.txt`;
+  - it compares each guide block marked `<!-- from: … -->` with the
+    program region it names;
+  - `--check-guide` does only the comparison, and `--update` rewrites
+    `go.mod.tmpl` and `go.sum` from `go mod tidy`.
 - **`.golangci.yml`:**
   - 21 linters, including `depguard`;
   - `revive`'s `exported`, `package-comments` and `var-naming` rules in
@@ -275,6 +323,9 @@ docs/
     - `make vet`, `gofmt`, `make tidy-check`, and `make lint` (with
       `make modernize`) with golangci-lint v2.14.0;
     - `make vuln` with govulncheck v1.8.0;
+    - `apicheck`: the API diff gate's test, then `make apicheck`. The
+      job's checkout fetches the whole history and its tags;
+    - `examples`: the examples gate's test, then `make examples`;
     - `shellcheck` v0.11.0 (pinned by SHA-256 and first on `PATH`),
       `markdownlint-cli2` 0.23.2 and `actionlint` v1.7.12.
   - One run per ref (`concurrency`, cancel in progress). Actions are pinned
@@ -298,8 +349,6 @@ docs/
   ([0005-MADR](decisions/0005-MADR-terminal-capabilities-and-services.md) A4).
 - **Image protocols** (Kitty placeholders, Sixel, iTerm2), which add
   `Query` values to `termcap`.
-- **`make apicheck`.** It needs a `v1` tag to compare against, and comes
-  with the `v1` record.
 - **A CLI front end,** by design
   ([0012-MADR](decisions/0012-MADR-bring-your-own-cli.md)). Helpers that
   make stacking easier, such as launching the TUI from a program's own
