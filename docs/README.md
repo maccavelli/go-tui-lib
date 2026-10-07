@@ -32,7 +32,7 @@ it was when they were written
 | 0010 | PLAN | [Implement the multi-module repository: go.work, per-module gates, and the release procedure](decisions/0010-PLAN-nested-adapter-modules.md) | complete |
 | 0010 | REPORT | [Nested modules, a committed go.work, and the adapters' upstream sources](reports/0010-REPORT-nested-modules-and-adapter-sources.md) | — |
 | 0011 | MADR | [Bring the living documents and the unexecuted records up to date after `v0.5.0`, correcting records only by amendment and front matter](decisions/0011-MADR-docs-accuracy-after-v0-5-0.md) | accepted |
-| 0011 | PLAN | [Implement the documentation pass after `v0.5.0`](decisions/0011-PLAN-docs-accuracy-after-v0-5-0.md) | in-progress |
+| 0011 | PLAN | [Implement the documentation pass after `v0.5.0`](decisions/0011-PLAN-docs-accuracy-after-v0-5-0.md) | complete |
 | 0012 | MADR | [Make go-tui-lib a TUI layer a program stacks on its own Go CLI, and retire the library's CLI front ends](decisions/0012-MADR-bring-your-own-cli.md) | accepted |
 | 0012 | PLAN | [Retire the CLI front ends: retract the adapters, remove `command/cli` and A12's check, release `v0.6.0`](decisions/0012-PLAN-bring-your-own-cli.md) | complete |
 | 0013 | MADR | [Add a `launch` package that decides between a TUI and plain output, and runs the TUI on the program's own streams](decisions/0013-MADR-cli-integration-helpers.md) | accepted; A1 accepted |

@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-10-07
 associated-madr: "0011-MADR-docs-accuracy-after-v0-5-0.md"
 ---
@@ -340,3 +340,49 @@ and the open questions.
 * **The citation checker:** 284 of 284 resolve.
 * **The identifier scan of the diff:** no match.
 * **No Go file, `go.mod` or `go.sum` changed.**
+
+### Step 5: close-out
+
+The owner approved it on 2026-10-07 ("Commit to main, then proceed"),
+after Step 4 was committed as `6826c1f`. Verification, item by item,
+against that commit:
+
+* **F1 to F33 each read as their fix says.**
+  * A script checks each finding's fixed text in the tree. All 30 checks
+    pass, and D1's `View` is present.
+  * F4, F15 and F20 are dropped, as the first revision says.
+  * The script was seen to fail. On a scratch copy with F23's "A1 to A5"
+    put back to "A1 to A4", it reported `F23 FAIL`.
+* **Every relative link and anchor resolves,** except five reports, all
+  text inside backticks that the checker reads as a link. They are in
+  records this PLAN did not touch:
+  * 0001-PLAN:652, a test's planted link to a missing file;
+  * 0004-PLAN:1012 and :1043, `PaneAs` written with its type argument
+    before its argument list;
+  * 0009-MADR:388, goose's rule for an unclosed link target;
+  * 0003-REPORT:285, the same `PaneAs` signature.
+
+  The checker ran over all 50 tracked Markdown files.
+* **Every cross-record citation resolves:** 288 of 288.
+* **Every Go example in the four guides compiles:** 22 of 22, in a
+  scratch module, each block verbatim (Step 3's method).
+* **The commands guide's example registers beside `workspace.Commands`.**
+  The F18 proof, run again: 16 commands; "1 matches" by its slash line
+  and "2 matches" through `Dispatch`.
+* **markdownlint is clean on what each step wrote,** and the identifier
+  scan of every step's diff found nothing (Steps 2–4).
+* **No `.go` file, `go.mod`, `go.sum`, tag or completed record's body
+  changed.**
+  * Step 2 (`47e11c4`, 5 files), Step 3 (`c79e140`, 5 files) and Step 4
+    (`6826c1f`, 12 files) touch none of them. In the completed records,
+    Step 4 changed only the `date` line.
+  * The same check reports `60ed13e`, which removed `command/cli`, as
+    touching 13 Go and module files, so it is seen to fail.
+
+Every Verification item holds: this PLAN is `complete`.
+
+**Open after this PLAN,** to be answered when those records are executed:
+
+* 0007-MADR's owner question Q8: the bindings for focus by index and
+  directional resize.
+* 0009-MADR's owner question Q9: the source of the theme revision.
