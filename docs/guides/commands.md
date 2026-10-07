@@ -47,6 +47,15 @@ resize, err := command.New("layout.resize", "Move a split",
   in field order), `short`, `hidden`, `placeholder` and `group`; and
   `schema:"min=…,max=…,minLen=…,maxLen=…,secret"`. A scalar `enum` must
   be required or have a default.
+- **The struct reads the same in Kong,** since `v0.5.0` (A12). Kong
+  requires a flag only with `required:""`, and a positional unless it has
+  `optional:""` or a default, and it names a field by `name:""` or else
+  its Go name spelled with dashes (`MaxItems` is `max-items`). `New`
+  refuses a top-level field where these disagree with the `json` tag, and
+  its error names the tag to add or remove: a required flag takes
+  `required:""`, an `omitzero` positional `optional:""`, and
+  `json:"max_items"` takes `name:"max_items"`. `SchemaOf` does not check,
+  so an output type needs none of these.
 - **The schema** is JSON Schema 2020-12. `secret` is written as
   `"writeOnly": true`; `arg`, `short`, `placeholder`, `group` and `hidden`
   go in one `"x-cli"` object, which JSON Schema treats as an annotation

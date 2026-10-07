@@ -22,7 +22,7 @@ type resizeArgs struct {
 }
 
 type kindsArgs struct {
-	Name   string         `json:"name" help:"a name"`
+	Name   string         `json:"name" required:"" help:"a name"`
 	N      int            `json:"n,omitzero" help:"a count"`
 	On     bool           `json:"on,omitzero" help:"a switch"`
 	Mode   string         `json:"mode,omitzero" enum:"fast,slow" default:"fast" help:"how"`

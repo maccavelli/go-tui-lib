@@ -32,7 +32,7 @@ var (
 )
 
 type zoomArgs struct {
-	Pane string `json:"pane,omitzero" arg:"" help:"the pane; default the focused one"`
+	Pane string `json:"pane,omitzero" arg:"" optional:"" help:"the pane; default the focused one"`
 }
 
 type deleteArgs struct {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 )
 
 // NoArgs is the argument type of a command without arguments. Its schema
@@ -33,6 +34,14 @@ type Option func(*Command)
 // against it before the command runs, and run receives them decoded
 // strictly into an A. It is an error to give no WithDanger
 // (docs/decisions/0006-MADR-command-registry.md A5).
+//
+// A must read the same in Kong (A12): each top-level field is required by
+// the json rule exactly when Kong requires it, which for a flag means a
+// required:"" tag and for an arg:"" field no optional:"" tag and no
+// default; and its json name is Kong's name for it, its name:"" tag or
+// else its Go name spelled Kong's way (MaxItems is max-items). New returns
+// an error naming the tag to add or remove. A type with its own JSONSchema
+// method is not checked.
 func New[A any](id ID, title string, run func(ctx context.Context, inv *Invocation, args A) (Result, error), opts ...Option) (Command, error) {
 	if run == nil {
 		return Command{}, fmt.Errorf("command: %s: no run function", id)
@@ -43,6 +52,9 @@ func New[A any](id ID, title string, run func(ctx context.Context, inv *Invocati
 	schema, err := SchemaOf[A]()
 	if err != nil {
 		return Command{}, fmt.Errorf("command: %s: %w", id, err)
+	}
+	if err := agreeWithKong(reflect.TypeFor[A]()); err != nil {
+		return Command{}, fmt.Errorf("command: %s: arguments: %w", id, err)
 	}
 	r, err := compileRule(schema)
 	if err != nil {

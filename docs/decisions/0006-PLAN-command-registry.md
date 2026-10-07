@@ -2379,3 +2379,124 @@ Step 11's code (`command/kongcmd/`: `kongcmd.go`, `grammar.go`,
 `help.go`, `resolver.go`, `complete.go`, `go.mod`, `go.sum`) is written
 and builds against `v0.4.0`, and has no tests yet. It stays uncommitted and
 out of `go.work` until Step 11a is released.
+
+### Step 11a: `New[A]` agrees with Kong, and the root release `v0.5.0`
+
+No deviation: the step was written with MADR A12 and approved as
+written (2026-10-06).
+
+#### What was built
+
+* `command/kongname.go` (new): `kongName`, Kong's spelling of a Go name,
+  written from Kong's documented behaviour (split where the kind of
+  character changes, an upper-case run giving its last letter to a
+  lower-case word, dashes, lower case); `agreeWithKong` and its helpers,
+  which walk the top-level fields as `SchemaOf`'s `structFields` does,
+  flattening an embedded struct as json and Kong both do, and skip a type
+  with its own `JSONSchema`.
+* `command/args.go`: `New` calls the check after `SchemaOf`, and its
+  documentation states the rule; no exported name was added.
+  `SchemaOf` is unchanged.
+* `workspace/commands.go`: `zoomArg.Pane` gains `optional:""` and
+  `stateArg.State` `required:""`, the two production fields the census
+  found. Neither changes a schema, a golden file or a behaviour: the
+  tags only say to Kong what `json` already said.
+* Test fixtures that `New` now refused, each given the tag its error
+  named: `command/decode_test.go` (`strictArgs.Name`, `.Delta`,
+  `args.User`, `.Token`: `required:""`), `command/export_test.go`
+  (`zoomArgs.Pane`: `optional:""`), `command/cli/cli_test.go`
+  (`kindsArgs.Name`: `required:""`), and
+  `command/cobracmd/frontend_test.go` (`kindsArgs.Name`: `required:""`;
+  `levelArgs.Words`: `optional:""`), which `command/cobracmd`'s tests
+  need in workspace mode against this root. Of the census's 14 fields,
+  these are 8 and the two in `workspace` 2; the other 4, in
+  `command/schema_test.go`, were not refused: those structs go to
+  `SchemaOf` only, which does not check.
+* `command/args_test.go` (new): `TestNewAgreesWithKong` (seven structs
+  refused, each error naming its fix; nine accepted, among them a
+  positional with a default, a pointer flag, an embedded struct, a
+  nested object and a type with its own schema; `SchemaOf` of refused
+  structs still succeeds) and `TestKongName` (twelve names). Before the
+  release, a scratch program had Kong v1.16.1 name fields with the same
+  twelve Go names: every spelling matched. Step 11's test checks it
+  again against Kong's model.
+* `docs/guides/commands.md`: the rule, beside the tags.
+
+#### Checks (Rule 3)
+
+The parked `command/kongcmd/` (Step 11's, untracked and outside
+`go.work`) makes `internal/conformance` fail in workspace mode in the
+tree, which finds the directory and cannot type-check it there. Every
+check below therefore ran in the tree with `GOWORK=off`, or in a scratch
+clone of HEAD with this step's changes staged and without
+`command/kongcmd/`, which is what CI sees.
+
+1. `gofmt -l command workspace`: silent.
+2. `make pre-add-check FILES="<the 8 Go files>"` in the clone: exit 0,
+   "go-precheck: 8 file(s) clean in 2 module(s)".
+3. `make lint`: exit 0, "0 issues." for the three targets in both
+   modules, after `make modernize`. (First run: staticcheck's De Morgan
+   suggestions, twice, and `errcheck` on a discarded error of
+   `ownSchema`, now returned.)
+4. `GOWORK=off go test -race -count=1 ./...`: 16 packages `ok`;
+   `command/cobracmd` 2.
+5. `GOWORK=off go test -shuffle=on -count=2 ./...`: the same.
+6. `LC_ALL=C GOWORK=off go test -count=1 ./...`: the same.
+7. `GOWORK=off go mod tidy -diff`: silent in both modules; `go.mod` and
+   `go.sum` unchanged. In the clone: `scripts/go-modules.sh --check` and
+   `make release-check` exit 0 ("go-precheck: 139 file(s) clean in 2
+   module(s)"), and the root's tests in workspace mode 16 `ok`.
+   `command/cobracmd`'s tests pass in workspace mode, against this root,
+   and with `GOWORK=off`, against `v0.4.0`.
+8. `make fuzz FUZZTIME=10s` in the clone: exit 0.
+9. Windows test host, on a copy of the tree without `command/kongcmd/`:
+   go1.27.1 windows/amd64. `make pre-add-check`: exit 0, "go-precheck:
+   139 file(s) clean in 2 module(s)"; `make lint`: exit 0, "0 issues."
+   for each module and target; `make vuln`: exit 0, "No vulnerabilities
+   found." in both modules; `GOWORK=off go test -count=3 -shuffle=on` of
+   `command`, `workspace` and `command/cli`, then `command/cobracmd`'s
+   tests in workspace mode: exit 0.
+10. `markdownlint-cli2` on `docs/guides/commands.md`: 0 issues; the
+    relative-link check: 0 broken.
+11. The identifier scan of the diff and the new files: no match.
+
+#### Mutations (Rule 4)
+
+| Mutation | Test | Failing line |
+| :--- | :--- | :--- |
+| S11a-1: the required check skipped | `TestNewAgreesWithKong` | `a required flag without required: <nil>, want an error naming add required:""` |
+| S11a-2: a positional's default not counted | `TestNewAgreesWithKong` | `a positional with a default: … Kong requires it, and the schema does not: add optional:""` |
+| S11a-3: the name check skipped | `TestNewAgreesWithKong` | `a json name Kong spells differently: <nil>, want an error naming add name:"max_items"` |
+| S11a-4: the spelling not lower-cased | `TestKongName` | `kongName("MaxItems") = "Max-Items", want "max-items"` |
+| S11a-5: an acronym not split before a word | `TestKongName` | `kongName("HTTPServer") = "https-erver", want "http-server"` |
+| S11a-6: `New` does not call the check | `TestNewAgreesWithKong` | `an optional positional: <nil>, want an error naming add optional:""` |
+
+`command/args.go` and `workspace/commands.go` hold anchors of Steps 4
+and 7, whose sets ran again: Step 4's 13 and Step 7's 11, all killed.
+
+#### Release notes for `v0.5.0`
+
+`v0.5.0` makes an argument struct read the same in Kong as in the
+registry (0006-MADR A12).
+
+* **`command`:** `New[A]` refuses an argument struct whose top-level
+  fields Kong would read differently: a field the `json` tag makes
+  required that Kong does not (a flag without `required:""`), or the
+  reverse (a positional with `omitzero` and without `optional:""`), and a
+  `json` name that is not Kong's name for the field (`name:""`, or the Go
+  name with dashes: `MaxItems` is `max-items`). The error names the tag
+  to add or remove. `SchemaOf` is unchanged, so output schemas need none
+  of these tags.
+* **`workspace`:** two argument structs gain the tags; nothing a caller
+  sees changes.
+* **Upgrading:** a struct that `v0.4.0` accepted may need `required:""`,
+  `optional:""` or `name:""`; `New`'s error says which. No module is
+  added, and nothing exported changes.
+
+#### The release
+
+Left to the owner: commit this step without `command/kongcmd/`, push,
+and with CI green tag `v0.5.0`. Then the agent runs the consumer smoke
+test against `v0.5.0`, and records it here; the step is done when the
+tag exists and the smoke test builds. Step 11 then moves
+`command/kongcmd`'s requirement to `v0.5.0` and resumes.

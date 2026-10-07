@@ -95,7 +95,7 @@ type paneArg struct {
 }
 
 type zoomArg struct {
-	Pane string `json:"pane,omitzero" arg:"" help:"the pane to zoom; the focused pane when empty" placeholder:"PANE"`
+	Pane string `json:"pane,omitzero" arg:"" optional:"" help:"the pane to zoom; the focused pane when empty" placeholder:"PANE"`
 }
 
 type resizeArg struct {
@@ -108,7 +108,7 @@ type layoutArg struct {
 }
 
 type stateArg struct {
-	State layout.State `json:"state" help:"the layout state: zoom, hidden panes and resized splits"`
+	State layout.State `json:"state" required:"" help:"the layout state: zoom, hidden panes and resized splits"`
 }
 
 type themeArg struct {

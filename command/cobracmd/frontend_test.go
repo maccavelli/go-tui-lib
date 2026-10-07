@@ -28,7 +28,7 @@ type resizeArgs struct {
 }
 
 type kindsArgs struct {
-	Name   string         `json:"name" help:"a name"`
+	Name   string         `json:"name" required:"" help:"a name"`
 	N      int            `json:"n,omitzero" help:"a count"`
 	On     bool           `json:"on,omitzero" help:"a switch"`
 	Mode   string         `json:"mode,omitzero" enum:"fast,slow" default:"fast" help:"how"`
@@ -43,7 +43,7 @@ type pathArgs struct {
 
 type levelArgs struct {
 	Level string   `json:"level" arg:"" enum:"low,high" help:"how loud"`
-	Words []string `json:"words,omitzero" arg:"" help:"what to say"`
+	Words []string `json:"words,omitzero" arg:"" optional:"" help:"what to say"`
 }
 
 // fixture is a registry for the shell, and the last arguments each
