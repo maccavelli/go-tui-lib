@@ -29,6 +29,10 @@
 #   3. go test once more in workspace mode, against the tree's other modules;
 #   4. for a module other than the root: no replace directive, and a
 #      requirement of the root, if any, on a release version (vX.Y.Z).
+# gofmt's own failure fails the check: a file it cannot read or parse makes
+# it exit non-zero with nothing on its output, and that is not "formatted"
+# (docs/decisions/0015-MADR-precheck-gofmt-errors.md).
+#
 # Then, once: scripts/go-modules.sh --check, which fails when go.work and the
 # tracked go.mod files disagree; and, when no file list is given (the
 # `make release-check` path), scripts/go-apicheck.sh, which fails on an
@@ -49,9 +53,11 @@
 # Usage:
 #   scripts/go-precheck.sh [file.go ...]
 #
-# With no arguments it checks every tracked Go file, in every module; with
-# arguments, only those, in the modules that own them (non-Go arguments are
-# ignored, so callers can pass a whole changed-file list). The lint, tidy and
+# With no arguments it checks every tracked Go file the work tree has, in
+# every module; with arguments, only those that exist, in the modules that
+# own them (non-Go arguments are ignored, so callers can pass a whole
+# changed-file list). A tracked file deleted but not yet staged is not a file
+# to commit, so neither path checks it. The lint, tidy and
 # vulnerability steps are module-scoped either way: golangci-lint analyses
 # packages, not files, so narrowing it to a file list would report different
 # findings than `make lint` and the two would drift.
@@ -67,6 +73,9 @@ set -uo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT" || exit 1
+
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
 
 # Whether the framework examples run: on a whole-tree run, or when a file
 # under testdata/frameworks is given.
@@ -86,7 +95,7 @@ if [ "$#" -gt 0 ]; then
   done
 else
   while IFS= read -r f; do
-    [ -n "$f" ] && files+=("$f")
+    [ -n "$f" ] && [ -f "$f" ] && files+=("$f")
   done < <(git ls-files '*.go')
 fi
 
@@ -234,8 +243,14 @@ while IFS= read -r m; do
   checked_modules=$((checked_modules + 1))
   echo "go-precheck: module $m (${#mfiles[@]} file(s))" >&2
 
-  # 1. gofmt.
-  unformatted="$(gofmt -l "${mfiles[@]}")"
+  # 1. gofmt. Its exit status counts as well as its list: a file it cannot
+  # read or parse makes it fail with nothing on its output.
+  unformatted="$(gofmt -l "${mfiles[@]}" 2>"$WORK/gofmt.err")"
+  gofmt_rc=$?
+  if [ "$gofmt_rc" -ne 0 ]; then
+    show "gofmt: failed (exit $gofmt_rc)" "$(cat "$WORK/gofmt.err")"
+    fail 1
+  fi
   if [ -n "$unformatted" ]; then
     echo "gofmt: these files are not formatted (run 'gofmt -w <file>'):" >&2
     printf '%s\n' "$unformatted" | sed 's/^/  /' >&2

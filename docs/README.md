@@ -43,8 +43,8 @@ it was when they were written
 | 0014 | PLAN | [W3: bounded input, one sanitizer, overflow-safe layout, no mutable package variables, wider fuzzing; release `v0.8.0`](decisions/0014-PLAN-hardening.md) | proposed |
 | 0014 | PLAN | [W4: renames with deprecation aliases, opaque options, one enum helper, JSON v2, structured errors; release `v0.9.0` and `v0.10.0`](decisions/0014-PLAN-canonicalization.md) | proposed |
 | 0014 | REPORT | [An API assessment of `v0.6.0`, and how Go CLIs and agent tools integrate a TUI](reports/0014-REPORT-api-assessment-and-integration-research.md) | — |
-| 0015 | MADR | [Make the pre-add check fail when gofmt itself fails, and skip a tracked file the work tree no longer has](decisions/0015-MADR-precheck-gofmt-errors.md) | proposed |
-| 0015 | PLAN | [Implement: the pre-add check fails when gofmt fails, and skips a tracked file the work tree no longer has](decisions/0015-PLAN-precheck-gofmt-errors.md) | proposed |
+| 0015 | MADR | [Make the pre-add check fail when gofmt itself fails, and skip a tracked file the work tree no longer has](decisions/0015-MADR-precheck-gofmt-errors.md) | accepted |
+| 0015 | PLAN | [Implement: the pre-add check fails when gofmt fails, and skips a tracked file the work tree no longer has](decisions/0015-PLAN-precheck-gofmt-errors.md) | in-progress |
 
 ## I want to…
 

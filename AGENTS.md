@@ -282,6 +282,12 @@ A Go file under a `testdata` directory is formatted, but not given to
 `go vet` or `go test`. The go command ignores `testdata`, and the framework
 examples there import modules the library does not require.
 
+gofmt's own failure fails the check: a file it cannot read or parse makes
+it exit non-zero with nothing on its output. With no file list, the files
+are the tracked Go files the work tree has, so a tracked file deleted but
+not yet staged is not checked
+(`docs/decisions/0015-MADR-precheck-gofmt-errors.md`).
+
 It ends with `scripts/go-modules.sh --check`. Then:
 
 - **With no file list** (`make release-check`, or `make pre-add-check`

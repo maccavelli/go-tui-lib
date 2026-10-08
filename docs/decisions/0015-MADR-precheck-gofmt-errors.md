@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-10-08
 decision-makers: owner
 consulted: 0013-PLAN-cli-integration-helpers.md (Step 6, the Windows run), 0014-PLAN-api-policy-gates.md (Step 5, deviation D5)

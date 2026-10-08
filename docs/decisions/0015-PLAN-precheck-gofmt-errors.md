@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in-progress
 date: 2026-10-08
 associated-madr: "0015-MADR-precheck-gofmt-errors.md"
 ---
@@ -145,4 +145,69 @@ P2 also fails only once P1's fix is in: with gofmt's status ignored, the
 
 ## Execution Record
 
-Not started.
+### Step 1: records
+
+The pair was committed as `5c49566` and `d33f165`. The owner approved
+execution on 2026-10-08 ("committed and pushed for this repo. proceed to
+fix."), choosing the MADR's recommended option.
+
+### Step 2: the fix, its test, CI and the descriptions
+
+No deviation.
+
+#### What was built
+
+* **`scripts/go-precheck.sh`:**
+  * **The no-list path** keeps a `git ls-files '*.go'` entry only when
+    `[ -f "$f" ]`.
+  * **The gofmt step** writes gofmt's standard error to a file in a
+    temporary directory, which the script removes on exit (`trap`), and
+    keeps gofmt's exit status. A non-zero status shows "gofmt: failed
+    (exit N):" and gofmt's message, through the script's `show`, then
+    `fail 1`. The unformatted list is reported as before.
+  * **The header** says both, and cites 0015-MADR.
+* **`scripts/go-precheck_test.sh`:** the PLAN's six cases, 12
+  assertions.
+  * gofmt, `go vet` and `go test` are the real ones. golangci-lint is a
+    stub that passes, and the three network gates are skipped.
+  * The broken source goes in through `printf '%s\n'`, not as the
+    format string (shellcheck SC2059).
+* **`.github/workflows/ci.yml`:** the step `precheck test`, after
+  `examples`.
+* **`AGENTS.md`, "Pre-add checks":** a paragraph after the `testdata`
+  one.
+* **`docs/architecture.md`:** the tree, the precheck bullet and the CI
+  bullet.
+* **The records:** 0015-MADR is accepted, this PLAN is `in-progress`, and
+  `docs/README.md`'s rows follow.
+
+#### Checks
+
+* **Mutations, on copies of the script, run by the test through
+  `PRECHECK`.** Both killed:
+  * P1 (gofmt's status ignored again): "a testdata file that does not
+    parse fails: want 1, got 0", and three more failures; 7 passed, 5
+    failed;
+  * P2 (the no-list `[ -f ]` removed): "a deleted tracked file is
+    skipped, no list: want 0, got 1", and "gofmt is not given it: a line
+    holds lstat"; 10 passed, 2 failed.
+* **H1 again,** on a scratch clone with the fixed script: exit 1, with
+  "gofmt: failed (exit 2):" and "testdata/frameworks/flag/broken.go:3:12:
+  expected ')', found '{'". Before the fix it printed "1 file(s) clean"
+  and exited 0.
+* **Rule 2 on macOS:**
+  * shellcheck 0.11.0 on `scripts/*.sh` and actionlint v1.7.12: clean;
+  * `make pre-add-check` (no list) and `make release-check`: "155 file(s)
+    clean in 1 module(s) (gofmt, golangci-lint, go vet, go test, go mod
+    tidy, govulncheck, apicheck, examples)". That is what the tree
+    reported before;
+  * `make pre-add-check FILES=launch/flags.go`: "1 file(s) clean";
+  * the script tests: `go-modules_test` 17 passed, `go-fuzz_test` 12,
+    `go-apicheck_test` 19, `go-examples_test` 19, and
+    `go-precheck_test` 12;
+  * markdownlint: 0 issues. The link check: 123 links, none broken.
+* **The Windows test host,** go1.27.1 windows/amd64:
+  * `go-precheck_test.sh` gave "12 passed, 0 failed", including the
+    deleted-file case;
+  * `make pre-add-check` gave "155 file(s) clean".
+* **The identifier scan of the diff and the new test:** no match.

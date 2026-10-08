@@ -164,6 +164,8 @@ scripts/
   go-examples.sh            builds and runs the framework examples, and
                             checks the guides' excerpts of them
   go-examples_test.sh       its offline test
+  go-precheck_test.sh       the pre-add check's gofmt step and its files,
+                            on throwaway repositories
 glyph/ theme/ layout/ workspace/ tuitest/ termcap/ termsvc/
 when/ command/              the packages; goldens under testdata/golden/
                             where a package renders
@@ -281,7 +283,10 @@ docs/
   runs, `go vet` and `go test` on their packages, `go mod tidy -diff` and
   `govulncheck ./...`; `go test` again in workspace mode; and, for a
   nested module, no `replace` and a release version of the root. A Go
-  file under `testdata` is formatted, but not vetted or tested. It ends
+  file under `testdata` is formatted, but not vetted or tested. gofmt's
+  own failure, on a file it cannot read or parse, fails the check, and
+  with no file list the files are the tracked Go files the work tree has
+  ([0015-MADR](decisions/0015-MADR-precheck-gofmt-errors.md)). It ends
   with `scripts/go-modules.sh --check`, then:
   - with no file list, the API diff gate;
   - with no file list, or one naming a file under `testdata/frameworks`,
@@ -339,6 +344,7 @@ docs/
     - `apicheck`: the API diff gate's test, then `make apicheck`. The
       job's checkout fetches the whole history and its tags;
     - `examples`: the examples gate's test, then `make examples`;
+    - `precheck test`: the pre-add check's own test;
     - `shellcheck` v0.11.0 (pinned by SHA-256 and first on `PATH`),
       `markdownlint-cli2` 0.23.2 and `actionlint` v1.7.12.
   - One run per ref (`concurrency`, cancel in progress). Actions are pinned
