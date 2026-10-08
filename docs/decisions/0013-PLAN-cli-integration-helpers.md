@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-10-07
 associated-madr: "0013-MADR-cli-integration-helpers.md"
 ---
@@ -19,6 +19,10 @@ W1.
   packages). The
   first draft's steps are replaced, not amended. It was never approved or
   executed.
+* **2026-10-08, Step 11 added, proposed:** drop `negatable:""` from
+  `Flags.TUI`, as 0013-MADR A1.10 (proposed) decides. Steps 1–10 are
+  complete. The status returns to `in-progress` when Step 11 is
+  approved.
 
 ## Goal
 
@@ -750,6 +754,52 @@ guide's examples compile and run in the harness.
 * **Verification,** item by item, with output.
 * **This PLAN `complete`.**
 * **An amendment** to either MADR only if a fact differed.
+
+### Step 11 (proposed, 2026-10-08): drop Kong's `--no-tui`
+
+0013-MADR A1.10, once the owner accepts it. One commit.
+
+* **`launch/flags.go`:**
+  * `Flags.TUI`'s tag loses `negatable:""`;
+  * the doc comment's clause "its negatable tag gives Kong --no-tui,
+    which no other framework reads" goes.
+* **`testdata/frameworks/kong/main.go`:** the comment on the embedded
+  `launch.Flags` becomes `// --mode and --tui`.
+* **`docs/guides/commands.md`:**
+  * the Kong excerpt follows the program, which the excerpt check
+    enforces;
+  * the sentence "With Kong, `launch.Flags` embeds into the grammar
+    (above), with `--no-tui`, …" loses "with `--no-tui`", and gains
+    "`--tui=false` cancels an earlier `--tui`".
+* **`testdata/frameworks/cases.txt`** gains two Kong cases:
+  * `kong --no-tui => 80 stderr unknown flag --no-tui`;
+  * `kong --tui --tui=false => 0 stdout line mode`.
+* **The records:**
+  * 0013-MADR's A1.10 becomes accepted;
+  * this PLAN's execution record for Step 11;
+  * `docs/README.md`'s 0013 rows.
+
+  The history stays as written: A1.2, A1.8, D8, and Steps 7 and 9's
+  records. A1.10 supersedes them.
+
+**Mutation:**
+
+| Name | Change | Must fail |
+| :--- | :--- | :--- |
+| S11-1 | the tag put back | `make examples`, on the case `kong --no-tui => 80` |
+
+**Checks:**
+
+* Rule 2, and the Windows test host;
+* `make apicheck` against `v0.7.0`: 0 incompatible changes;
+* `make examples`: 26 cases.
+
+**Release:** none in this step. The change ships in the next release
+after `v0.7.0`. The owner chooses `v0.7.1` or the next minor release, and
+tags it.
+
+**Done when** Rule 2's checks are clean, S11-1 is killed, and the
+excerpts and cases pass.
 
 ## Verification
 
@@ -1694,3 +1744,119 @@ Step 7 was committed as `c680671`.
   * `GOWORK=off go test -count=3 -shuffle=on ./...` gave 18 `ok`;
   * `launch` and `launchtest`: 37 tests and examples pass.
 * **The identifier scan of the diff:** no match.
+
+### Step 9: the release
+
+The owner asked on 2026-10-08 for Step 8 to be committed and everything
+outstanding pushed. The agent committed it as `59f1496`. The disclosure
+guard passed over the six outgoing commits (`cb116d0` to `59f1496`), and
+the agent pushed `main`. CI run `37792209643` passed every job on
+`59f1496`: `modules`, `test` on Ubuntu, macOS and Windows, and `gates`
+with `apicheck`, `examples` and the lint step. The owner then tagged
+`v0.7.0` and pushed it.
+
+* **Before the tag,** on `59f1496`:
+  * `make release-check`: "155 file(s) clean … apicheck, examples";
+  * `make lint`: three "0 issues.";
+  * `make vuln`: "No vulnerabilities found.";
+  * a dry run of the smoke test against the tree, through a `replace`,
+    gave the result below.
+* **The tag:** `v0.7.0` is an annotated tag on `59f1496`, with the
+  message "v0.7.0".
+* **The consumer smoke test** against the published `v0.7.0`, as
+  `docs/guides/releasing.md` gives it. It ran in a scratch module outside
+  the repository, with `go env GOWORK` empty.
+  * `go get github.com/maccavelli/go-tui-lib@v0.7.0` downloaded
+    `v0.7.0`, and `go mod tidy` passed.
+  * The program imports `launch`, `launch/launchtest`, `workspace`,
+    `layout` and `termcap`. `go vet` and `go build` passed.
+  * `go run .` printed:
+    * "decide: false launch.input-not-terminal";
+    * "launchtest decide: launch.terminal";
+    * "run: launch: the TUI did not start: launch.input-not-terminal".
+
+    It exited 2 through `ExitCode`, as designed.
+  * `go list -m all` showed `github.com/charmbracelet/x/term v0.2.2` and
+    `charm.land/bubbletea/v2 v2.0.10`.
+* **Release notes for `v0.7.0`:**
+  * **Added:**
+    * `launch`, with `Choice`, `Flags`, `Streams`, `StreamSource`,
+      `FromSource`, `Config`, `Decide`, `Decision`, `Target`, `Reason`,
+      `Run`, its options, `ErrNotStarted`, `ErrCrashed`, `Frame`,
+      `ExitCode`, `ExitError` and `Restorer`;
+    * `launch/launchtest`, with `Terminal`, `Pipe`, `Streams` and `Env`;
+    * `glyph.Tier`, with `TierUnicode`, `TierLegacy`, `TierASCII` and
+      `Tier.Set`;
+    * `command.(*Registry).Attach`;
+    * internally, `internal/enum`, which termcap's enums now use.
+  * **Changed:** `github.com/charmbracelet/x/term` is a direct
+    requirement, at the version Bubble Tea already selected. No module
+    was added.
+  * **Removed:** nothing. `make apicheck` reported "against v0.6.0, 0
+    incompatible change(s)". apidiff, run over all changes, listed only
+    additions.
+  * **Notes:**
+    * `Config.OpenTTY` is not supported on Windows (0013-MADR A1.9).
+    * `Flags.TUI` carries `negatable:""`, so a Kong program that embeds
+      `Flags` gets `--no-tui`.
+
+### Step 10: close-out
+
+The owner asked on 2026-10-08 ("v0.7.0 is pushed"). Verification, item by
+item, run again on `59f1496`, which `git describe --exact-match` names
+`v0.7.0`:
+
+* **`Choice` and `Flags`** parse `--tui` and `--mode` in the four tier-1
+  frameworks.
+  * Step 7's scratch programs showed it, and so do the harness programs
+    `make examples` runs.
+  * That run gave "24 case(s) run, 9 excerpt(s) checked, clean".
+  * The tier-2 results are in Step 7's record.
+* **`Decide`** follows §3–§6 as amended by A1.3, A1.7 and A1.9. It
+  spawns nothing (S3-3), and S3-1 to S3-10 were killed (Step 3, run again
+  in Step 6 for the moved tests).
+* **`Run`:**
+  * it holds the fallback in every outcome;
+  * it detaches the registry (L8 on both hosts) and writes the
+    `Restorer` (`TestRunRestorerAfterCrash`);
+  * it restores the saved state (L4 and L5, under D7);
+  * it returns the last good model;
+  * S4-1 to S4-12 were killed. S4-4 was caught by `TestRunCrash`;
+    `TestRunNotStarted` cannot catch it.
+* **`Frame`, `ExitCode` and `ExitError`** follow §8, §9 and A1.2. S5-1 to
+  S5-4 were killed.
+* **`launchtest`** carries the package's exported-API tests (D6), and
+  S6-1 was killed.
+* **Conformance** scans `launch` and `launchtest`. S8-1 to S8-3 were
+  killed. `go test -v ./launch/... ./internal/conformance` gave 42
+  passing tests and three `ok`.
+* **The live probes L1–L8** pass on macOS. On the Windows test host, L1,
+  L3, L4, L6 and L8 pass, and L7 passes as D9 decided: a clean fallback.
+* **x/term** is direct at v0.2.2 (`go.mod:12`), and kept to `launch` by
+  depguard's `xterm` rule. The module list (`GOWORK=off go list -m all`)
+  is the same 29 lines as before Step 3.
+* **`make apicheck`** gave "against v0.6.0, 0 incompatible change(s)"
+  and "clean": additions only.
+* **`v0.7.0`** is tagged, and the smoke test runs (Step 9).
+* **Rule 2's checks** were clean at every step, on macOS and the Windows
+  test host, and the identifier scan of each step's diff found nothing.
+
+**One line of the rollout plan differed:** it said `v0.7.0` would be
+tagged after Step 7's probes. It was tagged after Step 8, as the step
+order requires, since Step 8's documents describe the release.
+
+**The MADR's facts** that differed were amended during execution: A1.7
+(what `colorprofile.Env` reads on Windows), A1.8 (`PENDIN`, and the
+`negatable` tag) and A1.9 (`OpenTTY` on Windows). No further amendment is
+needed.
+
+**Open after this PLAN:**
+
+* **`scripts/go-precheck.sh` ignores gofmt's own errors** (Step 6). It
+  reads gofmt's list and not its exit status, so a file gofmt cannot read
+  passes. That belongs to a later record.
+* **A cancellable reader for a console handle other than stdin,**
+  upstream in ultraviolet. It would let `OpenTTY` work on Windows
+  (A1.9).
+
+Every Verification item holds, and this PLAN is `complete`.

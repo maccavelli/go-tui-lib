@@ -1266,6 +1266,44 @@ accepted, and its revision names each change.
   than stdin, upstream. launch cannot make one without making `CONIN$`
   the process's stdin, a process-wide stream §10 keeps it away from.
 
+#### A1.10 (2026-10-08, proposed): `Flags.TUI` drops `negatable:""`
+
+This amendment is **proposed**. If the owner accepts it, it supersedes the
+`--no-tui` sentence of A1.2 ("`negatable:""` adds `--no-tui`") and A1.8's
+second bullet.
+
+* **Context.** A1.8 put `negatable:""` on `Flags.TUI`, so that a Kong
+  program embedding `Flags` gets `--no-tui`, as A1.2's prose said. It
+  shipped in `v0.7.0`. After the release, the owner: "i see no need for
+  --no-tui then, since default is that with no args".
+* **What `--no-tui` does.** It sets `TUI` to false. With no flag, `TUI` is
+  already false, so `--no-tui` alone changes nothing. Its only use is
+  cancelling an earlier `--tui`, from an alias or a wrapper.
+* **The probe** (2026-10-08). A scratch clone dropped the tag, in a
+  commit after `v0.7.0`, and a Kong program embedded `Flags`:
+  * `make apicheck`: "against v0.7.0, 0 incompatible change(s)". The tag
+    is not part of the API apidiff compares;
+  * no flag gave `auto`, and `--tui` gave `tui`;
+  * `--no-tui` gave "unknown flag --no-tui", exit 80;
+  * `--tui=false` gave `auto`. Kong takes an explicit value for a `bool`,
+    so cancelling an earlier `--tui` stays possible without the tag.
+* **Considered options:**
+  * keep `negatable:""`, as `v0.7.0` ships it;
+  * drop it.
+* **Decision outcome (proposed).** Chosen option: "drop it", because
+  "no TUI" then has one spelling, no flag, as it has in every other
+  framework launch serves, and `--tui=false` still cancels an earlier
+  `--tui` in Kong.
+  * Good, because the flag set is the same in all seven frameworks: none
+    has `--no-tui`.
+  * Good, because the API is unchanged (`make apicheck` against
+    `v0.7.0`).
+  * Bad, because a Kong program built on `v0.7.0` whose users pass
+    `--no-tui` gets "unknown flag" (exit 80) after it upgrades. `v0.7.0`
+    was published on 2026-10-08, the same day.
+* **Release.** The change ships in the next release after `v0.7.0`. The
+  owner decides whether that is a `v0.7.1` or the next minor release.
+
 ## More Information
 
 ### Probes
