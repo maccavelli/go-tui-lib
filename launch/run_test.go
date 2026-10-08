@@ -5,17 +5,14 @@ import (
 	"errors"
 	"io"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/colorprofile"
-	"github.com/charmbracelet/x/ansi"
 
 	"github.com/maccavelli/go-tui-lib/command"
-	"github.com/maccavelli/go-tui-lib/termcap"
 )
 
 // tm is a model whose behaviour each test sets.
@@ -162,26 +159,6 @@ func TestRunPlainWritesNothing(t *testing.T) {
 	}
 }
 
-func TestRunQuits(t *testing.T) {
-	out := terminal(80, 24)
-	r := runTM(t, t.Context(), Streams{In: blocking(t), Out: out}, interactive(), tm{quitOnSize: true, keys: "x"})
-	if r.err != nil || r.m.keys != "x" {
-		t.Fatalf("Run = %+v, %v; want the typed model and nil", r.m, r.err)
-	}
-	if !strings.Contains(out.String(), "tm:x") {
-		t.Errorf("Out does not hold the view: %q", out.String())
-	}
-}
-
-func TestRunUsesTheGivenInput(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
-	defer cancel()
-	r := runTM(t, ctx, Streams{In: strings.NewReader("abq"), Out: terminal(80, 24)}, interactive(), tm{quitOnKey: "q"})
-	if r.err != nil || r.m.keys != "abq" {
-		t.Fatalf("Run = %+v, %v; want the keys typed on s.In", r.m, r.err)
-	}
-}
-
 func TestRunNotStarted(t *testing.T) {
 	c := countSaves(t)
 	old := newProgram
@@ -282,133 +259,6 @@ func TestRunEndsAreNotCrashes(t *testing.T) {
 	}
 }
 
-func TestRunRegistryDetached(t *testing.T) {
-	for _, end := range []string{"quit", "crash", "cancel"} {
-		t.Run(end, func(t *testing.T) {
-			var ran atomic.Int32
-			r := command.NewRegistry()
-			ping, err := command.New("app.ping", "Ping", func(context.Context, *command.Invocation, command.NoArgs) (command.Result, error) {
-				ran.Add(1)
-				return command.Result{Text: "pong"}, nil
-			}, command.WithDanger(command.ReadOnly))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := r.Register(ping); err != nil {
-				t.Fatal(err)
-			}
-			req := command.Request{ID: "app.ping", Origin: command.OriginAgent}
-			ctx, cancel := context.WithCancel(t.Context())
-			defer cancel()
-			started := make(chan *tea.Program, 1)
-			done := make(chan result, 1)
-			go func() {
-				got, err := Run(ctx, Streams{In: blocking(t), Out: terminal(80, 24)}, interactive(), tm{},
-					WithRegistry(r), OnStart(func(p *tea.Program) { started <- p }))
-				done <- result{got, err}
-			}()
-			p := within(t, 5*time.Second, func() *tea.Program { return <-started })
-
-			// While the TUI runs, an agent's Loop command runs on its loop.
-			res := within(t, 5*time.Second, func() string {
-				res, err := r.Run(t.Context(), req)
-				if err != nil {
-					t.Error(err)
-				}
-				return res.Text
-			})
-			if res != "pong" {
-				t.Errorf("the agent's command gave %q", res)
-			}
-			switch end {
-			case "quit":
-				p.Send(quitMsg{})
-			case "crash":
-				p.Send(panicMsg{})
-			case "cancel":
-				cancel()
-			}
-			out := within(t, 5*time.Second, func() result { return <-done })
-			if out.m.loops != 1 {
-				t.Errorf("the model ran %d LoopMsgs, want 1", out.m.loops)
-			}
-
-			// After Run, the same command runs on its caller, at once.
-			before := ran.Load()
-			text := within(t, time.Second, func() string {
-				res, err := r.Run(context.Background(), req)
-				if err != nil {
-					t.Error(err)
-				}
-				return res.Text
-			})
-			if text != "pong" || ran.Load() != before+1 {
-				t.Errorf("after Run: %q, with %d runs", text, ran.Load()-before)
-			}
-		})
-	}
-}
-
-func TestRunRestorerAfterCrash(t *testing.T) {
-	p := termcap.New()
-	p.Update(tea.ColorProfileMsg{Profile: colorprofile.TrueColor})
-	p.Update(tea.EnvMsg{"TERM=xterm-kitty"})
-	p.Update(tea.ModeReportMsg{Mode: ansi.ModeLightDark, Value: ansi.ModeReset})
-	if p.Restore() != ansi.ResetModeLightDark {
-		t.Fatal("the prober did not set mode 2031")
-	}
-	countSaves(t)
-	out := terminal(80, 24)
-	r := runTM(t, t.Context(), Streams{In: io.MultiReader(strings.NewReader("p"), blocking(t)), Out: out},
-		interactive(), tm{panicOn: "key:p"}, WithRestorer(p))
-	if !errors.Is(r.err, ErrCrashed) {
-		t.Fatalf("err = %v, want a crash", r.err)
-	}
-	if !strings.HasSuffix(out.String(), ansi.ResetModeLightDark) {
-		t.Errorf("the drawing stream does not end with mode 2031's reset: %q", out.String())
-	}
-}
-
-func TestRunOnStart(t *testing.T) {
-	var calls atomic.Int32
-	var mu sync.Mutex
-	var seen *tea.Program
-	r := runTM(t, t.Context(), Streams{In: blocking(t), Out: terminal(80, 24)}, interactive(), tm{},
-		OnStart(func(p *tea.Program) {
-			calls.Add(1)
-			mu.Lock()
-			seen = p
-			mu.Unlock()
-			go p.Send(quitMsg{}) // delivered once the program runs
-		}))
-	if r.err != nil {
-		t.Fatalf("err = %v; the message OnStart sent did not quit the program", r.err)
-	}
-	mu.Lock()
-	defer mu.Unlock()
-	if calls.Load() != 1 || seen == nil {
-		t.Errorf("OnStart was called %d times, with %v", calls.Load(), seen)
-	}
-}
-
-func TestRunEpilogue(t *testing.T) {
-	out := terminal(80, 24)
-	r := runTM(t, t.Context(), Streams{In: blocking(t), Out: out}, interactive(), tm{quitOnSize: true, epilogue: "resume with --continue\n"})
-	if r.err != nil {
-		t.Fatal(r.err)
-	}
-	if s := out.String(); !strings.HasSuffix(s, "resume with --continue\n") || strings.Index(s, "tm:") > strings.Index(s, "resume") {
-		t.Errorf("the epilogue is not written after the TUI's last byte: %q", s)
-	}
-
-	countSaves(t)
-	out = terminal(80, 24)
-	r = runTM(t, t.Context(), Streams{In: blocking(t), Out: out}, interactive(), tm{panicOn: "view", epilogue: "resume"})
-	if !errors.Is(r.err, ErrCrashed) || strings.Contains(out.String(), "resume") {
-		t.Errorf("after a crash: %v, and Out holds %q", r.err, out.String())
-	}
-}
-
 func TestRunOpensAndClosesTTY(t *testing.T) {
 	tty := func() Decision {
 		d := interactive()
@@ -464,58 +314,5 @@ func TestRunOpensAndClosesTTY(t *testing.T) {
 				t.Errorf("Out was written, though the TUI drew on the terminal: %q", out.String())
 			}
 		})
-	}
-}
-
-func TestWithFilterSeesTheModel(t *testing.T) {
-	var sawModel atomic.Bool
-	r := runTM(t, t.Context(), Streams{In: io.MultiReader(strings.NewReader("axbq"), blocking(t)), Out: terminal(80, 24)},
-		interactive(), tm{quitOnKey: "q"},
-		WithFilter(func(m tm, msg tea.Msg) tea.Msg {
-			sawModel.Store(true)
-			if k, ok := msg.(tea.KeyPressMsg); ok && k.String() == "x" {
-				return nil // dropped
-			}
-			return msg
-		}))
-	if r.err != nil || r.m.keys != "abq" {
-		t.Errorf("Run = %+v, %v; want x filtered out", r.m, r.err)
-	}
-	if !sawModel.Load() {
-		t.Error("the filter never saw the program's own model")
-	}
-}
-
-// other is a model of another type.
-type other struct{}
-
-func (other) Init() tea.Cmd                         { return nil }
-func (o other) Update(tea.Msg) (tea.Model, tea.Cmd) { return o, nil }
-func (other) View() tea.View                        { return tea.NewView("other") }
-
-// becomes turns into other on its first window size, and quits.
-type becomes struct{ tm }
-
-func (b becomes) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if _, ok := msg.(tea.WindowSizeMsg); ok {
-		return other{}, tea.Quit
-	}
-	return b, nil
-}
-
-func TestRunFinalModelOfAnotherType(t *testing.T) {
-	type out struct {
-		b   becomes
-		err error
-	}
-	r := within(t, 5*time.Second, func() out {
-		b, err := Run(t.Context(), Streams{In: blocking(t), Out: terminal(80, 24)}, interactive(), becomes{tm{keys: "kept"}})
-		return out{b, err}
-	})
-	if r.err == nil || !strings.Contains(r.err.Error(), "launch.other") || !strings.Contains(r.err.Error(), "launch.becomes") {
-		t.Errorf("err = %v; want one naming both types", r.err)
-	}
-	if r.b.keys != "kept" {
-		t.Errorf("the model is %+v; want the last good one", r.b)
 	}
 }

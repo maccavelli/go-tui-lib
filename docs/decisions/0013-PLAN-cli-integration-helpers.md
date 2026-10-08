@@ -1233,3 +1233,136 @@ Step 4 was committed as `0b7a9db`. No deviation.
   * `GOWORK=off go test -count=3 -shuffle=on ./...` gave 17 `ok`;
   * `launch`'s 30 tests and examples pass, the goldens among them.
 * **The identifier scan of the diff and the new files:** no match.
+
+### Step 6: `launch/launchtest`
+
+The owner approved it on 2026-10-07 ("Commit and proceed"), when Step 5
+was committed as `d6b17bd`.
+
+#### Deviations
+
+Both were found before anything was written. Each was asked, and the owner
+chose the recommendation.
+
+* **D5 (2026-10-07): `Terminal` is a deliberate clash with
+  `termcaptest.Terminal`.**
+  * **Found:** `termcap/termcaptest` exports `Terminal`, "a scripted fake
+    terminal speaking a Profile". The PLAN's `launchtest.Terminal` would
+    fail `TestNoTypeNameMeansTwoThings`.
+  * **Chosen:** both mean a fake terminal for tests, each in its own
+    test-kit package with its own constructor. `sharedNames` gains
+    `"Terminal": {"launch/launchtest", "termcap/termcaptest"}`, and
+    `docs/glossary.md` gains its row in the same change.
+  * **Not chosen:** renaming `launchtest`'s, which changes the PLAN's API.
+* **D6 (2026-10-07): the tests that use only `launch`'s exported API move
+  onto `launchtest`; the others stay internal.**
+  * **Found:** `launchtest` imports `launch`, since `Streams` returns a
+    `launch.Streams`. Steps 3–5's tests are in package `launch`, and Go
+    refuses that import cycle in a test. They are internal because they
+    use the seams: `decideWith`'s OS and opener, `runWith`, `save`,
+    `newProgram`, `colourEnv`, `tier`, `isTerminal` and `size`. Only a
+    `launch_test` file can import `launchtest`.
+  * **Chosen:** each test that uses only the exported API moves to
+    `launch/consumer_test.go`, in package `launch_test`, on `launchtest`.
+    That is `launchtest`'s first consumer. The rest stay on the
+    package-private fake.
+  * **Not chosen:** leaving every test in place, with `launchtest`
+    exercised only by its own tests and `ExampleTerminal`.
+
+#### What was built
+
+* **`launch/launchtest/launchtest.go`:** the PLAN's API.
+  * **`Terminal`:**
+    * `Read` waits, as a terminal does, until `Type` queues keys or
+      `Close` is called. After `Close` it returns the queued keys, then
+      `io.EOF`.
+    * `Write` keeps what is written, for `Output`.
+    * A second `Close` does nothing.
+    * It is safe for use from several goroutines.
+  * **`Pipe`** has `Read`, `Write` and `Output`, which the PLAN's sketch
+    left out, so that it can stand in for In, Out or Err. It has no
+    `IsTerminal`, so launch's terminal test says no.
+  * The package comment ends with the stable stability line.
+* **`launch/launchtest/launchtest_test.go`:** the reader waits for keys;
+  `Close` ends the input; the facts; `Pipe`; `Streams` and `Env`.
+* **`launch/launchtest/example_test.go`:** `ExampleTerminal`, the
+  `--tui` path end to end. It shows the decision on a fake terminal, then
+  a `Run` that quits on a typed q: "true launch.terminal 80 24 unicode",
+  then "abq <nil> 0".
+* **D6's move:**
+  * `launch/consumer_test.go` (package `launch_test`, 18 tests) and
+    `launch/consumer_unix_test.go` now hold the tests that use only the
+    exported API, on `launchtest`:
+    * `TestChoiceText`, `TestTargetText`, `TestFlagsRegister` and
+      `TestFromSource`;
+    * `TestRunQuits`, `TestRunUsesTheGivenInput`,
+      `TestRunRegistryDetached` and `TestRunRestorerAfterCrash`;
+    * `TestRunOnStart`, `TestRunEpilogue` and
+      `TestWithFilterSeesTheModel`;
+    * `TestRunFinalModelOfAnotherType` and
+      `TestRunSignalsStayTheProgramsUnix`;
+    * `TestFrameGolden`, `TestFrameRunsNoCommand`, `TestExitCode` and
+      `TestExitError`.
+  * `launch/flags_test.go`, `launch/frame_test.go` and
+    `launch/run_unix_test.go` moved whole, and are deleted.
+  * `launch/run_test.go` keeps the tests that need a seam:
+    `TestRunPlainWritesNothing`, `TestRunNotStarted`, `TestRunCrash`,
+    `TestRunEndsAreNotCrashes` and `TestRunOpensAndClosesTTY`.
+    `launch/decide_test.go` is unchanged.
+  * The golden files did not change. The moved test writes to the same
+    `testdata/golden/`.
+* **D5:** `sharedNames` has `Terminal`, and `docs/glossary.md` has its
+  row.
+
+#### Checks
+
+* **Mutations, on scratch copies.** All killed:
+  * S6-1 (`IsTerminal` false): `ExampleTerminal` printed "false
+    launch.input-not-terminal 0 0 unicode", then " launch: the TUI did not
+    start: launch.input-not-terminal 2";
+  * D5's entry removed: "Terminal is exported by [launch/launchtest
+    termcap/termcaptest]: one name, one meaning";
+  * **the earlier mutations whose tests moved, run again** against the
+    moved tests:
+    * S3-8: build failure, "*launch.Choice does not implement
+      flag.Getter";
+    * S4-2: "the TUI did not start: … open /dev/tty";
+    * S4-3: "program was interrupted";
+    * S4-9: `TestRunRegistryDetached/crash`, "did not return within 1s";
+    * S4-10: "does not end with mode 2031's reset";
+    * S4-11: "want x filtered out";
+    * S4-12: "after a crash: … Out holds";
+    * S5-1: "nocolor.utf8.60: line 1 differs";
+    * S5-2: "Frame called Init (true)";
+    * S5-4: "context.Canceled: ExitCode = 1, want 130".
+* **The API:** apidiff over all changes lists only additions since
+  `v0.6.0`, now with `package …/launch/launchtest: added`.
+  `go doc -short ./launch/launchtest` lists exactly the PLAN's names:
+  `Env`, `Streams`, `Pipe`, `NewPipe`, `Terminal` and `NewTerminal`.
+* **Rule 2 on macOS:**
+  * `make pre-add-check` over the 7 changed Go files: clean;
+  * `make release-check`: "150 file(s) clean … apicheck, examples";
+  * `make lint`: three "0 issues.";
+  * with `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    each gave 18 `ok`, and so did workspace mode. `launch/...` passed 10
+    times under `-race`;
+  * `go mod tidy -diff` and `scripts/go-modules.sh --check`: clean;
+  * markdownlint: 0 issues. The link check: 0 broken.
+* **The Windows test host,** go1.27.1 windows/amd64:
+  * `make pre-add-check` gave "153 file(s) clean … apicheck, examples";
+  * `make lint` and `make vuln` exit 0;
+  * `GOWORK=off go test -count=3 -shuffle=on ./...` gave 18 `ok`;
+  * `launch` and `launchtest` pass: 36 tests and examples;
+  * **an artifact of the copy, and something it showed:**
+    * The host's copy rebuilds its index from `d6b17bd`, which still
+      tracks the three moved files, so the precheck listed
+      `launch/run_unix_test.go`. gofmt then printed "GetFileAttributesEx
+      launch/run_unix_test.go: The system cannot find the file
+      specified".
+    * The tree here has the deletions staged, so it does not happen
+      there.
+    * The precheck still reported the file clean. It reads gofmt's list
+      of unformatted files and not gofmt's exit status, so a file gofmt
+      cannot read passes. That is outside this PLAN, and is left for the
+      owner.
+* **The identifier scan of the diff and the new files:** no match.

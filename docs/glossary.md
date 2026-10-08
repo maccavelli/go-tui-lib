@@ -25,6 +25,8 @@ are the only ones; none is added.
 | | `termcap` | where a capability fact came from, weakest first |
 | `Pane` | `layout` | a leaf node of a layout tree, by pane ID |
 | | `workspace` | the component interface a workspace hosts |
+| `Terminal` | `launch/launchtest` | a fake terminal stream for tests: it says it is a terminal, has a size, and takes typed keys |
+| | `termcap/termcaptest` | a fake terminal for tests that answers a program's queries as a terminal profile does |
 
 ## Reserved by accepted records
 

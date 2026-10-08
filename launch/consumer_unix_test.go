@@ -1,6 +1,6 @@
 //go:build unix
 
-package launch
+package launch_test
 
 import (
 	"os"
@@ -10,10 +10,13 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/maccavelli/go-tui-lib/launch"
+	"github.com/maccavelli/go-tui-lib/launch/launchtest"
 )
 
 // tickQuit is a model that quits on a timer.
-type tickQuit struct{ tm }
+type tickQuit struct{ model }
 
 type tickMsg struct{}
 
@@ -37,8 +40,8 @@ func TestRunSignalsStayTheProgramsUnix(t *testing.T) {
 	defer signal.Stop(sig)
 
 	got := within(t, 5*time.Second, func() error {
-		_, err := Run(t.Context(), Streams{In: blocking(t), Out: terminal(80, 24)}, interactive(), tickQuit{},
-			OnStart(func(*tea.Program) {
+		_, err := launch.Run(t.Context(), launch.Streams{In: idle(t), Out: launchtest.NewTerminal(80, 24)}, interactive(), tickQuit{},
+			launch.OnStart(func(*tea.Program) {
 				go func() {
 					time.Sleep(50 * time.Millisecond)
 					if err := syscall.Kill(os.Getpid(), syscall.SIGINT); err != nil {

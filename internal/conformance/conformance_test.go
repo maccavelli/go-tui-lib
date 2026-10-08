@@ -476,6 +476,9 @@ var sharedNames = map[string][]string{
 	"Kind":     {"command", "when"},
 	"Origin":   {"command", "termcap"},
 	"Pane":     {"layout", "workspace"},
+	// A fake terminal for tests, in each test kit
+	// (docs/decisions/0013-PLAN-cli-integration-helpers.md D5).
+	"Terminal": {"launch/launchtest", "termcap/termcaptest"},
 }
 
 // TestNoTypeNameMeansTwoThings fails when two public packages export a type
