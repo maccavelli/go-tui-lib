@@ -141,6 +141,30 @@ func TestDecideRules(t *testing.T) {
 	}
 }
 
+// TestDecideOpenTTYNotOnWindows: on Windows, OpenTTY is ignored, and the
+// controlling terminal is never opened (0013-MADR A1.9).
+func TestDecideOpenTTYNotOnWindows(t *testing.T) {
+	for _, c := range []struct {
+		name    string
+		in, out *fake
+		want    Reason
+	}{
+		{"input", pipe(), terminal(80, 24), ReasonInputNotTerminal},
+		{"output", terminal(80, 24), pipe(), ReasonOutputNotTerminal},
+	} {
+		o := oneTTY()
+		d := decideWith(streams(c.in, c.out, nil, base...), Config{Choice: ChoiceTUI, OpenTTY: true}, "windows", o.open)
+		if d.Interactive || d.Reason != c.want || o.opens != 0 {
+			t.Errorf("%s on windows: %v, %s, opened %d times; want plain, %s, never opened", c.name, d.Interactive, d.Reason, o.opens, c.want)
+		}
+		// The same decision elsewhere opens the terminal.
+		o = oneTTY()
+		if d := decideWith(streams(c.in, c.out, nil, base...), Config{Choice: ChoiceTUI, OpenTTY: true}, "linux", o.open); !d.Interactive || o.opens != 1 {
+			t.Errorf("%s on linux: %v, opened %d times; want interactive through the terminal", c.name, d.Interactive, o.opens)
+		}
+	}
+}
+
 func TestDecideOpensOnlyWhenNeeded(t *testing.T) {
 	for _, c := range []struct {
 		name     string

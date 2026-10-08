@@ -24,7 +24,10 @@ type Config struct {
 	// x=$(prog pick) captures only the result.
 	UIOnErr bool
 	// OpenTTY lets the TUI read from and draw on the controlling terminal
-	// when In or Out is not one.
+	// when In or Out is not one. It is not supported on Windows, where
+	// Decide ignores it: a read of the console handle launch would open
+	// cannot be cancelled there, so it would take the CLI's next line
+	// (docs/decisions/0013-MADR-cli-integration-helpers.md A1.9).
 	OpenTTY bool
 }
 
@@ -207,7 +210,7 @@ func decideWith(s Streams, c Config, goos string, open opener) Decision {
 		return plain(ReasonDumbTerminal)
 	}
 
-	t := &tty{allowed: c.OpenTTY, open: open}
+	t := &tty{allowed: c.OpenTTY && goos != "windows", open: open}
 	switch {
 	case isTerminal(s.In):
 		d.In = TargetStream

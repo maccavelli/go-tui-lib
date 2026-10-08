@@ -1366,3 +1366,205 @@ chose the recommendation.
       cannot read passes. That is outside this PLAN, and is left for the
       owner.
 * **The identifier scan of the diff and the new files:** no match.
+
+### Step 7: the tier-1 framework programs and the live probes (scratch)
+
+The owner approved it on 2026-10-07 ("Commit and proceed"), when Step 6
+was committed as `6e89b0e`.
+
+#### Deviations
+
+Both were found while the probes ran. Each was asked, and the owner chose
+the recommendation.
+
+* **D7 (2026-10-07): "state the same" means every termios mode, less
+  BSD's `PENDIN` state bit.**
+  * **Found:** on macOS, L4 (a crash) and L5 (Bubble Tea failing in
+    `initInputReader`) printed `same=false`. The states differed in one
+    bit: `Lflag` went from `1483` to `536872395`, which adds `0x20000000`.
+    That is `PENDIN`, which termios(4) describes as "retype pending input
+    (state)": a state bit the kernel sets, not a mode. Every other field
+    was equal: `Iflag`, `Oflag`, `Cflag`, the rest of `Lflag`, `Cc` and
+    both speeds. `stty -a` showed `icanon` and `echo`.
+  * **The control:** a scratch program with no launch and no Bubble Tea
+    saved stdin's state with `term.GetState`, entered raw mode with
+    `term.MakeRaw`, and restored it with `term.Restore`, under `script`.
+    It showed the same `PENDIN` difference, with no input pending and
+    with a key pending. The kernel sets the bit whenever canonical mode
+    comes back, so a byte-for-byte check cannot pass on macOS.
+  * **Chosen:** the probe compares every termios field, with `PENDIN`
+    masked out of `Lflag`, and logs the bit it ignores. 0013-MADR gains
+    A1.8 for the fact.
+  * **Not chosen:** keeping byte for byte, with L4 and L5 recorded as
+    failing on macOS.
+* **D8 (2026-10-07): `Flags.TUI`'s tag gains `negatable:""`.**
+  * **Found:** the kong program embeds `launch.Flags`, as the PLAN's
+    table says. `kong --no-tui` gave "kong: error: unknown flag --no-tui"
+    and exit 80. A1.2's tag list has no `negatable`, and a program cannot
+    add a tag to a field of a struct it embeds. The table's "`TUI` with
+    `negatable:""`" and A1.2's prose ("`negatable:""` adds `--no-tui`")
+    therefore could not hold.
+  * **Chosen:** `Flags.TUI`'s tag gains `negatable:""` in
+    `launch/flags.go`, the one source change in this otherwise scratch
+    step. The other frameworks ignore the key. apidiff does not compare
+    tags. The existing tests and the scratch kong program check it.
+  * **Not chosen:** correcting the table and A1.2's prose, so that a kong
+    program wanting `--no-tui` would declare its own bool.
+* **D9 (2026-10-08): `Config.OpenTTY` is not supported on Windows. This
+  is the PLAN's first resolution for L7.**
+  * **Found:** L7 on the Windows test host, in a console from `ssh -tt`,
+    with `OpenTTY` and stdin piped. The TUI read from `CONIN$`, but:
+    * **Keys arrived about one Enter late.**
+      * W7b: `q` was typed at about 4 s, and the TUI quit at 9.9 s, when
+        the next line's Enter arrived.
+      * W7f: with `q` and Enter typed together, the model received
+        `enter` first, and quit only at the following Enter.
+    * **The CLI's next line was lost.** The CLI mode's read of the
+      console got `""`, not the line typed.
+      * W7, W7b and W7f: the line was gone.
+      * W7c: of two lines typed, the second leaked to the shell after
+        the program ended ("rc=127").
+    * **The baseline is correct.** With no `OpenTTY` and stdin the
+      console (W7e), `q` took effect at once (3.9 s), and the line typed
+      afterwards reached the CLI ("hello").
+  * **The cause the PLAN foresaw:** only stdin's console reader can be
+    cancelled on Windows (ultraviolet's `cancelreader_windows.go`). A
+    read of the `CONIN$` launch opened stays in flight, and takes the
+    next input.
+  * **No fix inside launch's rules:** cancelling it would mean making
+    `CONIN$` the process's stdin during `Run`, and launch never touches a
+    process-wide stream. The fix belongs upstream.
+  * **Asked,** with two options:
+    * `OpenTTY` unsupported on Windows;
+    * refusing only its input there, which is untested.
+  * **The owner chose** the first, the recommendation.
+    * On `windows`, `Decide` treats `OpenTTY` as off, and never chooses
+      `TargetTTY`.
+    * `Config.OpenTTY`'s documentation says so.
+    * 0013-MADR gains A1.9.
+    * L7 is run again on Windows, to show the fallback.
+
+#### What was built
+
+* **In the tree:**
+  * D8's tag on `Flags.TUI`;
+  * D9's check in `decideWith`, and `Config.OpenTTY`'s documentation;
+  * `TestDecideOpenTTYNotOnWindows`;
+  * this record, and 0013-MADR A1.8 and A1.9.
+* **In the scratchpad,** a module that requires the tree through a
+  `replace`:
+  * **A shared probe core.** Its model keeps the keys typed as its
+    value, quits on q, and panics on p under `PROBE_PANIC`. It carries a
+    workspace and a `termcap.Prober`, which is also its `Restorer`. It
+    runs the `--tui` path with both fallbacks, and exits through
+    `ExitCode`.
+  * **Diagnostics go to a file** named by `PROBE_LOG`, so stderr carries
+    only what a user would see. They record the decision, the run, the
+    terminal state before and after (D7), `stty -a`, an agent's command
+    after the TUI, and one line read from the console.
+  * **The programs:**
+    * tier 1: `flag`, `cobra`, `kong` and `urfave`, each bound as the
+      PLAN's table says;
+    * tier 2: `ff` (v4.0.0-beta.1, the latest), `goflags` (v1.6.1) and
+      `goarg` (v1.6.1).
+  * **For L5,** a copy of Bubble Tea v2.0.10 whose `initInputReader`
+    fails, and a second module that replaces Bubble Tea with it.
+  * **For D7,** a control program.
+
+#### Checks
+
+* **The framework programs, with no terminal:** stdin from `/dev/null`,
+  stdout and stderr to files.
+  * **Every program behaves the same for these:**
+    * `--tui` and `--mode=tui`: one "Warning: --tui unavailable (launch:
+      the TUI did not start: launch.input-not-terminal); using the CLI",
+      then the CLI mode, exit 0, and no escape byte on stdout;
+    * `--mode=plain` and no flag: the CLI mode, and nothing on stderr;
+    * the refusing variant: exit 2.
+  * **`--mode=bogus`** fails with each framework's own exit status, and
+    each message names "launch: unknown Choice \"bogus\"":
+
+    | Program | Exit status |
+    | :--- | ---: |
+    | `flag` | 2 |
+    | `cobra` | 1 |
+    | `kong` | 80 |
+    | `urfave` | 1, with its usage on stdout |
+    | `ff` | 2 |
+    | `goflags` | 2 |
+    | `goarg` | 2 |
+  * **kong:**
+    * `FatalIfErrorf(&ExitError{Code: 3})` exits 3;
+    * after D8, `--no-tui` parses, and `--tui --no-tui` gives the CLI
+      mode.
+  * **Timing:** each program's first run took 420–710 ms, and every later
+    run 70–90 ms. That is a newly built binary's first start, and all are
+    under L1's 1 s.
+* **S3-8's second check.** The urfave program, built without
+  `Choice.Get`, fails to compile with "*launch.Choice does not implement
+  cli.Value (missing method Get)".
+  * The PLAN expected the go-flags program to fail to compile without
+    `UnmarshalFlag`. It compiles: go-flags falls back to parsing the
+    value as an integer, so every token fails at run time, "invalid
+    argument for flag \`--mode' (expected launch.Choice):
+    strconv.ParseUint: parsing \"plain\"", exit 2. The method is still
+    needed. The PLAN's "fails to compile" was wrong for go-flags.
+* **The live probes on macOS,** under `script -q /dev/null` at 100×30,
+  with keys fed through `script`'s input. Run on the final tree:
+
+  | Case | Result |
+  | :--- | :--- |
+  | L1 | one `Warning:` naming `launch.input-not-terminal`, the CLI mode, exit 0, no escape byte on stdout, 77–612 ms |
+  | L2 | the warning names `launch.dumb-terminal`, then the CLI mode |
+  | L3 | `flag`, `cobra`, `kong` and `urfave`: the TUI at `Decide`'s 100×30 (the model's size 100×30), no warning, exit 0 |
+  | L4 | Bubble Tea's "Caught panic" report, the warning, the CLI mode with the last good value `"a"`; the state the same under D7, with only `PENDIN` differing; `stty -a` with `icanon` and `echo`. The prober's `Restore()` was empty: nothing under `script` answers its queries, so mode 2031 was never set, and no reports could arrive |
+  | L5 | "Warning: --tui unavailable (launch: the TUI did not start: probe L5: initInputReader patched to fail)", the CLI mode, the state the same under D7 |
+  | L6 | the UI on stderr (`ui=err`); stdout held only `result: value=""`, with no escape byte |
+  | L7 | `in=tty`: the keys came from `/dev/tty`; a line typed after the TUI reached the CLI mode ("hello") |
+  | L8 | the agent's `workspace.zoom` after the TUI returned at once (0–1 ms), run once, with no error |
+* **D7's check seen to fail.** In a scratch copy of the tree, `Run` was
+  changed to skip restoring the saved states. L5 then printed
+  `same=false` with `pendin-differs=false`: a real difference, which the
+  mask does not hide.
+* **The live probes on Windows.**
+  * **How they ran.** Under `ssh -tt`, this host ignores the command
+    string and starts an interactive Git Bash in a console (ConPTY). Each
+    case therefore typed its shell lines, then its keys, into that
+    console.
+  * **L1** ran without a console (no `-tt`, stdin from `/dev/null`,
+    stdout piped): the warning, the CLI mode, exit 0, no escape byte on
+    stdout.
+
+  | Case | Result |
+  | :--- | :--- |
+  | L3 | the TUI at `Decide`'s 120×30 (ANSI256), exit 0 |
+  | L4 | the crash report, the warning, the CLI mode with `"a"`; the console state the same byte for byte |
+  | L6 | the UI on stderr; stdout held only the result, with no escape byte |
+  | L7 | before D9: keys late and the CLI's line lost (D9's evidence); after D9: "Warning: --tui unavailable (launch: the TUI did not start: launch.input-not-terminal)", the CLI mode, and the line typed afterwards reached it ("hello") |
+  | L8 | the agent's command returned in 1 ms, run once |
+* **D9's check seen to fail.** With `goos != "windows"` dropped from
+  `decideWith`, `TestDecideOpenTTYNotOnWindows` fails for both cases:
+  "input on windows: true, launch.terminal, opened 1 times".
+* **The tier-2 programs, recorded and not gated.** ff v4 (`NewFlagSetFrom`
+  on the `ff` tags), go-flags (`Flags` as a group, `UnmarshalFlag`) and
+  go-arg (`Flags` embedded, `UnmarshalText`) each parse `--tui` and
+  `--mode`. Each falls back with the warning, and refuses `bogus`.
+* **Rule 2,** for this step's Go changes: `launch/decide.go`,
+  `launch/flags.go` and `launch/decide_test.go`.
+  * **On macOS:**
+    * `make pre-add-check` over the 3 files: clean;
+    * `make release-check`: "155 file(s) clean … apicheck, examples";
+    * with `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+      each gave 18 `ok`, and so did workspace mode;
+    * `go mod tidy -diff` and `scripts/go-modules.sh --check`: clean;
+    * markdownlint: 0 issues;
+    * the citation checker resolves A1.7's and A1.9's citations, among
+      them `ultraviolet/cancelreader_windows.go:28-40`.
+  * **On the Windows test host:**
+    * `make pre-add-check` gave "155 file(s) clean";
+    * `make lint` and `make vuln` exit 0;
+    * `GOWORK=off go test -count=3 -shuffle=on ./...` gave 18 `ok`;
+    * `launch` and `launchtest`: 37 tests and examples pass.
+* **The identifier scan of the diff:** no match. The Windows console
+  captures hold the account name in its prompt. They stay in the
+  scratchpad, and every line this record quotes from them is redacted.

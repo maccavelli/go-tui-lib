@@ -6,10 +6,11 @@ import "flag"
 // the TUI. Its tags serve the frameworks that read a struct: Kong embeds it
 // (embed:""), go-flags groups it, ff adds it with AddStruct, and go-arg
 // embeds it. TUI is a plain bool because ff refuses a *bool, and because
-// Kong takes a bare --tui only into a bool.
+// Kong takes a bare --tui only into a bool; its negatable tag gives Kong
+// --no-tui, which no other framework reads.
 type Flags struct {
 	Mode Choice `name:"mode" long:"mode" ff:"long=mode" default:"auto" help:"auto, tui or plain" description:"auto, tui or plain"`
-	TUI  bool   `name:"tui" long:"tui" ff:"long=tui" help:"start the TUI" description:"start the TUI"`
+	TUI  bool   `name:"tui" negatable:"" long:"tui" ff:"long=tui" help:"start the TUI" description:"start the TUI"`
 }
 
 // RegisterFlags adds -mode and -tui to fs, for the standard flag package.

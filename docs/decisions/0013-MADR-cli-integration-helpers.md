@@ -1231,6 +1231,41 @@ accepted, and its revision names each change.
   from the environment. The PLAN's deviation D3 records the test that
   found this.
 
+#### A1.8 (2026-10-07, while executing the PLAN): two corrections from the live probes
+
+* **"The terminal is as it was" means every mode.** On macOS and the
+  BSDs, the kernel sets `PENDIN` in `c_lflag` whenever canonical mode
+  comes back. termios(4) calls it "retype pending input (state)".
+  * A bare `term.MakeRaw` and `term.Restore`, with no launch, leave it
+    set. So a state launch puts back after a crash or a failed start
+    matches the saved one in every mode, and differs in that bit.
+  * The PLAN's deviation D7 records the probe and the control run.
+* **`Flags.TUI` carries `negatable:""`.** A1.2's tag list omits it, but
+  its prose says `negatable:""` adds `--no-tui`. A program cannot add a
+  tag to a field of a struct it embeds, so the tag belongs on `Flags`.
+  The other frameworks ignore it. The PLAN's deviation D8 records the
+  probe.
+
+#### A1.9 (2026-10-08, while executing the PLAN): `OpenTTY` is not supported on Windows
+
+* **The finding.** On Windows, a TUI reading the `CONIN$` launch opened
+  gets its keys about one Enter late. When it ends, its read is still in
+  flight, and takes the CLI mode's next line.
+  * Only stdin's console reader can be cancelled there
+    (`ultraviolet/cancelreader_windows.go:28-40`), as §4's facts say.
+  * The PLAN's deviation D9 records the live probe, and the baseline
+    without `OpenTTY`, which is correct.
+* **The decision.** On Windows, `Decide` treats `Config.OpenTTY` as off,
+  and never chooses `TargetTTY`.
+  * A `--tui` whose stdin or stdout is redirected there gets a plain
+    decision, `launch.input-not-terminal` or
+    `launch.output-not-terminal`, and falls back to the CLI with its
+    input intact.
+  * `UIOnErr` still lets the TUI draw on a console Err.
+* **What would lift it.** A cancellable reader for a console handle other
+  than stdin, upstream. launch cannot make one without making `CONIN$`
+  the process's stdin, a process-wide stream §10 keeps it away from.
+
 ## More Information
 
 ### Probes
