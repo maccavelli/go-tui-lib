@@ -1161,3 +1161,75 @@ Step 3 was committed as `cb116d0`.
   * `launch`'s 24 tests pass. That is all but the Unix-only signal
     test.
 * **The identifier scan of the diff and the new files:** no match.
+
+### Step 5: `Frame`, `ExitCode`, `ExitError`, examples
+
+The owner approved it on 2026-10-07 ("Commit to main and proceed"), when
+Step 4 was committed as `0b7a9db`. No deviation.
+
+#### What was built
+
+* **`launch/frame.go`:** `Frame`, as the PLAN gives it.
+* **`launch/exit.go`:**
+  * `ExitError`, with pointer receivers as A1.2 writes them. Its `Error`
+    is `Err`'s text, or "exit status <Code>" when `Err` is nil.
+  * `ExitCode`, in the PLAN's order. It finds the interface with
+    `errors.AsType[interface{ error; ExitCode() int }]`, since `AsType`
+    takes an error type and every link of a chain is one.
+* **`launch/example_test.go`:**
+  * `ExampleDecide` shows the three choices on streams that are not
+    terminals, with `CI=true`;
+  * `ExampleFlags`;
+  * `ExampleRun`, the `--tui` pattern with both fallbacks, compiled and
+    not run.
+* **Tests:** `launch/frame_test.go` has `TestFrameGolden`,
+  `TestFrameRunsNoCommand`, `TestExitCode`, and `TestExitError`, which
+  covers `ExitError`'s three methods.
+  * **The golden's tree.** The first `TestFrameGolden` used
+    `layout.SidebarRightBottom`. At height 12 that preset's breakpoints
+    hide the bottom pane, and at width 60 the sidebar too, so the 60-cell
+    frame showed one pane. The test now builds a fixed tree: a main pane
+    and an 18-cell sidebar over a 3-row bottom pane. Every case shows the
+    three panes. Reading the first goldens showed the problem. They were
+    deleted before any commit, and written again.
+  * **The 8 goldens were read:**
+    * each has 12 rows at its case's width;
+    * the colour cases carry TrueColor escapes;
+    * the no-colour cases carry only bold, which marks the focused pane
+      (MADR §5: ASCII keeps bold);
+    * the ASCII cases use `+`, `-`, `|` and `>`.
+
+#### Checks
+
+* **Mutations, on scratch copies.** All killed:
+  * S5-1 (no profile message): exactly the four no-colour cases differ,
+    "frame-workspace nocolor.utf8.60: line 1 differs";
+  * S5-2 (`Init`'s command run): "Frame called Init (true) or ran a
+    command (true)";
+  * S5-3 (the interface checked last): "an ExitError inside a crash: 2,
+    want 7";
+  * S5-4 (`context.Canceled` gives 1): "context.Canceled: ExitCode = 1,
+    want 130".
+* **`go doc -short ./launch`** lists exactly A1.2's API with A1.6's
+  names:
+  * `ErrNotStarted`, `ErrCrashed`, `ExitCode`, `Frame` and `Run`;
+  * `Choice`, `Config`, `Decision` and `Decide`;
+  * `ExitError`, `Flags`, `Option` and its five constructors;
+  * `Reason`, `Restorer`, `StreamSource`, `Streams` and `FromSource`;
+  * `Target`.
+
+  apidiff over all changes lists only additions since `v0.6.0`, and
+  `make apicheck` is clean.
+* **Rule 2 on macOS:**
+  * `make pre-add-check` over the 4 new Go files: clean;
+  * `make release-check`: "149 file(s) clean … apicheck, examples";
+  * `make lint`: three "0 issues.";
+  * with `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    each gave 17 `ok`, and so did workspace mode;
+  * `go mod tidy -diff` and `scripts/go-modules.sh --check`: clean.
+* **The Windows test host,** go1.27.1 windows/amd64:
+  * `make pre-add-check` gave "149 file(s) clean … apicheck, examples";
+  * `make lint` and `make vuln` exit 0;
+  * `GOWORK=off go test -count=3 -shuffle=on ./...` gave 17 `ok`;
+  * `launch`'s 30 tests and examples pass, the goldens among them.
+* **The identifier scan of the diff and the new files:** no match.
