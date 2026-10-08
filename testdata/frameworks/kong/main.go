@@ -112,7 +112,7 @@ func main() {
 	}
 	// guide:kong
 	var cli struct {
-		launch.Flags `embed:""` // --mode, --tui and --no-tui
+		launch.Flags `embed:""` // --mode and --tui
 
 		Yes  bool     `help:"approve without asking"`
 		Save saveArgs `cmd:"" help:"Save the session"`

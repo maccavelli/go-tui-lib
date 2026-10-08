@@ -1266,11 +1266,11 @@ accepted, and its revision names each change.
   than stdin, upstream. launch cannot make one without making `CONIN$`
   the process's stdin, a process-wide stream §10 keeps it away from.
 
-#### A1.10 (2026-10-08, proposed): `Flags.TUI` drops `negatable:""`
+#### A1.10 (2026-10-08): `Flags.TUI` drops `negatable:""`
 
-This amendment is **proposed**. If the owner accepts it, it supersedes the
-`--no-tui` sentence of A1.2 ("`negatable:""` adds `--no-tui`") and A1.8's
-second bullet.
+The owner accepted this amendment on 2026-10-08 ("proceed, commit all
+records, then tag v0.7.1"). It supersedes the `--no-tui` sentence of A1.2
+("`negatable:""` adds `--no-tui`") and A1.8's second bullet.
 
 * **Context.** A1.8 put `negatable:""` on `Flags.TUI`, so that a Kong
   program embedding `Flags` gets `--no-tui`, as A1.2's prose said. It
@@ -1290,7 +1290,7 @@ second bullet.
 * **Considered options:**
   * keep `negatable:""`, as `v0.7.0` ships it;
   * drop it.
-* **Decision outcome (proposed).** Chosen option: "drop it", because
+* **Decision outcome.** Chosen option: "drop it", because
   "no TUI" then has one spelling, no flag, as it has in every other
   framework launch serves, and `--tui=false` still cancels an earlier
   `--tui` in Kong.
@@ -1301,8 +1301,7 @@ second bullet.
   * Bad, because a Kong program built on `v0.7.0` whose users pass
     `--no-tui` gets "unknown flag" (exit 80) after it upgrades. `v0.7.0`
     was published on 2026-10-08, the same day.
-* **Release.** The change ships in the next release after `v0.7.0`. The
-  owner decides whether that is a `v0.7.1` or the next minor release.
+* **Release.** The change ships in `v0.7.1`, as the owner chose.
 
 ## More Information
 

@@ -382,7 +382,7 @@ With Kong, the registry's argument struct can be the subcommand's grammar, and
 
 ```go
 var cli struct {
-    launch.Flags `embed:""` // --mode, --tui and --no-tui
+    launch.Flags `embed:""` // --mode and --tui
 
     Yes  bool     `help:"approve without asking"`
     Save saveArgs `cmd:"" help:"Save the session"`
@@ -579,8 +579,9 @@ f.RegisterFlags(fs)
 root.PersistentFlags().AddGoFlagSet(fs) // keeps --tui a bare boolean
 ```
 
-With Kong, `launch.Flags` embeds into the grammar (above), with
-`--no-tui`, and its streams are the writers Kong holds:
+With Kong, `launch.Flags` embeds into the grammar (above), and its
+streams are the writers Kong holds. No flag means no TUI, so there is no
+`--no-tui`; `--tui=false` cancels an earlier `--tui`:
 
 <!-- from: testdata/frameworks/kong/main.go#kong-tui -->
 

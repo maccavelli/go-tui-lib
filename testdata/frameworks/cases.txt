@@ -35,6 +35,8 @@ cobra --mode=plain => 0 stdout line mode
 kong --tui => 0 stderr launch.input-not-terminal
 kong --tui => 0 stdout line mode
 kong --mode=plain => 0 stdout line mode
+kong --no-tui => 80 stderr unknown flag --no-tui
+kong --tui --tui=false => 0 stdout line mode
 urfave --tui => 0 stderr launch.input-not-terminal
 urfave --tui => 0 stdout line mode
 urfave --mode=plain => 0 stdout line mode

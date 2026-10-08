@@ -19,10 +19,10 @@ W1.
   packages). The
   first draft's steps are replaced, not amended. It was never approved or
   executed.
-* **2026-10-08, Step 11 added, proposed:** drop `negatable:""` from
-  `Flags.TUI`, as 0013-MADR A1.10 (proposed) decides. Steps 1–10 are
-  complete. The status returns to `in-progress` when Step 11 is
-  approved.
+* **2026-10-08, Step 11 added:** drop `negatable:""` from `Flags.TUI`,
+  as 0013-MADR A1.10 decides. Steps 1–10 are complete. The owner approved
+  Step 11 the same day, and chose `v0.7.1` for its release, so the status
+  is `in-progress` again.
 
 ## Goal
 
@@ -755,9 +755,9 @@ guide's examples compile and run in the harness.
 * **This PLAN `complete`.**
 * **An amendment** to either MADR only if a fact differed.
 
-### Step 11 (proposed, 2026-10-08): drop Kong's `--no-tui`
+### Step 11 (2026-10-08): drop Kong's `--no-tui`
 
-0013-MADR A1.10, once the owner accepts it. One commit.
+0013-MADR A1.10. One commit, released as `v0.7.1`.
 
 * **`launch/flags.go`:**
   * `Flags.TUI`'s tag loses `negatable:""`;
@@ -794,9 +794,10 @@ guide's examples compile and run in the harness.
 * `make apicheck` against `v0.7.0`: 0 incompatible changes;
 * `make examples`: 26 cases.
 
-**Release:** none in this step. The change ships in the next release
-after `v0.7.0`. The owner chooses `v0.7.1` or the next minor release, and
-tags it.
+**Release:** `v0.7.1`, the owner's choice. The owner asked the agent to
+create the tag. It is an annotated tag on Step 11's commit. It is pushed
+after `main`, once CI passes there, and then the consumer smoke test runs
+against it.
 
 **Done when** Rule 2's checks are clean, S11-1 is killed, and the
 excerpts and cases pass.
@@ -1860,3 +1861,64 @@ needed.
   (A1.9).
 
 Every Verification item holds, and this PLAN is `complete`.
+
+### Step 11: drop Kong's `--no-tui`
+
+The owner approved it on 2026-10-08 ("proceed, commit all records, then
+tag v0.7.1"). The records were committed first, as `021303a`. No
+deviation.
+
+#### What was built
+
+* **`launch/flags.go`:** `Flags.TUI`'s tag lost `negatable:""`. The doc
+  comment now says there is no `--no-tui`, and that Kong's `--tui=false`
+  cancels an earlier `--tui`, citing A1.10.
+* **`testdata/frameworks/kong/main.go`:** the comment on the embedded
+  `launch.Flags` is `// --mode and --tui`.
+* **`docs/guides/commands.md`:** the Kong excerpt follows the program.
+  The Kong sentence says there is no `--no-tui`, and that `--tui=false`
+  cancels an earlier `--tui`.
+* **`testdata/frameworks/cases.txt`:** `kong --no-tui => 80 stderr
+  unknown flag --no-tui`, and `kong --tui --tui=false => 0 stdout line
+  mode`.
+* **The records:**
+  * 0013-MADR A1.10 is accepted;
+  * this PLAN is `complete` again;
+  * `docs/README.md`'s 0013 rows name A1.10 and `v0.7.1`.
+
+#### Checks
+
+* **S11-1, the tag put back,** in a scratch clone: `make examples` failed
+  with "kong --no-tui => 80 stderr unknown flag --no-tui: exit 0, want
+  80".
+* **`make examples`:** "26 case(s) run", "9 excerpt(s) checked",
+  "clean".
+* **`make apicheck`:** "against v0.7.0, 0 incompatible change(s)".
+* **Rule 2 on macOS:**
+  * `make pre-add-check` over the 2 Go files: "2 file(s) clean … go vet,
+    go test, …, examples";
+  * `make release-check`: "155 file(s) clean … apicheck, examples";
+  * with `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    each gave 18 `ok`, and so did workspace mode;
+  * `go mod tidy -diff` and `scripts/go-modules.sh --check`: clean;
+  * markdownlint: 0 issues.
+* **The Windows test host,** go1.27.1 windows/amd64:
+  * `make examples`: "26 case(s) run", "9 excerpt(s) checked", "clean";
+  * `make pre-add-check`: "155 file(s) clean … apicheck, examples";
+  * `make lint` and `make vuln` exit 0;
+  * `GOWORK=off go test -count=3 -shuffle=on ./...` gave 18 `ok`;
+  * `launch` and `launchtest` pass.
+* **The identifier scan of the diff:** no match.
+
+#### The release, `v0.7.1`
+
+* **The tag:** the agent created `v0.7.1`, at the owner's request, as an
+  annotated tag ("v0.7.1") on this step's commit. Its push waits for the
+  owner: first `main`, then the tag once CI passes on `main`, as
+  `docs/guides/releasing.md` orders it. The consumer smoke test runs
+  against the published tag after that.
+* **Release notes for `v0.7.1`:**
+  * **Changed:** a Kong program that embeds `launch.Flags` no longer
+    accepts `--no-tui`, which only repeated the default. `--tui=false`
+    cancels an earlier `--tui`. The other frameworks are unchanged.
+  * No API change: `make apicheck` against `v0.7.0` is clean.
