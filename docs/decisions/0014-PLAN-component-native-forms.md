@@ -161,7 +161,9 @@ and this table gives the line today. The steps below cite today's lines.
 * **`ErrPanicked`.** `var ErrPanicked error = …`, and
   `type PanicError struct{ ID ID; Value any; Stack []byte }` with:
   * `Error() string`, which gives "command: <id>: handler panicked" and
-    leaves out the value, because a panic value may hold a secret;
+    leaves out the value, because a panic value may hold a secret. A
+    gate's panic gives "command: <id>: gate panicked", through an
+    unexported field (D1, 2026-10-08);
   * `Unwrap() error`, which returns `ErrPanicked`;
   * `ExitCode() int`, which returns 2.
 * **`recover`** goes inside a helper around `c.Handler.Run`
@@ -537,3 +539,127 @@ No deviation.
   cites none of the facts that changed.
 * **The approval** is the same message's "then proceed".
 * **This PLAN** is `in-progress`, and its row in `docs/README.md` follows.
+
+### Step 2: panics and exit statuses in `command`
+
+#### Deviations
+
+* **D1 (2026-10-08): a gate's panic says "gate".**
+  * **Found:** the step fixes `PanicError`'s text as "command: <id>:
+    handler panicked". It also reports a panicking gate with the same
+    type. A gate's refusal would then read "command: refused: <id>: the
+    gate failed: command: <id>: handler panicked". That names the
+    handler, which never ran, in the error, the audit log and the MCP
+    message.
+  * **The owner's choice,** of three: `PanicError` gets an unexported
+    field that is set when the gate panicked, and its text is then
+    "command: <id>: gate panicked". The handler's text stays as
+    planned. No exported name changes, so `apidiff` sees nothing.
+    `TestGatePanicRefuses` checks the text.
+  * **The others:** one neutral "command: <id>: panicked" for both,
+    which changes the handler's planned text; or "handler panicked" for
+    both, which misreports a gate's panic.
+* **D2 (2026-10-08): three framework cases exit 3 on a refusal.**
+  * **Found:** with `ErrRefused`'s status in place, `make examples`
+    failed: "examples: cobra save notes => 1 stderr refused:
+    session.save: exit 3, want 1", and the same for kong and urfave. Those
+    examples pass the error through `launch.ExitCode`, which honours the
+    new status. The flag example exits 1 itself (`os.Exit(1)`, which
+    the commands guide quotes), so its case still passed. The gate passed
+    on `4857ea0`.
+  * **The owner's choice,** of two: `testdata/frameworks/cases.txt`
+    joins Step 2. The three cases expect 3, and the file's header says
+    why. The flag example and its case wait for Step 11, which moves
+    the guide's exits to `ExitCode` as planned.
+  * **The other:** move the flag example and its guide excerpt to
+    `launch.ExitCode` now, which pulls part of Step 11 into this step.
+
+#### What was built
+
+* **`command/registry.go`:**
+  * `ErrUnknown`, `ErrUnavailable` and `ErrRefused` are declared
+    `error` and hold a `*codedError` with statuses 2, 1 and 3. Their texts
+    are unchanged.
+  * The new `ErrPanicked` holds status 2.
+  * `codedError` has `Error` and `ExitCode`.
+* **`command/panic.go` (new):**
+  * `PanicError{ID, Value, Stack}` with `Error`, `Unwrap` and `ExitCode`.
+    Its unexported `gate` field gives D1's text.
+  * `runHandler` and `askGate` recover a panic into a `*PanicError` with
+    `debug.Stack()`.
+* **`command/args.go`:** `(*ArgError).ExitCode()` returns 2.
+* **`command/dispatch.go`:**
+  * `execute` calls `runHandler`, so Dispatch, Async, Run and CallMCP
+    all get the error.
+  * `onLoop`'s guard is gone, as the facts re-read before execution
+    recorded. Its closure sends `execute`'s outcome, which now always
+    arrives.
+* **`command/gate.go`:** both of `decide`'s gate calls go through
+  `askGate`. `verdict` wraps the `*PanicError` in the refusal.
+* **The documentation:** `Handler` and `Gate` say what a panic becomes.
+  The sentinels' block cites 0014-MADR A1 and `launch.ExitCode`.
+* **The audit:** unchanged. `SlogAuditor` already logs `Err.Error()`
+  only, and `TestPanicErrorHidesValue` proves the value stays out.
+* **Tests:**
+  * `command/panic_test.go` (new) has `TestHandlerPanicIsAnError`, with
+    subtests for Loop through `Dispatch`, Async inside its command, `Run`
+    in both modes, and `CallMCP`. It also has `TestGatePanicRefuses`,
+    `TestPanicErrorHidesValue` (the error, the slog audit line and
+    `CallMCP`'s text) and `TestSentinelsStillCompare`.
+  * `command/exitcode_test.go` (new, package `command_test`) has
+    `TestExitCodes`. Each bare and wrapped error goes through
+    `launch.ExitCode` and `errors.As`. That covers the four sentinels,
+    `*ArgError` and `*PanicError`, and five errors from real requests:
+    an unknown ID, no origin, bad arguments, a handler's panic and a
+    gate's panic.
+  * `command/loop_test.go`: `TestLoopPanicReleasesCaller` is rewritten
+    as the facts re-read before execution said.
+* **`testdata/frameworks/cases.txt`:** D2.
+
+#### Checks
+
+* **Mutations,** on scratch copies of the tree. All six were killed:
+  * **S2-1** (no `recover` around the handler):
+    `TestHandlerPanicIsAnError/Loop_through_Dispatch` failed, and the
+    test binary died with "panic: s3cr3t-panic-value [recovered,
+    repanicked]".
+  * **S2-2** (`Error()` includes the value): `TestPanicErrorHidesValue`
+    gave "Error() holds the panic's value", the same for the audit log,
+    and the same for CallMCP.
+  * **S2-3** (`ErrRefused`'s status is 1): `TestExitCodes` gave
+    "ErrRefused: launch.ExitCode(command: refused) = 1, want 3", and the
+    same for the wrapped error and for "no origin".
+  * **S2-4** (D1: a gate's panic says "handler"):
+    `TestGatePanicRefuses` gave `PanicError = "command: p: handler
+    panicked", s3cr3t-panic-value`.
+  * **S2-5** (no `recover` around the gate): `TestGatePanicRefuses`
+    died with the panic.
+  * **S2-6** (the loop's panic passed on again):
+    `TestLoopPanicReleasesCaller` gave "the loop recovered command:
+    loop: handler panicked; want no panic".
+* **Rule 2 on macOS:**
+  * `gofmt -l`: nothing.
+  * `make pre-add-check FILES=<the nine Go files>`: "9 file(s) clean".
+  * `make lint`: clean. On the first run, errorlint refused a `!=`
+    between two sentinels in `TestSentinelsStillCompare`, and it now
+    uses `errors.Is`.
+  * With `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    all passed, and so did workspace mode.
+  * `go mod tidy -diff`, `make vuln` ("No vulnerabilities found.") and
+    `scripts/go-modules.sh --check` were clean.
+  * `make apicheck`: "against v0.7.1, 0 incompatible change(s)". The
+    sentinels' declared type was already `error`.
+  * `make examples`: "clean", after D2. Before D2 it failed as D2
+    records.
+  * `make release-check`: "155 file(s) clean … apicheck, examples". The
+    three new files are untracked, so the no-list run does not see them.
+    The `FILES` run above covers them.
+* **The Windows test host,** go1.27.1 windows/amd64, with the working
+  tree and a bundle of `main` and its tags:
+  * `make pre-add-check FILES=<the nine>`: "9 file(s) clean".
+  * `make pre-add-check`: "155 file(s) clean".
+  * `make lint`: "0 issues".
+  * `make vuln`: clean.
+  * `make examples`: "clean".
+  * `GOWORK=off go test -count=2 -shuffle=on ./...`: 18 ok.
+  * The six panic and exit-status tests passed.

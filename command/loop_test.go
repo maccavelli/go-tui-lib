@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -199,12 +200,15 @@ func TestLoopPanicReleasesCaller(t *testing.T) {
 		defer func() { recovered <- recover() }()
 		lm.Run()
 	}()
+	// The handler's panic is Run's error, and the loop never sees it
+	// (docs/decisions/0014-PLAN-component-native-forms.md Step 2).
 	out := inSecond(t, got, "a panic on the loop left Run waiting")
-	if out.err == nil || !strings.Contains(out.err.Error(), "panicked on the loop: boom") {
-		t.Errorf("Run's error = %v; want one naming the panic", out.err)
+	pe, ok := errors.AsType[*PanicError](out.err)
+	if !ok || pe.ID != "loop" || pe.Value != "boom" || strings.Contains(out.err.Error(), "boom") {
+		t.Errorf("Run's error = %v; want a *PanicError for loop, without the value in its text", out.err)
 	}
-	if p := inSecond(t, recovered, "the loop did not finish"); p != "boom" {
-		t.Errorf("the loop recovered %v; want the panic passed on", p)
+	if p := inSecond(t, recovered, "the loop did not finish"); p != nil {
+		t.Errorf("the loop recovered %v; want no panic", p)
 	}
 }
 

@@ -107,22 +107,14 @@ func (r *Registry) onLoop(ctx context.Context, inv *Invocation, l *loopState) ou
 		if !claimed.CompareAndSwap(false, true) {
 			return nil
 		}
-		o := outcome{started: time.Now()}
-		// The outcome is sent however the handler ends. A panic is named in
-		// it, and then goes on to the program, which recovers it.
-		defer func() {
-			if p := recover(); p != nil {
-				done <- outcome{started: o.started, dur: time.Since(o.started),
-					err: fmt.Errorf("command: %s panicked on the loop: %v", inv.Command.ID, p)}
-				panic(p)
-			}
-		}()
+		// execute recovers the handler's panic into the outcome, so the
+		// outcome is always sent, and the loop never sees the panic
+		// (docs/decisions/0014-PLAN-component-native-forms.md Step 2).
 		if err := ctx.Err(); err != nil {
-			o.err = err
-			done <- o
+			done <- outcome{started: time.Now(), err: err}
 			return nil
 		}
-		o = r.execute(ctx, inv)
+		o := r.execute(ctx, inv)
 		cmd := o.res.Cmd
 		o.res.Cmd = nil
 		done <- o
@@ -203,7 +195,8 @@ type outcome struct {
 
 // execute runs inv: its handler, or for a Forward its slash text. An
 // Async command runs under a context Cancel reaches, and an Exclusive one
-// cancels its earlier runs first.
+// cancels its earlier runs first. A handler's panic is the outcome's
+// error, a *PanicError.
 func (r *Registry) execute(ctx context.Context, inv *Invocation) outcome {
 	c := &inv.Command
 	if c.Mode == Async {
@@ -215,7 +208,7 @@ func (r *Registry) execute(ctx context.Context, inv *Invocation) outcome {
 	if c.Kind == Forward {
 		o.res = Result{Text: forwardText(inv)}
 	} else {
-		o.res, o.err = c.Handler.Run(ctx, inv)
+		o.res, o.err = runHandler(ctx, c, inv)
 	}
 	o.dur = time.Since(o.started)
 	return o

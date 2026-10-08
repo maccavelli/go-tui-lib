@@ -17,17 +17,36 @@ import (
 )
 
 // The registry's errors, wrapped with detail; test them with errors.Is
-// (docs/decisions/0006-MADR-command-registry.md A4).
+// (docs/decisions/0006-MADR-command-registry.md A4). Each has an
+// ExitCode() int, the status a CLI exits with when the error ends it
+// (docs/decisions/0014-MADR-native-integration-api.md A1), which
+// launch.ExitCode honours through any wrapping.
 var (
-	// ErrUnknown: no command has the request's ID.
-	ErrUnknown = errors.New("command: unknown command")
+	// ErrUnknown: no command has the request's ID. Its status is 2.
+	ErrUnknown error = &codedError{"command: unknown command", 2}
 	// ErrUnavailable: the command's When is false in the request's
-	// context, or its Surfaces exclude the request's origin.
-	ErrUnavailable = errors.New("command: not available")
+	// context, or its Surfaces exclude the request's origin. Its status
+	// is 1.
+	ErrUnavailable error = &codedError{"command: not available", 1}
 	// ErrRefused: the policy or the gate refused the request, or it had no
-	// origin.
-	ErrRefused = errors.New("command: refused")
+	// origin. Its status is 3.
+	ErrRefused error = &codedError{"command: refused", 3}
+	// ErrPanicked: a handler or a gate panicked. A *PanicError wraps it.
+	// Its status is 2.
+	ErrPanicked error = &codedError{"command: panicked", 2}
 )
+
+// codedError is a sentinel with an exit status. It is compared by
+// identity, as errors.New's are.
+type codedError struct {
+	msg  string
+	code int
+}
+
+func (e *codedError) Error() string { return e.msg }
+
+// ExitCode is the status a CLI exits with.
+func (e *codedError) ExitCode() int { return e.code }
 
 // Registry holds commands and runs them. Reads walk an immutable snapshot
 // and take no lock; writes copy it and publish a new one. A Registry is

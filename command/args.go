@@ -25,6 +25,10 @@ func (e *ArgError) Error() string {
 	return "command: argument " + e.Path + ": " + e.Reason
 }
 
+// ExitCode is 2, the status of a usage error
+// (docs/decisions/0014-MADR-native-integration-api.md A1).
+func (e *ArgError) ExitCode() int { return 2 }
+
 // Option sets a field of the Command New builds.
 type Option func(*Command)
 

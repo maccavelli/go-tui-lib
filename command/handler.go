@@ -11,7 +11,9 @@ import (
 
 // Handler does a command's work. The same handler serves every surface: it
 // returns structured and human output, and a handler that needs the Bubble
-// Tea runtime returns the effect as Result.Cmd.
+// Tea runtime returns the effect as Result.Cmd. The registry recovers a
+// handler's panic, on every path and on the program's loop too, and
+// returns it as a *PanicError.
 type Handler interface {
 	Run(ctx context.Context, inv *Invocation) (Result, error)
 }
