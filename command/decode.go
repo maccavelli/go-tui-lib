@@ -24,8 +24,9 @@ const maxSchemaDepth = 64
 // required, enum, minimum, maximum, minLength, maxLength, items,
 // properties and additionalProperties, applies default, and knows which
 // values are secret (writeOnly) and which properties are positional
-// (x-cli arg). Every other keyword is carried in the schema and ignored
-// here.
+// (x-cli arg). It also keeps what a command line needs to describe a
+// property: its description and the rest of x-cli. Every other keyword is
+// carried in the schema and ignored here.
 type rule struct {
 	types          []string
 	enum           []any
@@ -36,6 +37,11 @@ type rule struct {
 	secret         bool
 	arg            bool
 	rest           bool // x-cli rest: a slash line may hold more words (A6)
+	help           string
+	short          string // x-cli short: a one-dash flag name
+	placeholder    string // x-cli placeholder: the value's name in help
+	group          string // x-cli group: the help section
+	hidden         bool   // x-cli hidden: left out of help and completion
 	items, addl    *rule
 	props          []prule // in document order
 	required       []string
@@ -121,7 +127,38 @@ func (r *rule) scalars(kw map[string]jsontext.Value) error {
 		}
 	}
 	r.arg, r.rest = cli.Arg, cli.Rest
+	r.annotations(kw)
 	return nil
+}
+
+// annotations reads what only describes a property: description, and
+// x-cli's short, placeholder, group and hidden. They change no check, so a
+// loaded schema with an annotation of the wrong type still compiles,
+// without it: a description or x-cli that does not decode leaves out every
+// annotation, and an x-cli member that does not decode leaves out x-cli's.
+func (r *rule) annotations(kw map[string]jsontext.Value) {
+	var a struct {
+		Description string
+		CLI         map[string]jsontext.Value `json:"x-cli"`
+	}
+	for name, dst := range map[string]any{"description": &a.Description, "x-cli": &a.CLI} {
+		if raw, ok := kw[name]; ok && json.Unmarshal(raw, dst) != nil {
+			return
+		}
+	}
+	r.help = a.Description
+	var c struct {
+		Short, Placeholder, Group string
+		Hidden                    bool
+	}
+	for name, dst := range map[string]any{
+		"short": &c.Short, "placeholder": &c.Placeholder, "group": &c.Group, "hidden": &c.Hidden,
+	} {
+		if v, ok := a.CLI[name]; ok && json.Unmarshal(v, dst) != nil {
+			return
+		}
+	}
+	r.short, r.placeholder, r.group, r.hidden = c.Short, c.Placeholder, c.Group, c.Hidden
 }
 
 // children reads items, properties and additionalProperties.

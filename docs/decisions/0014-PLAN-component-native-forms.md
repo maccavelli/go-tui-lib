@@ -266,12 +266,13 @@ and this table gives the line today. The steps below cite today's lines.
 
 * **The rule compiles all of `x-cli`.** The rule
   (`command/decode.go:104-123`) adds `short`, `placeholder`, `group` and
-  `hidden`, with `help` read from `description`.
+  `hidden`, with `help` read from `description`. Those five are read
+  leniently (D4, 2026-10-08).
 * **`ParseArgs(id ID, args []string, o Origin) (Request, error)`,**
   a method on `*Registry` (corrected 2026-10-08; see the facts re-read
   before execution):
   * **The grammar:**
-    * `--name=v`, `--name v` and `-s v`;
+    * `--name=v`, `--name v` and `-s v`, and `-s=v` (D3, 2026-10-08);
     * a bare `--name` for a boolean;
     * `--` ends the flags;
     * positional values and `rest` as in `ParseSlash`;
@@ -818,3 +819,138 @@ No deviation.
     vuln` and `make examples`: each exit 0;
   * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
   * the step's tests, with `TestExportGolden`: passed.
+
+### Step 5: `ParseArgs`, `Params`, `Complete`
+
+#### Deviations
+
+* **D3 (2026-10-08): `-s=value` is accepted.**
+  * **Found:** the grammar lists `-s v` for a short flag, and
+    `--name=v` for a long one. The standard library's flag package
+    accepts `-s=v` too, and so did the retired parser this step follows.
+  * **The owner's choice,** of two: keep `-s=v`, documented in
+    `ParseArgs`'s comment and tested in `TestParseArgs`.
+  * **The other:** only `-s v`, with `-s=v` an unknown flag.
+* **D4 (2026-10-08): the annotations are read leniently.**
+  * **Found:** compiling all of `x-cli` means the rule reads
+    `description`, `short`, `placeholder`, `group` and `hidden`. Read
+    strictly, as `arg`, `rest`, `enum` and the rest are, a loaded MCP or
+    ACP schema with one of those of the wrong type (`"description": 5`)
+    would stop compiling, though it compiles today, and its source would
+    lose the command.
+  * **The owner's choice,** of two: those five are read leniently. A
+    `description` or `x-cli` that does not decode leaves out every
+    annotation, and an `x-cli` member that does not decode leaves out
+    `x-cli`'s four. The schema still compiles, and `arg` and `rest` stay
+    strict as before. `TestParams` checks it, with a schema holding
+    `"description": 5` and `"short": 7`.
+  * **The other:** strict, so such a schema is refused.
+* **Recorded, not a deviation: `Complete` leaves hidden commands out.**
+  The step says "the IDs offered on `SurfaceCLI`". The code also leaves
+  out a command with `Hidden`, which `Command` documents as "runnable,
+  but not listed by Available". The owner asked why hidden commands would
+  be wanted there, and they are not.
+
+#### What was built
+
+* **`command/decode.go`:**
+  * The rule gains `help`, `short`, `placeholder`, `group` and `hidden`,
+    and `annotations` reads them (D4).
+  * `arg` and `rest` are read strictly, as before.
+* **`command/cliargs.go` (new):**
+  * **`(*Registry) ParseArgs(id, args, o)`,** whose grammar is in its
+    documentation:
+    * `--name=v`, `--name v`, `-s v`, and `-s=v` (D3);
+    * a bare boolean flag, and `--name=false`. A boolean never takes
+      the next word;
+    * repeats append to an array;
+    * `--` ends the flags, and `-` is a positional value;
+    * positional values are filled as `slashObject` fills them. A
+      command whose only argument is a string takes the words joined
+      with spaces, as `ParseSlash` takes its tail;
+    * under `x-cli rest`, an unknown flag and a positional value too
+      many stay in `Raw` only, as stray slash words do.
+
+    `Raw` is `quoteArgs(args)`: POSIX single quoting, with `'"'"'` for a
+    quote inside, which `splitWords` reads back. Errors:
+    * an unknown ID wraps `ErrUnknown`;
+    * an unknown flag gives "--x is not a known flag";
+    * a flag without its value gives "/name: --name needs a value";
+    * a bad value, and a missing required argument, give the
+      `*ArgError`s `assign` and `prepare` give.
+  * **`Param` and `Params(c)`:**
+    * the fields the step lists;
+    * `Rest` means a positional array, which takes every positional value
+      left;
+    * an array's `Enum` is its items' when it has none of its own.
+  * **`(*Registry) Complete(id, args, partial)`:**
+    * the IDs (above);
+    * after a value-taking flag, its enum values;
+    * for `--name=`, its values, or `true` and `false` for a boolean;
+    * for another `-` partial, the visible `--name`s and `-s`s;
+    * nothing for a positional, after `--`, or for an unknown command.
+
+    Sorted and de-duplicated. The documentation says completion reads
+    definitions only.
+* **Tests:**
+  * **`command/cliargs_test.go` (new):**
+    * `TestParseArgs`: 24 accepted forms and 14 errors. A duration
+      whose text is wrong passes `ParseArgs` and is refused by `Run` as
+      an `*ArgError` for `/wait`: the rule does not read a schema's
+      pattern, as for a slash line;
+    * `TestParseArgsRaw`;
+    * `TestParseArgsMatchesSlash`, over seven pairs;
+    * `TestParams`: a struct with every tag, a command with no schema,
+      a bad schema, and D4's schema;
+    * `TestComplete`, with 17 cases.
+  * **`command/fuzz_test.go`:** `FuzzParseArgs`, over four commands. It
+    checks that nothing panics, and that accepted arguments come out the
+    same when prepared again. It also checks that `Raw` splits back into
+    the same words, which parse to the same request. Splitting reads
+    runes, so the `Raw` check skips input that is not valid UTF-8.
+    `scripts/go-fuzz.sh` finds it with no change to the Makefile: "3 fuzz
+    targets ran clean in ./command".
+
+#### Checks
+
+* **The fuzz target** ran for 60 s with `-fuzz`: 1,261,071 executions,
+  no failure.
+* **Mutations,** on scratch copies of the tree. All nine were killed:
+  * **S5-1** (`--` does not end the flags): "-- is not a known flag".
+  * **S5-2** (a missing required argument passes): `deploy []: <nil>;
+    want an error with "/target: is required"`.
+  * **S5-3** (`Complete` lists IDs not on `SurfaceCLI`): the list gained
+    `app.quit` and `keys.only`.
+  * **S5-4** (a boolean takes the next word, added): "--verbose needs a
+    value", and `"h" is not true or false`. It was run again after the
+    lint fix below, with the same result.
+  * **S5-5** (`Raw` quotes nothing, added): `TestParseArgsRaw` and
+    `FuzzParseArgs` failed.
+  * **S5-6** (hidden flags offered, added): `--token` and `--quiet`
+    appeared.
+  * **S5-7** (the rule drops `short`, added): "-n is not a known flag".
+  * **S5-8** (D4 made strict, added): `TestParams` died on the schema.
+  * **S5-9** (the one-string rule takes one word, added):
+    `TestParseArgs` and `TestParseArgsMatchesSlash` failed.
+* **Rule 2 on macOS:**
+  * `gofmt -l`: nothing.
+  * `make pre-add-check FILES=<the four Go files>`: "4 file(s) clean".
+  * `make lint`: clean. On the first run, goconst counted four `"true"`
+    literals in the package, two of them new, and unused found a test
+    type left over. The new code now uses `strconv.FormatBool`, which
+    leaves `frontmatter.go` and `loaddir.go` untouched, and the type is
+    gone.
+  * With `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    all passed, and so did workspace mode.
+  * `go mod tidy -diff`, `make vuln` and `scripts/go-modules.sh --check`
+    were clean.
+  * `make apicheck`: "against v0.7.1, 0 incompatible change(s)".
+  * `make examples`: "clean".
+  * `make release-check`: "161 file(s) clean … apicheck, examples".
+* **The Windows test host,** go1.27.1 windows/amd64, with the working
+  tree and a bundle of `main` and its tags:
+  * the `FILES` and no-list `make pre-add-check`, `make lint`, `make
+    vuln` and `make examples`: each exit 0;
+  * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
+  * the step's tests and the slash tests, with `FuzzParseArgs`'s seeds:
+    passed.
