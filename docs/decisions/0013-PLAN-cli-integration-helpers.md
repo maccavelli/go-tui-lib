@@ -1917,6 +1917,18 @@ deviation.
   owner: first `main`, then the tag once CI passes on `main`, as
   `docs/guides/releasing.md` orders it. The consumer smoke test runs
   against the published tag after that.
+* **Published (2026-10-08).** The owner pushed `main` and the tag. CI run
+  `37809306889` on `cad97f5` passed every job. `git ls-remote` shows
+  `refs/tags/v0.7.1` on `origin`, peeling to `cad97f5`.
+* **The consumer smoke test** against the published `v0.7.1`, as Step 9
+  ran it for `v0.7.0`, in a scratch module with `go env GOWORK` empty:
+  * `go get github.com/maccavelli/go-tui-lib@v0.7.1` downloaded `v0.7.1`;
+  * `go vet` and `go build` passed;
+  * `go run .` printed "decide: false launch.input-not-terminal",
+    "launchtest decide: launch.terminal" and "run: launch: the TUI did
+    not start: launch.input-not-terminal", and exited 2 through
+    `ExitCode`, as designed;
+  * `go list -m all` showed `github.com/charmbracelet/x/term v0.2.2`.
 * **Release notes for `v0.7.1`:**
   * **Changed:** a Kong program that embeds `launch.Flags` no longer
     accepts `--no-tui`, which only repeated the default. `--tui=false`

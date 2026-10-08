@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-10-08
 associated-madr: "0015-MADR-precheck-gofmt-errors.md"
 ---
@@ -211,3 +211,33 @@ No deviation.
     deleted-file case;
   * `make pre-add-check` gave "155 file(s) clean".
 * **The identifier scan of the diff and the new test:** no match.
+
+### Step 3: close-out
+
+The owner committed Step 2 as `47c91bf`. The agent ran the disclosure
+guard (exit 0) over the three outgoing commits, `5c49566`, `d33f165` and
+`47c91bf`, and pushed `main` at the owner's request. The owner asked for
+the close-out on 2026-10-08. Verification, item by item:
+
+* **The new test passes on macOS, on the Windows test host and in CI.**
+  * On `47c91bf`, `./scripts/go-precheck_test.sh` gave "12 passed, 0
+    failed".
+  * The Windows test host gave the same (Step 2).
+  * CI run `37816285759` on `47c91bf` passed every job. The `gates`
+    step `precheck test` passed on its first run.
+* **P1 and P2 were killed** (Step 2).
+* **H1, run again, fails** with "gofmt: failed (exit 2):" and gofmt's
+  message (Step 2).
+* **`make release-check` on the tree** reports what it did before:
+  "155 file(s) clean in 1 module(s) (gofmt, golangci-lint, go vet, go
+  test, go mod tidy, govulncheck, apicheck, examples)", on `47c91bf`.
+
+**One line of the rollout plan held as written:** Step 2 was one commit,
+and nothing a consumer imports changed, so there is no release.
+
+**Outside this repository:** go-selfupdate-lib's copy of the script has
+the same gap. It is recorded there as a report, for that repository's
+own decision: go-selfupdate-lib `docs/reports/0016-REPORT-precheck-gofmt-errors.md`.
+
+Every Verification item holds: this PLAN is `complete`, and 0015-MADR
+stays `accepted`.
