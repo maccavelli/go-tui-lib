@@ -814,3 +814,89 @@ completed.
   steps cite lines as they read them.
 * **`docs/README.md`:** this PLAN's row now carries the PLAN's title, and
   `in-progress`.
+
+### Step 2: prerequisites from 0014-MADR W2
+
+The owner approved it on 2026-10-07 ("committed, proceed"), after Step 1
+was committed as `0bfc24b`. No deviation.
+
+#### What was built
+
+* **2a, `internal/enum`:** `Name`, `Marshal` and `Unmarshal`, with the
+  PLAN's signatures. `Name` formats an unnamed value with `strconv.Itoa`,
+  which gives the same text as termcap's `fmt.Sprintf("%d", v)`.
+  * termcap's `name`, `marshal` and `unmarshal` stay as unexported
+    one-line calls into it, so their callers are unchanged. termcap's
+    tests and golden files pass unchanged.
+  * The package comment ends with `Stability: internal.`, as W0's
+    conformance test requires.
+* **2b, `glyph.Tier`:** `TierUnicode` (the zero value), `TierLegacy` and
+  `TierASCII`, with `Set`, `String`, `MarshalText` and `UnmarshalText`
+  through `internal/enum`. The tokens are "unicode", "legacy" and
+  "ascii", and the errors read "glyph: …".
+  * `TierLegacy.Set()` is `ASCII()` until theme v2 fills it.
+  * A tier with no name also gives `ASCII()`, which every terminal draws.
+  * `For` is now `TierUnicode.Set()` or `TierASCII.Set()`, with the same
+    result as before.
+* **2c, `Registry.Attach`:**
+  * The registry's loop is an `atomic.Pointer` to `{send, done}`. Run
+    reads it without a lock, and `mu` serialises `Attach` and `detach`.
+    `WithLoop` stores a loop whose `done` is nil, so it is never detached.
+  * `detach` runs once. It clears the loop only if it is still the
+    attached one, then closes `done`.
+  * `onLoop` follows the PLAN's three-way select with an `atomic.Bool`
+    claim. The loop's run also keeps today's check: a message it claims
+    after `ctx` has ended runs nothing, and reports `ctx.Err()`.
+  * **The panic path.** A `defer` recovers the panic, sends an outcome
+    whose error is "command: <id> panicked on the loop: <value>", and
+    panics again with the same value. Bubble Tea still recovers the
+    panic as before, and the caller is released.
+  * `Attach`'s documentation says to detach only after the program's
+    `Run` has returned. It also says that a command run on the caller
+    after detach keeps its `Result.Cmd`, which no program will run.
+* **Tests:**
+  * `command/loop_test.go` holds the PLAN's five loop tests, plus
+    `TestWithLoopUnchanged`. That test checks that `WithLoop`'s loop is
+    used on every run, and that `Attach` then `detach` leaves the
+    registry with no loop. `TestRunOnLoop` and `TestDispatchLoop` pass
+    unchanged.
+  * `TestEnumNames` is in `internal/enum`. `TestTierWidths` and
+    `TestTierText` are in `glyph`.
+
+#### Checks
+
+* **Mutations, each on a scratch clone,** all killed:
+  * S2-1 (`detach` does not close `done`): "Run still waits on a
+    detached loop";
+  * S2-2 (the claim dropped): "iteration 98: the handler ran 2 times,
+    want exactly 1";
+  * S2-3 (`TierLegacy` gives `Unicode()`): "legacy.Set() is not the
+    table the tier names";
+  * S2-4 (case-folded names accepted): `Unmarshal("TMUX"): <nil>, want
+    "termcap: unknown Mux \"TMUX\""`;
+  * S2-5 (`ctx` wins without the claim): "Run = {…}, context canceled;
+    want the handler's outcome", and the audit recorded the
+    cancellation;
+  * S2-6 (no `defer`): "a panic on the loop left Run waiting".
+* **The API:** apidiff, run over all changes rather than only
+  incompatible ones, between `v0.6.0` and the tree, lists only compatible
+  changes:
+  * `./command.(*Registry).Attach: added`;
+  * `./glyph.Tier: added`, with its methods;
+  * `TierASCII`, `TierLegacy` and `TierUnicode: added`.
+
+  `make apicheck` (in `make release-check`) is clean.
+* **Rule 2:**
+  * `make pre-add-check` over the 8 changed Go files: clean;
+  * `make release-check`: "128 file(s) clean … apicheck, examples";
+  * `make lint`: three "0 issues.";
+  * `make vuln`: "No vulnerabilities found.";
+  * with `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    each gave 16 `ok` (`internal/enum` is new), and so did workspace
+    mode;
+  * `go mod tidy -diff` and `scripts/go-modules.sh --check`: clean.
+* **The Windows test host,** go1.27.1 windows/amd64:
+  * `make pre-add-check`, `make lint` and `make vuln` exit 0;
+  * `GOWORK=off go test -count=3 -shuffle=on ./...` gave 16 `ok`;
+  * the nine Step 2 tests pass.
+* **The identifier scan of the diff and the new files:** no match.

@@ -14,10 +14,7 @@
 // policy in AGENTS.md, "API conventions".
 package termcap
 
-import (
-	"fmt"
-	"slices"
-)
+import "github.com/maccavelli/go-tui-lib/internal/enum"
 
 // Support is what is known about one capability.
 type Support uint8
@@ -124,25 +121,14 @@ func (m Mux) MarshalText() ([]byte, error) { return marshal(muxNames, "Mux", m) 
 func (m *Mux) UnmarshalText(b []byte) error { return unmarshal(muxNames, "Mux", b, m) }
 
 // name is v's entry in names, or its number when names has none.
-func name[T ~uint8](names []string, v T) string {
-	if int(v) < len(names) {
-		return names[v]
-	}
-	return fmt.Sprintf("%d", v)
-}
+func name[T ~uint8](names []string, v T) string { return enum.Name(names, v) }
 
+// marshal is v's entry in names; one it has none for is an error.
 func marshal[T ~uint8](names []string, kind string, v T) ([]byte, error) {
-	if int(v) >= len(names) {
-		return nil, fmt.Errorf("termcap: %s %d has no name", kind, v)
-	}
-	return []byte(names[v]), nil
+	return enum.Marshal("termcap", kind, names, v)
 }
 
+// unmarshal reads a name marshal wrote.
 func unmarshal[T ~uint8](names []string, kind string, b []byte, v *T) error {
-	i := slices.Index(names, string(b))
-	if i < 0 {
-		return fmt.Errorf("termcap: unknown %s %q", kind, b)
-	}
-	*v = T(i)
-	return nil
+	return enum.Unmarshal("termcap", kind, names, b, v)
 }

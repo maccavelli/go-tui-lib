@@ -55,6 +55,68 @@ func TestASCIISetIsASCII(t *testing.T) {
 	})
 }
 
+// TestTierWidths holds every tier's table to the same rule as Unicode() and
+// ASCII(): each glyph one rune, one cell wide, so a view laid out for one
+// tier fits every other.
+func TestTierWidths(t *testing.T) {
+	for _, tier := range []Tier{TierUnicode, TierLegacy, TierASCII} {
+		n := 0
+		fields(reflect.ValueOf(tier.Set()), tier.String(), func(path, s string) {
+			n++
+			if w := ansi.StringWidth(s); w != 1 || utf8.RuneCountInString(s) != 1 {
+				t.Errorf("%s = %q is %d cells and %d runes, want 1 and 1", path, s, w, utf8.RuneCountInString(s))
+			}
+		})
+		if n != 68 {
+			t.Errorf("%s: walked %d glyphs, want 68", tier, n)
+		}
+	}
+}
+
+func TestTierText(t *testing.T) {
+	for _, c := range []struct {
+		tier Tier
+		text string
+		set  Set
+	}{
+		{TierUnicode, "unicode", Unicode()},
+		// The legacy tier is ASCII until theme v2 fills it.
+		{TierLegacy, "legacy", ASCII()},
+		{TierASCII, "ascii", ASCII()},
+	} {
+		if got := c.tier.String(); got != c.text {
+			t.Errorf("Tier(%d).String() = %q, want %q", c.tier, got, c.text)
+		}
+		b, err := c.tier.MarshalText()
+		if err != nil || string(b) != c.text {
+			t.Errorf("Tier(%d).MarshalText() = %q, %v", c.tier, b, err)
+		}
+		var back Tier
+		if err := back.UnmarshalText([]byte(c.text)); err != nil || back != c.tier {
+			t.Errorf("UnmarshalText(%q) = %d, %v", c.text, back, err)
+		}
+		if c.tier.Set() != c.set {
+			t.Errorf("%s.Set() is not the table the tier names", c.tier)
+		}
+	}
+	if TierUnicode != 0 {
+		t.Error("TierUnicode is not the zero Tier")
+	}
+	if got := Tier(9).String(); got != "9" {
+		t.Errorf("Tier(9).String() = %q", got)
+	}
+	if _, err := Tier(9).MarshalText(); err == nil || err.Error() != "glyph: Tier 9 has no name" {
+		t.Errorf("Tier(9).MarshalText(): %v", err)
+	}
+	if Tier(9).Set() != ASCII() {
+		t.Error("an unnamed tier is not ASCII")
+	}
+	v := TierASCII
+	if err := v.UnmarshalText([]byte("Unicode")); err == nil || err.Error() != `glyph: unknown Tier "Unicode"` || v != TierASCII {
+		t.Errorf("UnmarshalText(\"Unicode\"): %v, left %s", err, v)
+	}
+}
+
 func TestFor(t *testing.T) {
 	if For(true) != Unicode() || For(false) != ASCII() {
 		t.Fatal("For does not choose the set by utf8")

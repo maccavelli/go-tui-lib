@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -53,8 +54,8 @@ func (r *Registry) Run(ctx context.Context, req Request) (Result, error) {
 		return Result{}, err
 	}
 	var o outcome
-	if inv.Command.Mode == Loop && r.loop != nil {
-		o = r.onLoop(ctx, inv)
+	if l := r.loop.Load(); inv.Command.Mode == Loop && l != nil {
+		o = r.onLoop(ctx, inv, l)
 	} else {
 		o = r.execute(ctx, inv)
 	}
@@ -62,28 +63,85 @@ func (r *Registry) Run(ctx context.Context, req Request) (Result, error) {
 	return o.res, o.err
 }
 
-// onLoop runs inv on the program's loop through a LoopMsg, and waits for
-// it or for ctx. A LoopMsg the loop reaches after ctx has ended runs
-// nothing.
-func (r *Registry) onLoop(ctx context.Context, inv *Invocation) outcome {
+// Attach makes send the registry's loop until detach is called. A Loop
+// command started while attached runs on the loop; once detached, or when
+// the loop does not take it, it runs on the caller instead, exactly once.
+//
+// send is a program's Send. A LoopMsg is sent from a goroutine of its own,
+// which ends when send returns, and detach cannot end a send that is
+// blocked: Bubble Tea's Send returns once the program has ended, so detach
+// after the program's Run has returned, never before it has started. A
+// command that runs on the caller after detach keeps its Result.Cmd, which
+// no program will run.
+//
+// Attach replaces the current loop, WithLoop's included, and detach then
+// leaves the registry with none. A second detach does nothing.
+func (r *Registry) Attach(send func(tea.Msg)) (detach func()) {
+	l := &loopState{send: send, done: make(chan struct{})}
+	r.mu.Lock()
+	r.loop.Store(l)
+	r.mu.Unlock()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			r.mu.Lock()
+			r.loop.CompareAndSwap(l, nil)
+			r.mu.Unlock()
+			close(l.done)
+		})
+	}
+}
+
+// onLoop runs inv on l through a LoopMsg, and waits for its outcome. Either
+// the loop or this caller claims the run, never both:
+//   - the LoopMsg runs the command only if it wins the claim;
+//   - when l is detached, a command the loop has not claimed runs here;
+//   - when ctx ends, a command the loop has not claimed is cancelled, and
+//     one it has claimed is waited for, so its outcome is kept.
+//
+// A LoopMsg the loop reaches after the claim was lost runs nothing.
+func (r *Registry) onLoop(ctx context.Context, inv *Invocation, l *loopState) outcome {
+	var claimed atomic.Bool
 	done := make(chan outcome, 1)
 	msg := LoopMsg{run: func() tea.Cmd {
-		if err := ctx.Err(); err != nil {
-			done <- outcome{started: time.Now(), err: err}
+		if !claimed.CompareAndSwap(false, true) {
 			return nil
 		}
-		o := r.execute(ctx, inv)
+		o := outcome{started: time.Now()}
+		// The outcome is sent however the handler ends. A panic is named in
+		// it, and then goes on to the program, which recovers it.
+		defer func() {
+			if p := recover(); p != nil {
+				done <- outcome{started: o.started, dur: time.Since(o.started),
+					err: fmt.Errorf("command: %s panicked on the loop: %v", inv.Command.ID, p)}
+				panic(p)
+			}
+		}()
+		if err := ctx.Err(); err != nil {
+			o.err = err
+			done <- o
+			return nil
+		}
+		o = r.execute(ctx, inv)
 		cmd := o.res.Cmd
 		o.res.Cmd = nil
 		done <- o
 		return cmd
 	}}
-	go r.loop(msg) // Send blocks until the program takes it
+	go l.send(msg) // Send blocks until the program takes it, or ends
 	select {
 	case o := <-done:
 		return o
+	case <-l.done:
+		if claimed.CompareAndSwap(false, true) {
+			return r.execute(ctx, inv)
+		}
+		return <-done
 	case <-ctx.Done():
-		return outcome{started: time.Now(), err: ctx.Err()}
+		if claimed.CompareAndSwap(false, true) {
+			return outcome{started: time.Now(), err: ctx.Err()}
+		}
+		return <-done
 	}
 }
 

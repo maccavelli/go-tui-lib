@@ -10,6 +10,8 @@
 // policy in AGENTS.md, "API conventions".
 package glyph
 
+import "github.com/maccavelli/go-tui-lib/internal/enum"
+
 // Border is one border style: the same thirteen glyphs, in the same order, as
 // a lipgloss.Border, so the theme package converts it field for field.
 type Border struct {
@@ -103,10 +105,50 @@ func ASCII() Set {
 	}
 }
 
-// For returns Unicode() when utf8 is true, and ASCII() otherwise.
+// For returns TierUnicode.Set() when utf8 is true, and TierASCII.Set()
+// otherwise: Unicode() or ASCII().
 func For(utf8 bool) Set {
 	if utf8 {
+		return TierUnicode.Set()
+	}
+	return TierASCII.Set()
+}
+
+// Tier is a glyph table's tier: Unicode, the legacy console's, or ASCII
+// (docs/decisions/0014-MADR-native-integration-api.md W2 and A1.2). Its
+// text form is a stable lowercase token, so a flag or a config file can
+// name it.
+type Tier uint8
+
+// The tiers, richest first.
+const (
+	// TierUnicode is the Unicode table, for a UTF-8 terminal.
+	TierUnicode Tier = iota
+	// TierLegacy is the legacy console's table, for a console that draws
+	// only its code page. Until theme v2 fills it, its Set is ASCII().
+	TierLegacy
+	// TierASCII is the ASCII table.
+	TierASCII
+)
+
+var tierNames = []string{"unicode", "legacy", "ascii"}
+
+// Set is the tier's glyph table. TierLegacy, and a tier with no name, give
+// ASCII(), which every terminal draws.
+func (t Tier) Set() Set {
+	if t == TierUnicode {
 		return Unicode()
 	}
 	return ASCII()
+}
+
+// String is the tier's token: "unicode", "legacy" or "ascii".
+func (t Tier) String() string { return enum.Name(tierNames, t) }
+
+// MarshalText is the tier's token. A tier with no token is an error.
+func (t Tier) MarshalText() ([]byte, error) { return enum.Marshal("glyph", "Tier", tierNames, t) }
+
+// UnmarshalText reads a token MarshalText wrote, exactly, case included.
+func (t *Tier) UnmarshalText(b []byte) error {
+	return enum.Unmarshal("glyph", "Tier", tierNames, b, t)
 }

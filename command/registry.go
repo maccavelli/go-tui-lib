@@ -33,12 +33,12 @@ var (
 // and take no lock; writes copy it and publish a new one. A Registry is
 // safe for use from any goroutine.
 type Registry struct {
-	mu       sync.Mutex // serialises writers
+	mu       sync.Mutex // serialises writers, and Attach and detach
 	snap     atomic.Pointer[snapshot]
 	policy   policy
 	auditor  Auditor
 	prefixer func(Source) string
-	loop     func(tea.Msg) // WithLoop's send, or nil
+	loop     atomic.Pointer[loopState] // the program's loop, or nil
 	running  running
 }
 
@@ -63,6 +63,14 @@ type entry struct {
 	builtin bool  // added by Register, not loaded by ReplaceSource
 }
 
+// loopState is one attachment of a program's loop: its send, and a channel
+// closed when it is detached. WithLoop's done is nil: it is never
+// detached.
+type loopState struct {
+	send func(tea.Msg)
+	done chan struct{}
+}
+
 // RegistryOption configures NewRegistry.
 type RegistryOption func(*Registry)
 
@@ -85,7 +93,12 @@ func WithPrefixer(f func(Source) string) RegistryOption {
 // touches the program's state from its own goroutine
 // (docs/decisions/0006-MADR-command-registry.md A7). With WithLoop set,
 // Update must use Dispatch, not Run, or it waits for itself.
-func WithLoop(send func(tea.Msg)) RegistryOption { return func(r *Registry) { r.loop = send } }
+//
+// WithLoop is a permanent Attach, for a registry whose program runs for its
+// whole life.
+func WithLoop(send func(tea.Msg)) RegistryOption {
+	return func(r *Registry) { r.loop.Store(&loopState{send: send}) }
+}
 
 // NewRegistry returns a registry at version 0 holding only its own
 // commands: command.list, command.describe and app.quit.
