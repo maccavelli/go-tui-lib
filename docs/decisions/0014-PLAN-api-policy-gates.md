@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-10-07
 associated-madr: "0014-MADR-native-integration-api.md"
 ---
@@ -1102,6 +1102,18 @@ Checked on `e826412` (Steps 2 to 6), with D9's fix where it applies:
     removed code, so it is seen to fail.
 * **CI:** run `37703582070` on `e826412` passed its test jobs on Linux,
   macOS and Windows, and failed in `gates` at `apicheck` (D9).
-  * **Open:** the run on the push of D9's fix must pass every job,
-    including `apicheck`, `examples` and the lint step that did not run.
-  * This PLAN stays `in-progress` until it does.
+  * **Run `37704939096` on `6663705`,** D9's fix, passed every job:
+    * `modules`, and `test` on `ubuntu-24.04`, `macos-15` and
+      `windows-2025`;
+    * `gates`, including the three steps that had not run:
+      * `apicheck`: "go-apicheck_test: 19 passed, 0 failed", then
+        "apicheck: .: against v0.6.0, 0 incompatible change(s)" and
+        "apicheck: clean";
+      * `examples`: "go-examples_test: 19 passed, 0 failed", then "12
+        case(s) run", "5 excerpt(s) checked" and "clean";
+      * shellcheck, markdownlint and actionlint.
+
+Every Verification item holds, and this PLAN is `complete`. W0's gates
+ship in `v0.7.0`, with
+[0013-PLAN-cli-integration-helpers.md](0013-PLAN-cli-integration-helpers.md),
+which is next.
