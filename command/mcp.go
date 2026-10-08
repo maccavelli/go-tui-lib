@@ -2,7 +2,6 @@ package command
 
 import (
 	"context"
-	json "encoding/json/v2"
 	"errors"
 
 	"github.com/maccavelli/go-tui-lib/when"
@@ -96,15 +95,9 @@ func (r *Registry) CallMCP(ctx context.Context, name string, arguments []byte, c
 	if err != nil {
 		return mcpError(name, err)
 	}
-	text := res.Text
-	if res.Value != nil {
-		b, err := json.Marshal(res.Value, json.Deterministic(true))
-		if err != nil {
-			return mcpError(name, err)
-		}
-		if text == "" {
-			text = string(b)
-		}
+	text, err := resultText(res)
+	if err != nil {
+		return mcpError(name, err)
 	}
 	out := MCPCallResult{ResultType: mcpResultComplete, Content: []MCPContent{}, StructuredContent: res.Value}
 	if text != "" {

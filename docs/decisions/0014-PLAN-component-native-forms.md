@@ -739,3 +739,82 @@ No deviation.
     vuln` and `make examples`: each exit 0;
   * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
   * the step's tests, with `TestBuiltins`: passed.
+
+### Step 4: `Format` and `WriteResult`
+
+No deviation.
+
+#### What was built
+
+* **`command/result.go` (new):**
+  * `Format`, with `FormatText` (the zero value) and `FormatJSON`. Its
+    `String`, `MarshalText` and `UnmarshalText` go through
+    `internal/enum`, with the tokens `text` and `json`.
+  * `WriteResult(w, res, f)`:
+    * **`FormatText`** writes `resultText`, with a newline added when
+      the text lacks one. An empty text writes nothing.
+    * **`FormatJSON`** writes `Value` as JSON, or `null`, and a newline.
+    * An encoding error is wrapped as "command: result: …", and a write
+      error as "command: writing the result: …".
+    * An unknown `Format` is an error.
+    * The documentation says why `Result.Cmd` is not run.
+  * `resultText` is `CallMCP`'s rule, moved here: `Text`, or else `Value`
+    as JSON. A `Value` that does not encode is an error even when there
+    is text, as before.
+  * `resultJSON` is deterministic JSON v2 with `durationMarshalers`. It
+    returns the encoder's own error, so `CallMCP`'s message for one is
+    unchanged.
+* **`command/mcp.go`:** `CallMCP` calls `resultText`, and the file no
+  longer imports JSON v2.
+* **One consequence of the shared encoder.** A `time.Duration` in
+  `Result.Value` used to make `CallMCP` an error result, because JSON v2
+  has no default form for it. Now it is written as "1m30s". No golden
+  holds a duration, and each existing golden is byte-identical.
+  `Result.Value` still goes into `structuredContent` untouched, for the
+  MCP server's own encoder.
+* **Tests,** in `command/result_test.go` (new):
+  * `TestWriteResult`: both formats over an empty result, `Text` only
+    (with and without its newline), `Value` only, both, a bare duration
+    and a `Cmd` that panics if run. Also a failing writer, a `Value` that
+    does not encode, and an unknown `Format`.
+  * `TestFormatText`: the tokens round-trip, `flag.TextVar` binds
+    `--format=json`, and `--format=JSON` is refused.
+  * `TestCallMCPUnchanged`: for four results, `CallMCP`'s text plus a
+    newline equals `WriteResult`'s `FormatText` output. The step names
+    the MCP goldens for this test; `TestExportGolden` already holds
+    them, unchanged, and this test adds the equality.
+
+#### Checks
+
+* **Mutations,** on scratch copies of the tree. All six were killed:
+  * **S4-1** (`FormatText` adds no newline): `TestWriteResult` gave
+    `text only, text: wrote "done", <nil>; want "done\n"`, and four more.
+  * **S4-2** (`Value`'s JSON wins over `Text`, added): for "both" as
+    text, it wrote the value's JSON where it wanted `"done\n"`.
+  * **S4-3** (no duration marshaler, added): `command: result: json:
+    cannot marshal from Go time.Duration within "/a": no default
+    representation`, and five more.
+  * **S4-4** (`CallMCP` does not use `resultText`, added):
+    `TestCallMCPUnchanged` gave empty `Content` for the `Value`-only
+    results.
+  * **S4-5** (`FormatJSON` writes no newline, added): `empty, json:
+    wrote "null", <nil>; want "null\n"`, and six more.
+  * **S4-6** (a write error is dropped, added): `text to a failing
+    writer: <nil>`.
+* **Rule 2 on macOS:**
+  * `gofmt -l`: nothing.
+  * `make pre-add-check FILES=<the three Go files>`: "3 file(s) clean".
+  * `make lint`: clean.
+  * With `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    all passed, and so did workspace mode.
+  * `go mod tidy -diff`, `make vuln` and `scripts/go-modules.sh --check`
+    were clean.
+  * `make apicheck`: "against v0.7.1, 0 incompatible change(s)".
+  * `make examples`: "clean".
+  * `make release-check`: "159 file(s) clean … apicheck, examples".
+* **The Windows test host,** go1.27.1 windows/amd64, with the working
+  tree and a bundle of `main` and its tags:
+  * the `FILES` and no-list `make pre-add-check`, `make lint`, `make
+    vuln` and `make examples`: each exit 0;
+  * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
+  * the step's tests, with `TestExportGolden`: passed.
