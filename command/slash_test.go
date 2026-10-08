@@ -19,9 +19,9 @@ func slashRegistry(t testing.TB) *Registry {
 	t.Helper()
 	ok := func(context.Context, *Invocation, resizeArgs) (Result, error) { return Result{}, nil }
 	return registryOf(t, nil,
-		mustNew(t, "workspace.resize", ok, WithSlash("resize", "rs")),
-		mustNew(t, "files.add", func(context.Context, *Invocation, addArgs) (Result, error) { return Result{}, nil }, WithSlash("add")),
-		mustNew(t, "review", func(context.Context, *Invocation, reviewArgs) (Result, error) { return Result{}, nil }, WithSlash("review")),
+		testCommand(t, "workspace.resize", ok, WithSlash("resize", "rs")),
+		testCommand(t, "files.add", func(context.Context, *Invocation, addArgs) (Result, error) { return Result{}, nil }, WithSlash("add")),
+		testCommand(t, "review", func(context.Context, *Invocation, reviewArgs) (Result, error) { return Result{}, nil }, WithSlash("review")),
 		cmd("acp.agent.plan", UI, func(c *Command) { c.Kind, c.Handler, c.Slash = Forward, nil, "plan" }),
 	)
 }

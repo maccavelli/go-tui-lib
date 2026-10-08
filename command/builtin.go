@@ -19,9 +19,10 @@ type describeArgs struct {
 	ID string `json:"id" arg:"" help:"the command's ID" placeholder:"ID"`
 }
 
-// builtins is the registry's own commands, closed over r.
+// builtins is the registry's own commands, closed over r. Their
+// definitions are fixed, so an error is a bug, and MustNew panics on it.
 func (r *Registry) builtins() []Command {
-	list, err1 := New(idList, "List commands", func(_ context.Context, inv *Invocation, _ NoArgs) (Result, error) {
+	list := MustNew(idList, "List commands", func(_ context.Context, inv *Invocation, _ NoArgs) (Result, error) {
 		var infos []ManifestCommand
 		var text strings.Builder
 		for c := range r.Available(inv.Context, inv.Origin.surface()) {
@@ -32,7 +33,7 @@ func (r *Registry) builtins() []Command {
 	},
 		WithDescription("Lists the commands the caller can run now: not hidden, offered where it asks from, and available in its context."),
 		WithDanger(ReadOnly), WithIdempotent())
-	describe, err2 := New(idDescribe, "Describe a command", func(_ context.Context, _ *Invocation, a describeArgs) (Result, error) {
+	describe := MustNew(idDescribe, "Describe a command", func(_ context.Context, _ *Invocation, a describeArgs) (Result, error) {
 		c, ok := r.Lookup(ID(a.ID))
 		if !ok {
 			return Result{}, &ArgError{Path: "/id", Reason: "no command has this ID"}
@@ -50,15 +51,10 @@ func (r *Registry) builtins() []Command {
 	},
 		WithDescription("Describes one command: its ID, arguments schema and danger."),
 		WithArgHint("command id"), WithDanger(ReadOnly), WithIdempotent())
-	quit, err3 := New(idQuit, "Quit", func(context.Context, *Invocation, NoArgs) (Result, error) {
+	quit := MustNew(idQuit, "Quit", func(context.Context, *Invocation, NoArgs) (Result, error) {
 		return Result{Cmd: msgCmd(QuitRequestMsg{})}, nil
 	},
 		WithDescription("Asks the program to quit; the program decides."),
 		WithDanger(UI), WithSurfaces(AllSurfaces&^SurfaceCLI))
-	for _, err := range []error{err1, err2, err3} {
-		if err != nil {
-			panic(err) // fixed definitions; this is a bug
-		}
-	}
 	return []Command{list, describe, quit}
 }

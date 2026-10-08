@@ -663,3 +663,79 @@ No deviation.
   * `make examples`: "clean".
   * `GOWORK=off go test -count=2 -shuffle=on ./...`: 18 ok.
   * The six panic and exit-status tests passed.
+
+### Step 3: `ArgsOf`, `MustNew`, `GateFunc`, `AllowIf`, `WatchContext`
+
+No deviation.
+
+#### What was built
+
+* **`command/args.go`:**
+  * `MustNew[A]` has `New[A]`'s signature and panics with `New`'s error.
+  * `ArgsOf[A](a A) (json.RawMessage, error)` marshals with JSON v2,
+    `Deterministic(true)` and the new `durationMarshalers`. Its error
+    is prefixed "command: arguments: ".
+* **`command/decode.go`:** `durationMarshalers`, beside
+  `durationUnmarshalers`, writes `d.String()`.
+* **`command/builtin.go`:** the three built-ins use `MustNew`, and the
+  loop that panicked on their errors is gone.
+* **`command/gate.go`:** `GateFunc` with `Decide`, and `AllowIf(ok)`,
+  which answers `AllowOnce` or `RejectOnce`.
+* **`command/registry.go`:** `WatchContext(ctx)` waits on the change
+  channel or `ctx.Done()`, and returns nil on the latter. `Watch()` is
+  `WatchContext(context.Background())`.
+* **Tests,** in `command/forms_test.go` (new):
+  * `TestArgsOfDuration`: `{"name":"x","wait":"1m30s"}`, which a
+    `MustNew` command's rule accepts and decodes back to 90 s;
+  * `TestArgsOfDeterministic`: a five-key map, sorted and identical over
+    20 runs, and an error for a func;
+  * `TestMustNewPanics`;
+  * `TestAllowIf`: both answers, and both through `Request.Gate` on a
+    Destructive command from the CLI;
+  * `TestGateFunc`;
+  * `TestWatchContextEnds`. It returns nil within 100 ms of cancel, and
+    `runtime.NumGoroutine()` falls back to its count before. A change
+    still wakes it.
+* **A test helper renamed.** revive's confusing-naming rule refused the
+  exported `MustNew` beside the test helper `mustNew` in
+  `command/decode_test.go`. The helper is now `testCommand`, in its 12
+  uses across `decode_test.go`, `export_test.go` and `slash_test.go`.
+  No assertion changed.
+
+#### Checks
+
+* **Mutations,** on scratch copies of the tree. All six were killed:
+  * **S3-1a** (no duration marshaler, JSON v2's default):
+    `TestArgsOfDuration` gave `json: cannot marshal from Go
+    time.Duration within "/wait": no default representation`.
+  * **S3-1b** (integer nanoseconds, JSON v1's form): `ArgsOf =
+    {"name":"x","wait":90000000000}`, and "New's rule refused ArgsOf's
+    arguments: command: argument /wait: is an integer, not string".
+  * **S3-2** (`WatchContext` ignores `ctx`): "WatchContext did not
+    return within 100 ms of cancel".
+  * **S3-3** (`AllowIf` inverted, added): `TestAllowIf` failed on both
+    answers.
+  * **S3-4** (`MustNew` swallows the error, added): "MustNew did not
+    panic".
+  * **S3-5** (`Deterministic(false)`, added): `ArgsOf =
+    {"b":2,"a":1,"c":3,"e":5,"d":4}; want sorted members`.
+* **Rule 2 on macOS:**
+  * `gofmt -l`: nothing.
+  * `make pre-add-check FILES=<the nine Go files>`: "9 file(s) clean".
+  * `make lint`: clean after the rename. Before it, the one finding was
+    "command/args.go:83:6: confusing-naming: Method 'MustNew' differs
+    only by capitalization to function 'mustNew' in
+    command/decode_test.go".
+  * With `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    all passed, and so did workspace mode.
+  * `go mod tidy -diff`, `make vuln` and `scripts/go-modules.sh --check`
+    were clean.
+  * `make apicheck`: "against v0.7.1, 0 incompatible change(s)".
+  * `make examples`: "clean".
+  * `make release-check`: "158 file(s) clean … apicheck, examples".
+* **The Windows test host,** go1.27.1 windows/amd64, with the working
+  tree and a bundle of `main` and its tags:
+  * the `FILES` and no-list `make pre-add-check`, `make lint`, `make
+    vuln` and `make examples`: each exit 0;
+  * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
+  * the step's tests, with `TestBuiltins`: passed.

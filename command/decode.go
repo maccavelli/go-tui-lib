@@ -422,6 +422,12 @@ var durationUnmarshalers = json.UnmarshalFunc(func(b []byte, d *time.Duration) e
 	return nil
 })
 
+// durationMarshalers encode a time.Duration in the string form
+// durationUnmarshalers read and SchemaOf's pattern accepts.
+var durationMarshalers = json.MarshalFunc(func(d time.Duration) ([]byte, error) {
+	return json.Marshal(d.String())
+})
+
 // decodeArgs decodes raw into an A strictly: unknown members are errors.
 func decodeArgs[A any](raw []byte) (A, error) {
 	var a A

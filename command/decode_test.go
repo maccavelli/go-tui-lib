@@ -9,8 +9,8 @@ import (
 	"time"
 )
 
-// mustNew is New, failing t on an error.
-func mustNew[A any](t testing.TB, id ID, run func(context.Context, *Invocation, A) (Result, error), opts ...Option) Command {
+// testCommand is New with the danger UI, failing t on an error.
+func testCommand[A any](t testing.TB, id ID, run func(context.Context, *Invocation, A) (Result, error), opts ...Option) Command {
 	t.Helper()
 	c, err := New(id, string(id), run, append([]Option{WithDanger(UI)}, opts...)...)
 	if err != nil {
@@ -30,7 +30,7 @@ type strictArgs struct {
 
 func TestDecodeStrict(t *testing.T) {
 	var got strictArgs
-	r := registryOf(t, nil, mustNew(t, "strict", func(_ context.Context, _ *Invocation, a strictArgs) (Result, error) {
+	r := registryOf(t, nil, testCommand(t, "strict", func(_ context.Context, _ *Invocation, a strictArgs) (Result, error) {
 		got = a
 		return Result{}, nil
 	}))
@@ -94,7 +94,7 @@ func TestDefaultsFilled(t *testing.T) {
 	}
 	var got args
 	var raw string
-	r := registryOf(t, nil, mustNew(t, "d", func(_ context.Context, inv *Invocation, a args) (Result, error) {
+	r := registryOf(t, nil, testCommand(t, "d", func(_ context.Context, inv *Invocation, a args) (Result, error) {
 		got, raw = a, string(inv.Args)
 		return Result{}, nil
 	}))
@@ -158,7 +158,7 @@ func TestAuditMasksSecrets(t *testing.T) {
 	}
 	var log auditLog
 	r := registryOf(t, []RegistryOption{WithAuditor(&log)},
-		mustNew(t, "login", func(context.Context, *Invocation, args) (Result, error) { return Result{}, nil },
+		testCommand(t, "login", func(context.Context, *Invocation, args) (Result, error) { return Result{}, nil },
 			WithDanger(Destructive), WithWhen("!off")),
 	)
 	full := `{"user":"me","token":"s3cret","nested":{"key":"s3cret"},"keys":["s3cret"]}`

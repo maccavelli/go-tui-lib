@@ -422,10 +422,20 @@ func (r *Registry) Version() uint64 { return r.snap.Load().version }
 // then returns ChangedMsg, with a ConflictMsg when that change renamed or
 // refused a command (docs/decisions/0006-MADR-command-registry.md A6). The
 // host issues it again after each ChangedMsg, as with any subscription.
-func (r *Registry) Watch() tea.Cmd {
+// It waits for ever; WatchContext stops waiting.
+func (r *Registry) Watch() tea.Cmd { return r.WatchContext(context.Background()) }
+
+// WatchContext is Watch, and returns a nil message, which Bubble Tea
+// ignores, once ctx ends: a program that stops listening cancels ctx, and
+// leaves no goroutine waiting.
+func (r *Registry) WatchContext(ctx context.Context) tea.Cmd {
 	s := r.snap.Load()
 	return func() tea.Msg {
-		<-s.changed
+		select {
+		case <-s.changed:
+		case <-ctx.Done():
+			return nil
+		}
 		next := s.next
 		changed := ChangedMsg{Version: next.version}
 		if len(next.conflicts) == 0 {

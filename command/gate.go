@@ -45,6 +45,26 @@ type Gate interface {
 	Decide(ctx context.Context, inv *Invocation) (Decision, error)
 }
 
+// GateFunc is a function used as a Gate.
+type GateFunc func(ctx context.Context, inv *Invocation) (Decision, error)
+
+// Decide calls f.
+func (f GateFunc) Decide(ctx context.Context, inv *Invocation) (Decision, error) {
+	return f(ctx, inv)
+}
+
+// AllowIf is a Gate that answers AllowOnce when ok, and RejectOnce
+// otherwise: a program's own command line passes its --yes flag, as
+// Request.Gate.
+func AllowIf(ok bool) Gate {
+	return GateFunc(func(context.Context, *Invocation) (Decision, error) {
+		if ok {
+			return AllowOnce, nil
+		}
+		return RejectOnce, nil
+	})
+}
+
 // asks reports whether the policy asks the gate before a command of danger
 // d runs for origin o: a mutating command from an agent, and a destructive
 // one from an agent or the shell.

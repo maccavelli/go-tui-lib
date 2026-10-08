@@ -43,16 +43,16 @@ type deleteArgs struct {
 // hidden one, one not offered to agents and one whose When is false.
 func catalogue(t testing.TB, o ...RegistryOption) *Registry {
 	t.Helper()
-	readDoc := mustNew(t, "doc.read", func(context.Context, *Invocation, NoArgs) (Result, error) {
+	readDoc := testCommand(t, "doc.read", func(context.Context, *Invocation, NoArgs) (Result, error) {
 		return Result{Value: map[string]any{"lines": 3}}, nil
 	}, WithDanger(ReadOnly), WithDescription("Reads the document."), WithOutput(Schema(`{"type":"object","properties":{"lines":{"type":"integer"}}}`)))
-	zoom := mustNew(t, "view.zoom", func(_ context.Context, _ *Invocation, a zoomArgs) (Result, error) {
+	zoom := testCommand(t, "view.zoom", func(_ context.Context, _ *Invocation, a zoomArgs) (Result, error) {
 		return Result{Text: "zoomed " + a.Pane}, nil
 	}, WithDanger(UI), WithIdempotent(), WithSlash("zoom"), WithArgHint("pane"), WithDescription("Zooms a pane."), WithMeta("icon", "zoom"))
-	reset := mustNew(t, "session.reset", func(context.Context, *Invocation, NoArgs) (Result, error) {
+	reset := testCommand(t, "session.reset", func(context.Context, *Invocation, NoArgs) (Result, error) {
 		return Result{Text: "reset"}, nil
 	}, WithDanger(Mutating), WithSlash("reset"), WithDescription("Resets the session."))
-	del := mustNew(t, "files.delete", func(_ context.Context, _ *Invocation, a deleteArgs) (Result, error) {
+	del := testCommand(t, "files.delete", func(_ context.Context, _ *Invocation, a deleteArgs) (Result, error) {
 		return Result{}, errors.New("no such file: " + a.Path)
 	}, WithDanger(Destructive), WithOpenWorld(), WithDescription("Deletes a file."))
 	r := registryOf(t, o, readDoc, zoom, reset, del,

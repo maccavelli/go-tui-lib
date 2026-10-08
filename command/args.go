@@ -2,6 +2,8 @@ package command
 
 import (
 	"context"
+	"encoding/json"
+	jsonv2 "encoding/json/v2"
 	"errors"
 	"fmt"
 )
@@ -74,6 +76,27 @@ func New[A any](id ID, title string, run func(ctx context.Context, inv *Invocati
 		return Command{}, errors.New("command: " + string(id) + ": no WithDanger; declare ReadOnly, UI, Mutating or Destructive")
 	}
 	return c, nil
+}
+
+// MustNew is New, and panics on its error: for a command whose definition
+// is fixed in the program, where an error is a bug.
+func MustNew[A any](id ID, title string, run func(ctx context.Context, inv *Invocation, args A) (Result, error), opts ...Option) Command {
+	c, err := New(id, title, run, opts...)
+	if err != nil {
+		panic(err)
+	}
+	return c
+}
+
+// ArgsOf encodes a as a request's arguments: deterministic JSON, with a
+// time.Duration in the string form New's schema accepts ("1m30s"). It is
+// how a program's own command line builds Request.Args from its flags.
+func ArgsOf[A any](a A) (json.RawMessage, error) {
+	b, err := jsonv2.Marshal(a, jsonv2.Deterministic(true), jsonv2.WithMarshalers(durationMarshalers))
+	if err != nil {
+		return nil, fmt.Errorf("command: arguments: %w", err)
+	}
+	return b, nil
 }
 
 // WithDescription sets Description.
