@@ -1,6 +1,6 @@
 ---
-status: proposed
-date: 2026-10-07
+status: in-progress
+date: 2026-10-08
 associated-madr: "0014-MADR-native-integration-api.md"
 ---
 # Implement W2: native forms in `command`, `workspace`, `termcap`, `termsvc`, `theme` and `tuitest`
@@ -61,6 +61,35 @@ Everything is additive, and released in `v0.8.0` with W3.
 | `theme.Background` and `BorderStyle` are `int`s without text forms; `workspace`'s theme command spells `Unknown` as `"auto"` | `theme/theme.go:35-43`, `:181`; `workspace/commands.go:115`, `:327` |
 | four tests map a `tuitest.Case` to TrueColor or ASCII and `glyph.For(c.UTF8)` | `workspace/golden_test.go:17-23`, `agent_golden_test.go:29-33`, `commands_test.go:420-424`; `theme/theme_test.go:157-162` |
 | 12 workspace goldens are drawn with WcWidth and are wider than their nominal width under `ansi.StringWidth` | the `width-wcwidth.*` goldens, measured |
+
+### Facts re-read before execution (2026-10-08)
+
+`v0.7.0` and `v0.7.1` shipped after this PLAN was written. Before
+execution the agent read every row above again on `7b4bded`. The design
+facts hold, apart from the ones this table corrects. Where only a line
+moved, the citation in the table above is still the 2026-10-07 reading,
+and this table gives the line today. The steps below cite today's lines.
+
+| Fact | Today |
+| :--- | :--- |
+| **Corrected.** Eight workspace goldens, not 12, are wider than their nominal width under `ansi.StringWidth`: the eight `width-wcwidth.*` goldens, 83 cells at 80 and 121 at 120, and none under `ansi.WcWidth`. The other four of the twelve measured are `tuitest`'s own `clash` fixtures, which are wider under both methods on purpose. | measured over every `testdata/golden` directory with both methods: `workspace` 8 of 152; `tuitest/internal/clash` 4 of 8; `command`, `launch`, `layout`, `theme` and `termcap` none |
+| **New since the PLAN.** 0013 Step 2c put a guard on the loop. `onLoop`'s closure recovers a Loop handler's panic, sends the caller an error that names the panic's value ("command: <id> panicked on the loop: <value>"), and panics again, so that Bubble Tea recovers it and the TUI crashes. 0013's PLAN recorded it as the behaviour "until 0014 W2's `recover` lands". `TestLoopPanicReleasesCaller` asserts both halves. | `command/dispatch.go:103-146`, the guard at `:111-119`; `command/loop_test.go:184-209`; [0013-PLAN-cli-integration-helpers.md](0013-PLAN-cli-integration-helpers.md) Step 2 |
+| **New since the PLAN.** `launch` imports `command` (`WithRegistry`), so a `command` test that calls `launch.ExitCode` lives in the external test package `command_test`. Every `command` test file today is in package `command`. | `launch/option.go:31`; `go list -deps ./launch` |
+| **New since the PLAN.** `launch.ExitCode` honours an error's own `ExitCode() int` first, through the error chain. | `launch/exit.go:48` |
+| **New since the PLAN.** `launch` reads `termcap.Env` (`NO_COLOR`, `FORCE_COLOR`, `CLICOLOR_FORCE`, `CI`, `TERM`, `COLUMNS`, the program's `NoInputEnv` and the locale), so Step 8's case-folding reaches `launch`'s decision on Windows too. colorprofile's own reading of the list `launch` gives it does not change. | `launch/colour.go:19-38`, `launch/locale.go:18-20`, `launch/decide.go:202-242` |
+| **Corrected.** Step 5's `ParseArgs` is a method on `*Registry`, as `ParseSlash` is and as 0014-MADR W2 names it (`Registry.ParseArgs`): it needs the registry to find the command. Step 5 as written dropped the receiver. | `command/slash.go:24`; 0014-MADR W2's table |
+| moved: `execute` runs the handler at `command/dispatch.go:218`, in `execute` at `:207-222` | `command/dispatch.go` |
+| moved: the sentinels at `command/registry.go:19-30`; `ArgError` at `command/args.go:16-26` | |
+| moved: the compiled `x-cli` at `command/decode.go:108-123`, inside `scalars` at `:90-124` | |
+| moved: `Watch` at `command/registry.go:406-418` | |
+| moved: the built-ins at `command/builtin.go:23-63`, the panic at `:60` | |
+| moved: the first theme at `workspace/workspace.go:268`, in `New` at `:264-295`; `ThemeBuilder` at `:190`; `Pane` at `:49`; `Model[M]`'s forwarding at `workspace/model.go:79-162` | |
+| moved: the notifier's encoder at `termsvc/notify.go:238-277` | |
+| moved: `theme.Background` at `theme/theme.go:39-48`, `BorderStyle` at `:184-195` | |
+| moved: `make fuzz` at `Makefile:98-101` | |
+| unchanged: `CallMCP`'s rule; `ParseSlash`; `cliInfo`; `durationUnmarshalers`; `Gate`; the guide's `yesGate`; `setEnv`, `WithDisabled` and `Env.LookupEnv`; `Notify` and `Copy` under `context.Background()`; `workspace/commands.go:115`, `:327`; the four mapping sites; termcaptest's seven profiles; bubbles' `help.New()` | as cited above |
+| no clash: `Format`, `Param`, `PanicError`, `PlainViewer` and `GlyphThemeBuilder` are in `docs/glossary.md`, reserved by 0014-MADR W2. `GateFunc` is not a type name elsewhere. No public package exports any of the new function or method names yet | `docs/glossary.md:39-43`; a search of the non-test Go files |
+| the preconditions hold: 0013's PLAN is complete, `v0.7.0` and `v0.7.1` are tagged, W0's gates are in force, and `scripts/apicheck.allow` lists nothing | [0014-PLAN-api-policy-gates.md](0014-PLAN-api-policy-gates.md); `git tag` |
 
 ### Preconditions
 
@@ -140,6 +169,22 @@ Everything is additive, and released in `v0.8.0` with W3.
   holding `debug.Stack()`. `o.dur` is still set, and Async's `done` still
   runs. The same helper wraps `Gate.Decide`; a panicking gate gives a
   refusal wrapping the `PanicError`.
+* **The loop's guard (added 2026-10-08).** A Loop handler's panic is
+  recovered inside `execute`, like every other handler's. So the loop
+  never sees it, and the TUI keeps running. The caller gets the
+  `*PanicError`, and the value is not in its text. That is the end state
+  0013's PLAN named, and 0014-MADR W2 decides "`recover` around every
+  handler".
+  * `onLoop`'s guard (`command/dispatch.go:111-119`) is removed with its
+    comment. With the handler recovered inside `execute`, nothing it
+    wraps can panic.
+  * `TestLoopPanicReleasesCaller` is rewritten for the new end state. The
+    caller is still released within a second. Its error is a
+    `*PanicError` for `loop`, and the loop goroutine recovers `nil`.
+  * Before Step 2, a panicking Loop handler under `launch.Run` crashed
+    the TUI with `ErrCrashed`. After it, `Run` keeps going, and the
+    command's caller gets the error. The release notes say so (Step 11
+    and W3's release step).
 * **The audit** records the `PanicError`. `SlogAuditor` logs its `Error()`
   only; the value and the stack stay in the error for the program.
 * **Exit statuses (A1):**
@@ -157,7 +202,10 @@ Everything is additive, and released in `v0.8.0` with W3.
   * `TestPanicErrorHidesValue`;
   * `TestExitCodes`: each error bare and wrapped, through
     `launch.ExitCode` and through `errors.As` to
-    `interface{ ExitCode() int }`;
+    `interface{ ExitCode() int }`. It is in the external package
+    `command_test`, because `launch` imports `command` (added
+    2026-10-08). A panicking gate's refusal gives 3, the status of the
+    refusal, which comes first in its chain;
   * `TestSentinelsStillCompare`.
 * **Mutations:**
   * **S2-1:** no `recover`. `TestHandlerPanicIsAnError` crashes the test
@@ -217,7 +265,9 @@ Everything is additive, and released in `v0.8.0` with W3.
 * **The rule compiles all of `x-cli`.** The rule
   (`command/decode.go:104-123`) adds `short`, `placeholder`, `group` and
   `hidden`, with `help` read from `description`.
-* **`ParseArgs(id ID, args []string, o Origin) (Request, error)`:**
+* **`ParseArgs(id ID, args []string, o Origin) (Request, error)`,**
+  a method on `*Registry` (corrected 2026-10-08; see the facts re-read
+  before execution):
   * **The grammar:**
     * `--name=v`, `--name v` and `-s v`;
     * a bare `--name` for a boolean;
@@ -388,7 +438,8 @@ Everything is additive, and released in `v0.8.0` with W3.
   * `(Case) Glyphs() glyph.Set` gives `glyph.For(c.UTF8)`;
   * `Fits(t T, s string, width int, m ansi.Method)` fails on any line
     wider than `width` under `m`. It is opt-in, because the WcWidth
-    goldens are wider under `StringWidth`.
+    goldens are wider under `StringWidth` (eight of them, as re-measured
+    on 2026-10-08).
   * The four mapping sites use `Profile` and `Glyphs`, with their goldens
     byte-identical.
 * **Tests:**
@@ -407,7 +458,9 @@ Everything is additive, and released in `v0.8.0` with W3.
   * `ArgsOf` and `WriteResult` replace `json.Marshal` and `fmt.Println`;
   * a section on `ParseArgs`, a generic `run <id> …` subcommand, and
     completion with cobra's `ValidArgsFunction` through `Complete`;
-  * exit statuses through `ExitCode`.
+  * exit statuses through `ExitCode`;
+  * a handler's panic is an `ErrPanicked` error, a Loop handler's
+    included, and no longer crashes the TUI (added 2026-10-08).
 
   The excerpts are tied to the framework-example harness, whose programs
   gain these forms and their cases.
@@ -463,4 +516,24 @@ Everything is additive, and released in `v0.8.0` with W3.
 
 ## Execution Record
 
-Not started.
+### Step 1: records
+
+No deviation.
+
+* **The refresh.** On 2026-10-08 the owner asked the agent to "Verify w2
+  update related docs as needed, then proceed." The agent read every fact
+  in the Scope table again on `7b4bded`. It measured the golden widths
+  again, with a scratch program outside the tree, using x/ansi `v0.11.8`,
+  the version `go.mod` requires. The results are in "Facts re-read before
+  execution (2026-10-08)", with the amended lines in Steps 2, 5, 10 and
+  11.
+  * Two facts were wrong: the golden count, and `ParseArgs`'s missing
+    receiver.
+  * One fact is new: 0013's loop guard, which Step 2 now replaces.
+* **No other record changes.** 0014-MADR's W2 already decides `recover`
+  around every handler, and names `Registry.ParseArgs`. 0013's PLAN
+  already names W2's `recover` as the end of its loop guard. Neither
+  needs an amendment. [0014-PLAN-hardening.md](0014-PLAN-hardening.md)
+  cites none of the facts that changed.
+* **The approval** is the same message's "then proceed".
+* **This PLAN** is `in-progress`, and its row in `docs/README.md` follows.
