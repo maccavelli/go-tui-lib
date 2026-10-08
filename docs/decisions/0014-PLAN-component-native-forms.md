@@ -359,7 +359,8 @@ and this table gives the line today. The steps below cite today's lines.
   `Model[M]` forwards it.
 * **`(*Workspace) RenderPlain(width int) string`** lays the workspace out
   at `width` × the current height (or the fallback), then for each
-  visible pane in focus-ring order writes:
+  visible pane in focus-ring order writes (D6, 2026-10-08: every visible
+  pane, the ring's first and then the rest in tree order):
   1. its title, flattened to one line;
   2. its `PlainView(width)`, or else its `View(width, h)` with escape
      sequences stripped (`ansi.Strip`), where `h` is its laid-out height,
@@ -368,7 +369,8 @@ and this table gives the line today. The steps below cite today's lines.
 
   Overlays and hidden panes are left out. It never touches the view cache.
 * **`(*Workspace) Help() help.Model`** is bubbles' model, with:
-  * `ShortSeparator` and `FullSeparator` from the glyph set's `Bullet`;
+  * `ShortSeparator` and `FullSeparator` from the glyph set's `Bullet`
+    (D7, 2026-10-08: `FullSeparator` keeps bubbles' four spaces);
   * `Ellipsis` from its `Ellipsis`;
   * styles from the theme.
 * **Tests:**
@@ -1057,3 +1059,48 @@ No deviation.
     vuln` and `make examples`: each exit 0;
   * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
   * the step's tests, with the background and golden tests: passed.
+
+### Step 7: `RenderPlain` and `Help`
+
+#### Deviations
+
+* **D6 (2026-10-08): `RenderPlain` writes every visible pane.**
+  * **Found:** the step says "each visible pane in focus-ring order". The
+    focus ring leaves out a pane whose `Focusable()` is false, such as a
+    status footer (`workspace/workspace.go:670-680`). Read literally, a
+    plain render would drop that pane's text.
+  * **The owner's choice,** of two: every placed pane with a non-empty
+    area. The focus ring's panes come first, in its order (`WithFocusRing`'s,
+    else the tree's), then the visible panes it leaves out, in tree order.
+    Hidden and zero-size panes and overlays are left out.
+  * **The other:** the focus ring only.
+* **D7 (2026-10-08): `Help`'s `FullSeparator` stays four spaces.**
+  * **Found:** the step takes both separators from the glyph set's
+    `Bullet`. bubbles' `FullSeparator` default is four spaces, which hold
+    no glyph (bubbles v2.2.1 `help/help.go:96`). Only `ShortSeparator`
+    (" • ") and `Ellipsis` ("…") draw anything outside ASCII, as the fact
+    table records.
+  * **The owner's choice,** of two: `ShortSeparator` is " " + `Bullet` +
+    " ", `Ellipsis` is the glyph set's, and `FullSeparator` stays as
+    bubbles draws it.
+  * **The other:** a bullet between the full help's columns too, which
+    changes bubbles' layout.
+* **D8 (2026-10-08): the step is paused for GO-2026-6604.**
+  * **Found:** the step's code was complete, and its first gate run
+    passed `make vuln`. The second run, after a lint fix, failed. That
+    afternoon the vulnerability database had added GO-2026-6604
+    (CVE-2026-56857, published 2026-10-08T22:31Z): "Root.Mkdir(All) can
+    follow junctions out of the root on Windows in os", in every Go 1.27
+    release before 1.27.2. govulncheck traces it to `tuitest.compare`
+    calling `os.Root.WriteFile` (`tuitest/tuitest.go:187`), which W2 does
+    not touch.
+  * **Not this step's doing:** `make vuln` and `make release-check` fail
+    on `main` as well. The commit gate runs the same precheck, so the
+    step cannot be committed until it passes.
+  * **The owner's choice,** of two: a record of its own first,
+    [0016-MADR-go-1-27-2-for-go-2026-6604.md](0016-MADR-go-1-27-2-for-go-2026-6604.md),
+    then this step resumes, with its code as it stands, uncommitted.
+  * **The other:** a deviation step in this PLAN. That would mix a
+    security patch into W2 and its release.
+  * **Not offered,** being workarounds: excluding the advisory from
+    govulncheck, or dropping `os.Root` from `tuitest`.

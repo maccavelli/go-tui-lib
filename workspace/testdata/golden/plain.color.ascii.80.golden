@@ -1,0 +1,14 @@
+  7|Session
+ 11|user: hello
+ 15|agent: hi there
+  0|
+ 20|Metrics and more [3]
+ 11|tokens 1200
+ 10|cost $0.01
+  0|
+  4|logs
+ 25|INFO started (plain, www)
+  0|
+  6|footer
+ 28|model x | mode ask | ctx 12%
+  0|

@@ -3,6 +3,7 @@ package workspace
 import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // Bubble is the shape of a bubbles component, and of any model built like
@@ -111,6 +112,16 @@ func (p *Model[M]) Cursor() *tea.Cursor {
 		return c.Cursor()
 	}
 	return nil
+}
+
+// PlainView is the hosted model's PlainView(width) when it has one, and
+// otherwise its View with escape sequences removed, which is what
+// RenderPlain does for a pane with no PlainView.
+func (p *Model[M]) PlainView(width int) string {
+	if v, ok := any(&p.M).(PlainViewer); ok { // *M has M's methods too
+		return v.PlainView(width)
+	}
+	return ansi.Strip(p.M.View())
 }
 
 // Keys is the hosted model's bindings, or nil.
