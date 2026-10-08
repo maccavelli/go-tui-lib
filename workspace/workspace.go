@@ -140,13 +140,16 @@ type Workspace struct {
 	sizes    map[layout.PaneID]SizeMsg
 	osizes   map[string]SizeMsg // each open overlay's last content size
 	cache    map[viewKey]string
-	ids      []layout.PaneID // every pane's ID, sorted, for Broadcast
-	frame    *cells.Frame    // the reused frame buffer
-	method   ansi.Method     // how the frame and its views measure
-	pinned   bool            // WithWidthMethod fixed method
-	themeGen uint64          // raised on every theme change
-	follow   bool            // rebuild the theme on profile and background messages
-	builder  ThemeBuilder    // how to rebuild it; nil is theme.New with the glyphs in use
+	ids      []layout.PaneID   // every pane's ID, sorted, for Broadcast
+	frame    *cells.Frame      // the reused frame buffer
+	method   ansi.Method       // how the frame and its views measure
+	pinned   bool              // WithWidthMethod fixed method
+	themeGen uint64            // raised on every theme change
+	follow   bool              // rebuild the theme on profile and background messages
+	builder  ThemeBuilder      // how to rebuild it; nil is theme.New with the glyphs in use
+	gbuilder GlyphThemeBuilder // how to rebuild it, given the glyphs; wins over builder
+	themed   bool              // WithTheme gave the first theme
+	glyphs   glyph.Set         // the starting glyphs, for the first theme
 	profile  colorprofile.Profile
 	bg       theme.Background // the background the terminal last reported
 	pinnedBg theme.Background // SetBackground's choice; Unknown follows bg
@@ -186,25 +189,64 @@ type drag struct {
 // Option configures a Workspace.
 type Option func(*Workspace)
 
-// ThemeBuilder makes the theme for a colour profile and a background.
+// ThemeBuilder makes the theme for a colour profile and a background. It
+// chooses its own glyphs.
 type ThemeBuilder func(p colorprofile.Profile, bg theme.Background) theme.Theme
+
+// GlyphThemeBuilder makes the theme for a colour profile, a background and
+// the glyphs in use: WithGlyphs's at first, then the theme's own.
+type GlyphThemeBuilder func(p colorprofile.Profile, bg theme.Background, g glyph.Set) theme.Theme
 
 // WithTheme fixes the theme: profile and background messages do not change
 // it, though they still reach the panes. Without it, the workspace follows
 // the terminal: it starts with ANSI256, an unknown background and Unicode
-// glyphs, and rebuilds the theme on each tea.ColorProfileMsg and
-// tea.BackgroundColorMsg (docs/decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md
-// §4).
+// glyphs, or what WithProfile, WithBackground and WithGlyphs say, and
+// rebuilds the theme on each tea.ColorProfileMsg and tea.BackgroundColorMsg
+// (docs/decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md §4).
+//
+// WithTheme's theme is the first theme, whatever the options' order, and
+// its profile, background and glyphs are the starting ones: WithProfile,
+// WithBackground and WithGlyphs are then ignored. A WithThemeBuilder or
+// WithGlyphThemeBuilder after it makes the workspace follow from there
+// (docs/decisions/0014-PLAN-component-native-forms.md D5).
 func WithTheme(t theme.Theme) Option {
-	return func(w *Workspace) { w.theme, w.follow = t, false }
+	return func(w *Workspace) { w.theme, w.follow, w.themed = t, false, true }
 }
 
-// WithThemeBuilder makes the workspace follow the terminal, rebuilding its
-// theme with b on each profile and background message. The default builder
-// is theme.New with the glyphs in use; a program with its own palettes
-// passes one that adds them, such as with theme.WithPaletteFor.
+// WithThemeBuilder makes the workspace follow the terminal, building its
+// theme with b for the starting profile and background, and again on each
+// profile and background message. The default builder is theme.New with
+// the glyphs in use; a program with its own palettes passes one that adds
+// them, such as with theme.WithPaletteFor. b chooses its own glyphs, so
+// WithGlyphs does not reach it; a GlyphThemeBuilder is given them.
 func WithThemeBuilder(b ThemeBuilder) Option {
 	return func(w *Workspace) { w.builder, w.follow = b, true }
+}
+
+// WithGlyphThemeBuilder is WithThemeBuilder for a builder that is given the
+// glyphs in use. It wins over a WithThemeBuilder.
+func WithGlyphThemeBuilder(b GlyphThemeBuilder) Option {
+	return func(w *Workspace) { w.gbuilder, w.follow = b, true }
+}
+
+// WithGlyphs sets the starting glyphs (default Unicode), for the default
+// builder and a GlyphThemeBuilder, so a program's own command line can pass
+// launch's choice of glyph tier.
+func WithGlyphs(g glyph.Set) Option { return func(w *Workspace) { w.glyphs = g } }
+
+// WithProfile sets the starting colour profile (default ANSI256). A
+// tea.ColorProfileMsg replaces it.
+func WithProfile(p colorprofile.Profile) Option { return func(w *Workspace) { w.profile = p } }
+
+// WithBackground sets the starting background (default Unknown). A
+// tea.BackgroundColorMsg replaces it; SetBackground is the way to pin one.
+func WithBackground(bg theme.Background) Option { return func(w *Workspace) { w.bg = bg } }
+
+// WithSize sets the size the workspace lays out at before its first
+// tea.WindowSizeMsg (default 80 by 24), such as a plain render's. A
+// negative size is 0, as in a WindowSizeMsg.
+func WithSize(width, height int) Option {
+	return func(w *Workspace) { w.width, w.height = max(width, 0), max(height, 0) }
 }
 
 // WithoutBackgroundQuery leaves tea.RequestBackgroundColor out of Init, for
@@ -265,7 +307,6 @@ func New(root layout.Node, panes map[layout.PaneID]Pane, opts ...Option) *Worksp
 	w := &Workspace{
 		root:   root,
 		panes:  make(map[layout.PaneID]Pane, len(panes)),
-		theme:  theme.New(colorprofile.ANSI256, theme.Unknown, glyph.Unicode()),
 		keys:   DefaultKeyMap(),
 		border: theme.BorderRounded,
 		mouse:  true,
@@ -277,13 +318,23 @@ func New(root layout.Node, panes map[layout.PaneID]Pane, opts ...Option) *Worksp
 		method: ansi.WcWidth,
 		dirty:  true,
 		follow: true,
+
+		profile: colorprofile.ANSI256,
+		bg:      theme.Unknown,
+		glyphs:  glyph.Unicode(),
 	}
 	maps.Copy(w.panes, panes)
 	w.ids = slices.Sorted(maps.Keys(w.panes))
 	for _, o := range opts {
 		o(w)
 	}
-	w.profile, w.bg = w.theme.Profile, w.theme.Background
+	// The first theme is built once every option has applied
+	// (docs/decisions/0014-PLAN-component-native-forms.md Step 6).
+	if w.themed {
+		w.profile, w.bg, w.glyphs = w.theme.Profile, w.theme.Background, w.theme.Glyphs
+	} else {
+		w.theme = w.build(w.glyphs)
+	}
 	w.solve()
 	if !w.focusable(w.focus) {
 		w.focus = ""
@@ -321,12 +372,21 @@ func (w *Workspace) rebuildTheme() {
 	if !w.follow {
 		return
 	}
+	w.SetTheme(w.build(w.theme.Glyphs))
+}
+
+// build makes a theme for the current profile and background with the
+// builder in use: the GlyphThemeBuilder, given g; else the ThemeBuilder;
+// else theme.New with g.
+func (w *Workspace) build(g glyph.Set) theme.Theme {
 	bg := w.background()
-	if w.builder != nil {
-		w.SetTheme(w.builder(w.profile, bg))
-		return
+	switch {
+	case w.gbuilder != nil:
+		return w.gbuilder(w.profile, bg, g)
+	case w.builder != nil:
+		return w.builder(w.profile, bg)
 	}
-	w.SetTheme(theme.New(w.profile, bg, w.theme.Glyphs))
+	return theme.New(w.profile, bg, g)
 }
 
 // Err returns the error of the last layout, if any. The workspace keeps the

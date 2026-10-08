@@ -331,7 +331,10 @@ and this table gives the line today. The steps below cite today's lines.
        lands it passes through `clampSize`.
   2. **The first theme is built after every option has applied.**
      * `WithTheme` wins over everything: the other options are then
-       ignored, and the documentation says so.
+       ignored, and the documentation says so. (D5, 2026-10-08: it wins
+       for the first theme and the starting facts. Whether the workspace
+       then follows is still decided by the last of `WithTheme` and the
+       two builder options, as today.)
      * Otherwise the first theme comes from the `GlyphThemeBuilder`, else
        the `ThemeBuilder`, else `theme.New(profile, bg, glyphs)`.
      * Rebuilds use the same choice.
@@ -954,3 +957,103 @@ No deviation.
   * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
   * the step's tests and the slash tests, with `FuzzParseArgs`'s seeds:
     passed.
+
+### Step 6: the workspace's options
+
+#### Deviations
+
+* **D5 (2026-10-08): `WithTheme` fixes the first theme, not whether the
+  workspace follows.**
+  * **Found:** rule 2 says "`WithTheme` wins over everything: the other
+    options are then ignored". Today `WithTheme` and `WithThemeBuilder`
+    are decided by order: the last decides whether the workspace follows
+    the terminal (`workspace/workspace.go:198-208`).
+    `WithTheme(t)` then `WithThemeBuilder(b)` means "start from `t`, then
+    rebuild with `b`". `workspace/commands_test.go:429` (through
+    `session`, `workspace/agent_test.go:130`) and
+    `launch/consumer_test.go:523-524` use it, and the `commands-light.*`
+    goldens and `launch`'s `Frame` golden depend on it. Read literally,
+    the rule would turn the builder off and change them. apidiff cannot
+    see that.
+  * **The owner's choice,** of two: `WithTheme` fixes the first theme and
+    the starting profile, background and glyphs, in any order.
+    `WithGlyphs`, `WithProfile` and `WithBackground` are ignored for it.
+    Whether the workspace then follows stays as today: the last of
+    `WithTheme`, `WithThemeBuilder` and `WithGlyphThemeBuilder` decides.
+    No golden changes, and the options' documentation says so.
+  * **The other:** the literal rule, which changes the `v0.7` behaviour
+    and those goldens, and needs a release note.
+
+#### What was built
+
+* **`workspace/workspace.go`:**
+  * `GlyphThemeBuilder`, and the options `WithGlyphThemeBuilder`,
+    `WithGlyphs`, `WithProfile`, `WithBackground` and `WithSize`.
+  * New fields: `gbuilder`, `themed` and `glyphs`.
+  * `New` starts from ANSI256, Unknown and Unicode glyphs, applies the
+    options, and then builds the first theme:
+    * under `WithTheme`, the starting profile, background and glyphs are
+      the theme's (D5);
+    * otherwise `build(w.glyphs)` makes it: the `GlyphThemeBuilder`,
+      else the `ThemeBuilder`, else `theme.New`.
+  * `rebuildTheme` calls `build` with the theme's glyphs, so a rebuild
+    keeps the glyphs in use, as the default builder always did.
+  * `WithSize` sets the size before the first `WindowSizeMsg`, with a
+    negative size made 0, as that message's handling does.
+  * The option comments say which options reach which builder, and D5's
+    rule.
+* **One change a program can see.** A `ThemeBuilder` now makes the first
+  theme too, so it runs once in `New`. Before, the first theme was
+  always `theme.New(ANSI256, Unknown, Unicode)`, and the builder ran only
+  on the first message. This is the step's "the first theme through the
+  builder". No golden changed, and neither did `background_test.go`'s
+  counts, which compare builds before and after a message.
+* **Tests,** in `workspace/options_test.go` (new):
+  * `TestFirstThemeFollowsOptions`: no options; each fact alone; all
+    three, in both orders; both builders, before and after the facts,
+    with the `GlyphThemeBuilder` winning on the first theme and on a
+    rebuild; and a `ThemeBuilder`'s first theme.
+  * `TestWithThemeWins`: the facts are ignored in both orders, and a
+    message does not rebuild. D5 is checked both ways: a builder after
+    `WithTheme` follows from it, and a builder before it does not.
+  * `TestWithSizeBeforeFirstMessage`: 40 by 6 before the message, 30 by
+    4 after it, a negative size, and the default.
+  * `TestGlyphsReachBuilder`: a `GlyphThemeBuilder` is given ASCII from
+    `WithGlyphs`, at first and on a rebuild. A `ThemeBuilder`'s theme
+    does not get them.
+
+#### Checks
+
+* **Mutations,** on scratch copies of the tree. All seven were killed:
+  * **S6-1** (the first theme ignores `WithGlyphs`):
+    `TestFirstThemeFollowsOptions` gave "WithGlyphs: first theme
+    {p:4 bg:0 ascii:false}", and the same for "all three".
+  * **S6-2** (`WithTheme` does not give the first theme, added):
+    `TestWithThemeWins` failed.
+  * **S6-3** (a `ThemeBuilder` wins, added): `TestFirstThemeFollowsOptions`
+    gave "glyph builder [], builder [{p:5 bg:1 ascii:false}]".
+  * **S6-4** (`WithSize` does nothing, added): "24 lines, 80 wide; want 6
+    by 40".
+  * **S6-5** (D5 reversed, added): "WithTheme then a builder: built [], …,
+    following false".
+  * **S6-6** (a rebuild passes the starting glyphs, added):
+    `TestGlyphsReachBuilder` failed.
+  * **S6-7** (the starting facts not taken from `WithTheme`'s theme,
+    added): "profile TrueColor, bg 1".
+* **Rule 2 on macOS:**
+  * `gofmt -l`: nothing.
+  * `make pre-add-check FILES=<the two Go files>`: "2 file(s) clean".
+  * `make lint`: clean.
+  * With `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    all passed, and so did workspace mode. No golden changed.
+  * `go mod tidy -diff`, `make vuln` and `scripts/go-modules.sh --check`
+    were clean.
+  * `make apicheck`: "against v0.7.1, 0 incompatible change(s)".
+  * `make examples`: "clean".
+  * `make release-check`: "163 file(s) clean … apicheck, examples".
+* **The Windows test host,** go1.27.1 windows/amd64, with the working
+  tree and a bundle of `main` and its tags:
+  * the `FILES` and no-list `make pre-add-check`, `make lint`, `make
+    vuln` and `make examples`: each exit 0;
+  * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
+  * the step's tests, with the background and golden tests: passed.
