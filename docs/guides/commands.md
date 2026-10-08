@@ -346,11 +346,11 @@ With the standard `flag` package:
 <!-- from: testdata/frameworks/flag/main.go#flag -->
 
 ```go
-switch os.Args[1] {
+switch args[0] {
 case "save":
     fs := flag.NewFlagSet("save", flag.ExitOnError)
     yes := fs.Bool("yes", false, "approve without asking")
-    _ = fs.Parse(os.Args[2:])
+    _ = fs.Parse(args[1:])
     if err := runCLI(ctx, r, "session.save", saveArgs{Name: fs.Arg(0)}, *yes); err != nil {
         fmt.Fprintln(os.Stderr, err)
         os.Exit(1)
@@ -375,15 +375,18 @@ save := &cobra.Command{
 save.Flags().BoolVar(&yes, "yes", false, "approve without asking")
 ```
 
-With Kong, the registry's argument struct can be the subcommand's grammar:
+With Kong, the registry's argument struct can be the subcommand's grammar, and
+`launch.Flags` embeds beside it (see "Start the TUI from your CLI"):
 
 <!-- from: testdata/frameworks/kong/main.go#kong -->
 
 ```go
 var cli struct {
+    launch.Flags `embed:""` // --mode, --tui and --no-tui
+
     Yes  bool     `help:"approve without asking"`
     Save saveArgs `cmd:"" help:"Save the session"`
-    TUI  struct{} `cmd:"" default:"1" help:"Run the TUI"`
+    Line struct{} `cmd:"" default:"1" help:"Run the line mode"`
 }
 kctx := kong.Parse(&cli)
 if kctx.Command() == "save <name>" {
@@ -391,13 +394,31 @@ if kctx.Command() == "save <name>" {
 }
 ```
 
-With urfave/cli v3:
+With urfave/cli v3, whose root command also carries the `--tui` path (see
+"Start the TUI from your CLI"):
 
 <!-- from: testdata/frameworks/urfave/main.go#urfave -->
 
 ```go
 app := &cli.Command{
     Name: "pi",
+    Flags: []cli.Flag{
+        &cli.GenericFlag{Name: "mode", Value: &f.Mode, Usage: "auto, tui or plain"},
+        &cli.BoolFlag{Name: "tui", Destination: &f.TUI, Usage: "start the TUI"},
+    },
+    Action: func(ctx context.Context, c *cli.Command) error {
+        s := launch.Streams{In: c.Reader, Out: c.Writer, Err: c.ErrWriter, Env: os.Environ()}
+        m := session{}
+        if f.Resolve() == launch.ChoiceTUI {
+            final, code, fallBack := tui(ctx, s, r, m)
+            if !fallBack {
+                return exitWith(code)
+            }
+            m = final
+        }
+        lineMode(s, m)
+        return nil
+    },
     Commands: []*cli.Command{{
         Name:      "save",
         Usage:     "Save the session",
@@ -410,7 +431,7 @@ app := &cli.Command{
 }
 if err := app.Run(context.Background(), os.Args); err != nil {
     fmt.Fprintln(os.Stderr, err)
-    os.Exit(1)
+    os.Exit(launch.ExitCode(err))
 }
 ```
 
@@ -431,9 +452,223 @@ if err := app.Run(context.Background(), os.Args); err != nil {
 - **These examples are compiled and run** before every release. Each is
   cut from a complete program under `testdata/frameworks`, which
   `make examples` builds against the library in a module of its own and
-  runs: without `--yes` the save is refused, with it the save runs, and a
-  bad flag exits with the framework's own status. The library itself
-  imports none of the frameworks.
+  runs: without `--yes` the save is refused, with it the save runs, a bad
+  flag exits with the framework's own status, and `--tui` with no
+  terminal falls back to the line mode. The library itself imports none
+  of the frameworks.
+
+## Start the TUI from your CLI
+
+`launch` starts the TUI from your program's own command line, on its own
+streams, and only where it can run
+([0013-MADR](../decisions/0013-MADR-cli-integration-helpers.md)). A
+program whose default is its own CLI mode asks for the TUI with `--tui`.
+When the TUI cannot start, or crashes, the program says why on its
+standard error and goes on in its CLI mode, from where the TUI was:
+
+<!-- from: testdata/frameworks/flag/main.go#tui -->
+
+```go
+// tui runs the TUI for --tui. When it cannot start, or crashes, it says why
+// on Err and returns the model to continue from, with fallBack true: the
+// program goes on in its own CLI mode, and never repeats what the TUI did.
+// An end the user or the program chose ends the program, with its status.
+func tui(ctx context.Context, s launch.Streams, r *command.Registry, m session) (session, int, bool) {
+    d := launch.Decide(s, launch.Config{Choice: launch.ChoiceTUI})
+    final, err := launch.Run(ctx, s, d, m, launch.WithRegistry(r))
+    switch {
+    case errors.Is(err, launch.ErrNotStarted):
+        fmt.Fprintf(s.Err, "Warning: --tui unavailable (%v); using the CLI\n", err)
+        return m, 0, true
+    case errors.Is(err, launch.ErrCrashed):
+        fmt.Fprintf(s.Err, "Warning: the TUI stopped (%v); continuing in the CLI\n", err)
+        return final, 0, true
+    default:
+        return final, launch.ExitCode(err), false
+    }
+}
+```
+
+- **`Decide`** reads the terminal state of the streams and the environment
+  you pass, never the process's own, and returns a `Decision` with a
+  `Reason` token. Its rules, in order:
+  1. `ChoicePlain`: plain, `launch.requested-plain`.
+  2. Unless `ChoiceTUI`: the variable `Config.NoInputEnv` names, set and
+     not empty (`launch.no-input-variable`), then `CI` set, not empty, and
+     neither `false` nor `0` (`launch.ci`). A flag outranks the
+     environment, so `--tui` skips both.
+  3. `TERM=dumb`, whatever the choice: `launch.dumb-terminal`.
+  4. The input: `In` if it is a terminal (`launch.input-not-terminal`
+     otherwise).
+  5. The drawing stream: `Out` if it is a terminal
+     (`launch.output-not-terminal` otherwise).
+  6. Otherwise interactive, `launch.terminal`.
+- **`Decision`** also carries the colour profiles for `Out` and for the
+  TUI's stream, the glyph tier the locale allows, and the size. The
+  profiles come from the environment, with no terminfo file read and no
+  process started: `NO_COLOR` lowers them, and `FORCE_COLOR`, unless `0`
+  or `false`, raises them. On Windows with no `TERM`, the system's build
+  number counts too
+  ([0013-MADR](../decisions/0013-MADR-cli-integration-helpers.md) A1.7).
+- **`Run`** starts Bubble Tea on the decision's streams, with no signal
+  handler: cancel `ctx` from your own `signal.NotifyContext`. It returns
+  the final model as your type.
+  - A failure before your model's `Init` wraps `ErrNotStarted`: nothing
+    was drawn by your model, and the terminal is as it was.
+  - A crash after it, a panic Bubble Tea recovered or a failure reading
+    input, wraps `ErrCrashed`. The terminal is restored, and the model is
+    the last good one, after the last `Update` that returned. Bubble Tea
+    writes its own crash report to the process's standard error.
+  - An interrupt (`tea.ErrInterrupted`) or a cancelled `ctx` returns
+    Bubble Tea's error as it is: the user or the program ended it.
+- **`Run` never sets the alternate screen;** your `View` does. A final
+  model with an `Epilogue() string` method has it printed to `Out` after
+  a clean end, for a resume hint.
+
+### The flags in each framework
+
+`launch.Flags` is `--mode` (`auto`, `tui` or `plain`, a `launch.Choice`)
+and `--tui`, a plain `bool`. `Resolve` is `ChoiceTUI` when `--tui` is set,
+and the mode otherwise. With the standard `flag` package:
+
+<!-- from: testdata/frameworks/flag/main.go#flag-tui -->
+
+```go
+var f launch.Flags
+global := flag.NewFlagSet("pi", flag.ExitOnError)
+f.RegisterFlags(global)
+_ = global.Parse(os.Args[1:])
+s := launch.Streams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr, Env: os.Environ()}
+m := session{}
+if f.Resolve() == launch.ChoiceTUI {
+    final, code, fallBack := tui(ctx, s, r, m)
+    if !fallBack {
+        os.Exit(code)
+    }
+    m = final
+}
+```
+
+With Cobra, `RegisterFlags` on a `flag.FlagSet` and `AddGoFlagSet` keep
+`--tui` a bare boolean, and `FromSource` takes the command's streams as
+they are:
+
+<!-- from: testdata/frameworks/cobra/main.go#cobra-tui -->
+
+```go
+var f launch.Flags
+root := &cobra.Command{
+    Use:   "pi",
+    Short: "A program with a TUI beside its CLI",
+    RunE: func(c *cobra.Command, _ []string) error {
+        s := launch.FromSource(c, os.Environ())
+        m := session{}
+        if f.Resolve() == launch.ChoiceTUI {
+            final, code, fallBack := tui(c.Context(), s, r, m)
+            if !fallBack {
+                return exitWith(code)
+            }
+            m = final
+        }
+        lineMode(s, m)
+        return nil
+    },
+}
+fs := flag.NewFlagSet("pi", flag.ContinueOnError)
+f.RegisterFlags(fs)
+root.PersistentFlags().AddGoFlagSet(fs) // keeps --tui a bare boolean
+```
+
+With Kong, `launch.Flags` embeds into the grammar (above), with
+`--no-tui`, and its streams are the writers Kong holds:
+
+<!-- from: testdata/frameworks/kong/main.go#kong-tui -->
+
+```go
+if kctx.Command() == "line" {
+    s := launch.Streams{In: os.Stdin, Out: kctx.Stdout, Err: kctx.Stderr, Env: os.Environ()}
+    m := session{}
+    if cli.Resolve() == launch.ChoiceTUI {
+        final, code, fallBack := tui(ctx, s, r, m)
+        if !fallBack {
+            os.Exit(code)
+        }
+        m = final
+    }
+    lineMode(s, m)
+}
+```
+
+With urfave/cli v3, `--mode` is a `GenericFlag` on the `Choice`, which has
+the `Get` urfave requires, and the streams are the command's own (the
+root command above).
+
+The tier-2 frameworks were run once, not on every release:
+
+| Framework | How `launch.Flags` binds |
+| :--- | :--- |
+| ff v4 | `ff.NewFlagSetFrom(name, &flags)`, from the `ff` tags |
+| go-flags | a `group:""` field, read through `UnmarshalFlag` |
+| go-arg | embedded, read through `UnmarshalText` |
+
+Each needs a one-line `launch.Streams{…}` literal; only a Cobra command
+fits `FromSource`.
+
+### Where the TUI reads and draws
+
+- **`Config.UIOnErr`** lets the TUI draw on `Err` when `Out` is not a
+  terminal, so `x=$(prog pick --tui)` captures only the result on `Out`.
+- **`Config.OpenTTY`** lets the TUI read from and draw on the controlling
+  terminal when `In` or `Out` is not one, as fzf does. It is not
+  supported on Windows, where `Decide` ignores it: a read of the console
+  handle launch would open cannot be cancelled, and would take the CLI's
+  next line
+  ([0013-MADR](../decisions/0013-MADR-cli-integration-helpers.md) A1.9).
+
+### Commands, a prober and an agent
+
+- **`launch.WithRegistry(r)`** attaches the registry to the program while
+  the TUI runs, so an agent's `Loop` command runs on the program's loop.
+  It is detached on every outcome, and a `Loop` command run after that
+  runs on its caller, at once.
+- **`launch.WithRestorer(p)`** with your `*termcap.Prober` writes its
+  resets, such as mode 2031's, to the TUI's stream on every outcome, a
+  crash included, so the CLI mode's input gets no colour-scheme reports.
+- **`launch.OnStart(f)`** calls `f` with the `*tea.Program` before it
+  runs, so a goroutine of yours can `Send` to it.
+- **`launch.WithFilter`** is `tea.WithFilter`, given your own model;
+  `WithProgramOptions` adds any other Bubble Tea option.
+
+### Plain output and the exit status
+
+- **`launch.Frame(m, width, height, profile)`** draws your model once, for
+  a plain status board or a final screen. It sends the profile and the
+  size through `Update`, runs no command, and returns the view.
+- **`launch.ExitCode(err)`** is the shell's status: an error's own
+  `ExitCode() int` first, such as a `launch.ExitError`; then 0 for nil, 2
+  for `ErrNotStarted`, 130 for an interrupt or a cancel, 124 for a
+  deadline, 2 for a panic, and 1 otherwise. `launch.ExitError` carries a
+  status through Kong's `FatalIfErrorf` and urfave's exit handler.
+
+### Testing it
+
+`launch/launchtest` gives your own tests fake streams: a `Terminal` that
+says it is one, has a size and takes typed keys, a `Pipe` that is not one,
+and `Streams` and `Env` builders. `ExampleTerminal` tests a `--tui` path
+end to end: the decision on a fake terminal, then a run that quits on a
+typed `q`.
+
+### Cautions
+
+- **pflag ignores `IsBoolFlag` on a custom value,** so a bare `--tui`
+  bound through pflag's own `Var` asks for an argument. Use
+  `RegisterFlags` and `AddGoFlagSet`, as above, or set `NoOptDefVal`.
+- **Cobra prints usage on an error to `Out`,** not `Err` (cobra #1708).
+  Set `SilenceUsage`, or a script that captures `Out` gets the usage.
+- **Pass the streams unwrapped.** A `bufio` writer, a colour writer or an
+  `io.MultiWriter` hides the descriptor: `Decide` then sees no terminal,
+  unless the wrapper has its own `IsTerminal() bool`, and Bubble Tea
+  enters no raw mode.
 
 ## What the library never does
 

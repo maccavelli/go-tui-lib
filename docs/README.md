@@ -85,7 +85,9 @@ it was when they were written
 | run the same commands from my own CLI (`flag`, Cobra, Kong) | [guides/commands.md](guides/commands.md#run-commands-from-your-own-cli) |
 | see complete, tested programs on `flag`, Cobra, Kong and urfave/cli | `testdata/frameworks/`, built and run by `make examples` ([architecture.md, Tooling](architecture.md#tooling)) |
 | know why go-tui-lib ships no CLI front end | [0012-MADR](decisions/0012-MADR-bring-your-own-cli.md) |
-| see the planned helpers that start the TUI from my CLI, or print plainly when no one is at a terminal | [0013-MADR](decisions/0013-MADR-cli-integration-helpers.md) |
+| start the TUI from my CLI with `--tui`, in `flag`, Cobra, Kong or urfave/cli, and fall back to the CLI when it cannot run | [guides/commands.md](guides/commands.md#start-the-tui-from-your-cli) |
+| test my CLI's `--tui` path with fake terminals | `launch/launchtest`, and `ExampleTerminal` in `launch/launchtest/example_test.go` |
+| know why `launch` decides and falls back as it does | [0013-MADR](decisions/0013-MADR-cli-integration-helpers.md) |
 | see how the API will grow to fit any Go CLI framework natively, and the hardening and renames planned before `v1` | [0014-MADR](decisions/0014-MADR-native-integration-api.md) |
 | see how flag, Cobra, Kong, urfave/cli and agent tools such as Codex, Grok and Pi integrate a TUI, and what the API assessment found | [0014-REPORT](reports/0014-REPORT-api-assessment-and-integration-research.md) |
 | know why the command registry is built this way | [0006-MADR](decisions/0006-MADR-command-registry.md) |

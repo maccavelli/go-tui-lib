@@ -46,6 +46,12 @@ screen, the mouse mode, focus reporting or keyboard enhancements, and never
 installs a signal handler. Its mouse handling is inert until you set a mouse
 mode.
 
+The program also owns how the TUI starts. When your program has its own
+command line, `launch` decides whether the TUI can run on its streams,
+runs it with `launch.WithRegistry` so the workspace's commands reach the
+loop, and falls back to your CLI mode when it cannot start or crashes:
+see [Start the TUI from your CLI](commands.md#start-the-tui-from-your-cli).
+
 ## Choose a layout
 
 Four presets build the common arrangements as ordinary `layout.Node` trees:

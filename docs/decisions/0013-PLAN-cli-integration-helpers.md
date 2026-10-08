@@ -1568,3 +1568,129 @@ the recommendation.
 * **The identifier scan of the diff:** no match. The Windows console
   captures hold the account name in its prompt. They stay in the
   scratchpad, and every line this record quotes from them is redacted.
+
+### Step 8: conformance, collision allowlist, documents
+
+The owner approved it on 2026-10-08 ("Commit to main and proceed"), when
+Step 7 was committed as `c680671`.
+
+#### Deviations
+
+* **D10 (2026-10-08): two descriptions this PLAN made stale are corrected
+  here.**
+  * **Found:** Step 8 lists the documents it changes. Two that it does
+    not list no longer describe the tree:
+    * `docs/glossary.md`, "Reserved by accepted records", still lists
+      `launch`'s names as not yet built. Step 3's record said Step 8
+      would move them.
+    * `docs/architecture.md`'s package graph and table do not show Step
+      2's additions: `internal/enum`, `glyph.Tier` and
+      `Registry.Attach`. Step 8 lists only `internal/enum`'s line in the
+      tree.
+  * **Asked;** the owner chose to correct both in this step, the
+    recommendation.
+  * **Not chosen:** leaving them for a later record.
+
+#### What was built
+
+* **`internal/conformance`.**
+  * `launch` and `launch/launchtest` are in the scan's must-read list,
+    which comes from `go list` (W0).
+  * The `Decision` entry has been in `sharedNames` since Step 3 (D1),
+    and `Terminal` since Step 6 (D5).
+* **The framework examples** (`testdata/frameworks`) gained the `--tui`
+  path, so the guide's launch examples join the harness:
+  * **Every program** holds the same `session` model (a stand-in that
+    quits on q), the `tui` helper and `lineMode`.
+    * `tui` decides with `ChoiceTUI`, runs with `WithRegistry`, and
+      falls back with a warning, from the model reached, on
+      `ErrNotStarted` or `ErrCrashed`.
+    * `lineMode` is the program's own CLI mode.
+    * `flag/main.go` marks `tui`, as the region `tui`.
+  * **`flag`** parses `launch.Flags` on a global `FlagSet`, then the
+    subcommand from its arguments, in the region `flag-tui`. The
+    existing `flag` region now switches on `args[0]`, not `os.Args[1]`.
+  * **`cobra`:** the root command's `RunE`, with `RegisterFlags` and
+    `PersistentFlags().AddGoFlagSet`, and `FromSource`, in the region
+    `cobra-tui`. Its exit is `launch.ExitCode(err)`.
+  * **`kong`:**
+    * The grammar embeds `launch.Flags`.
+    * The default command, which was `TUI`, is `Line`.
+    * The `--tui` path is in the region `kong-tui`.
+  * **`urfave`:** the root command carries `--mode` (a `GenericFlag` on
+    the `Choice`), `--tui` and the action, in the existing region. Its
+    exit is `launch.ExitCode(err)`.
+  * **`cases.txt`** adds three cases for each framework:
+    * `--tui`: the warning names `launch.input-not-terminal`;
+    * `--tui`: stdout holds "line mode";
+    * `--mode=plain`: stdout holds "line mode".
+
+    That makes 24 cases. `go.mod.tmpl` and `go.sum` needed no change.
+* **`docs/guides/commands.md`:**
+  * "Start the TUI from your CLI", with the pattern; `Decide`'s rules
+    and `Decision`; `Run`'s outcomes; the flags in each framework, with
+    the tier-2 table; `UIOnErr` and `OpenTTY` (not on Windows, A1.9);
+    `WithRegistry`, `WithRestorer`, `OnStart` and `WithFilter`; `Frame`
+    and `ExitCode`; `launchtest`; and the three cautions.
+  * Its four code blocks come from the regions, and the excerpt check
+    holds them.
+  * In "Run commands from your own CLI", the `flag`, `kong` and `urfave`
+    excerpts follow the programs, and the last bullet names the `--tui`
+    cases.
+* **The guides:**
+  * `building-workspaces.md`, "The program owns the program": a
+    paragraph pointing to the new section;
+  * `terminal-capabilities.md`, "Do not probe without input": `Run`
+    always sets an input, and a prober goes to `WithRestorer` as well.
+* **`README.md`:** the current release is `v0.7.0`, a Status bullet for
+  `launch`, and an "I want to…" row.
+* **`docs/README.md`:** rows for the guide section and `launchtest`. The
+  0013-MADR row now reads "know why `launch` decides and falls back as it
+  does".
+* **`docs/architecture.md`,** with D10's part:
+  * the graph: `launch`, `launch/launchtest` and `internal/enum`, with
+    `glyph` and `termcap` now pointing to `internal/enum`;
+  * the table: rows for `launch`, `launch/launchtest` and
+    `internal/enum`. `glyph`'s row names `Tier`, and `command`'s names
+    `Attach`;
+  * the tree: `launch/`, `launch/launchtest/` and `internal/enum/`;
+  * Dependencies: x/term required, and kept to `launch` by depguard;
+  * "What is not here": the sentence about helpers is gone.
+* **`docs/glossary.md`,** D10's other part. `launch`'s nine names and
+  `glyph.Tier` leave "Reserved", and a short section says they are built.
+
+#### Checks
+
+* **Mutations, on scratch clones.** All killed by
+  `TestNoPackageOwnsTheTerminal`, each naming the planted file:
+  * S8-1, a `launch` file writes to `os.Stderr`: "launch/zz_mutant.go:8
+    uses os.Stderr";
+  * S8-2, a `launch` file sets `AltScreen`: "launch/zz_mutant.go:6 sets
+    AltScreen";
+  * S8-3, a `launch` file imports `os/exec`: "imports os/exec", "uses
+    os/exec.Command".
+* **The new harness cases seen to fail.** In a clone, the `flag`
+  program's fallback lost its warning. `make examples` failed with "flag
+  --tui => 0 stderr launch.input-not-terminal: stderr does not hold …",
+  and the `tui` excerpt differed.
+* **The harness:** `make examples` gave "24 case(s) run", "9 excerpt(s)
+  checked" and "clean".
+* **Rule 2 on macOS:**
+  * `make pre-add-check` over the 4 programs gave "4 file(s) clean … go
+    vet, go test, …, examples". The examples gate ran, as D5 of
+    0014-PLAN-api-policy-gates.md has it;
+  * `make release-check`: "155 file(s) clean … apicheck, examples";
+  * with `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    each gave 18 `ok`, and so did workspace mode;
+  * `go mod tidy -diff` and `scripts/go-modules.sh --check`: clean;
+  * markdownlint over the repository: 0 issues;
+  * the link check over the eight changed Markdown files: 153 links,
+    none broken.
+* **The Windows test host,** go1.27.1 windows/amd64:
+  * `make examples` gave "24 case(s) run", "9 excerpt(s) checked" and
+    "clean";
+  * `make pre-add-check` gave "155 file(s) clean";
+  * `make lint` and `make vuln` exit 0;
+  * `GOWORK=off go test -count=3 -shuffle=on ./...` gave 18 `ok`;
+  * `launch` and `launchtest`: 37 tests and examples pass.
+* **The identifier scan of the diff:** no match.

@@ -23,3 +23,18 @@ kong save --bogus notes => 80 stderr unknown flag --bogus
 urfave save notes => 1 stderr refused: session.save
 urfave save --yes notes => 0 stdout saved notes
 urfave save --bogus notes => 1 stderr flag provided but not defined: -bogus
+
+# The --tui path, with no terminal: a warning naming the reason, then the
+# line mode. --mode=plain goes to the line mode with no warning.
+flag --tui => 0 stderr launch.input-not-terminal
+flag --tui => 0 stdout line mode
+flag --mode=plain => 0 stdout line mode
+cobra --tui => 0 stderr launch.input-not-terminal
+cobra --tui => 0 stdout line mode
+cobra --mode=plain => 0 stdout line mode
+kong --tui => 0 stderr launch.input-not-terminal
+kong --tui => 0 stdout line mode
+kong --mode=plain => 0 stdout line mode
+urfave --tui => 0 stderr launch.input-not-terminal
+urfave --tui => 0 stdout line mode
+urfave --mode=plain => 0 stdout line mode

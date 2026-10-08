@@ -136,6 +136,11 @@ A program run with `tea.WithInput(nil)` must not probe: tea skips its own
 queries then, but the replies to the prober's would leak into the shell.
 Pass `termcap.WithDisabled()`, or do not embed a prober at all.
 
+`launch.Run` always sets an input, so a program started through `launch`
+can probe. Pass the prober to `launch.WithRestorer` as well: its resets,
+such as mode 2031's, are then written on every outcome, a crash included
+([Start the TUI from your CLI](commands.md#start-the-tui-from-your-cli)).
+
 ## Drop split replies
 
 A reply split across reads arrives as an unknown event and then as key

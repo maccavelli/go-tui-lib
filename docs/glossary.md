@@ -35,15 +35,6 @@ later record does not reuse them for something else.
 
 | Name | Package | Record | Means |
 | :--- | :--- | :--- | :--- |
-| `Choice` | `launch` | [0013-MADR](decisions/0013-MADR-cli-integration-helpers.md) A1.6 | the program's request, bound to its flag: `auto`, `tui`, `plain` |
-| `Config` | `launch` | 0013-MADR A1.2 | how a program lets the TUI reach the terminal |
-| `Target` | `launch` | 0013-MADR A1.2 | where the TUI reads or draws |
-| `Reason` | `launch` | 0013-MADR A1.2 | why a decision fell as it did, as a stable token |
-| `Streams`, `StreamSource` | `launch` | 0013-MADR A1.2 | the program's streams and environment, and what a `*cobra.Command` offers |
-| `Flags` | `launch` | 0013-MADR A1.2 | the shared `--mode` and `--tui` flags |
-| `Restorer` | `launch` | 0013-MADR A1.1 | what undoes a mode set outside Bubble Tea |
-| `ExitError` | `launch` | 0013-MADR A1.2 | an error carrying an exit status |
-| `Tier` | `glyph` | [0014-MADR](decisions/0014-MADR-native-integration-api.md) W2, A1.2 | a glyph table's tier: Unicode, legacy console, ASCII |
 | `Verdict` | `command` | 0014-MADR W4 | a gate's answer, today `command.Decision` |
 | `Format` | `command` | 0014-MADR W2 | how `WriteResult` writes a result: text or JSON |
 | `Param` | `command` | 0014-MADR W2 | one parameter of a command, for flags and completion |
@@ -51,6 +42,15 @@ later record does not reuse them for something else.
 | `PlainViewer` | `workspace` | 0014-MADR W2 | a pane that can render itself without chrome or colour |
 | `GlyphThemeBuilder` | `workspace` | 0014-MADR W2 | a theme builder that is given the glyphs |
 | `LoadOption` | `command` | 0014-MADR W3 | an option of `LoadDirWith` |
+
+## Built from those records
+
+`launch`'s `Choice`, `Config`, `Target`, `Reason`, `Streams`,
+`StreamSource`, `Flags`, `Restorer` and `ExitError`, and `glyph.Tier`, were
+reserved here and are now built
+([0013-PLAN](decisions/0013-PLAN-cli-integration-helpers.md)). Each has one
+meaning, as its package documents it. `Decision` and `Terminal` are in
+"Deliberate" above.
 
 ## Names the planned records must not take
 

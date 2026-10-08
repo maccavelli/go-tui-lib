@@ -18,7 +18,7 @@ pattern, used by every program that needs it.
 
 ## Status
 
-- **The current release is `v0.6.0`.** `v0` means the API may still
+- **The current release is `v0.7.0`.** `v0` means the API may still
   change.
 - **Multi-pane workspaces, since `v0.1.0`.** `layout` arranges panes: a main
   pane with a sidebar on either side, a bottom pane, a footer, responsive
@@ -41,6 +41,12 @@ pattern, used by every program that needs it.
   availability in VS Code's when-clause grammar, and `workspace`
   publishes its own. A program's own CLI runs the same commands through
   `Registry.Run`.
+- **Starting the TUI from any Go CLI, since `v0.7.0`.** `launch` decides
+  whether the TUI can run on a program's own streams, with a reason; runs
+  it with no signal handler; and falls back to the program's CLI mode when
+  it cannot start or crashes, with the terminal as it was. Its flag types
+  bind natively in the standard `flag` package, Cobra, Kong and
+  urfave/cli; `launch/launchtest` tests the path with fake terminals.
 - **The stack is Charm v2:** `charm.land/bubbletea/v2`,
   `charm.land/lipgloss/v2` and `charm.land/bubbles/v2`, with
   `github.com/charmbracelet/colorprofile` and
@@ -67,6 +73,7 @@ repository as it is now.
 | build a main pane with a sidebar, a bottom pane and a footer | [the workspace guide](docs/guides/building-workspaces.md) |
 | learn what the terminal supports, and send notifications, copies and links | [the terminal capabilities guide](docs/guides/terminal-capabilities.md) |
 | define commands once, for keys, slash lines, agents and your own CLI | [the commands guide](docs/guides/commands.md) |
+| start the TUI from my CLI with `--tui`, and fall back when it cannot run | [Start the TUI from your CLI](docs/guides/commands.md#start-the-tui-from-your-cli) |
 | know which Charm version to use, and what may be imported | [AGENTS.md, Dependencies](AGENTS.md#dependencies) |
 | know the rules every TUI package follows | [AGENTS.md, TUI conventions](AGENTS.md#tui-conventions) |
 | know what a type name means across the packages | [the glossary](docs/glossary.md) |

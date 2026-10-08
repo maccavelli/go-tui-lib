@@ -24,17 +24,20 @@ below).
 ## Packages
 
 ```text
+ launch        start the TUI from a CLI   → command, glyph, termcap, internal/enum; bubbletea, colorprofile, x/term
+ launch/launchtest  fake streams for tests → launch, termcap (tests)
  workspace     Bubble Tea pane host       → layout, theme, glyph, internal/cells, command, when; bubbletea, bubbles/key, bubbles/help, colorprofile, x/ansi
  command       the command registry       → when; bubbletea
  when          availability expressions   → standard library
  internal/cells  the reused frame buffer  → layout; ultraviolet, x/ansi
  termsvc       terminal services          → termcap; bubbletea, x/ansi
- termcap       capabilities, the probe    → internal/termevent; bubbletea, x/ansi, colorprofile
+ termcap       capabilities, the probe    → internal/termevent, internal/enum; bubbletea, x/ansi, colorprofile
  termcap/termcaptest  fake terminals      → termcap; bubbletea, x/ansi, colorprofile (tests)
  internal/termevent   pass-through events → ultraviolet
  internal/termevent/termeventtest  those events for tests → ultraviolet, bubbletea
  theme         palettes, roles, styles    → glyph; lipgloss, colorprofile
- glyph         Unicode and ASCII glyphs   → standard library
+ glyph         Unicode and ASCII glyphs   → internal/enum
+ internal/enum  enum names and text forms → standard library
  layout        geometry and state         → standard library
  tuitest       golden rendering           → x/ansi (tests and examples only)
 ```
@@ -42,8 +45,11 @@ below).
 | Package | What it holds |
 | :--- | :--- |
 | `when` | `Parse` and `MustParse` → `Expr` (`Eval`, `String`, `Keys`), VS Code's when-clause grammar with RE2 regexes; `Check` against `Keys`; `Context`, `Map`, `Layered`, `Value`; typed `Key[T]` |
-| `command` | `Command`, `ID`, `New[A]` and its options, `SchemaOf` (JSON Schema 2020-12 from Kong-aligned tags), `ArgError`; `Registry` (`NewRegistry` with `WithGate`, `WithAuditor`, `WithPrefixer` and `WithLoop`; `Register`, `ReplaceSource`, `Lookup`, `Slash`, `ParseSlash`, `All`, `Available`, `Watch`, `Dispatch`, `Run`, `Cancel`, `CancelAll`, `Remove`, `Version`); the policy, `Gate`, `Decision`, `Auditor`, `SlogAuditor`; `LoadDir`, `FromMCPPrompts`, `FromACP`; `MCPTools`, `CallMCP`, `ACPCommands`, `Manifest`; `WithLoop` and `LoopMsg`; the messages |
-| `glyph` | `Set` (4 border styles, separators with a cross and four tees, focus marker, ellipsis, scroll, bullet, badge brackets), `Unicode()`, `ASCII()`, `For(utf8)`; every glyph one cell |
+| `command` | `Command`, `ID`, `New[A]` and its options, `SchemaOf` (JSON Schema 2020-12 from Kong-aligned tags), `ArgError`; `Registry` (`NewRegistry` with `WithGate`, `WithAuditor`, `WithPrefixer` and `WithLoop`; `Attach`, a loop that can be detached; `Register`, `ReplaceSource`, `Lookup`, `Slash`, `ParseSlash`, `All`, `Available`, `Watch`, `Dispatch`, `Run`, `Cancel`, `CancelAll`, `Remove`, `Version`); the policy, `Gate`, `Decision`, `Auditor`, `SlogAuditor`; `LoadDir`, `FromMCPPrompts`, `FromACP`; `MCPTools`, `CallMCP`, `ACPCommands`, `Manifest`; `WithLoop` and `LoopMsg`; the messages |
+| `glyph` | `Set` (4 border styles, separators with a cross and four tees, focus marker, ellipsis, scroll, bullet, badge brackets), `Unicode()`, `ASCII()`, `For(utf8)`; `Tier` (`TierUnicode`, `TierLegacy`, `TierASCII`) and `Tier.Set`; every glyph one cell |
+| `launch` | `Choice` and `Flags` (`--mode`, `--tui`, bound natively in each framework); `Streams`, `StreamSource`, `FromSource`; `Config`, `Decide` → `Decision` with `Target`s and a `Reason` token; `Run[M]` with `WithRegistry`, `WithRestorer`, `OnStart`, `WithProgramOptions`, `WithFilter`; `ErrNotStarted`, `ErrCrashed`; `Frame`; `ExitCode`, `ExitError`; `Restorer` |
+| `launch/launchtest` | `Terminal` (a fake terminal stream with a size and typed keys), `Pipe`, `Streams`, `Env` |
+| `internal/enum` | `Name`, `Marshal` and `Unmarshal` over a table of names, for an enum's `String`, `MarshalText` and `UnmarshalText` |
 | `theme` | `Palette` for dark, light and unknown backgrounds; `LightDarkColor` and `ProfileColor`; `Styles`; `New(profile, background, glyphs)` with `WithPalette` and `WithPaletteFor`; `FromDark`; `Border(style)` |
 | `layout` | `Rect`, `Size` (fixed, percent, ratio, fill; min, max, shrink order), `Node` (`Pane`, `Split`, `Responsive`, or a custom node), `Solve` → `Plan`; `State` (JSON); the sidebar presets |
 | `workspace` | `Pane` and its optional interfaces; `Workspace` (routing, focus, chrome, resize, zoom, hide, overlays, cursor, `View`, `help.KeyMap`, the width method, a following theme, `SetBackground`, `Panes`, `PaneAs`, `WhenContext`); `Wrap`; `KeyMap`; `Commands` and the context keys |
@@ -162,6 +168,9 @@ glyph/ theme/ layout/ workspace/ tuitest/ termcap/ termsvc/
 when/ command/              the packages; goldens under testdata/golden/
                             where a package renders
 termcap/termcaptest/        fake terminals for tests
+launch/                     start the TUI from a program's own CLI
+launch/launchtest/          fake streams for a program's tests
+internal/enum/              enum names and text forms
 internal/cells/             the reused frame buffer, an ultraviolet importer
 internal/termevent/         pass-through events, the other ultraviolet importer
 internal/conformance/       the conformance scan: terminal ownership,
@@ -189,8 +198,9 @@ docs/
 - **Required:** `charm.land/bubbletea/v2` v2.0.10, `charm.land/lipgloss/v2`
   v2.0.6, `charm.land/bubbles/v2` v2.2.1,
   `github.com/charmbracelet/colorprofile` v0.4.3,
-  `github.com/charmbracelet/x/ansi` v0.11.8, and
-  `github.com/charmbracelet/ultraviolet` at
+  `github.com/charmbracelet/x/ansi` v0.11.8,
+  `github.com/charmbracelet/x/term` v0.2.2, the version Bubble Tea selects,
+  and `github.com/charmbracelet/ultraviolet` at
   `v0.0.0-20260811164956-006e29f97886`, the pseudo-version lipgloss's
   requirement selects; it has no tagged release
   ([0004-MADR](decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md) §1).
@@ -211,6 +221,9 @@ docs/
 - **Kept to two packages by `depguard`:** `github.com/charmbracelet/ultraviolet`
   to `internal/cells` and `internal/termevent` (with
   `internal/termevent/termeventtest` beneath it), test files included.
+- **Kept to one package by `depguard`:** `github.com/charmbracelet/x/term`
+  to `launch`, so only `launch` asks the terminal for its state
+  ([0013-MADR](decisions/0013-MADR-cli-integration-helpers.md) §11).
 
 ## Tooling
 
@@ -350,8 +363,6 @@ docs/
 - **Image protocols** (Kitty placeholders, Sixel, iTerm2), which add
   `Query` values to `termcap`.
 - **A CLI front end,** by design
-  ([0012-MADR](decisions/0012-MADR-bring-your-own-cli.md)). Helpers that
-  make stacking easier, such as launching the TUI from a program's own
-  subcommand, or choosing interactive or plain output, are a later
-  record.
+  ([0012-MADR](decisions/0012-MADR-bring-your-own-cli.md)). `launch` starts
+  the TUI from the program's own command line instead.
 - **A release workflow, Dependabot, and any tag** other than the owner's.
