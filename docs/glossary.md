@@ -16,6 +16,8 @@ are the only ones; none is added.
 | :--- | :--- | :--- |
 | `Option` | any | each package's own option type, passed to its constructor |
 | `Context` | `layout` | the state a layout tree is arranged with, collecting the plan as each node places its leaves |
+| `Decision` | `command` | a gate's answer: allow or reject, once or always. W4 of [0014-MADR](decisions/0014-MADR-native-integration-api.md) renames it `Verdict` in `v0.10.0`, and the clash ends |
+| | `launch` | the start-up outcome: whether the TUI can start, where, and why |
 | | `when` | the values a when-clause expression reads, by key |
 | `Kind` | `command` | what running a command does: `Action`, `Prompt` or `Forward` |
 | | `when` | the type of a `when.Value` |
@@ -35,7 +37,6 @@ later record does not reuse them for something else.
 | `Config` | `launch` | 0013-MADR A1.2 | how a program lets the TUI reach the terminal |
 | `Target` | `launch` | 0013-MADR A1.2 | where the TUI reads or draws |
 | `Reason` | `launch` | 0013-MADR A1.2 | why a decision fell as it did, as a stable token |
-| `Decision` | `launch` | 0013-MADR A1.2 | the start-up outcome. `command.Decision` shares the name until `v0.10.0`, when 0014 W4 removes it for `command.Verdict` |
 | `Streams`, `StreamSource` | `launch` | 0013-MADR A1.2 | the program's streams and environment, and what a `*cobra.Command` offers |
 | `Flags` | `launch` | 0013-MADR A1.2 | the shared `--mode` and `--tui` flags |
 | `Restorer` | `launch` | 0013-MADR A1.1 | what undoes a mode set outside Bubble Tea |

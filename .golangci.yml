@@ -86,6 +86,17 @@ linters:
           deny:
             - pkg: github.com/charmbracelet/ultraviolet
               desc: "ultraviolet only in internal/cells and internal/termevent (docs/decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md §1, docs/decisions/0005-MADR-terminal-capabilities-and-services.md §1)"
+        # x/term is a direct requirement for launch alone: only launch asks
+        # the terminal for its state
+        # (docs/decisions/0013-MADR-cli-integration-helpers.md §11).
+        xterm:
+          list-mode: lax
+          files:
+            - $all
+            - "!**/launch/**"
+          deny:
+            - pkg: github.com/charmbracelet/x/term
+              desc: "x/term only in launch (docs/decisions/0013-MADR-cli-integration-helpers.md A1, docs/decisions/0014-MADR-native-integration-api.md W1)"
     errcheck:
       check-type-assertions: true
       check-blank: true

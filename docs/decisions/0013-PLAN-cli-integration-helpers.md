@@ -900,3 +900,154 @@ was committed as `0bfc24b`. No deviation.
   * `GOWORK=off go test -count=3 -shuffle=on ./...` gave 16 `ok`;
   * the nine Step 2 tests pass.
 * **The identifier scan of the diff and the new files:** no match.
+
+### Step 3: the flag types, the streams and `Decide`
+
+The owner approved it on 2026-10-07 ("proceed"), after Step 2 was
+committed as `5b28e83`.
+
+#### Deviations
+
+Both were found before anything was written. Each was asked, and the owner
+chose the recommendation.
+
+* **D1 (2026-10-07): `Decision`'s collision entry lands in this step, not
+  Step 8.**
+  * **Found:** this step creates `launch.Decision`.
+    `TestNoTypeNameMeansTwoThings` (W0 Step 3) fails as soon as two public
+    packages export one name, unless `sharedNames` allows it. The PLAN
+    adds the entry in Step 8, so Step 3's checks would fail. A scan of
+    the public packages' exported types found no other clash: `Choice`,
+    `Flags`, `StreamSource`, `Streams`, `Config`, `Target`, `Reason`,
+    `Restorer` and `ExitError` are free, and `Option` is allowed
+    everywhere.
+  * **Chosen:** `sharedNames` gains `"Decision": {"command", "launch"}`
+    in this step, with a comment that 0014's W4 removes `command`'s in
+    `v0.10.0`. `docs/glossary.md` moves `Decision` from "Reserved" to
+    "Deliberate" in the same change, as its rule requires. Step 8's
+    collision allowlist item is then already done.
+  * **Not chosen:** renaming `launch`'s type, which would amend 0013-MADR
+    A1.6.
+* **D2 (2026-10-07): `AGENTS.md`'s x/term sentence comes from 0013-MADR
+  §11.**
+  * **Found:** the PLAN says "the one sentence of 0014-MADR W1". W1 has no
+    dependency sentence. 0013-MADR §11 says that "AGENTS.md's
+    Dependencies section names the package and points here".
+  * **Chosen:** one sentence from §11: x/term is a direct requirement at
+    the version Bubble Tea selects, only `launch` may import it, and the
+    depguard rule `xterm` refuses it everywhere else.
+  * **Not chosen:** leaving `AGENTS.md` unchanged.
+* **D3 (2026-10-07): the `FORCE_COLOR` cases are exact per OS, and the
+  MADR's fact about `colorprofile.Env` is corrected (0013-MADR A1.7).**
+  * **Found:** on the Windows test host, `TestColourEnv` failed with
+    "FORCE_COLOR=1: profile = TrueColor, want ANSI", and the same for
+    `FORCE_COLOR=true`. `make pre-add-check` and the shuffled tests
+    failed with it. Every other `launch` test passed there, and all
+    passed on macOS. The fault was new in this step.
+  * **The cause:** with `TERM` unset, empty or `dumb`, colorprofile's
+    `Env` asks Windows for its build number (`colorprofile@v0.4.3/env_windows.go:17`) and
+    gives that console's profile, which `CLICOLOR_FORCE` keeps. A1.3 and
+    the facts table say `Env` "reads the environment only". It opens no
+    file and starts no process, so the no-spawn rule holds.
+  * **Asked,** with two options: exact per OS with `ConEmuANSI=ON`, which
+    colorprofile answers from the environment (`colorprofile@v0.4.3/env_windows.go:13`); or
+    "at least ANSI".
+  * **The owner chose** the first, the recommendation.
+    * Those cases set `ConEmuANSI=ON`, and expect TrueColor on Windows
+      and ANSI elsewhere.
+    * The MADR gains A1.7.
+    * `launch`'s two comments that said the profile comes from "the
+      environment alone" now name the Windows lookup.
+
+#### What was built
+
+* **`launch/`:** `doc.go`, `choice.go`, `flags.go`, `streams.go`,
+  `decide.go`, `terminal.go`, `colour.go` and `locale.go`, as the PLAN
+  lists them, with A1.2's and A1.6's names. Choices the PLAN left open:
+  * **`Target` has `String`, `MarshalText` and `UnmarshalText`**
+    ("none", "stream", "err", "tty"), through `internal/enum`. This
+    follows `AGENTS.md`'s API conventions, rule 5. Each `Reason`
+    constant is its token.
+  * **A plain decision's `UIProfile` is `NoTTY`,** since there is no TUI
+    stream, and its `In` and `UI` are `TargetNone`.
+  * **The controlling terminal is probed:** opened, measured, and closed
+    at once, each distinct file once, the first time a target needs it.
+    One that does not open, or does not close cleanly, is not used.
+    errcheck refuses a discarded `Close` error, and `Decide` returns no
+    error, so a close that fails makes the terminal unusable. That is
+    the conservative reading.
+  * **The PLAN's unexported `decide` is `decideWith`.** revive's
+    `confusing-naming` refuses two functions in one file that differ only
+    in case.
+  * **`CI`, `FORCE_COLOR`:** "false" and "0" are compared exactly, as the
+    MADR writes them.
+  * **`doc.go`** ends with the full stability line, which W0's
+    conformance test requires. The PLAN's "`Stability: stable.`" is its
+    first sentence.
+* **`go.mod`:** x/term v0.2.2 is in the direct `require` block. The
+  output of `GOWORK=off go list -m all` is the same, 29 lines, before and
+  after, and `go mod tidy -diff` is clean.
+* **`.golangci.yml`:** the `xterm` rule, as the PLAN gives it.
+* **`AGENTS.md`, Dependencies:** D2's sentence.
+* **D1:** `sharedNames` has `Decision`, and `docs/glossary.md` moves
+  `Decision` to "Deliberate". The glossary's other reserved `launch`
+  names are now partly built. Step 8, which edits the documents, moves
+  them once Steps 4 to 6 have added the rest.
+* **Tests:** `launch/flags_test.go` and `launch/decide_test.go`.
+  * They hold the PLAN's nine tests, and `TestTargetText` and
+    `TestDecideGlyphs`. The latter checks that the operating system
+    reaches the tier through `decideWith`.
+  * The fakes are package-private, in `launch/fake_test.go`, until Step 6.
+  * Every environment is explicit. The only file opened is
+    `os.DevNull`.
+  * `TestDecideOpensOnlyWhenNeeded` also covers a terminal that does not
+    close cleanly.
+
+#### Checks
+
+* **Mutations, on scratch copies.** All killed. They were run again
+  after D3's test change:
+  * S3-1 (`NO_COLOR` rule dropped): "NO_COLOR=yes: profile = ANSI256,
+    want Ascii";
+  * S3-2 (`FORCE_COLOR=0` forces): "FORCE_COLOR=0: profile = ANSI, want
+    NoTTY";
+  * S3-3 (`profile` calls `Detect` on a writer with no descriptor): "no
+    NO_COLOR: profile = NoTTY, want ANSI256";
+  * S3-4 (`CI=false` vetoes): `TestDecideRules/CI=false`, "reason
+    launch.ci";
+  * S3-5 (`TERM=dumb` inside the `ChoiceTUI` skip): `TestDecideRules/
+    TERM=dumb,_tui`, "reason launch.terminal";
+  * S3-6 (the file mode asked): "/dev/null is a terminal";
+  * S3-7 (`LANG` first): `tier(["LC_ALL=C" "LANG=en_US.UTF-8"], linux) =
+    unicode, want ascii`;
+  * S3-8 (`Get` removed) and S3-8b (`UnmarshalFlag` removed): the tests do
+    not compile, "*Choice does not implement flag.Getter (missing method
+    Get)" and the go-flags interface. Step 7's programs are the PLAN's
+    second check;
+  * S3-9 (files not closed): "the one file was closed 0 times, want 1".
+    Its first form did not compile, because the mutation left `in`
+    unused. It was rewritten to compile, and run again;
+  * S3-10: `make lint` fails with depguard's "x/term only in launch" on
+    both `theme/xterm_mut.go` and `workspace/xterm_mut_test.go`. With the
+    `xterm` rule removed, `make lint` passes on the same copy.
+* **The API:** apidiff, run over all changes, lists only additions since
+  `v0.6.0`: Step 2's, and `package …/launch: added`. `make apicheck` is
+  clean.
+* **Rule 2 on macOS,** on the final tree:
+  * `make pre-add-check` over the 12 changed Go files: clean;
+  * `make release-check`: "131 file(s) clean … apicheck, examples";
+  * `make lint` (three "0 issues.") and `make vuln` are clean;
+  * with `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    each gave 17 `ok`, and so did workspace mode;
+  * `go mod tidy -diff` and `scripts/go-modules.sh --check` are clean;
+  * markdownlint over the repository: 0 issues. The link check over
+    `AGENTS.md`, the glossary and this PLAN: 0 broken.
+* **The Windows test host,** go1.27.1 windows/amd64, on the final tree:
+  * the first run failed in `TestColourEnv` (D3); the rest of `launch`
+    passed;
+  * after D3, `make pre-add-check` gave "131 file(s) clean … apicheck,
+    examples";
+  * `make lint` and `make vuln` exit 0;
+  * `GOWORK=off go test -count=3 -shuffle=on ./...` gave 17 `ok`;
+  * `launch`'s 11 tests pass, `TestColourEnv` among them.
+* **The identifier scan of the diff and the new files:** no match.

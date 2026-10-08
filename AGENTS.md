@@ -25,8 +25,11 @@ amendment A3, which names the stack: `charm.land/bubbletea/v2`,
 `internal/termevent/termeventtest` beneath it) may import it, at the
 version lipgloss's requirement selects, and depguard refuses it everywhere
 else (`docs/decisions/0005-MADR-terminal-capabilities-and-services.md`
-§1). Any other module needs
-its own MADR.
+§1). `github.com/charmbracelet/x/term` is a direct requirement at the
+version Bubble Tea selects, and only `launch` may import it: the depguard
+rule `xterm` refuses it everywhere else
+(`docs/decisions/0013-MADR-cli-integration-helpers.md` §11). Any other
+module needs its own MADR.
 
 Never import the Charm v1 paths `github.com/charmbracelet/bubbletea`,
 `github.com/charmbracelet/lipgloss` or `github.com/charmbracelet/bubbles`;

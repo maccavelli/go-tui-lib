@@ -1216,6 +1216,21 @@ accepted, and its revision names each change.
   collision check allows both until W4 removes the old name in `v0.10.0`,
   through a dated allowlist entry.
 
+#### A1.7 (2026-10-07, while executing the PLAN): what `colorprofile.Env` reads on Windows
+
+* **The fact, corrected.** A1.3 says `colorprofile.Env` "reads the
+  environment only". On Windows it also asks the operating system for its
+  build number, when `TERM` is unset, empty or `dumb`, and `ConEmuANSI` is
+  not `ON` (`colorprofile@v0.4.3/env.go:144-152`,
+  `colorprofile@v0.4.3/env_windows.go:12-40`, through `windows.RtlGetNtVersionNumbers`). That
+  is how a Windows console, which sets no `TERM`, gets its colours.
+* **What holds.** It opens no file and starts no process, so A1.3's
+  decision, and the owner's no-spawn rule, are unchanged.
+* **What changes.** A test of a profile with `TERM=dumb` depends on the
+  host's Windows build, unless it sets `ConEmuANSI=ON`, which answers
+  from the environment. The PLAN's deviation D3 records the test that
+  found this.
+
 ## More Information
 
 ### Probes
