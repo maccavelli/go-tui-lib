@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in-progress
 date: 2026-10-07
 associated-madr: "0013-MADR-cli-integration-helpers.md"
 ---
@@ -792,4 +792,25 @@ guide's examples compile and run in the harness.
 
 ## Execution Record
 
-Not started.
+### Step 1: records
+
+The owner approved this PLAN on 2026-10-07 ("plan approved. proceed."),
+after [0014-PLAN-api-policy-gates.md](0014-PLAN-api-policy-gates.md) was
+completed.
+
+* **The preconditions hold:**
+  * 0011 is complete (`5c6f4bc`);
+  * 0014's W0 PLAN is complete. CI run `37704939096` passed on its last
+    code commit, `6663705`, and `28357ef` marks it `complete`.
+* **The facts table, re-read on `28357ef`:** each fact still holds. W0's
+  Step 6 added a three-line stability paragraph before each `package`
+  clause, so the line numbers in files with a package comment moved down
+  by three. Two of the cited spans moved:
+  * termcap's generics are now at `termcap/termcap.go:127-147`;
+  * `command.Mode`'s constants are at `command/command.go:204-207`.
+
+  `command/registry.go:82-88`, `command/dispatch.go`'s `onLoop` (line 68)
+  and `go.mod:16` (x/term v0.2.2, `// indirect`) are unchanged. Later
+  steps cite lines as they read them.
+* **`docs/README.md`:** this PLAN's row now carries the PLAN's title, and
+  `in-progress`.

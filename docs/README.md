@@ -36,7 +36,7 @@ it was when they were written
 | 0012 | MADR | [Make go-tui-lib a TUI layer a program stacks on its own Go CLI, and retire the library's CLI front ends](decisions/0012-MADR-bring-your-own-cli.md) | accepted |
 | 0012 | PLAN | [Retire the CLI front ends: retract the adapters, remove `command/cli` and A12's check, release `v0.6.0`](decisions/0012-PLAN-bring-your-own-cli.md) | complete |
 | 0013 | MADR | [Add a `launch` package that decides between a TUI and plain output, and runs the TUI on the program's own streams](decisions/0013-MADR-cli-integration-helpers.md) | accepted; A1 accepted |
-| 0013 | PLAN | [Implement the `launch` package: decide, run with fallback, draw once, map the exit, release `v0.7.0`](decisions/0013-PLAN-cli-integration-helpers.md) | proposed |
+| 0013 | PLAN | [Implement the `launch` package with native types for every CLI framework, and release `v0.7.0`](decisions/0013-PLAN-cli-integration-helpers.md) | in-progress |
 | 0014 | MADR | [Make go-tui-lib's API natively integrable from any Go CLI: native types and component forms, hardening, and canonicalization during `v0`](decisions/0014-MADR-native-integration-api.md) | accepted; A1 recorded |
 | 0014 | PLAN | [W0: the API diff gate, conformance bans, the collision check, the glossary, the framework-example harness and the conventions](decisions/0014-PLAN-api-policy-gates.md) | complete |
 | 0014 | PLAN | [W2: native forms in `command`, `workspace`, `termcap`, `termsvc`, `theme` and `tuitest`](decisions/0014-PLAN-component-native-forms.md) | proposed |
