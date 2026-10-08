@@ -42,6 +42,13 @@ func (f *fake) Close() error {
 	return f.closeErr
 }
 
+// String is everything written to f, and not yet read.
+func (f *fake) String() string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.buf.String()
+}
+
 func (f *fake) closes() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()

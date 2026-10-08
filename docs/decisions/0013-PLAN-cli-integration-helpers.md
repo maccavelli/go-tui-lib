@@ -1051,3 +1051,113 @@ chose the recommendation.
   * `GOWORK=off go test -count=3 -shuffle=on ./...` gave 17 `ok`;
   * `launch`'s 11 tests pass, `TestColourEnv` among them.
 * **The identifier scan of the diff and the new files:** no match.
+
+### Step 4: `Run`
+
+The owner approved it on 2026-10-07 ("Commit to main then proceed"), when
+Step 3 was committed as `cb116d0`.
+
+#### Deviations
+
+* **D4 (2026-10-07): a failed reset or restore is joined into `Run`'s
+  error, not ignored.**
+  * **Found, before anything was written:** the PLAN writes the
+    `Restorer`'s bytes "with write errors ignored". This repository's
+    errcheck runs with `check-blank: true` (`.golangci.yml`), so
+    `_, _ = io.WriteString(…)` fails lint, and no `//nolint` directive
+    exists in the repository's own code. The PLAN does not say what
+    happens to an error putting a saved terminal state back.
+  * **Asked,** with two options: join the error into `Run`'s, or keep
+    "ignored" behind the repository's first `//nolint:errcheck`.
+  * **The owner chose** the first, the recommendation.
+    * A failed write of a `Restorer`'s bytes, a failed restore of a
+      saved state, a failed close of the controlling terminal, and a
+      failed epilogue write are each joined onto what `Run` returns with
+      `errors.Join`. `errors.Is` still finds `ErrNotStarted`,
+      `ErrCrashed`, `tea.ErrInterrupted` and the rest.
+    * When nothing failed, `Run` returns its error as it was, so a
+      program's own type assertion sees it unwrapped (A1.2).
+    * On a clean end, a reset that did not land makes `Run` return the
+      final model with that error alone. The terminal may still be in
+      mode 2031, and `ExitCode` gives 1.
+
+#### What was built
+
+* **`launch/`:** `errors.go`, `restore.go`, `option.go`, `model.go` and
+  `run.go`, as the PLAN lists them. Choices the PLAN left open:
+  * **The seams.** `newProgram` is a package variable (`tea.NewProgram`).
+    `save` is a package variable (`saveState`). The controlling terminal
+    comes through the same `opener` as `Decide`, passed to an unexported
+    `runWith`.
+  * **A save that fails** returns `ErrNotStarted` before a program is
+    built. It closes the terminal Run opened.
+  * **A decision marked interactive with no input or no drawing target**
+    returns `ErrNotStarted`, naming both targets.
+  * **A nil `ctx`** is `context.Background()`.
+  * **Several `WithRestorer`s and `OnStart`s** are kept, and run in
+    order.
+  * **`WithFilter[M]`** passes a message through unchanged when the model
+    is not an `M`.
+  * **The saved states** are saved once each when In and Out are one
+    stream.
+  * **The epilogue** is written only when `Out` is set.
+* **Tests:** `launch/run_test.go` has the PLAN's 12 tests and one more,
+  `TestRunFinalModelOfAnotherType`, for item 8 of `Run`'s steps.
+  `launch/run_unix_test.go` holds `TestRunSignalsStayTheProgramsUnix`,
+  with a `unix` build tag.
+  * The streams are the package's fakes and `io.Pipe` readers. Each run
+    has a five-second guard.
+  * **What reaches the test process's standard error.** In the crash
+    cases, Bubble Tea writes its own crash report ("Caught panic" and the
+    stack) to the process's standard error. That is MADR §10's documented
+    behaviour, which launch cannot move. It happens 8 times in a
+    `go test -v ./launch` run. No test reads or writes a standard stream
+    itself.
+
+#### Checks
+
+* **Mutations, on scratch copies,** each test process with stdin from
+  `/dev/null` and in a new session, so no mutant could reach a real
+  terminal. All killed:
+  * S4-1 (a plain decision builds): "a plain decision built a program";
+  * S4-2 (no `WithInput`): Bubble Tea fell back to the controlling
+    terminal, which did not open: "launch: the TUI did not start:
+    bubbletea: error opening TTY";
+  * S4-3 (no `WithoutSignalHandler`): "Run = program was killed: program
+    was interrupted; want the model's own quit, nil";
+  * S4-4 (`Init` does not set `started`): `TestRunCrash/Init`, "err =
+    launch: the TUI did not start: … want ErrCrashed".
+    `TestRunNotStarted` passes under this mutation, and cannot fail: its
+    program fails before `Init`, so `started` is false either way. The
+    PLAN named it in error;
+  * S4-5 (a cancelled `ctx` is a crash): "carries a sentinel", and
+    "restored 2 saved states on an end the program chose";
+  * S4-6 (the crash returns the final model): `TestRunCrash/Update,
+    after a good Update`, "the model's keys are \"\", want … \"a\"";
+  * S4-7 (no restore on a crash): "restored 0 saved states, want 2";
+  * S4-8 (`%v`): "want ErrCrashed wrapping tea.ErrProgramPanic";
+  * S4-9 (no detach on a crash): `TestRunRegistryDetached/crash`, "did
+    not return within 1s";
+  * S4-10 (the `Restorer` only on a clean end): "the drawing stream does
+    not end with mode 2031's reset";
+  * S4-11 (`WithFilter` gets the wrapper): "want x filtered out", and
+    "the filter never saw the program's own model";
+  * S4-12 (the epilogue after a crash): "after a crash: … Out holds
+    \"…resume\"".
+* **The API:** apidiff over all changes lists only additions since
+  `v0.6.0`. `make apicheck` is clean.
+* **Rule 2 on macOS:**
+  * `make pre-add-check` over the 8 changed Go files: clean;
+  * `make release-check`: "142 file(s) clean … apicheck, examples";
+  * `make lint`: three "0 issues.";
+  * with `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    each gave 17 `ok`, and so did workspace mode. The `Run` tests also
+    passed 20 times under `-race`, with no race reported;
+  * `go mod tidy -diff` and `scripts/go-modules.sh --check`: clean.
+* **The Windows test host,** go1.27.1 windows/amd64:
+  * `make pre-add-check` gave "142 file(s) clean … apicheck, examples";
+  * `make lint` and `make vuln` exit 0;
+  * `GOWORK=off go test -count=3 -shuffle=on ./...` gave 17 `ok`;
+  * `launch`'s 24 tests pass. That is all but the Unix-only signal
+    test.
+* **The identifier scan of the diff and the new files:** no match.
