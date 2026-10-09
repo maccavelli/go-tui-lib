@@ -10,6 +10,7 @@ import (
 
 	"github.com/maccavelli/go-tui-lib/glyph"
 	"github.com/maccavelli/go-tui-lib/internal/enum"
+	"github.com/maccavelli/go-tui-lib/internal/limits"
 )
 
 // Config is how a program lets the TUI reach the terminal.
@@ -109,7 +110,9 @@ type Decision struct {
 	// Width and Height are in cells: the size of the stream the TUI draws
 	// on, or, for a plain decision, Out's size when it is a terminal, else
 	// COLUMNS when that is a positive integer, with Height 0. Each is 0
-	// when unknown; the program picks its own fallback.
+	// when unknown; the program picks its own fallback. Both are clamped
+	// as workspace clamps a window: to workspace.MaxSide, then to
+	// workspace.MaxCells.
 	Width, Height int
 }
 
@@ -192,6 +195,7 @@ func decideWith(s Streams, c Config, goos string, open opener) Decision {
 		} else {
 			d.Width, d.Height = columns(s), 0
 		}
+		d.Width, d.Height = limits.Clamp(d.Width, d.Height)
 		return d
 	}
 
@@ -234,6 +238,7 @@ func decideWith(s Streams, c Config, goos string, open opener) Decision {
 	}
 	d.Interactive, d.Reason = true, ReasonTerminal
 	d.UIProfile = profile(true, s.Env)
+	d.Width, d.Height = limits.Clamp(d.Width, d.Height)
 	return d
 }
 

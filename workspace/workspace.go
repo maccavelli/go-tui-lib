@@ -33,6 +33,7 @@ import (
 
 	"github.com/maccavelli/go-tui-lib/glyph"
 	"github.com/maccavelli/go-tui-lib/internal/cells"
+	"github.com/maccavelli/go-tui-lib/internal/limits"
 	"github.com/maccavelli/go-tui-lib/layout"
 	"github.com/maccavelli/go-tui-lib/theme"
 )
@@ -252,11 +253,28 @@ func WithProfile(p colorprofile.Profile) Option { return func(w *Workspace) { w.
 func WithBackground(bg theme.Background) Option { return func(w *Workspace) { w.bg = bg } }
 
 // WithSize sets the size the workspace lays out at before its first
-// tea.WindowSizeMsg (default 80 by 24), such as a plain render's. A
-// negative size is 0, as in a WindowSizeMsg.
+// tea.WindowSizeMsg (default 80 by 24), such as a plain render's. It is
+// clamped as a WindowSizeMsg is.
 func WithSize(width, height int) Option {
-	return func(w *Workspace) { w.width, w.height = max(width, 0), max(height, 0) }
+	return func(w *Workspace) { w.width, w.height = clampSize(width, height) }
 }
+
+// The largest window the workspace draws
+// (docs/decisions/0014-PLAN-hardening.md Step 4, finding H3). A larger
+// tea.WindowSizeMsg, or WithSize, is clamped: each side to MaxSide, then
+// the height until the area is at most MaxCells, keeping the width, and
+// the frame draws from the top left. The constants change only by a
+// record.
+const (
+	// MaxSide is the most cells the window has on either side.
+	MaxSide = limits.MaxSide
+	// MaxCells is the most cells the window has in all: 524,288, about
+	// 56 MiB of frame.
+	MaxCells = limits.MaxCells
+)
+
+// clampSize is the size w × h is drawn at.
+func clampSize(w, h int) (int, int) { return limits.Clamp(w, h) }
 
 // WithoutBackgroundQuery leaves tea.RequestBackgroundColor out of Init, for
 // a program that runs its own probe or must send nothing unasked. By default
@@ -475,11 +493,12 @@ func (w *Workspace) SetState(s layout.State) tea.Cmd {
 }
 
 // Update handles a message: sizes, keys, mouse events, targeted messages,
-// and anything else, which reaches every pane.
+// and anything else, which reaches every pane. A tea.WindowSizeMsg is
+// clamped to MaxSide and MaxCells.
 func (w *Workspace) Update(msg tea.Msg) tea.Cmd {
 	switch m := msg.(type) {
 	case tea.WindowSizeMsg:
-		w.width, w.height = max(m.Width, 0), max(m.Height, 0)
+		w.width, w.height = clampSize(m.Width, m.Height)
 		return w.resolve()
 	case targeted:
 		return w.Send(m.id, m.msg)

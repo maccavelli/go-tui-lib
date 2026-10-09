@@ -22,7 +22,8 @@ type PlainViewer interface{ PlainView(width int) string }
 
 // RenderPlain renders the workspace as plain lines, one pane after another,
 // for output that is read rather than looked at. It lays the workspace out
-// at width × the current height (80 × 24 before any size), then writes each
+// at width × the current height (80 × 24 before any size), clamped as a
+// tea.WindowSizeMsg is, to MaxSide and MaxCells, then writes each
 // pane the layout shows, the focus ring's first in its order, then the rest
 // in tree order:
 //  1. its title and badge, on one line;
@@ -41,6 +42,7 @@ func (w *Workspace) RenderPlain(width int) string {
 	if height <= 0 {
 		height = fallbackHeight
 	}
+	width, height = clampSize(width, height)
 	plan, err := layout.Solve(w.withMinimums(w.root), layout.Rect{W: width, H: height}, w.state)
 	if err != nil {
 		plan = w.plan

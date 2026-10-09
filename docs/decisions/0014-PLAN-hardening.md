@@ -704,3 +704,90 @@ No deviation.
   * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
   * the step's test, with `TestRenderAllocs` and the theme, pop and
     pane-replacement tests: passed.
+
+### Step 4: the window clamp (H3)
+
+No deviation.
+
+#### What was built
+
+* **`internal/limits` (new, the owner's choice of 2026-10-09):**
+  `MaxSide = 4096`, `MaxCells = 1 << 19`, and `Clamp(w, h)`. `Clamp`
+  puts each side in `[0, MaxSide]`, then cuts the height to
+  `MaxCells / w` when the area is over. The width is kept.
+* **`workspace`:**
+  * `MaxSide` and `MaxCells` are exported, equal to `limits`', and
+    documented with the rule;
+  * `clampSize` is `limits.Clamp`;
+  * the `WindowSizeMsg` case and `WithSize` clamp, and `Update`'s and
+    `WithSize`'s documentation say so;
+  * `RenderPlain` clamps the width and height it lays out at, so a plain
+    view is asked for at most `MaxSide` cells, and its documentation
+    says so.
+
+  A pane's `SizeMsg` comes from the clamped layout, so it is bounded too.
+  `TestWindowClamp` checks it.
+* **`launch.Decide`** clamps `Width` and `Height` through `limits.Clamp`,
+  on the plain path and the interactive one. `Decision`'s documentation
+  says so. `launch` does not import `workspace`.
+* **Tests:**
+  * `workspace/clamp_test.go` (new):
+    * `TestWindowClamp`: 2^30 × 2^30 and 4096 × 4096 give 4096 × 128;
+      1000 × 600 gives 1000 × 524; 512 × 1024, 100 × 0 and 5000 × 10
+      (to 4096 × 10); and -5 × -7 gives 0 × 0. It covers a
+      `WindowSizeMsg` and `WithSize`, a pane's `SizeMsg`, and
+      `RenderPlain(2^30)` through a pane that reports the width it was
+      asked for. It is written in numbers, not the constants, so it also
+      runs on the code before the clamp;
+    * `TestClampConstants`;
+    * `TestRenderAtClamp`, skipped under `-short`: a 4096 × 128 frame
+      renders 128 lines, none over 4096 cells, in 1,475 allocations,
+      measured by `testing.AllocsPerRun` and logged;
+  * `launch/clamp_test.go` (new): `TestDecideClampsSize`, for a 2^30 ×
+    2^30 fake terminal, `COLUMNS=99999999`, and a 120 × 40 terminal
+    unchanged.
+
+#### Checks
+
+* **Rule 3: the probes fail before the fix.** `TestWindowClamp` and
+  `TestDecideClampsSize`, on a scratch copy of `9675c76`, the commit
+  before this step, without the two tests that name the new constants:
+  * "WindowSizeMsg 1073741824 × 1073741824 gives 1073741824 ×
+    1073741824, want 4096 × 128", the same for `WithSize`, and for 4096
+    × 4096, 1000 × 600 and 5000 × 10;
+  * "the pane was told 1073741824 × 1073741824";
+  * `RenderPlain(2^30) = "a\nplain at 1073741824\n\n"`;
+  * "a 2^30 × 2^30 terminal: interactive true, 1073741824 ×
+    1073741824", and "COLUMNS=99999999: … 99999999 × 0".
+
+  Both pass on the step's code. `RenderPlain`'s part of the test first
+  looked only at line widths, which a short pane body never exceeds, so
+  it could not see the clamp. It became the width-reporting pane above.
+* **Mutations,** on scratch copies of the tree. All six were killed by a
+  failing test:
+  * **S4-1** (no `MaxCells` step): "WindowSizeMsg 1073741824 ×
+    1073741824 gives 4096 × 4096, want 4096 × 128".
+  * **S4-2** (no `MaxSide` step on the width, added): "gives 1073741824 ×
+    0".
+  * **S4-3** (`RenderPlain` unclamped, added): "plain at 1073741824".
+  * **S4-4** (`WithSize` unclamped, added): `TestWindowClamp`.
+  * **S4-5** and **S4-6** (`Decide`'s plain or interactive path
+    unclamped, added): `TestDecideClampsSize`.
+* **Rule 2 on macOS,** go1.27.2:
+  * `gofmt -l`: nothing.
+  * `make pre-add-check FILES=<the six Go files>`: "6 file(s) clean".
+  * `make lint`: clean.
+  * With `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    all passed, and so did workspace mode. `TestRenderAllocs` stays at
+    441.
+  * `go mod tidy -diff`, `make vuln` and `scripts/go-modules.sh --check`
+    were clean.
+  * `make apicheck`: "against v0.7.1, 0 incompatible change(s)".
+  * `make examples`: "clean".
+  * `make release-check`: "179 file(s) clean … apicheck, examples".
+* **The Windows test host,** go1.27.2 windows/amd64:
+  * the `FILES` and no-list `make pre-add-check`, `make lint`, `make
+    vuln` and `make examples`: each exit 0;
+  * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
+  * the step's tests, with `TestRenderAtClamp` and `TestRenderAllocs`:
+    passed.
