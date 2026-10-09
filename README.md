@@ -47,6 +47,15 @@ pattern, used by every program that needs it.
   it cannot start or crashes, with the terminal as it was. Its flag types
   bind natively in the standard `flag` package, Cobra, Kong and
   urfave/cli; `launch/launchtest` tests the path with fake terminals.
+- **Native forms for a program's own CLI, for `v0.8.0`.** `command`
+  parses a command line (`ParseArgs`), describes and completes a command's
+  arguments (`Params`, `Complete`), writes a result as text or JSON
+  (`WriteResult`), gives each error an exit status, and turns a handler's
+  panic into an error. `workspace` renders plain text for a pipe or a
+  screen reader (`RenderPlain`) and takes its starting glyphs, profile,
+  background and size as options; `termcap.EnvCaps` reads the
+  environment's facts without a program; `termsvc` returns its bytes for a
+  CLI to write. Unreleased: on `main`.
 - **The stack is Charm v2:** `charm.land/bubbletea/v2`,
   `charm.land/lipgloss/v2` and `charm.land/bubbles/v2`, with
   `github.com/charmbracelet/colorprofile` and

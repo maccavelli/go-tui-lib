@@ -5,9 +5,9 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	tea "charm.land/bubbletea/v2"
@@ -17,30 +17,40 @@ import (
 	"github.com/maccavelli/go-tui-lib/launch"
 )
 
-// yesGate approves a command that asks, when --yes was given.
-type yesGate bool
-
-func (y yesGate) Decide(context.Context, *command.Invocation) (command.Decision, error) {
-	if y {
-		return command.AllowOnce, nil
-	}
-	return command.RejectOnce, nil
-}
-
-// runCLI runs a registry command from the program's own command line.
-func runCLI(ctx context.Context, r *command.Registry, id command.ID, args any, yes bool) error {
-	raw, err := json.Marshal(args)
+// runCLI runs a registry command from the program's own command line, and
+// writes its result to w. AllowIf(yes) approves a command that asks, when
+// --yes was given.
+func runCLI(ctx context.Context, w io.Writer, r *command.Registry, id command.ID, args any, yes bool) error {
+	raw, err := command.ArgsOf(args)
 	if err != nil {
 		return err
 	}
 	res, err := r.Run(ctx, command.Request{
-		ID: id, Args: raw, Origin: command.OriginCLI, Caller: "pi", Gate: yesGate(yes),
+		ID: id, Args: raw, Origin: command.OriginCLI, Caller: "pi", Gate: command.AllowIf(yes),
 	})
 	if err != nil {
 		return err
 	}
-	fmt.Println(res.Text)
-	return nil
+	return command.WriteResult(w, res, command.FormatText)
+}
+
+// runAny runs any command offered to the CLI, by its ID and its arguments
+// as the shell split them: "run session.save notes", or "run
+// session.save --name=notes".
+func runAny(ctx context.Context, w io.Writer, r *command.Registry, args []string, yes bool, f command.Format) error {
+	if len(args) == 0 {
+		return &command.ArgError{Reason: "run: name a command"}
+	}
+	req, err := r.ParseArgs(command.ID(args[0]), args[1:], command.OriginCLI)
+	if err != nil {
+		return err
+	}
+	req.Caller, req.Gate = "pi", command.AllowIf(yes)
+	res, err := r.Run(ctx, req)
+	if err != nil {
+		return err
+	}
+	return command.WriteResult(w, res, f)
 }
 
 type saveArgs struct {
@@ -110,6 +120,8 @@ func main() {
 		os.Exit(1)
 	}
 	var f launch.Flags
+	var format command.Format
+	one := 1
 	// guide:urfave
 	app := &cli.Command{
 		Name: "pi",
@@ -136,7 +148,19 @@ func main() {
 			ArgsUsage: "NAME",
 			Flags:     []cli.Flag{&cli.BoolFlag{Name: "yes", Usage: "approve without asking"}},
 			Action: func(ctx context.Context, c *cli.Command) error {
-				return runCLI(ctx, r, "session.save", saveArgs{Name: c.Args().First()}, c.Bool("yes"))
+				return runCLI(ctx, c.Root().Writer, r, "session.save", saveArgs{Name: c.Args().First()}, c.Bool("yes"))
+			},
+		}, {
+			Name:      "run",
+			Usage:     "Run any command by its ID",
+			ArgsUsage: "ID [ARGS...]",
+			Flags: []cli.Flag{
+				&cli.BoolFlag{Name: "yes", Usage: "approve without asking"},
+				&cli.TextFlag{Name: "format", Value: &format, Usage: "text or json"},
+			},
+			StopOnNthArg: &one, // the flags after the ID are the command's
+			Action: func(ctx context.Context, c *cli.Command) error {
+				return runAny(ctx, c.Root().Writer, r, c.Args().Slice(), c.Bool("yes"), format)
 			},
 		}},
 	}

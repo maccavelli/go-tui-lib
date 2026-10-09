@@ -128,13 +128,31 @@ features; turning the protocol off belongs to a later record (MADR A4).
 | `WithGOOS(goos)` | reads the identity for another OS: a test, or a wish server |
 
 Under JetBrains the prober sends nothing at all, and inside Neovim's, Vim's
-or Emacs's terminal it skips the gated queries; each fact says why.
+or Emacs's terminal it skips the gated queries; each fact says why. A
+disabled prober says why under JetBrains too.
+
+On Windows, `termcap.Env`'s lookups ignore the case of a name, as
+Windows's environment does: `Path` and `PATH` are one variable. Elsewhere
+they match exactly.
 
 ## Do not probe without input
 
 A program run with `tea.WithInput(nil)` must not probe: tea skips its own
 queries then, but the replies to the prober's would leak into the shell.
 Pass `termcap.WithDisabled()`, or do not embed a prober at all.
+
+With no program at all, such as in your own command line,
+`termcap.EnvCaps(env, goos, opts...)` gives the same facts a disabled
+prober holds after the first `tea.EnvMsg`: the terminal's name and brand,
+the multiplexer, the editor, the platform, whether the session is remote,
+and light or dark from the environment. `WithAppearanceEnv` and
+`WithOverride` apply; the options that only shape a probe change nothing,
+the hooks are not run, and `Profile` stays unknown.
+
+```go
+caps := termcap.EnvCaps(termcap.Env(os.Environ()), runtime.GOOS,
+    termcap.WithAppearanceEnv("PI_APPEARANCE"))
+```
 
 `launch.Run` always sets an input, so a program started through `launch`
 can probe. Pass the prober to `launch.WithRestorer` as well: its resets,
@@ -196,6 +214,17 @@ return m, n.Notify(termsvc.Notification{Title: "Done", Body: "3 files changed"})
   collapsed, cut to 80 cells for the title and 240 for the body.
   `WithGate(f)` lets you decide last, such as for completed turns only;
   `WithBackend(b)` sends through a desktop API you supply.
+- **A backend runs under a deadline:** 5 s by default,
+  `WithBackendTimeout(d)` to change it. `NotifyContext(ctx, x)` also
+  ends it with your context; a backend that misses the deadline gives
+  `failed`, with the context's error in `Err`. `Notify` is
+  `NotifyContext` under `context.Background()`.
+- **From your own command line,** which runs no Bubble Tea program,
+  `n.Sequence(x)` returns the bytes `Notify` would write, with the same
+  cleaning and numbering, or the reason it would skip. Write them to the
+  terminal yourself. Such a program never sees focus, so build the
+  notifier `WithPolicy(termsvc.Always)`, and give it the environment's
+  facts with `n.Update(termcap.CapsMsg{Caps: termcap.EnvCaps(…)})`.
 
 ## Clipboard and links
 
@@ -203,6 +232,12 @@ return m, n.Notify(termsvc.Notification{Title: "Done", Body: "3 files changed"})
   also wraps it for passthrough. It delivers `CopiedMsg`: `Unconfirmed`,
   because OSC 52 never replies. With `WithClipboard(b)` your clipboard
   confirms or fails. Over 100,000 bytes it fails and sends nothing.
+  `CopyContext` and `WithCopyTimeout` bound your clipboard as
+  `NotifyContext` and `WithBackendTimeout` bound a backend.
+- **`termsvc.CopySequence(caps, text)`** returns the bytes `Copy` has
+  written, OSC 52 and inside tmux the same wrapped for passthrough, with
+  the route, for your own command line to write. Over 100,000 bytes it
+  returns `ErrCopyTooLarge`.
 - **`CopyPlan(caps)`** orders the routes to try: your clipboard, tmux's
   buffer (run `TmuxLoadBuffer()` with the text on standard input), OSC 52.
 - **`ImageReadCommands(goos, wayland)`** lists the commands that read an

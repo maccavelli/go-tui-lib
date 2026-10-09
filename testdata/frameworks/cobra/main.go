@@ -5,10 +5,10 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 
 	tea "charm.land/bubbletea/v2"
@@ -18,30 +18,40 @@ import (
 	"github.com/maccavelli/go-tui-lib/launch"
 )
 
-// yesGate approves a command that asks, when --yes was given.
-type yesGate bool
-
-func (y yesGate) Decide(context.Context, *command.Invocation) (command.Decision, error) {
-	if y {
-		return command.AllowOnce, nil
-	}
-	return command.RejectOnce, nil
-}
-
-// runCLI runs a registry command from the program's own command line.
-func runCLI(ctx context.Context, r *command.Registry, id command.ID, args any, yes bool) error {
-	raw, err := json.Marshal(args)
+// runCLI runs a registry command from the program's own command line, and
+// writes its result to w. AllowIf(yes) approves a command that asks, when
+// --yes was given.
+func runCLI(ctx context.Context, w io.Writer, r *command.Registry, id command.ID, args any, yes bool) error {
+	raw, err := command.ArgsOf(args)
 	if err != nil {
 		return err
 	}
 	res, err := r.Run(ctx, command.Request{
-		ID: id, Args: raw, Origin: command.OriginCLI, Caller: "pi", Gate: yesGate(yes),
+		ID: id, Args: raw, Origin: command.OriginCLI, Caller: "pi", Gate: command.AllowIf(yes),
 	})
 	if err != nil {
 		return err
 	}
-	fmt.Println(res.Text)
-	return nil
+	return command.WriteResult(w, res, command.FormatText)
+}
+
+// runAny runs any command offered to the CLI, by its ID and its arguments
+// as the shell split them: "run session.save notes", or "run
+// session.save --name=notes".
+func runAny(ctx context.Context, w io.Writer, r *command.Registry, args []string, yes bool, f command.Format) error {
+	if len(args) == 0 {
+		return &command.ArgError{Reason: "run: name a command"}
+	}
+	req, err := r.ParseArgs(command.ID(args[0]), args[1:], command.OriginCLI)
+	if err != nil {
+		return err
+	}
+	req.Caller, req.Gate = "pi", command.AllowIf(yes)
+	res, err := r.Run(ctx, req)
+	if err != nil {
+		return err
+	}
+	return command.WriteResult(w, res, f)
 }
 
 type saveArgs struct {
@@ -140,12 +150,33 @@ func main() {
 		Short: "Save the session",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, a []string) error {
-			return runCLI(c.Context(), r, "session.save", saveArgs{Name: a[0]}, yes)
+			return runCLI(c.Context(), c.OutOrStdout(), r, "session.save", saveArgs{Name: a[0]}, yes)
 		},
 	}
 	save.Flags().BoolVar(&yes, "yes", false, "approve without asking")
 	// guide:end
-	root.AddCommand(save)
+	// guide:cobra-run
+	var format command.Format
+	run := &cobra.Command{
+		Use:   "run ID [ARGS...]",
+		Short: "Run any command by its ID",
+		Args:  cobra.MinimumNArgs(1),
+		RunE: func(c *cobra.Command, a []string) error {
+			return runAny(c.Context(), c.OutOrStdout(), r, a, yes, format)
+		},
+		// The IDs, then each command's flags and their values.
+		ValidArgsFunction: func(_ *cobra.Command, a []string, partial string) ([]string, cobra.ShellCompDirective) {
+			if len(a) == 0 {
+				return r.Complete("", nil, partial), cobra.ShellCompDirectiveNoFileComp
+			}
+			return r.Complete(command.ID(a[0]), a[1:], partial), cobra.ShellCompDirectiveNoFileComp
+		},
+	}
+	run.Flags().BoolVar(&yes, "yes", false, "approve without asking")
+	run.Flags().TextVar(&format, "format", command.FormatText, "text or json")
+	run.Flags().SetInterspersed(false) // the flags after the ID are the command's
+	// guide:end
+	root.AddCommand(save, run)
 	if err := root.ExecuteContext(context.Background()); err != nil {
 		os.Exit(launch.ExitCode(err))
 	}

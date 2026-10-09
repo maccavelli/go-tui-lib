@@ -271,13 +271,17 @@ The same actions are also commands, `workspace.Commands(ws)`, for a
 palette, slash lines and agents: see
 [the workspace's commands](commands.md#the-workspaces-commands).
 
-The workspace is a `help.KeyMap`, so a help footer is one call:
+The workspace is a `help.KeyMap`, and `ws.Help()` is a bubbles help model
+drawn with the workspace's glyphs and styles, so a help footer is one call:
 
 ```go
-footer := help.New().View(ws)
+footer := ws.Help().View(ws)
 ```
 
-The short help lists the bindings of whoever has the keyboard, the top
+`Help` takes the short help's separator from the glyph set's `Bullet` and
+its ellipsis from its `Ellipsis`, so the ASCII set draws `*` and `~`
+where `help.New()` draws `•` and `…`. Call `SetWidth` on it, as on any
+help model. The short help lists the bindings of whoever has the keyboard, the top
 modal overlay's pane or else the focused pane, from its `KeyMapper`, then
 focus-next and zoom. The full help has four columns: those bindings, focus,
 layout and overlays. Disabled bindings are left out.
@@ -367,11 +371,24 @@ version is refused.
   background in `Init`, and rebuilds its theme on each
   `tea.ColorProfileMsg` and `tea.BackgroundColorMsg`, which still reach
   your panes.
+  - `WithGlyphs(g)`, `WithProfile(p)` and `WithBackground(bg)` change what
+    it starts from, such as the glyph tier and profile `launch` decided.
+    `WithBackground` is where it starts, not a pin: a background message
+    replaces it, and `SetBackground` is the pin.
+  - `WithSize(width, height)` is the size it lays out at before the first
+    `tea.WindowSizeMsg` (80 × 24 by default), such as for a plain render.
   - `WithTheme(theme.New(profile, background, glyph.For(utf8)))` fixes the
-    theme instead; the messages then change nothing.
-  - `WithThemeBuilder(b)` rebuilds with your own builder, such as one that
-    adds `theme.WithPaletteFor` for each background, so your colours
-    survive a background change.
+    theme instead; the messages then change nothing. Its theme is the
+    first, whatever the options' order, and `WithGlyphs`, `WithProfile`
+    and `WithBackground` are then ignored. A `WithThemeBuilder` after it
+    makes the workspace follow from that theme.
+  - `WithThemeBuilder(b)` builds the first theme, and every rebuild, with
+    your own builder, such as one that adds `theme.WithPaletteFor` for
+    each background, so your colours survive a background change. It
+    chooses its own glyphs.
+  - `WithGlyphThemeBuilder(b)` is the same for a builder that is given
+    the glyphs in use, `WithGlyphs`'s at first. It wins over a
+    `WithThemeBuilder`.
   - `WithoutBackgroundQuery()` leaves the query out of `Init`, for a
     program that runs its own probe.
   - `ws.SetTheme(t)` replaces the theme now; a following workspace builds
@@ -383,3 +400,25 @@ version is refused.
 
   With no colour, the focused pane is still marked by the focus glyph and a
   bold title.
+
+## Plain output
+
+`ws.RenderPlain(width)` writes the workspace for a pipe, a log or a screen
+reader: one pane after another, each as its title and badge on one line,
+its content, and a blank line. It has no borders, no colour and no escape
+sequences, and no trailing spaces.
+
+- **The order** is the focus ring's (`WithFocusRing`'s, else the tree's),
+  then the visible panes the ring leaves out, such as a footer that
+  refuses focus. Hidden and zero-size panes, and overlays, are left out.
+- **The content** is the pane's `PlainView(width)` when it is a
+  `workspace.PlainViewer`, and otherwise its `View` at `width` × its
+  content height, with escape sequences removed. A pane `Wrap` hosts
+  forwards its model's own `PlainView`.
+- **It changes nothing:** it lays the workspace out at `width` × the
+  current height on its own, and leaves the layout, the panes' sizes,
+  the frame and the view cache as they were.
+
+With `launch`, a program that decides on plain output can still build the
+workspace, give it `WithSize` and the decided glyphs, and print
+`RenderPlain`.

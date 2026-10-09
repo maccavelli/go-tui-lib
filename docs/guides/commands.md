@@ -139,6 +139,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
   `Update` as a `LoopMsg` and waits, so an agent's tool call, which
   arrives on its own goroutine, never touches your model off the loop
   (A7). With `WithLoop` set, `Update` must use `Dispatch`, not `Run`.
+- **A handler's panic is an error,** on every path, `Run`, `Dispatch`,
+  an `Async` command and a `Loop` command on your program's loop
+  included: a `*command.PanicError`, which wraps `command.ErrPanicked`
+  and holds the value and the stack. Its text names the command only,
+  since the value may hold a secret. Your TUI keeps running. A gate's
+  panic refuses the request.
+- **`WatchContext(ctx)`** is `Watch` that gives up when `ctx` ends, so a
+  program that stops listening leaves no goroutine waiting.
 - **Reads are lock-free.** `Lookup`, `Slash`, `All` and `Available` read
   one snapshot, and are safe from any goroutine.
 - **The registry's own commands,** registered by `NewRegistry`:
@@ -305,35 +313,47 @@ go-tui-lib is a TUI layer: your program keeps its own command line, in the
 standard `flag` package, Cobra, Kong, urfave/cli or anything else, and adds
 the TUI beside it. A CLI handler runs a registry command by calling `Run`
 with `command.OriginCLI`, so the gate and the audit trail apply as they do
-to a key or an agent:
+to a key or an agent. `command.ArgsOf` makes the arguments from your
+flags, `command.AllowIf` turns `--yes` into the request's gate, and
+`command.WriteResult` prints the result:
 
 <!-- from: testdata/frameworks/flag/main.go#runcli -->
 
 ```go
-// yesGate approves a command that asks, when --yes was given.
-type yesGate bool
-
-func (y yesGate) Decide(context.Context, *command.Invocation) (command.Decision, error) {
-    if y {
-        return command.AllowOnce, nil
-    }
-    return command.RejectOnce, nil
-}
-
-// runCLI runs a registry command from the program's own command line.
-func runCLI(ctx context.Context, r *command.Registry, id command.ID, args any, yes bool) error {
-    raw, err := json.Marshal(args)
+// runCLI runs a registry command from the program's own command line, and
+// writes its result to w. AllowIf(yes) approves a command that asks, when
+// --yes was given.
+func runCLI(ctx context.Context, w io.Writer, r *command.Registry, id command.ID, args any, yes bool) error {
+    raw, err := command.ArgsOf(args)
     if err != nil {
         return err
     }
     res, err := r.Run(ctx, command.Request{
-        ID: id, Args: raw, Origin: command.OriginCLI, Caller: "pi", Gate: yesGate(yes),
+        ID: id, Args: raw, Origin: command.OriginCLI, Caller: "pi", Gate: command.AllowIf(yes),
     })
     if err != nil {
         return err
     }
-    fmt.Println(res.Text)
-    return nil
+    return command.WriteResult(w, res, command.FormatText)
+}
+
+// runAny runs any command offered to the CLI, by its ID and its arguments
+// as the shell split them: "run session.save notes", or "run
+// session.save --name=notes".
+func runAny(ctx context.Context, w io.Writer, r *command.Registry, args []string, yes bool, f command.Format) error {
+    if len(args) == 0 {
+        return &command.ArgError{Reason: "run: name a command"}
+    }
+    req, err := r.ParseArgs(command.ID(args[0]), args[1:], command.OriginCLI)
+    if err != nil {
+        return err
+    }
+    req.Caller, req.Gate = "pi", command.AllowIf(yes)
+    res, err := r.Run(ctx, req)
+    if err != nil {
+        return err
+    }
+    return command.WriteResult(w, res, f)
 }
 
 type saveArgs struct {
@@ -351,10 +371,18 @@ case "save":
     fs := flag.NewFlagSet("save", flag.ExitOnError)
     yes := fs.Bool("yes", false, "approve without asking")
     _ = fs.Parse(args[1:])
-    if err := runCLI(ctx, r, "session.save", saveArgs{Name: fs.Arg(0)}, *yes); err != nil {
-        fmt.Fprintln(os.Stderr, err)
-        os.Exit(1)
-    }
+    err = runCLI(ctx, os.Stdout, r, "session.save", saveArgs{Name: fs.Arg(0)}, *yes)
+case "run": // pi run [--yes] [--format=json] ID ARGS…
+    fs := flag.NewFlagSet("run", flag.ExitOnError)
+    yes := fs.Bool("yes", false, "approve without asking")
+    var format command.Format
+    fs.TextVar(&format, "format", command.FormatText, "text or json")
+    _ = fs.Parse(args[1:]) // stops at the ID; the rest is the command's
+    err = runAny(ctx, os.Stdout, r, fs.Args(), *yes, format)
+}
+if err != nil {
+    fmt.Fprintln(os.Stderr, err)
+    os.Exit(launch.ExitCode(err))
 }
 ```
 
@@ -369,7 +397,7 @@ save := &cobra.Command{
     Short: "Save the session",
     Args:  cobra.ExactArgs(1),
     RunE: func(c *cobra.Command, a []string) error {
-        return runCLI(c.Context(), r, "session.save", saveArgs{Name: a[0]}, yes)
+        return runCLI(c.Context(), c.OutOrStdout(), r, "session.save", saveArgs{Name: a[0]}, yes)
     },
 }
 save.Flags().BoolVar(&yes, "yes", false, "approve without asking")
@@ -386,11 +414,20 @@ var cli struct {
 
     Yes  bool     `help:"approve without asking"`
     Save saveArgs `cmd:"" help:"Save the session"`
+    Run  struct {
+        Format command.Format `default:"text" help:"text or json"`
+        ID     string         `arg:"" passthrough:"" help:"the command's ID"`
+        Args   []string       `arg:"" optional:"" help:"its arguments"`
+    } `cmd:"" help:"Run any command by its ID"`
     Line struct{} `cmd:"" default:"1" help:"Run the line mode"`
 }
 kctx := kong.Parse(&cli)
-if kctx.Command() == "save <name>" {
-    kctx.FatalIfErrorf(runCLI(ctx, r, "session.save", cli.Save, cli.Yes))
+switch kctx.Command() {
+case "save <name>":
+    kctx.FatalIfErrorf(runCLI(ctx, kctx.Stdout, r, "session.save", cli.Save, cli.Yes))
+case "run <id>", "run <id> <args>":
+    args := append([]string{cli.Run.ID}, cli.Run.Args...)
+    kctx.FatalIfErrorf(runAny(ctx, kctx.Stdout, r, args, cli.Yes, cli.Run.Format))
 }
 ```
 
@@ -425,7 +462,19 @@ app := &cli.Command{
         ArgsUsage: "NAME",
         Flags:     []cli.Flag{&cli.BoolFlag{Name: "yes", Usage: "approve without asking"}},
         Action: func(ctx context.Context, c *cli.Command) error {
-            return runCLI(ctx, r, "session.save", saveArgs{Name: c.Args().First()}, c.Bool("yes"))
+            return runCLI(ctx, c.Root().Writer, r, "session.save", saveArgs{Name: c.Args().First()}, c.Bool("yes"))
+        },
+    }, {
+        Name:      "run",
+        Usage:     "Run any command by its ID",
+        ArgsUsage: "ID [ARGS...]",
+        Flags: []cli.Flag{
+            &cli.BoolFlag{Name: "yes", Usage: "approve without asking"},
+            &cli.TextFlag{Name: "format", Value: &format, Usage: "text or json"},
+        },
+        StopOnNthArg: &one, // the flags after the ID are the command's
+        Action: func(ctx context.Context, c *cli.Command) error {
+            return runAny(ctx, c.Root().Writer, r, c.Args().Slice(), c.Bool("yes"), format)
         },
     }},
 }
@@ -436,13 +485,25 @@ if err := app.Run(context.Background(), os.Args); err != nil {
 ```
 
 - **The policy treats `OriginCLI` as the shell:** a `Destructive` command
-  asks the gate. `yesGate` refuses it unless `--yes` was given, so the run
-  fails with `command: refused: session.save: the gate said
-  reject_once`; you could ask on the terminal instead.
+  asks the gate. `AllowIf(yes)` refuses it unless `--yes` was given, so
+  the run fails with `command: refused: session.save: the gate said
+  reject_once`; you could ask on the terminal instead, with a
+  `command.GateFunc`.
 - **Only commands offered on `SurfaceCLI` run.** The workspace's own
-  commands are not, since they need the running TUI. `Result.Cmd` is a
-  TUI's effect, and is ignored here. `Result.Text` and `Result.Value` are
-  yours to print, as text or as JSON.
+  commands are not, since they need the running TUI.
+- **`WriteResult(w, res, f)`** writes `Result.Text`, or else
+  `Result.Value` as JSON, for `command.FormatText`, and `Result.Value` as
+  JSON, or `null`, for `command.FormatJSON`, each with a newline. A
+  `time.Duration` is written as `"1m30s"`. `Format` has text forms
+  (`text`, `json`), so a `--format` flag binds to it with `flag.TextVar`,
+  pflag's `TextVar` or urfave's `TextFlag`. `Result.Cmd` is a TUI's
+  effect, and is not run. `ArgsOf` writes a duration the same way, which
+  `New`'s schema reads back.
+- **Each error carries its exit status,** through `ExitCode() int`, and
+  `launch.ExitCode` reads it through any wrapping: 2 for
+  `command.ErrUnknown` and a `*command.ArgError`, 1 for
+  `ErrUnavailable`, 3 for `ErrRefused`, and 2 for `ErrPanicked`. Kong's
+  `FatalIfErrorf` honours it too.
 - **A struct shared with Kong:** Kong reads `arg`, `help`, `default`,
   `enum`, `short`, `hidden`, `placeholder` and `group` as the registry
   does. It takes a field's name from its Go name (`MaxItems` is
@@ -452,10 +513,68 @@ if err := app.Run(context.Background(), os.Args); err != nil {
 - **These examples are compiled and run** before every release. Each is
   cut from a complete program under `testdata/frameworks`, which
   `make examples` builds against the library in a module of its own and
-  runs: without `--yes` the save is refused, with it the save runs, a bad
-  flag exits with the framework's own status, and `--tui` with no
+  runs: without `--yes` the save is refused, with exit status 3; with it
+  the save runs; a bad flag exits with the framework's own status; `run`
+  takes any command by its ID; Cobra completes it; and `--tui` with no
   terminal falls back to the line mode. The library itself imports none
   of the frameworks.
+
+### Any command, by its ID
+
+`runAny`, above, runs whichever command the user names: `pi run
+session.save notes`, or `pi run --yes --format=json session.save
+--name=notes`. `Registry.ParseArgs(id, args, origin)` reads the words the
+shell split into the request a slash line or an agent would send:
+
+- `--name=v`, `--name v`, `-s v` and `-s=v`, where `name` is the
+  argument's JSON name and `s` its `short` tag; a bare `--flag` sets a
+  boolean, and a repeated flag adds to a list;
+- positional values fill the arguments tagged `arg`, in order; `--` ends
+  the flags, so `-- -3` is a value;
+- `Raw` is the words, quoted where the shell would need it, so a prompt's
+  `$ARGUMENTS` sees what the user typed;
+- an unknown flag, a missing value or a missing required argument is a
+  `*command.ArgError`, which exits 2.
+
+The program's own flags, `--yes` and `--format` here, come before the ID:
+everything after it belongs to the command. Each framework stops at the
+ID its own way: the standard `flag` package always does, pflag with
+`SetInterspersed(false)`, urfave with `StopOnNthArg`, and Kong with
+`passthrough` on the ID.
+
+`command.Params(cmd)` lists a command's arguments, with their types,
+help, short names, groups and whether they are positional, hidden or
+secret, for a help screen of your own. `Registry.Complete(id, args,
+partial)` completes a command line: the IDs offered on the CLI, then the
+command's flags and their values. With Cobra:
+
+<!-- from: testdata/frameworks/cobra/main.go#cobra-run -->
+
+```go
+var format command.Format
+run := &cobra.Command{
+    Use:   "run ID [ARGS...]",
+    Short: "Run any command by its ID",
+    Args:  cobra.MinimumNArgs(1),
+    RunE: func(c *cobra.Command, a []string) error {
+        return runAny(c.Context(), c.OutOrStdout(), r, a, yes, format)
+    },
+    // The IDs, then each command's flags and their values.
+    ValidArgsFunction: func(_ *cobra.Command, a []string, partial string) ([]string, cobra.ShellCompDirective) {
+        if len(a) == 0 {
+            return r.Complete("", nil, partial), cobra.ShellCompDirectiveNoFileComp
+        }
+        return r.Complete(command.ID(a[0]), a[1:], partial), cobra.ShellCompDirectiveNoFileComp
+    },
+}
+run.Flags().BoolVar(&yes, "yes", false, "approve without asking")
+run.Flags().TextVar(&format, "format", command.FormatText, "text or json")
+run.Flags().SetInterspersed(false) // the flags after the ID are the command's
+```
+
+`pi __complete run se` then answers `session.save`, and `pi __complete
+run session.save --` answers `--name`. Completion reads the commands'
+definitions only: it does not check a command's `When` or its gate.
 
 ## Start the TUI from your CLI
 
@@ -649,7 +768,9 @@ fits `FromSource`.
   `ExitCode() int` first, such as a `launch.ExitError`; then 0 for nil, 2
   for `ErrNotStarted`, 130 for an interrupt or a cancel, 124 for a
   deadline, 2 for a panic, and 1 otherwise. `launch.ExitError` carries a
-  status through Kong's `FatalIfErrorf` and urfave's exit handler.
+  status through Kong's `FatalIfErrorf` and urfave's exit handler, and
+  `command`'s errors carry theirs (see "Run commands from your own
+  CLI").
 
 ### Testing it
 

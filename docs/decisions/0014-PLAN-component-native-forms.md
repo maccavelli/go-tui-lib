@@ -1497,3 +1497,125 @@ No deviation.
   * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
   * the step's tests, with the golden tests of `theme`, `tuitest` and
     `workspace`: passed.
+
+### Step 11: documents and examples
+
+No deviation.
+
+#### What was done
+
+* **The four framework programs** (`testdata/frameworks/{flag,cobra,kong,urfave}/main.go`):
+  * **`runCLI`** builds the arguments with `command.ArgsOf`, gates with
+    `command.AllowIf(yes)`, and writes with `command.WriteResult` to the
+    framework's own writer:
+    * `os.Stdout` for flag;
+    * `c.OutOrStdout()` for Cobra;
+    * `kctx.Stdout` for Kong;
+    * `c.Root().Writer` for urfave.
+
+    `yesGate` and `encoding/json` are gone.
+  * **`runAny`**, beside it: `Registry.ParseArgs`, then `Run` with the
+    same caller and gate, then `WriteResult` in the chosen `Format`.
+  * **A `run` subcommand** in each, with `--yes` and `--format`, where
+    `--format` binds natively:
+    * flag uses `flag.TextVar`, and the flag package stops at the ID;
+    * Cobra uses pflag's `TextVar`, with `SetInterspersed(false)`;
+    * Kong uses a `command.Format` field, with `passthrough` on the ID;
+    * urfave uses `TextFlag`, with `StopOnNthArg: 1`.
+
+    The program's flags come before the ID, and everything after it is
+    the command's.
+  * **Cobra's `run`** completes through `ValidArgsFunction` and
+    `Registry.Complete`: the IDs, then the command's flags and values. It
+    is a new guide region, `cobra-run`.
+  * **The flag example's `save`** exits through `launch.ExitCode`, as D2
+    deferred to this step.
+* **`testdata/frameworks/cases.txt`:**
+  * the flag refusal case expects 3, and the header says every example
+    exits with the error's own status;
+  * 18 `run` cases across the four programs: success, `--format=json`, a
+    refusal (3), a missing required argument, an unknown flag and an
+    unknown command (2);
+  * two Cobra completion cases, `__complete run se` and `__complete run
+    session.save --`.
+
+  That is 46 cases in all, up from 26.
+* **`docs/guides/commands.md`:**
+  * the five changed excerpts, rewritten from the programs by a script
+    that applies the checker's own normalisation, which the check then
+    passed;
+  * the CLI section's prose: `ArgsOf`, `AllowIf`, `WriteResult` and
+    `Format`, and each error's exit status;
+  * a new subsection, "Any command, by its ID": `ParseArgs`'s grammar,
+    the program's flags before the ID in each framework, `Params`, and
+    `Complete` with the `cobra-run` excerpt;
+  * in "Run commands from your program": a handler's panic as a
+    `*PanicError`, the TUI kept running, and `WatchContext`;
+  * in "Plain output and the exit status": `command`'s errors carry their
+    statuses.
+* **`docs/guides/building-workspaces.md`:**
+  * `ws.Help()` replaces `help.New()` in the footer example, and says
+    what the ASCII set draws;
+  * the theme options, with D5's rule for `WithTheme`;
+  * a new section, "Plain output", on `RenderPlain`, with D6's order.
+* **`docs/guides/terminal-capabilities.md`:**
+  * `EnvCaps`, with an example;
+  * case-folding on Windows, and the disabled prober's JetBrains reasons
+    (D9);
+  * the backend deadline, `NotifyContext` and `Sequence` for a CLI;
+  * `CopyContext`, `WithCopyTimeout` and `CopySequence`.
+* **`docs/architecture.md`:**
+  * the package diagram: `theme` now imports `internal/enum`, and
+    `tuitest` imports `glyph` and `colorprofile`, as `go list` shows;
+  * the rows for `command`, `internal/enum`, `theme`, `workspace`,
+    `termcap`, `termsvc` and `tuitest`.
+* **`README.md`:** a Status bullet, "Native forms for a program's own
+  CLI, for `v0.8.0`", which says the work is unreleased, on `main`.
+* **Not changed:** the README's first Status bullet still says "The
+  current release is `v0.7.0`", though `v0.7.1` is tagged. 0013's Step 11
+  did not touch it, and this step's list does not name it. W3's release
+  step is where it moves to `v0.8.0`.
+
+#### Checks
+
+* **The examples gate is the step's check.** The gate is a script, so
+  the mutation tool, which runs `go test`, does not reach it. Instead
+  each mutation went into a scratch copy of the tree, as a fresh git
+  repository, and `scripts/go-examples.sh` ran there. All four were
+  killed by a failing case or excerpt:
+  * **S11-1** (flag's `run` ignores `--yes`): "flag run session.save
+    notes => 3 stderr refused: session.save: exit 0, want 3", and the
+    `runcli` excerpt differs.
+  * **S11-2** (Cobra completes nothing): `cobra __complete run
+    session.save -- => 0 stdout --name: stdout does not hold "--name"`.
+  * **S11-3** (the guide's `cobra-run` excerpt loses a line): "the
+    excerpt differs from testdata/frameworks/cobra/main.go#cobra-run".
+  * **S11-4** (urfave's `run` parses flags after the ID): "urfave run
+    --yes session.save --bogus => 2 …: exit 1, want 2".
+
+  S11-4's first form removed `StopOnNthArg`, and left `one` unused, so
+  the build failed. That is not a kill. It became `one := 9`, which
+  compiles and lets urfave read the flags after the ID.
+* **Rule 2 on macOS,** go1.27.2:
+  * `gofmt -l`: nothing.
+  * `make pre-add-check FILES=<the four programs>`: "4 file(s) clean …
+    examples".
+  * `make lint`: clean.
+  * With `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    all passed, and so did workspace mode.
+  * `go mod tidy -diff`, `make vuln` and `scripts/go-modules.sh --check`
+    were clean.
+  * `make apicheck`: "against v0.7.1, 0 incompatible change(s)".
+  * `make examples`: "46 case(s) run", "10 excerpt(s) checked",
+    "clean".
+  * `make release-check`: "173 file(s) clean … apicheck, examples".
+  * markdownlint: 0 issues. The link check: 42 links, none broken.
+* **The Windows test host,** go1.27.2 windows/amd64:
+  * the `FILES` and no-list `make pre-add-check`, `make lint`, `make
+    vuln` and `make examples`: each exit 0;
+  * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
+  * `scripts/go-examples.sh`: "46 case(s) run", "10 excerpt(s)
+    checked", "clean".
+
+**Done when** `make examples` passes, with the new cases: it does, on
+both hosts.

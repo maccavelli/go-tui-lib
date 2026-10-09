@@ -5,10 +5,10 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 
 	tea "charm.land/bubbletea/v2"
@@ -18,30 +18,40 @@ import (
 )
 
 // guide:runcli
-// yesGate approves a command that asks, when --yes was given.
-type yesGate bool
-
-func (y yesGate) Decide(context.Context, *command.Invocation) (command.Decision, error) {
-	if y {
-		return command.AllowOnce, nil
-	}
-	return command.RejectOnce, nil
-}
-
-// runCLI runs a registry command from the program's own command line.
-func runCLI(ctx context.Context, r *command.Registry, id command.ID, args any, yes bool) error {
-	raw, err := json.Marshal(args)
+// runCLI runs a registry command from the program's own command line, and
+// writes its result to w. AllowIf(yes) approves a command that asks, when
+// --yes was given.
+func runCLI(ctx context.Context, w io.Writer, r *command.Registry, id command.ID, args any, yes bool) error {
+	raw, err := command.ArgsOf(args)
 	if err != nil {
 		return err
 	}
 	res, err := r.Run(ctx, command.Request{
-		ID: id, Args: raw, Origin: command.OriginCLI, Caller: "pi", Gate: yesGate(yes),
+		ID: id, Args: raw, Origin: command.OriginCLI, Caller: "pi", Gate: command.AllowIf(yes),
 	})
 	if err != nil {
 		return err
 	}
-	fmt.Println(res.Text)
-	return nil
+	return command.WriteResult(w, res, command.FormatText)
+}
+
+// runAny runs any command offered to the CLI, by its ID and its arguments
+// as the shell split them: "run session.save notes", or "run
+// session.save --name=notes".
+func runAny(ctx context.Context, w io.Writer, r *command.Registry, args []string, yes bool, f command.Format) error {
+	if len(args) == 0 {
+		return &command.ArgError{Reason: "run: name a command"}
+	}
+	req, err := r.ParseArgs(command.ID(args[0]), args[1:], command.OriginCLI)
+	if err != nil {
+		return err
+	}
+	req.Caller, req.Gate = "pi", command.AllowIf(yes)
+	res, err := r.Run(ctx, req)
+	if err != nil {
+		return err
+	}
+	return command.WriteResult(w, res, f)
 }
 
 type saveArgs struct {
@@ -142,10 +152,18 @@ func main() {
 		fs := flag.NewFlagSet("save", flag.ExitOnError)
 		yes := fs.Bool("yes", false, "approve without asking")
 		_ = fs.Parse(args[1:])
-		if err := runCLI(ctx, r, "session.save", saveArgs{Name: fs.Arg(0)}, *yes); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
+		err = runCLI(ctx, os.Stdout, r, "session.save", saveArgs{Name: fs.Arg(0)}, *yes)
+	case "run": // pi run [--yes] [--format=json] ID ARGS…
+		fs := flag.NewFlagSet("run", flag.ExitOnError)
+		yes := fs.Bool("yes", false, "approve without asking")
+		var format command.Format
+		fs.TextVar(&format, "format", command.FormatText, "text or json")
+		_ = fs.Parse(args[1:]) // stops at the ID; the rest is the command's
+		err = runAny(ctx, os.Stdout, r, fs.Args(), *yes, format)
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(launch.ExitCode(err))
 	}
 	// guide:end
 }

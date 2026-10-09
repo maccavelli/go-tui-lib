@@ -5,9 +5,9 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	tea "charm.land/bubbletea/v2"
@@ -17,30 +17,40 @@ import (
 	"github.com/maccavelli/go-tui-lib/launch"
 )
 
-// yesGate approves a command that asks, when --yes was given.
-type yesGate bool
-
-func (y yesGate) Decide(context.Context, *command.Invocation) (command.Decision, error) {
-	if y {
-		return command.AllowOnce, nil
-	}
-	return command.RejectOnce, nil
-}
-
-// runCLI runs a registry command from the program's own command line.
-func runCLI(ctx context.Context, r *command.Registry, id command.ID, args any, yes bool) error {
-	raw, err := json.Marshal(args)
+// runCLI runs a registry command from the program's own command line, and
+// writes its result to w. AllowIf(yes) approves a command that asks, when
+// --yes was given.
+func runCLI(ctx context.Context, w io.Writer, r *command.Registry, id command.ID, args any, yes bool) error {
+	raw, err := command.ArgsOf(args)
 	if err != nil {
 		return err
 	}
 	res, err := r.Run(ctx, command.Request{
-		ID: id, Args: raw, Origin: command.OriginCLI, Caller: "pi", Gate: yesGate(yes),
+		ID: id, Args: raw, Origin: command.OriginCLI, Caller: "pi", Gate: command.AllowIf(yes),
 	})
 	if err != nil {
 		return err
 	}
-	fmt.Println(res.Text)
-	return nil
+	return command.WriteResult(w, res, command.FormatText)
+}
+
+// runAny runs any command offered to the CLI, by its ID and its arguments
+// as the shell split them: "run session.save notes", or "run
+// session.save --name=notes".
+func runAny(ctx context.Context, w io.Writer, r *command.Registry, args []string, yes bool, f command.Format) error {
+	if len(args) == 0 {
+		return &command.ArgError{Reason: "run: name a command"}
+	}
+	req, err := r.ParseArgs(command.ID(args[0]), args[1:], command.OriginCLI)
+	if err != nil {
+		return err
+	}
+	req.Caller, req.Gate = "pi", command.AllowIf(yes)
+	res, err := r.Run(ctx, req)
+	if err != nil {
+		return err
+	}
+	return command.WriteResult(w, res, f)
 }
 
 type saveArgs struct {
@@ -116,11 +126,20 @@ func main() {
 
 		Yes  bool     `help:"approve without asking"`
 		Save saveArgs `cmd:"" help:"Save the session"`
+		Run  struct {
+			Format command.Format `default:"text" help:"text or json"`
+			ID     string         `arg:"" passthrough:"" help:"the command's ID"`
+			Args   []string       `arg:"" optional:"" help:"its arguments"`
+		} `cmd:"" help:"Run any command by its ID"`
 		Line struct{} `cmd:"" default:"1" help:"Run the line mode"`
 	}
 	kctx := kong.Parse(&cli)
-	if kctx.Command() == "save <name>" {
-		kctx.FatalIfErrorf(runCLI(ctx, r, "session.save", cli.Save, cli.Yes))
+	switch kctx.Command() {
+	case "save <name>":
+		kctx.FatalIfErrorf(runCLI(ctx, kctx.Stdout, r, "session.save", cli.Save, cli.Yes))
+	case "run <id>", "run <id> <args>":
+		args := append([]string{cli.Run.ID}, cli.Run.Args...)
+		kctx.FatalIfErrorf(runAny(ctx, kctx.Stdout, r, args, cli.Yes, cli.Run.Format))
 	}
 	// guide:end
 	// guide:kong-tui

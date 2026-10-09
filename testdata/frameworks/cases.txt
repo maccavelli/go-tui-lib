@@ -6,12 +6,12 @@
 # The framework is the program's directory. The substring is the rest of the
 # line, matched literally in the stream named. A bad flag's exit status is
 # each framework's own, as measured: 2 for flag, 80 for kong, 1 for cobra and
-# urfave. A refusal exits 3, ErrRefused's status, where the example passes
-# the error through launch.ExitCode
-# (docs/decisions/0014-MADR-native-integration-api.md A1); the flag example
-# still exits 1 itself.
+# urfave. Every example passes a command's error through launch.ExitCode,
+# so it exits with the error's own status
+# (docs/decisions/0014-MADR-native-integration-api.md A1): 3 for a refusal,
+# 2 for an unknown command or bad arguments.
 
-flag save notes => 1 stderr refused: session.save
+flag save notes => 3 stderr refused: session.save
 flag save --yes notes => 0 stdout saved notes
 flag save --bogus notes => 2 stderr flag provided but not defined: -bogus
 
@@ -26,6 +26,33 @@ kong save --bogus notes => 80 stderr unknown flag --bogus
 urfave save notes => 3 stderr refused: session.save
 urfave save --yes notes => 0 stdout saved notes
 urfave save --bogus notes => 1 stderr flag provided but not defined: -bogus
+
+# run: any command by its ID, its arguments parsed by command.ParseArgs, the
+# result written by command.WriteResult (docs/decisions/0014-PLAN-component-native-forms.md
+# Step 11).
+flag run --yes session.save notes => 0 stdout saved notes
+flag run --yes --format=json session.save --name=notes => 0 stdout "notes"
+flag run session.save notes => 3 stderr refused: session.save
+flag run --yes session.save => 2 stderr /name: is required
+flag run --yes session.save --bogus => 2 stderr --bogus is not a known flag
+flag run no.such => 2 stderr unknown command
+cobra run --yes session.save notes => 0 stdout saved notes
+cobra run --yes --format=json session.save notes => 0 stdout "notes"
+cobra run session.save notes => 3 stderr refused: session.save
+cobra run --yes session.save --bogus => 2 stderr --bogus is not a known flag
+kong run --yes session.save notes => 0 stdout saved notes
+kong run --yes --format=json session.save --name=notes => 0 stdout "notes"
+kong run session.save notes => 3 stderr refused: session.save
+kong run --yes no.such => 2 stderr unknown command
+urfave run --yes session.save notes => 0 stdout saved notes
+urfave run --yes --format=json session.save --name=notes => 0 stdout "notes"
+urfave run session.save notes => 3 stderr refused: session.save
+urfave run --yes session.save --bogus => 2 stderr --bogus is not a known flag
+
+# Completion through cobra's ValidArgsFunction and Registry.Complete: the
+# IDs offered on the CLI, then a command's flags.
+cobra __complete run se => 0 stdout session.save
+cobra __complete run session.save -- => 0 stdout --name
 
 # The --tui path, with no terminal: a warning naming the reason, then the
 # line mode. --mode=plain goes to the line mode with no warning.

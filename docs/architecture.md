@@ -35,31 +35,31 @@ below).
  termcap/termcaptest  fake terminals      → termcap; bubbletea, x/ansi, colorprofile (tests)
  internal/termevent   pass-through events → ultraviolet
  internal/termevent/termeventtest  those events for tests → ultraviolet, bubbletea
- theme         palettes, roles, styles    → glyph; lipgloss, colorprofile
+ theme         palettes, roles, styles    → glyph, internal/enum; lipgloss, colorprofile
  glyph         Unicode and ASCII glyphs   → internal/enum
  internal/enum  enum names and text forms → standard library
  layout        geometry and state         → standard library
- tuitest       golden rendering           → x/ansi (tests and examples only)
+ tuitest       golden rendering           → glyph; x/ansi, colorprofile (tests and examples only)
 ```
 
 | Package | What it holds |
 | :--- | :--- |
 | `when` | `Parse` and `MustParse` → `Expr` (`Eval`, `String`, `Keys`), VS Code's when-clause grammar with RE2 regexes; `Check` against `Keys`; `Context`, `Map`, `Layered`, `Value`; typed `Key[T]` |
-| `command` | `Command`, `ID`, `New[A]` and its options, `SchemaOf` (JSON Schema 2020-12 from Kong-aligned tags), `ArgError`; `Registry` (`NewRegistry` with `WithGate`, `WithAuditor`, `WithPrefixer` and `WithLoop`; `Attach`, a loop that can be detached; `Register`, `ReplaceSource`, `Lookup`, `Slash`, `ParseSlash`, `All`, `Available`, `Watch`, `Dispatch`, `Run`, `Cancel`, `CancelAll`, `Remove`, `Version`); the policy, `Gate`, `Decision`, `Auditor`, `SlogAuditor`; `LoadDir`, `FromMCPPrompts`, `FromACP`; `MCPTools`, `CallMCP`, `ACPCommands`, `Manifest`; `WithLoop` and `LoopMsg`; the messages |
+| `command` | `Command`, `ID`, `New[A]` and `MustNew[A]` and their options, `SchemaOf` (JSON Schema 2020-12 from Kong-aligned tags), `ArgsOf`, `ArgError`; `Registry` (`NewRegistry` with `WithGate`, `WithAuditor`, `WithPrefixer` and `WithLoop`; `Attach`, a loop that can be detached; `Register`, `ReplaceSource`, `Lookup`, `Slash`, `ParseSlash`, `ParseArgs`, `Complete`, `All`, `Available`, `Watch`, `WatchContext`, `Dispatch`, `Run`, `Cancel`, `CancelAll`, `Remove`, `Version`); `Params` and `Param`; `Format` and `WriteResult`; the policy, `Gate`, `GateFunc`, `AllowIf`, `Decision`, `Auditor`, `SlogAuditor`; the errors, each with its exit status, and `PanicError`; `LoadDir`, `FromMCPPrompts`, `FromACP`; `MCPTools`, `CallMCP`, `ACPCommands`, `Manifest`; `WithLoop` and `LoopMsg`; the messages |
 | `glyph` | `Set` (4 border styles, separators with a cross and four tees, focus marker, ellipsis, scroll, bullet, badge brackets), `Unicode()`, `ASCII()`, `For(utf8)`; `Tier` (`TierUnicode`, `TierLegacy`, `TierASCII`) and `Tier.Set`; every glyph one cell |
 | `launch` | `Choice` and `Flags` (`--mode`, `--tui`, bound natively in each framework); `Streams`, `StreamSource`, `FromSource`; `Config`, `Decide` → `Decision` with `Target`s and a `Reason` token; `Run[M]` with `WithRegistry`, `WithRestorer`, `OnStart`, `WithProgramOptions`, `WithFilter`; `ErrNotStarted`, `ErrCrashed`; `Frame`; `ExitCode`, `ExitError`; `Restorer` |
 | `launch/launchtest` | `Terminal` (a fake terminal stream with a size and typed keys), `Pipe`, `Streams`, `Env` |
-| `internal/enum` | `Name`, `Marshal` and `Unmarshal` over a table of names, for an enum's `String`, `MarshalText` and `UnmarshalText` |
-| `theme` | `Palette` for dark, light and unknown backgrounds; `LightDarkColor` and `ProfileColor`; `Styles`; `New(profile, background, glyphs)` with `WithPalette` and `WithPaletteFor`; `FromDark`; `Border(style)` |
+| `internal/enum` | `Name`, `Marshal` and `Unmarshal` over a table of names, for an enum's `String`, `MarshalText` and `UnmarshalText`, on `uint8` or `int` |
+| `theme` | `Palette` for dark, light and unknown backgrounds; `LightDarkColor` and `ProfileColor`; `Styles`; `New(profile, background, glyphs)` with `WithPalette` and `WithPaletteFor`; `FromDark`; `Border(style)`; text forms for `Background` and `BorderStyle` |
 | `layout` | `Rect`, `Size` (fixed, percent, ratio, fill; min, max, shrink order), `Node` (`Pane`, `Split`, `Responsive`, or a custom node), `Solve` → `Plan`; `State` (JSON); the sidebar presets |
-| `workspace` | `Pane` and its optional interfaces; `Workspace` (routing, focus, chrome, resize, zoom, hide, overlays, cursor, `View`, `help.KeyMap`, the width method, a following theme, `SetBackground`, `Panes`, `PaneAs`, `WhenContext`); `Wrap`; `KeyMap`; `Commands` and the context keys |
+| `workspace` | `Pane` and its optional interfaces, `PlainViewer` among them; `Workspace` (routing, focus, chrome, resize, zoom, hide, overlays, cursor, `View`, `RenderPlain`, `help.KeyMap` and `Help`, the width method, a following theme with `WithGlyphs`, `WithProfile`, `WithBackground` and `GlyphThemeBuilder`, `WithSize`, `SetBackground`, `Panes`, `PaneAs`, `WhenContext`); `Wrap`; `KeyMap`; `Commands` and the context keys |
 | `internal/cells` | `Frame`: a reused cell buffer that draws strings into rectangles with a chosen width method |
-| `termcap` | `Prober` (one batch of queries ended by DA1, a deadline, tea's own replies observed, mode 2031 and its reset, `IsReplyFragment`); `Caps` of `Fact`s with origin and reason; `FromEnv` and `Identity`; the keyboard, link and notification views; `TmuxQuery`; `Report` and `Findings` |
+| `termcap` | `Prober` (one batch of queries ended by DA1, a deadline, tea's own replies observed, mode 2031 and its reset, `IsReplyFragment`); `EnvCaps`, the environment's facts with no program; `Caps` of `Fact`s with origin and reason; `Env`, whose lookups ignore case on Windows; `FromEnv` and `Identity`; the keyboard, link and notification views; `TmuxQuery`; `Report` and `Findings` |
 | `termcap/termcaptest` | `Terminal`, a scripted fake terminal; `Profile` and seven profiles; `Run` |
-| `termsvc` | `Notifier` (OSC 99, 777, 9 or the bell; focus policies; `NotifyResultMsg`); `Copy` and `CopiedMsg`; `Link`, `LinkDisplay`, `LinkPolicy`; prompt marks; `Wrap`; `SanitizeTitle`; the activity beacon; `Pointer`; `ProgressSupported` |
+| `termsvc` | `Notifier` (OSC 99, 777, 9 or the bell; focus policies; `NotifyResultMsg`; `Sequence`, its bytes for a CLI; `NotifyContext` and `WithBackendTimeout`); `Copy`, `CopyContext`, `CopySequence` and `CopiedMsg`; `Link`, `LinkDisplay`, `LinkPolicy`; prompt marks; `Wrap`; `SanitizeTitle`; the activity beacon; `Pointer`; `ProgressSupported` |
 | `internal/termevent` | `Decode`: the ultraviolet events tea passes through untranslated, as plain values |
 | `internal/termevent/termeventtest` | those events built for tests outside `internal/termevent` |
-| `tuitest` | `Golden` across {colour, no colour} × {UTF-8, ASCII} × widths; `Text` for a single file; `Annotate` |
+| `tuitest` | `Golden` across {colour, no colour} × {UTF-8, ASCII} × widths; `Case.Profile` and `Case.Glyphs`; `Fits`; `Text` for a single file; `Annotate` |
 
 - **`layout` has no Charm import,** so its solver can serve any front end.
 - **Imports point downward.** `when` imports only the standard library,
