@@ -1104,3 +1104,100 @@ No deviation.
     security patch into W2 and its release.
   * **Not offered,** being workarounds: excluding the advisory from
     govulncheck, or dropping `os.Root` from `tuitest`.
+  * **What followed:**
+    * The owner committed the step's code with the 0016 records, as
+      `c71b4ba`, before the advisory was cleared.
+    * 0016-PLAN-go-1-27-2-for-go-2026-6604 then moved both hosts to
+      go1.27.2 and the floor to `go 1.27.2`, in `970e14e`.
+    * Under that toolchain, every gate below passes, `make vuln`
+      included.
+
+    So this step resumes only to record what it built, with no change
+    to its code.
+
+#### What was built
+
+* **`workspace/plain.go` (new):**
+  * **`PlainViewer`.**
+  * **`RenderPlain(width)`:**
+    * it solves a layout of its own at `width` × the current height (80 ×
+      24 before any size), with `layout.Solve`, and changes nothing in
+      the workspace;
+    * the panes come in `plainOrder`: the focus ring's first, then the
+      rest in tree order (D6);
+    * a pane's title and badge are flattened to one line, without
+      escapes;
+    * the body is its `PlainView(width)`, or else its `View(width, content
+      height)`. Either way it is stripped of escapes, trailing spaces and
+      trailing blank lines;
+    * a blank line follows each pane, and a width of 0 or less gives "".
+  * **`Help()`:** `help.New()` with `ShortSeparator` " " + `Bullet` + " ",
+    the glyph set's `Ellipsis`, and the theme's styles: `Body` for keys,
+    `Muted` for the rest. `FullSeparator` keeps bubbles' four spaces (D7).
+* **`workspace/model.go`:** `Model[M].PlainView`. It gives the hosted
+  model's `PlainView` when `*M` has one, which includes a value
+  receiver's, and otherwise its `View()` stripped of escapes.
+* **One rule beyond the step's text:** trailing spaces are dropped from
+  each line, as well as trailing blank lines. A pane's view is padded to
+  its width, and plain output is for a pipe or a screen reader.
+* **Tests,** in `workspace/plain_test.go` (new):
+  * **`TestRenderPlainGolden`:** the eight new `plain.*` goldens, over
+    the tuitest matrix at 40 and 80. They were read before the commit:
+    * at 40 the layout hides the sidebar;
+    * the overlay is absent, and the footer comes last;
+    * the output is the same in every colour and glyph case, as plain
+      text must be.
+  * **`TestRenderPlainNoEscapes`:** in colour, no escape and no trailing
+    space. The view cache, the plan and the frame are unchanged. A
+    wrapped bubble with no `PlainView` gives "s\nred line\n\n", and
+    width 0 gives "".
+  * **`TestRenderPlainOrder`:** tree order with the footer last;
+    `WithFocusRing` first; a hidden pane left out; and a zoomed pane
+    alone.
+  * **`TestHelpUsesGlyphs`:** the ASCII set draws " * " and "~", and no
+    "•" or "…", in the short, the truncated and the full help. The
+    Unicode set draws " • ". `FullSeparator` is four spaces.
+
+#### Checks
+
+* **Mutations,** on scratch copies of the tree. All eight were killed on
+  the final code:
+  * **S7-1** (`RenderPlain` keeps escapes): "an escape sequence in
+    …\x1b[1muser: hello\x1b[m…".
+  * **S7-2** (`Help` uses `help.New()`): `the short help "alt+. next
+    pane • alt+z zoom" has no " * "`.
+  * **S7-3** (D6: the ring's order ignored, added): `TestRenderPlainOrder`
+    failed for `WithFocusRing`.
+  * **S7-4** (D6: the focus ring only, added): the golden lost the
+    footer.
+  * **S7-5** (trailing blank lines kept, added): the golden differs.
+  * **S7-6** (`Model` does not forward the bubble's `PlainView`, added):
+    the golden lost "(plain, www)".
+  * **S7-7** (`RenderPlain` lays out the workspace itself, added): "RenderPlain
+    changed the cache, the plan or the frame".
+  * **S7-8** (bubbles' ellipsis kept, added): the truncated help ended in
+    "…", not "~".
+
+  On the first run, S7-6 removed only `Model`'s value-receiver check, and
+  survived. That mutant was equivalent: `*M`'s method set holds `M`'s, so
+  the pointer check still forwarded. The redundant check was removed from
+  the code, and S7-6 was rewritten to remove the forward. It was then
+  killed.
+* **Rule 2 on macOS:**
+  * `gofmt -l`: nothing.
+  * `make pre-add-check FILES=<the three Go files>`: "3 file(s) clean".
+  * `make lint`: clean. On the first run, modernize wanted
+    `strings.SplitSeq` in a test loop, and it has it.
+  * With `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    all passed, and so did workspace mode.
+  * `go mod tidy -diff` and `scripts/go-modules.sh --check` were clean.
+  * `make apicheck`: "against v0.7.1, 0 incompatible change(s)".
+  * `make examples`: "clean".
+  * `make vuln` failed on go1.27.1 with GO-2026-6604 (D8). On go1.27.2,
+    in 0016's Step 3 run over the same tree, it gave "No vulnerabilities
+    found." `make release-check` gave "166 file(s) clean … apicheck,
+    examples".
+* **The Windows test host:** 0016's Step 3 run, on go1.27.2, covered this
+  step's code. It ran `make pre-add-check` (166 files), `make lint`,
+  `make vuln`, `make examples` and `GOWORK=off go test -count=2
+  -shuffle=on ./...`, each exit 0.

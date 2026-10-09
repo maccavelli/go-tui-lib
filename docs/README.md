@@ -46,7 +46,7 @@ it was when they were written
 | 0015 | MADR | [Make the pre-add check fail when gofmt itself fails, and skip a tracked file the work tree no longer has](decisions/0015-MADR-precheck-gofmt-errors.md) | accepted |
 | 0015 | PLAN | [Implement: the pre-add check fails when gofmt fails, and skips a tracked file the work tree no longer has](decisions/0015-PLAN-precheck-gofmt-errors.md) | complete |
 | 0016 | MADR | [Move the toolchain floor to Go 1.27.2, the release that fixes GO-2026-6604](decisions/0016-MADR-go-1-27-2-for-go-2026-6604.md) | accepted |
-| 0016 | PLAN | [Implement: the toolchain floor moves to Go 1.27.2](decisions/0016-PLAN-go-1-27-2-for-go-2026-6604.md) | in-progress |
+| 0016 | PLAN | [Implement: the toolchain floor moves to Go 1.27.2](decisions/0016-PLAN-go-1-27-2-for-go-2026-6604.md) | complete |
 
 ## I want to…
 
