@@ -1,6 +1,7 @@
 package termcap
 
 import (
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -12,11 +13,20 @@ import (
 type Env []string
 
 // LookupEnv is the value of key, and whether it is set. When key appears
-// more than once, the last wins, as in tea's own environment.
-func (e Env) LookupEnv(key string) (string, bool) {
+// more than once, the last wins, as in tea's own environment. On Windows,
+// where the environment's names ignore case, key matches a name in any
+// case.
+func (e Env) LookupEnv(key string) (string, bool) { return e.lookup(key, runtime.GOOS) }
+
+// lookup is LookupEnv for a program running on goos.
+func (e Env) lookup(key, goos string) (string, bool) {
+	n := len(key)
 	for _, kv := range slices.Backward(e) {
-		if v, ok := strings.CutPrefix(kv, key+"="); ok {
-			return v, true
+		if len(kv) <= n || kv[n] != '=' {
+			continue
+		}
+		if name := kv[:n]; name == key || goos == goosWindows && strings.EqualFold(name, key) {
+			return kv[n+1:], true
 		}
 	}
 	return "", false

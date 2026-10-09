@@ -391,7 +391,8 @@ and this table gives the line today. The steps below cite today's lines.
     options;
   * options that only concern probing are ignored, as documented;
   * `Profile` stays unknown;
-  * JetBrains' reasons apply.
+  * JetBrains' reasons apply. (D9, 2026-10-08: a disabled prober sets
+    them too.)
 * **`Env.LookupEnv`** matches names regardless of case when the running
   `GOOS` is `windows`. An unexported `lookup(key, goos)` carries the
   rule, so it is tested on every host.
@@ -1201,3 +1202,104 @@ No deviation.
   step's code. It ran `make pre-add-check` (166 files), `make lint`,
   `make vuln`, `make examples` and `GOWORK=off go test -count=2
   -shuffle=on ./...`, each exit 0.
+
+### Step 8: `EnvCaps`, and case-folding on Windows
+
+#### Deviations
+
+* **D9 (2026-10-08): a disabled prober sets the JetBrains reasons.**
+  * **Found:** the step asks for `EnvCaps` to give "exactly the facts of
+    a `WithDisabled` prober", and also says "JetBrains' reasons apply". A
+    disabled prober never sets them: `start` returns for `p.disabled`
+    (`termcap/prober.go:324-326`) before the JetBrains block (`:327-333`).
+    So the two cannot both hold. No test or golden covers a disabled
+    prober in JetBrains; the report goldens probe.
+  * **The owner's choice,** of three: the JetBrains block moves before the
+    disabled return. A disabled prober in JetBrains then marks the seven
+    query facts Unknown, with `NotQueried` and `ReasonJetBrainsPaints`.
+    `EnvCaps` is a disabled prober by construction, and the test asserts
+    the reasons for the JetBrains profile itself, so mutation S8-1 can
+    fail it.
+  * **The others:** `EnvCaps` adds the reasons on its own, with the test
+    allowing that one difference; or no JetBrains reasons, dropping the
+    line and S8-1.
+
+#### What was built
+
+* **`termcap/envcaps.go` (new):** `EnvCaps(env, goos, opts...)`. It
+  builds a prober from `opts` plus `WithDisabled()` and `WithGOOS(goos)`,
+  so `goos` wins over a `WithGOOS` in `opts`. It calls `start(env)`,
+  whose command it does not run, and returns `Caps()`. It is a disabled
+  prober by construction. The documentation lists:
+  * the options that apply: `WithAppearanceEnv` and `WithOverride`;
+  * those that change nothing, which only shape a probe;
+  * the hooks it does not run;
+  * the unknown `Profile`, and the JetBrains reasons.
+* **`termcap/prober.go`:** the JetBrains block runs before the disabled
+  return (D9), and `WithDisabled`'s documentation says so.
+* **`termcap/env.go`:**
+  * `LookupEnv` is `lookup(key, runtime.GOOS)`;
+  * `lookup` matches a name exactly, or, on `windows`, with
+    `strings.EqualFold`;
+  * the last match wins, as before, and an entry without "=" after the
+    name is skipped;
+  * `Getenv` follows, and so do `launch`'s reads of the environment.
+* **Tests:**
+  * `termcap/envcaps_test.go` (new, package `termcap_test`, since
+    `termcaptest` imports `termcap`):
+    * `TestEnvCapsMatchesDisabledProber` checks `reflect.DeepEqual` with
+      a disabled prober's `Caps()` after `tea.EnvMsg`. It covers the
+      seven termcaptest profiles, on linux, darwin and windows, with no
+      options, with the appearance variable and an override, and with
+      probe-only options and a contrary `WithGOOS`;
+    * it then asserts the seven JetBrains facts (unknown, `NotQueried`,
+      `ReasonJetBrainsPaints`), the appearance variable and override
+      themselves, and an unprobed Kitty's empty `KittyKeyboard`.
+  * `termcap/lookup_test.go` (new): `TestLookupFoldsOnWindows` and
+    `TestLookupExactElsewhere`. They cover the last-wins rule, an empty
+    value, an entry with no "=", a prefix of a name, and `Getenv` under
+    the running GOOS.
+
+#### Checks
+
+* **Mutations,** on scratch copies of the tree. All six were killed by a
+  failing test:
+  * **S8-1** (D9 reversed: no JetBrains reasons when disabled):
+    "JetBrains KittyKeyboard = {Value:unknown Origin:not-queried
+    Reason:}; want … ReasonJetBrainsPaints", and the other six facts.
+  * **S8-2** (no folding on Windows, added): `windows "PATH" = "",
+    false`.
+  * **S8-3** (folding everywhere, added): `linux "PATH" = "C:\bin",
+    true; want "", false`.
+  * **S8-4** (`EnvCaps` drops its options, added): "kitty, linux,
+    appearance and override" did not match.
+  * **S8-5** (`EnvCaps` ignores `goos`, added): "kitty, windows, no
+    options" did not match.
+  * **S8-6** (the first of a repeated name wins, added): `windows
+    "Term" = "xterm"; want "dumb-later"`.
+
+  S8-6's first two mutants did not compile: one left `slices` unused, the
+  other ranged `slices.Values` with two variables. A build failure is not
+  a kill, so it was rewritten until it compiled, and then it failed the
+  test.
+* **Rule 2 on macOS,** go1.27.2:
+  * `gofmt -l`: nothing, after `gofmt -w` on the new test.
+  * `make pre-add-check FILES=<the five Go files>`: "5 file(s) clean".
+  * `make lint`: clean.
+  * With `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    all passed, and so did workspace mode.
+  * `go mod tidy -diff`, `make vuln` ("No vulnerabilities found.") and
+    `scripts/go-modules.sh --check` were clean.
+  * `make apicheck`: "against v0.7.1, 0 incompatible change(s)".
+  * `make examples`: "clean".
+  * `make release-check`: "166 file(s) clean … apicheck, examples". The
+    three new files are untracked; the `FILES` run covers them.
+* **The Windows test host,** go1.27.2 windows/amd64, where `LookupEnv`
+  folds for real:
+  * the `FILES` and no-list `make pre-add-check`, `make lint`, `make
+    vuln` and `make examples`: each exit 0;
+  * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
+  * the step's tests, with `termcap`'s disabled, report and env tests:
+    passed. The filter matched no `launch` test there; `launch`'s tests,
+    which read the environment through `Getenv`, ran in the shuffled
+    suite above.

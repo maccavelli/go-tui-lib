@@ -78,7 +78,9 @@ func WithoutColorSchemeUpdates() Option { return func(p *Prober) { p.noScheme = 
 func WithoutBackgroundRequest() Option { return func(p *Prober) { p.noBackground = true } }
 
 // WithDisabled sends nothing. Init returns nil, and the first tea.EnvMsg
-// delivers a CapsMsg holding only the environment's facts. A program run
+// delivers a CapsMsg holding only the environment's facts, with the
+// JetBrains reasons when the environment names a JetBrains terminal.
+// EnvCaps gives the same facts without a program. A program run
 // without input, tea.WithInput(nil), must not probe: tea skips its own
 // queries then, but the replies to the prober's would reach the shell.
 func WithDisabled() Option { return func(p *Prober) { p.disabled = true } }
@@ -321,15 +323,17 @@ func (p *Prober) start(env Env) tea.Cmd {
 	p.started = true
 	p.caps.setEnv(env, p.goos, p.appearanceEnv)
 	hooks := p.hooks()
-	if p.disabled {
-		return tea.Batch(append(hooks, p.deliver())...)
-	}
 	// JetBrains paints a query as text: send nothing, and say why each
-	// fact a query would have set is unknown (MADR A1, Q7).
+	// fact a query would have set is unknown (MADR A1, Q7), whether or not
+	// the prober is disabled (docs/decisions/0014-PLAN-component-native-forms.md
+	// D9).
 	if p.caps.EnvBrand.Value == BrandJetBrains {
 		for _, f := range queryFacts(&p.caps) {
 			f.SetReason(Unknown, NotQueried, ReasonJetBrainsPaints)
 		}
+		return tea.Batch(append(hooks, p.deliver())...)
+	}
+	if p.disabled {
 		return tea.Batch(append(hooks, p.deliver())...)
 	}
 	// An editor's terminal answers for the editor, so the gated queries,
