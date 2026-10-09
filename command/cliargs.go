@@ -36,7 +36,9 @@ import (
 // needs it, so $ARGUMENTS expands to what the user typed. Args is checked
 // against the schema, defaults included. An unknown id wraps ErrUnknown;
 // an unknown flag, a missing or bad value, or a missing required argument
-// is an *ArgError.
+// is an *ArgError. So are words, or Raw or Args built from them, over the
+// registry's limit (WithMaxArgBytes); the words' total length is checked
+// before anything is built.
 func (r *Registry) ParseArgs(id ID, args []string, o Origin) (Request, error) {
 	snap := r.snap.Load()
 	i, ok := snap.byID[id]
@@ -44,7 +46,17 @@ func (r *Registry) ParseArgs(id ID, args []string, o Origin) (Request, error) {
 		return Request{}, fmt.Errorf("%w: %q", ErrUnknown, id)
 	}
 	e := &snap.entries[i]
+	n := 0
+	for _, a := range args {
+		n += len(a)
+	}
+	if err := r.tooLarge(n); err != nil {
+		return Request{}, err
+	}
 	req := Request{ID: id, Raw: quoteArgs(args), Origin: o}
+	if err := r.tooLarge(len(req.Raw)); err != nil {
+		return Request{}, err
+	}
 	if e.args == nil {
 		return req, nil
 	}
@@ -57,6 +69,9 @@ func (r *Registry) ParseArgs(id ID, args []string, o Origin) (Request, error) {
 		return Request{}, &ArgError{Reason: reasonOf(err)}
 	}
 	if req.Args, err = e.args.prepare(raw); err != nil {
+		return Request{}, err
+	}
+	if err := r.tooLarge(len(req.Args)); err != nil {
 		return Request{}, err
 	}
 	return req, nil

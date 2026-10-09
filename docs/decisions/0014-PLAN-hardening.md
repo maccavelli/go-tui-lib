@@ -288,7 +288,8 @@ values (exactly at, and one over); `TestExpandCap`.
 * **Checked in `admit`,** before `prepare` and whatever `e.args` is. The
   same cap applies to a slash line's `Raw`, and to W2's `ParseArgs`, on
   the total length of its words, before it builds or prepares anything
-  (added 2026-10-09).
+  (added 2026-10-09). D5 (2026-10-09): the `Raw` and `Args` the two
+  build are held to it too, so a request either one parses is admitted.
 * **Over the limit:** `&ArgError{Reason: "arguments are N bytes, over M"}`,
   and the audit records `Args: nil`.
 * **`FuzzPrepareMask`,** over a schema with a secret field, a slice of
@@ -303,7 +304,9 @@ values (exactly at, and one over); `TestExpandCap`.
 `ParseArgs` (added 2026-10-09), and exactly at the limit.
 
 **Mutation S6-1:** the check runs after `prepare`. The 16 MiB case
-allocates, and its time assertion of 100 ms fails.
+allocates, and its time assertion of 100 ms fails. D4 (2026-10-09): the
+time does not fail on macOS; an assertion on the bytes allocated
+does.
 
 ### Step 7: overflow-safe layout (H10)
 
@@ -903,3 +906,150 @@ No deviation.
   * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
   * the step's tests, with `TestExpand` and the `LoadDir` golden and
     source tests: passed.
+
+### Step 6: the argument limit (H5)
+
+#### Deviations
+
+* **D4 (2026-10-09): S6-1 is killed by the bytes allocated, not by the
+  time.**
+  * **Found:** with the check moved after `prepare`, `CallMCP` with
+    16 MiB of valid JSON still took well under 100 ms on macOS, so the
+    step's time assertion did not fail. The mutant died only because a
+    16 MiB input that is not valid JSON got "not valid JSON" in place of
+    "over 1048576".
+  * **The owner's choice:** keep the 100 ms assertion and the error text,
+    and add a deterministic one: refusing 16 MiB through `CallMCP`
+    allocates under 1 MiB, read from `runtime.MemStats.TotalAlloc`
+    around the call. S6-1b, the mutant with the not-valid-JSON case
+    removed, is killed by it alone.
+  * **The other:** the error text alone, with the time assertion recorded
+    as not killing S6-1.
+* **D5 (2026-10-09): what `ParseSlash` and `ParseArgs` build is held to
+  the limit.**
+  * **Found:** the step caps a slash tail and `ParseArgs`'s total word
+    length. The `Args` built from them is longer (JSON quotes and the
+    property name), and `ParseArgs`'s `Raw` is longer (the joining
+    spaces and quoting). A line just under 1 MiB would parse, and `Run`
+    would then refuse it, against `FuzzParseSlash`'s invariant that an
+    accepted line runs.
+  * **The owner's choice:** keep the checks on the built values.
+    `ParseSlash` checks the tail before reading it and `Args` after
+    preparing it. `ParseArgs` checks the words' total first, then `Raw`,
+    then `Args`. Whatever parses, `admit` accepts. Each one's
+    documentation says so.
+  * **The other:** only the step's two checks, with a request near the
+    limit refused at `Run`.
+
+#### What was built
+
+* **`command/registry.go`:**
+  * `DefaultMaxArgBytes = 1 << 20`;
+  * `WithMaxArgBytes(n int) RegistryOption`. A value below 1 keeps the
+    default, as D3 chose for `LoadDir`'s options.
+  * `tooLarge(n)`, the one check: `&ArgError{Reason: "arguments are N
+    bytes, over M"}`, or nil.
+* **`command/dispatch.go`:**
+  * `admit` checks the larger of `len(req.Args)` and `len(req.Raw)`
+    after the ID lookup, and before the origin, the surface, the `When`,
+    `prepare` and the policy. It runs whether or not the command has a
+    schema.
+  * `audit` records `Args: nil` for arguments over the limit, without
+    reading them to mask.
+* **`command/slash.go` and `command/cliargs.go`:** the checks of D5.
+  `ParseArgs` adds the words' lengths before quoting or building
+  anything.
+* **`command/arglimit_test.go` (new):**
+  * `TestArgLimit`, over a registry with an auditor:
+    * `CallMCP` with 16 MiB, valid JSON and not: the error names the
+      size, within 100 ms and under 1 MiB allocated (D4), and the audit
+      record has no arguments;
+    * `Run`: a secret inside 2 MiB is refused and not recorded; 16 MiB
+      of `Args` to a command without a schema; 16 MiB of `Raw`; one byte
+      over; exactly at the limit, which runs and is recorded whole;
+    * `ParseSlash`: a 16 MiB tail; a tail one byte over; a tail that
+      fits whose `Args` is one byte over; and two lines exactly at the
+      limit, each of which then runs;
+    * `ParseArgs`: 16 MiB of words; words that fit whose `Raw` is one
+      byte over; `Args` one byte over; and two requests exactly at the
+      limit, each of which then runs.
+  * `FuzzPrepareMask`, over a schema with a secret field, a slice of
+    secrets and a nested object holding a secret. For the raw input, and
+    for `prepare`'s output when it succeeds: no panic; `prepare`'s output
+    is valid JSON; `mask` is nil or has `"***"` at every secret path
+    present; and no secret of four bytes or more appears in the masked
+    output unless the input also holds it outside a secret path. Twelve
+    seeds.
+
+  Both use only names that existed before the step: `argLimit` is the
+  literal `1 << 20`.
+* **`command/registry_test.go`:** `TestWithMaxArgBytes`, the option at 10
+  bytes through `Run`, `ParseSlash` and `ParseArgs`, and values below 1
+  keeping the default.
+
+#### Checks
+
+* **Rule 3: the probe fails before the fix.** `TestArgLimit`, on a
+  scratch copy of `9a8c139`, the commit before this step: 16 failures,
+  among them "valid JSON: the audit record has 16777216 bytes of
+  arguments", "a 16 MiB tail: <nil>", "16 MiB of words: <nil>" and
+  "valid JSON: refusing 16 MiB allocated 33570520 bytes". It passes on
+  the step's code. `FuzzPrepareMask` checks code that already existed,
+  and passes there; mutations S6-9 and S6-10 show it can fail.
+* **Mutations,** on scratch copies of the tree. All eleven were killed by
+  a failing test, none by a build failure:
+  * **S6-1** (the check after `prepare`): the not-valid-JSON case got
+    `not valid JSON: unexpected EOF` where it wanted `arguments are
+    16777214 bytes, over 1048576`.
+  * **S6-1b** (S6-1 with the not-valid-JSON case removed, added for D4):
+    "valid JSON: refusing 16 MiB allocated 16793808 bytes, 1 MiB or
+    more".
+  * **S6-2** (the audit records arguments over the limit, added): "valid
+    JSON: the audit record has 16777216 bytes of arguments".
+  * **S6-3** (no tail check in `ParseSlash`, added): "a tail one byte
+    over: <nil>".
+  * **S6-4** (no `Raw` check in `ParseArgs`, added): "Raw one byte over:
+    <nil>".
+  * **S6-5** (no built-`Args` check in `ParseSlash`, added): "arguments
+    one byte over: <nil>".
+  * **S6-6** (`<` for `<=`, added): "exactly at the limit: … arguments
+    are 1048576 bytes, over 1048576".
+  * **S6-7** (`WithMaxArgBytes` ignored, added): `ParseSlash`, `ParseArgs`
+    and `Run` each returned nil where they wanted `arguments are 11 bytes,
+    over 10`.
+  * **S6-8** (a value below 1 taken, added): "WithMaxArgBytes(0), at the
+    default: … over 0".
+  * **S6-9** (`mask` leaves a nested object's secrets, added):
+    `FuzzPrepareMask`'s first seed, with `"nested":{"key":"s3cret"}` in
+    the masked output.
+  * **S6-10** (`mask` hides only string secrets, added): seeds 0, 3 and
+    5, `token is not "***"`.
+* **Fuzzing,** 60 s each on a scratch copy: `FuzzPrepareMask` (2,367,288
+  executions), `FuzzParseSlash` (6,027,318) and `FuzzParseArgs`
+  (373,930). No failure.
+  * `FuzzParseArgs` reported 0 executions a second from 18 s on. The
+    same run on `9a8c139` stalled too. Stopping the stalled workers there
+    with SIGQUIT made the engine report that it was minimizing a new
+    2,761-byte input, which it wrote to the scratch copy's corpus; that
+    input replays and passes in under a second. That is the fuzz engine's minimizing, which it does not
+    count as executions, not a hang in the library. It is noted for
+    Step 9, and nothing was changed.
+* **Rule 2 on macOS,** go1.27.2:
+  * `gofmt -l`: nothing.
+  * `make pre-add-check FILES=<the six Go files>`: "6 file(s) clean".
+  * `make lint`: clean.
+  * With `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    all passed, and so did workspace mode. `TestArgLimit` also passed
+    three times under `-race`.
+  * `go mod tidy -diff`, `make vuln` and `scripts/go-modules.sh --check`
+    were clean.
+  * `make apicheck`: "against v0.7.1, 0 incompatible change(s)". The
+    step adds `DefaultMaxArgBytes` and `WithMaxArgBytes`.
+  * `make examples`: "clean".
+  * `make release-check`: "183 file(s) clean … apicheck, examples".
+* **The Windows test host,** go1.27.2 windows/amd64:
+  * the `FILES` and no-list `make pre-add-check`, `make lint`, `make
+    vuln` and `make examples`: each exit 0;
+  * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
+  * the step's tests, with `TestAuditMasksSecrets`, `FuzzParseArgs` and
+    `FuzzParseSlash`: passed.

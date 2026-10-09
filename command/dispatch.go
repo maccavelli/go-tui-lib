@@ -154,6 +154,10 @@ func (r *Registry) admit(ctx context.Context, req Request) (*entry, *Invocation,
 		return nil, nil, 0, fmt.Errorf("%w: %q", ErrUnknown, req.ID)
 	}
 	e := &s.entries[i]
+	// The size first, before anything reads the arguments.
+	if err := r.tooLarge(max(len(req.Args), len(req.Raw))); err != nil {
+		return e, nil, 0, err
+	}
 	c := req.Context
 	if c == nil {
 		c = when.Map(nil)
@@ -253,7 +257,10 @@ func (r *Registry) audit(req Request, e *entry, d Decision, o outcome, err error
 		return
 	}
 	args := req.Args
-	if e != nil {
+	switch {
+	case r.tooLarge(len(args)) != nil:
+		args = nil // too large to record, or to read for masking
+	case e != nil:
 		args = e.args.mask(args)
 	}
 	r.auditor.Audit(Record{

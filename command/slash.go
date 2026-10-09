@@ -20,7 +20,9 @@ import (
 // quoted name=value is a positional value. Each value is read as its
 // property's type. A command whose only argument is a string takes the
 // whole tail as it. The arguments are checked against the schema, so an
-// accepted line runs unless the command's own checks refuse it.
+// accepted line runs unless the command's own checks refuse it. A tail, or
+// arguments built from it, over the registry's limit (WithMaxArgBytes) is
+// an *ArgError, and the tail's size is checked before it is read.
 func (r *Registry) ParseSlash(line string) (Request, error) {
 	s := strings.TrimPrefix(strings.TrimLeftFunc(line, unicode.IsSpace), "/")
 	name, tail := s, ""
@@ -33,6 +35,9 @@ func (r *Registry) ParseSlash(line string) (Request, error) {
 		return Request{}, fmt.Errorf("%w: no slash command /%s", ErrUnknown, name)
 	}
 	e := &snap.entries[i]
+	if err := r.tooLarge(len(tail)); err != nil {
+		return Request{}, err
+	}
 	req := Request{ID: e.cmd.ID, Raw: tail, Origin: OriginSlash}
 	if e.args == nil {
 		return req, nil
@@ -46,6 +51,9 @@ func (r *Registry) ParseSlash(line string) (Request, error) {
 		return Request{}, &ArgError{Reason: reasonOf(err)}
 	}
 	if req.Args, err = e.args.prepare(raw); err != nil {
+		return Request{}, err
+	}
+	if err := r.tooLarge(len(req.Args)); err != nil {
 		return Request{}, err
 	}
 	return req, nil

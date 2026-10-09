@@ -60,6 +60,32 @@ type Registry struct {
 	prefixer func(Source) string
 	loop     atomic.Pointer[loopState] // the program's loop, or nil
 	running  running
+	maxArg   int // the largest request's arguments, and slash or command line, in bytes
+}
+
+// DefaultMaxArgBytes is the largest request's arguments a registry takes,
+// in bytes, unless WithMaxArgBytes sets another
+// (docs/decisions/0014-PLAN-hardening.md Step 6, finding H5).
+const DefaultMaxArgBytes = 1 << 20
+
+// WithMaxArgBytes sets the largest request's arguments the registry takes,
+// in bytes: Request.Args and Request.Raw, a slash line's tail, and the
+// words ParseArgs reads, each on its own. Larger is an *ArgError before
+// anything parses it. A value below 1 keeps DefaultMaxArgBytes.
+func WithMaxArgBytes(n int) RegistryOption {
+	return func(r *Registry) {
+		if n > 0 {
+			r.maxArg = n
+		}
+	}
+}
+
+// tooLarge is the error for n bytes of arguments, or nil when they fit.
+func (r *Registry) tooLarge(n int) error {
+	if n <= r.maxArg {
+		return nil
+	}
+	return &ArgError{Reason: fmt.Sprintf("arguments are %d bytes, over %d", n, r.maxArg)}
 }
 
 // snapshot is one published version of the registry. Nothing changes it
@@ -123,7 +149,7 @@ func WithLoop(send func(tea.Msg)) RegistryOption {
 // NewRegistry returns a registry at version 0 holding only its own
 // commands: command.list, command.describe and app.quit.
 func NewRegistry(o ...RegistryOption) *Registry {
-	r := &Registry{}
+	r := &Registry{maxArg: DefaultMaxArgBytes}
 	r.policy.always = map[alwaysKey]Decision{}
 	r.running.runs = map[ID]map[uint64]context.CancelFunc{}
 	for _, f := range o {

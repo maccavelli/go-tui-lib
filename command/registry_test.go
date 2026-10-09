@@ -325,3 +325,48 @@ func TestStrings(t *testing.T) {
 		}
 	}
 }
+
+// TestWithMaxArgBytes: the option sets the limit for every way in, and a
+// value below 1 keeps DefaultMaxArgBytes
+// (docs/decisions/0014-PLAN-hardening.md Step 6).
+func TestWithMaxArgBytes(t *testing.T) {
+	if DefaultMaxArgBytes != argLimit {
+		t.Fatalf("DefaultMaxArgBytes = %d, want %d", DefaultMaxArgBytes, argLimit)
+	}
+	reg := func(o ...RegistryOption) *Registry {
+		return registryOf(t, o, cmd("plain", UI, func(c *Command) { c.Slash = "plain" }))
+	}
+	r := reg(WithMaxArgBytes(10))
+	for n, want := range map[int]bool{10: true, 11: false} {
+		args := `"` + strings.Repeat("a", n-2) + `"`
+		_, err := r.Run(t.Context(), Request{ID: "plain", Args: []byte(args), Origin: OriginKey})
+		_, serr := r.ParseSlash("/plain " + strings.Repeat("a", n))
+		_, perr := r.ParseArgs("plain", []string{strings.Repeat("a", n)}, OriginCLI)
+		for what, err := range map[string]error{"Run": err, "ParseSlash": serr, "ParseArgs": perr} {
+			if want && err != nil {
+				t.Errorf("WithMaxArgBytes(10), %s of %d bytes: %v", what, n, err)
+			}
+			if !want {
+				overLimitOf(t, what, n, 10, err)
+			}
+		}
+	}
+	for _, n := range []int{0, -1} {
+		r := reg(WithMaxArgBytes(n))
+		raw := strings.Repeat("a", DefaultMaxArgBytes)
+		if _, err := r.Run(t.Context(), Request{ID: "plain", Raw: raw, Origin: OriginKey}); err != nil {
+			t.Errorf("WithMaxArgBytes(%d), at the default: %v", n, err)
+		}
+		_, err := r.Run(t.Context(), Request{ID: "plain", Raw: raw + "a", Origin: OriginKey})
+		overLimitOf(t, fmt.Sprintf("WithMaxArgBytes(%d), one byte over the default", n), DefaultMaxArgBytes+1, DefaultMaxArgBytes, err)
+	}
+}
+
+// overLimitOf fails t unless err is an *ArgError for n bytes over limit.
+func overLimitOf(t *testing.T, what string, n, limit int, err error) {
+	t.Helper()
+	want := fmt.Sprintf("arguments are %d bytes, over %d", n, limit)
+	if _, ok := errors.AsType[*ArgError](err); !ok || !strings.Contains(err.Error(), want) {
+		t.Errorf("%s: %v; want an *ArgError with %q", what, err, want)
+	}
+}
