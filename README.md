@@ -52,7 +52,7 @@ pattern, used by every program that needs it.
   `github.com/charmbracelet/colorprofile` and
   `github.com/charmbracelet/x/ansi`. The v1 `github.com/charmbracelet/…`
   paths are refused by lint.
-- **Go 1.27.1** is required.
+- **Go 1.27.2** is required.
 - **No CLI front end, since `v0.6.0`.** `command/cli` is gone, and the
   Cobra and Kong adapters, `command/cobracmd` and `command/kongcmd`, are
   retracted at `v0.1.1`. An adapter a TUI needs, such as the planned

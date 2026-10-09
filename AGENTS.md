@@ -8,7 +8,7 @@ this file. A repository-local `CLAUDE.md` / `.claude/rules/` / `.grok/rules/` /
 (`github.com/maccavelli/go-tui-lib`). It is a library only: no packaged
 binary. Each capability lives in its own top-level directory, with the
 package named after the directory; there is no root package. Unexported
-helpers shared between packages live under `internal/`. Requires Go 1.27.1.
+helpers shared between packages live under `internal/`. Requires Go 1.27.2.
 
 ## Dependencies
 
@@ -171,7 +171,8 @@ needs an exception says so.
 
     `internal/conformance` fails on a package without it.
 11. **The toolchain floor.** The `go` line in each `go.mod`, today
-    1.27.1, moves only by a record. It moves to the newest patch of a
+    1.27.2 (`docs/decisions/0016-MADR-go-1-27-2-for-go-2026-6604.md`),
+    moves only by a record. It moves to the newest patch of a
     release Go still supports, and the record names the features that need
     it.
 

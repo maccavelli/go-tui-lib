@@ -12,7 +12,7 @@ below).
 - **A library only.** Each capability is a top-level directory, with the
   package named after it. There is no root package. Helpers shared between
   packages go under `internal/`.
-- **Go 1.27.1**, with no `toolchain` line.
+- **Go 1.27.2**, with no `toolchain` line.
 - **Ten packages,** and five internal ones, for multi-pane terminal
   workspaces, terminal capabilities and services, a command registry run
   from keys, slash lines, agents and the program's own CLI, and the
