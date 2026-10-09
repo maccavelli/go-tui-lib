@@ -1,6 +1,6 @@
 ---
-status: proposed
-date: 2026-10-07
+status: in-progress
+date: 2026-10-09
 associated-madr: "0014-MADR-native-integration-api.md"
 ---
 # Implement W3: bounded input, one sanitizer, overflow-safe layout, no mutable package variables, wider fuzzing, and release `v0.8.0`
@@ -22,7 +22,8 @@ bounded, sanitized where it is displayed, and fuzzed. In detail:
 * **`layout`'s arithmetic** cannot overflow.
 * **No exported package variable** can change the library's behaviour.
 * **`make fuzz`** finds every fuzz target by itself, and nine new targets
-  cover the parsers and renderers.
+  cover the parsers and renderers. (Corrected 2026-10-09: ten, as Step 9's
+  table and the Verification list them.)
 
 The release is `v0.8.0`, together with W2.
 
@@ -46,6 +47,36 @@ Each probe below ran on a scratch copy and fails on today's code.
 | C6 | `SanitizeTitle` keeps U+200B, U+2028, U+FEFF, U+2060, U+E0041 and U+00AD | `termsvc/beacon.go:22` | — |
 | H9 | four fuzz targets exist; `make fuzz` names three packages by hand; CI uploads three corpus directories | `Makefile:94-97`; `.github/workflows/ci.yml:101-120`; `layout/layout_test.go:595`, `command/fuzz_test.go:11`, `command/frontmatter_test.go:40`, `when/fuzz_test.go:12` | a fuzz target on `clip` failed at once: `clip("\x1b", 3, 1)` gives a line 0 cells wide |
 | — | `LoadDir(fsys, src)` and `NewTerminal(p)` have no options parameter; adding one would change their signatures, which `apidiff` reports as incompatible | `go doc` | — |
+
+### Facts re-read before execution (2026-10-09)
+
+W2 (0014-PLAN-component-native-forms) and the Go 1.27.2 floor
+(0016-PLAN-go-1-27-2-for-go-2026-6604) landed after this PLAN was
+written. The agent read every row above again on `e45a9f9`, and ran the
+probes for H1, H3, C6 and H10 again on a scratch copy, with Go 1.27.2.
+Every finding still holds. The table above keeps the 2026-10-07
+readings; this one gives today's lines and what W2 added. The steps below
+are annotated where it changes them.
+
+| Fact | Today |
+| :--- | :--- |
+| H1 holds: two panes gave 310 cache entries after 500 resizes, and 710 after 200 more theme changes, where the bound would be 4 | `viewOf` at `workspace/render.go:143-153`; the map at `workspace/workspace.go:142` and `:317`; `forget` at `:452`, `:458` and `workspace/overlay.go:105` |
+| H3 holds: a 2^30 × 2^30 `WindowSizeMsg` gives 1073741824 × 1073741824. W2's `WithSize(2^30, 2^30)` does the same | `workspace/workspace.go:472-474`; `WithSize` at `:248-250`; `internal/cells/cells.go:30`, `:38`; `clip`'s `Grow` at `workspace/render.go:160` |
+| **New, from W2:** `RenderPlain(width)` lays the workspace out at `width` × the height with no cap | `workspace/plain.go:35-46` |
+| H4 holds | `command/loaddir.go:37`, `:49`, `:78` |
+| H5 holds | `prepare` at `command/decode.go:212`; `CallMCP` at `command/mcp.go:94`; `admit` at `command/dispatch.go:150`, its `prepare` at `:175`; `command/slash.go:48` |
+| **New, from W2:** `ParseArgs` is a fourth path. It builds the arguments from the words and calls `prepare` itself, before `Run`'s `admit` | `command/cliargs.go:59` |
+| H10 holds: `Ratio(2^40, 2^41)` of 16,777,216 cells gave 0, not 8,388,608; two `Fill(2^40)` gave 1 and 16,777,215 | `Percent` and `Ratio` at `layout/size.go:272-276`; `minSum` at `:255-260`; `share` at `:304`; `sum` at `:398` |
+| H11 holds | `RunTimeout` at `termcap/termcaptest/termcaptest.go:170`, read at `:245` and `:256`; the seven `Key*` variables at `workspace/context.go:20-33` |
+| C6 holds: `ParseActivity` kept `"ev\x1b[31m\u202eil"` as the vendor, and `SanitizeTitle` kept each of U+200B, U+2028, U+FEFF, U+2060, U+E0041 and U+00AD | `strip` and `clean` at `termsvc/termsvc.go:93`, `:117`; `SanitizeTitle` at `termsvc/beacon.go:27`; `ParseActivity` at `:97`; `Pointer` at `:146`; `osc99ID` at `termsvc/notify.go:338`; `LinkPolicy.Openable` at `termsvc/links.go:44`; `isSpaceOrControl` at `command/registry.go:225`; XTVERSION at `termcap/prober.go:650-654` |
+| C6's title finding has a new shape: a title `"evil\nline"` no longer adds a line, since `clip` holds the frame to its height, but the top border stops after "evil" | `workspace/render.go:214` (`title`), `:238` (`renderBox`) |
+| **New, from W2:** `RenderPlain`'s titles, through `plainTitle`, strip escapes and collapse whitespace, but kept U+202E in the probe. Its bodies, through `plainText`, strip escapes only | `workspace/plain.go:88-97`, `:99-108` |
+| `clip("\x1b", 3, 1)` still gives a line 0 cells wide | `workspace/render.go:158` |
+| H9: five fuzz targets now, in four packages' tests. W2 added `FuzzParseArgs`, which `make fuzz` already runs, since `command` is listed. The Makefile and CI still name three packages by hand | `layout/layout_test.go`, `command/fuzz_test.go` (two), `command/frontmatter_test.go`, `when/fuzz_test.go`; `Makefile:98-101`; `.github/workflows/ci.yml:105-124` |
+| `launch.Decide` sets `Width` and `Height` from the terminal, or `COLUMNS` with no upper bound | `launch/decide.go:113`, `:191-193`, `:225-231`, `:242` |
+| `LoadOption` is in `docs/glossary.md`, reserved by 0014-MADR W3 | `docs/glossary.md:44` |
+| **The constants' home (owner's choice, 2026-10-09).** `launch` does not import `workspace`; it imports `command`, `glyph`, `termcap` and `internal/enum`. The owner chose, of three: a new `internal/limits` holds `MaxSide`, `MaxCells` and the clamp. `workspace` exports `MaxSide` and `MaxCells` as constants equal to them, and `launch` uses the internal package. The others: `layout` exports them, or `launch` imports `workspace` | `go list -deps ./launch` |
+| The preconditions hold: 0014-PLAN-component-native-forms is `complete` (`e45a9f9`), and `scripts/apicheck.allow` lists nothing | the records |
 
 ### Preconditions
 
@@ -139,7 +170,10 @@ func HasControl(s string) bool
   * `title()` and `renderBox` flatten and truncate titles and badges with
     `Line` and `Truncate`;
   * `clip` passes each line through `Line` before truncating, which fixes
-    the fuzz failure.
+    the fuzz failure;
+  * (added 2026-10-09) `plainTitle` uses `Line`, and `plainText` passes
+    each line of a plain body through `Line`, so `RenderPlain` holds
+    nothing `Line` drops. The `plain.*` goldens stay byte-identical.
 
 **Tests:**
 
@@ -185,6 +219,9 @@ byte-identical for clean inputs.
 
 ### Step 4: the window clamp (H3)
 
+* **`internal/limits`** (added 2026-10-09, the owner's choice) holds the
+  values and `Clamp(w, h)`. `workspace` exports them as below, equal to
+  the internal ones.
 * **`const MaxSide = 4096` and `const MaxCells = 1 << 19`** (524,288
   cells, about 56 MiB of frame). For scale, an 8K display with a 6 × 12
   pixel font is about 1280 × 360, or 460,800 cells.
@@ -194,9 +231,10 @@ byte-identical for clean inputs.
 
   Width is kept, so lines stay whole, and the frame draws top-left.
 * **Used by:** the `WindowSizeMsg` case, W2's `WithSize`, and `SizeMsg` to
-  panes.
-* **`launch.Decide`** caps `Width` and `Height` with the same constants
-  (an additive change to `launch`).
+  panes. Also W2's `RenderPlain`: its width goes into `[0, MaxSide]`,
+  and its layout's height follows the same clamp (added 2026-10-09).
+* **`launch.Decide`** caps `Width` and `Height` with the same constants,
+  through `internal/limits` (an additive change to `launch`).
 * **The documentation** of `Update` and the constants says so.
 
 **Tests:**
@@ -240,7 +278,9 @@ values (exactly at, and one over); `TestExpandCap`.
 * **`WithMaxArgBytes(n int) RegistryOption`,** with
   `DefaultMaxArgBytes = 1 << 20`.
 * **Checked in `admit`,** before `prepare` and whatever `e.args` is. The
-  same cap applies to a slash line's `Raw`.
+  same cap applies to a slash line's `Raw`, and to W2's `ParseArgs`, on
+  the total length of its words, before it builds or prepares anything
+  (added 2026-10-09).
 * **Over the limit:** `&ArgError{Reason: "arguments are N bytes, over M"}`,
   and the audit records `Args: nil`.
 * **`FuzzPrepareMask`,** over a schema with a secret field, a slice of
@@ -251,8 +291,8 @@ values (exactly at, and one over); `TestExpandCap`.
   * no secret of four or more bytes from the input appears in `mask`'s
     output.
 
-**Tests:** `TestArgLimit` covers `CallMCP` at 16 MiB, `Run`, slash, and
-exactly at the limit.
+**Tests:** `TestArgLimit` covers `CallMCP` at 16 MiB, `Run`, slash,
+`ParseArgs` (added 2026-10-09), and exactly at the limit.
 
 **Mutation S6-1:** the check runs after `prepare`. The 16 MiB case
 allocates, and its time assertion of 100 ms fails.
@@ -316,7 +356,7 @@ allocates, and its time assertion of 100 ms fails.
   * `scripts/go-fuzz_test.sh` gains a case where a package with no
     target is skipped.
   * CI's corpus upload becomes `**/testdata/fuzz/`, and the comment at
-    `ci.yml:101-104` drops the hand-kept list.
+    `ci.yml:105-108` drops the hand-kept list (lines as of 2026-10-09).
 * **The new targets:**
 
   | Target | Fuzzes | Invariant |
@@ -344,7 +384,10 @@ check fails.
 
 1. **The documents:**
    * `docs/architecture.md` gains `internal/sanitize` and the limits;
-   * `README.md`'s Status names `v0.8.0`;
+   * `README.md`'s Status names `v0.8.0`. Its first bullet, "The current
+     release is `v0.7.0`", becomes `v0.8.0`, and the bullet W2 added
+     ("for `v0.8.0` … Unreleased: on `main`") says since `v0.8.0`
+     (added 2026-10-09);
    * the guides name `LoadDirWith`, `WithMaxArgBytes` and the clamp where
      they describe those calls.
 2. **The tag.** The owner commits, has the agent run the disclosure
@@ -354,6 +397,13 @@ check fails.
    `WriteResult`, `workspace.RenderPlain` and `launch.Decide`.
 4. **The release notes** in the execution record:
    * W2's and W3's additions;
+   * W2's behaviour changes, which its close-out lists (added 2026-10-09):
+     * a Loop handler's panic no longer crashes the TUI;
+     * a `ThemeBuilder` builds the first theme;
+     * `CallMCP` encodes a `time.Duration`;
+     * a disabled prober gives the JetBrains reasons;
+     * `termcap.Env` folds case on Windows;
+   * the Go 1.27.2 floor, from 0016-MADR-go-1-27-2-for-go-2026-6604;
    * the behaviour changes, each with its value:
      * the `LoadDir` defaults;
      * the 1 MiB argument limit;
@@ -400,4 +450,28 @@ check fails.
 
 ## Execution Record
 
-Not started.
+### Step 1: records
+
+No deviation.
+
+* **The refresh.** On 2026-10-09 the owner asked the agent to verify this
+  PLAN, after W2 and 0016 had landed. The agent read every fact again on
+  `e45a9f9`. It ran the H1, H3, C6 and H10 probes again, on a scratch copy
+  with Go 1.27.2. The results are in "Facts re-read before execution
+  (2026-10-09)", with the amended lines in the Goal and in Steps 2, 4, 6,
+  9 and 10.
+  * Every finding still holds.
+  * W2 added four paths the steps now cover: `RenderPlain`'s titles and
+    bodies, `RenderPlain`'s and `WithSize`'s sizes, `ParseArgs`'s
+    arguments, and a fifth fuzz target.
+  * The Goal's "nine" new fuzz targets is ten.
+* **The owner's choice:** `internal/limits` holds the window clamp, which
+  `workspace` re-exports and `launch` uses.
+* **No other record changes.** 0014-MADR's W3 names the findings, not
+  where the constants live. The glossary already reserves `LoadOption`.
+* **The approval:** "Approved to proceed", 2026-10-09.
+* **This PLAN** is `in-progress`, and its row in `docs/README.md` follows.
+* **Checks:**
+  * markdownlint: clean, the records' `*` list markers aside;
+  * the link check: none broken;
+  * the identifier scan: no match.
