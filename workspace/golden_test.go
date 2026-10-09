@@ -5,9 +5,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/charmbracelet/colorprofile"
 
-	"github.com/maccavelli/go-tui-lib/glyph"
 	"github.com/maccavelli/go-tui-lib/layout"
 	"github.com/maccavelli/go-tui-lib/theme"
 	"github.com/maccavelli/go-tui-lib/tuitest"
@@ -15,11 +13,7 @@ import (
 
 // caseTheme is the theme a golden case renders with.
 func caseTheme(c tuitest.Case) theme.Theme {
-	p := colorprofile.ASCII
-	if c.Color {
-		p = colorprofile.TrueColor
-	}
-	return theme.New(p, theme.Unknown, glyph.For(c.UTF8))
+	return theme.New(c.Profile(), theme.Unknown, c.Glyphs())
 }
 
 // frame builds the four-pane workspace for a case, applies setup, and

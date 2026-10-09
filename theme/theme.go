@@ -33,6 +33,7 @@ import (
 	"github.com/charmbracelet/colorprofile"
 
 	"github.com/maccavelli/go-tui-lib/glyph"
+	"github.com/maccavelli/go-tui-lib/internal/enum"
 )
 
 // Background is what the terminal's background is known to be.
@@ -46,6 +47,28 @@ const (
 	// Light is a light background.
 	Light
 )
+
+var backgroundNames = []string{"unknown", "dark", "light"}
+
+// String is the background's token: "unknown", "dark" or "light".
+func (b Background) String() string { return enum.Name(backgroundNames, b) }
+
+// MarshalText is the background's token. A background with no token is an
+// error.
+func (b Background) MarshalText() ([]byte, error) {
+	return enum.Marshal("theme", "Background", backgroundNames, b)
+}
+
+// UnmarshalText reads a token MarshalText wrote, exactly, case included,
+// and also "auto" as Unknown, the word workspace's theme command takes for
+// following the terminal.
+func (b *Background) UnmarshalText(t []byte) error {
+	if string(t) == "auto" {
+		*b = Unknown
+		return nil
+	}
+	return enum.Unmarshal("theme", "Background", backgroundNames, t, b)
+}
 
 // FromDark is the background a terminal reports as dark or light, as
 // tea.BackgroundColorMsg.IsDark answers.
@@ -193,6 +216,23 @@ const (
 	// BorderDouble is a double line.
 	BorderDouble
 )
+
+var borderNames = []string{"light", "rounded", "heavy", "double"}
+
+// String is the border style's token: "light", "rounded", "heavy" or
+// "double".
+func (s BorderStyle) String() string { return enum.Name(borderNames, s) }
+
+// MarshalText is the border style's token. A style with no token is an
+// error.
+func (s BorderStyle) MarshalText() ([]byte, error) {
+	return enum.Marshal("theme", "BorderStyle", borderNames, s)
+}
+
+// UnmarshalText reads a token MarshalText wrote, exactly, case included.
+func (s *BorderStyle) UnmarshalText(t []byte) error {
+	return enum.Unmarshal("theme", "BorderStyle", borderNames, t, s)
+}
 
 // Theme is everything a package needs to render: the profile and background
 // it was built for, the glyphs, the palette and the built styles.

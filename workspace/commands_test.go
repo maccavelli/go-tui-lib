@@ -417,11 +417,7 @@ func TestCommandsGolden(t *testing.T) {
 	}
 	for i, s := range steps {
 		tuitest.Golden(t, s.name, tuitest.Matrix{Widths: []int{80, 160}}, func(c tuitest.Case) string {
-			p := colorprofile.ASCII
-			if c.Color {
-				p = colorprofile.TrueColor
-			}
-			g := glyph.For(c.UTF8)
+			p, g := c.Profile(), c.Glyphs()
 			// A workspace that follows the background, built for the case's
 			// profile and glyphs, starting dark.
 			build := func(_ colorprofile.Profile, bg theme.Background) theme.Theme { return theme.New(p, bg, g) }

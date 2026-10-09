@@ -3,9 +3,6 @@ package workspace_test
 import (
 	"testing"
 
-	"github.com/charmbracelet/colorprofile"
-
-	"github.com/maccavelli/go-tui-lib/glyph"
 	"github.com/maccavelli/go-tui-lib/layout"
 	"github.com/maccavelli/go-tui-lib/theme"
 	"github.com/maccavelli/go-tui-lib/tuitest"
@@ -26,11 +23,7 @@ func TestAgentSessionGolden(t *testing.T) {
 		{"agent-left-bottom-main", true, layout.UnderMain},
 	} {
 		tuitest.Golden(t, s.name, tuitest.Matrix{Widths: []int{80, 120, 200}}, func(c tuitest.Case) string {
-			p := colorprofile.ASCII
-			if c.Color {
-				p = colorprofile.TrueColor
-			}
-			th := theme.New(p, theme.Unknown, glyph.For(c.UTF8))
+			th := theme.New(c.Profile(), theme.Unknown, c.Glyphs())
 			return session(agentRoot(s.left, s.span), th, c.Width, 30).Render()
 		})
 	}

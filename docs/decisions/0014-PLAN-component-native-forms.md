@@ -1412,3 +1412,88 @@ No deviation.
     vuln` and `make examples`: each exit 0;
   * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
   * the step's tests, with `termsvc`'s notify and copy tests: passed.
+
+### Step 10: `theme`, `internal/enum` and `tuitest`
+
+No deviation.
+
+#### What was built
+
+* **`internal/enum`:**
+  * a `Value` constraint, `~uint8 | ~int`, used by `Name`, `Marshal` and
+    `Unmarshal`;
+  * an `index` helper that also refuses a negative value, which an `int`
+    enum can hold. A negative value has no name, and prints as its
+    number.
+* **`theme/theme.go`:**
+  * `Background`'s `String`, `MarshalText` and `UnmarshalText`, with
+    `unknown`, `dark` and `light`. `UnmarshalText` also reads `auto` as
+    `Unknown`.
+  * `BorderStyle`'s, with `light`, `rounded`, `heavy` and `double`.
+  * No non-test code formats either type with `%v`, so adding `String`
+    changes no output. No golden changed.
+* **`tuitest/case.go` (new):** `Case.Profile` (TrueColor or ASCII),
+  `Case.Glyphs` (`glyph.For(c.UTF8)`), and `Fits(t, s, width, m)`.
+  `Fits` reports each line over `width` under `m`, by line number.
+* **The four mapping sites** use `Profile` and `Glyphs`:
+  * `workspace/golden_test.go`'s `caseTheme`;
+  * `workspace/agent_golden_test.go`;
+  * `workspace/commands_test.go`;
+  * `theme/theme_test.go`'s `swatch`.
+
+  Two of them drop their now-unused imports. Every golden is
+  byte-identical: `git status` shows none changed.
+* **Tests:**
+  * `internal/enum/enum_test.go`: `TestEnumInt`, with names over `int`,
+    and -1, -100 and 2 as having no name;
+  * `theme/text_test.go` (new):
+    * `TestBackgroundText`: the tokens, `auto`, five refused spellings
+      that leave the value alone, -1 and 3, and `flag.TextVar`;
+    * `TestBorderStyleText`;
+  * `tuitest/case_test.go` (new):
+    * `TestCaseHelpers`;
+    * `TestFits`: a fitting string with escapes, two wide lines reported
+      by number, and a family emoji that fits under `GraphemeWidth` and
+      not under `WcWidth`. It uses the package's existing `recorder`.
+
+#### Checks
+
+* **Mutations,** on scratch copies of the tree. All seven were killed by
+  a failing test:
+  * **S10-1** (`Case.Profile` gives ANSI256 for colour): on a scratch
+    copy, the full list of failures was `TestFramesGolden`,
+    `TestChromeGolden`, `TestWidthMethodGolden`, `TestAgentSessionGolden`
+    and `TestCommandsGolden` in `workspace`, `TestSwatchGolden` in
+    `theme`, and `TestCaseHelpers`. That is every golden test the four
+    migrated sites feed.
+  * **S10-2** (`Case.Glyphs` inverted, added): the same goldens.
+  * **S10-3** (`auto` refused, added): `"auto" = 1, theme: unknown
+    Background "auto"`.
+  * **S10-4** (`Fits` ignores the method, added): the emoji case.
+  * **S10-5** (`Fits` fails an exact fit, added): "a fitting string
+    failed".
+  * **S10-6** (a negative value indexes `names`, added): `TestEnumInt`
+    panicked, "index out of range [-1]".
+  * **S10-7** (the border tokens out of order, added):
+    `TestBorderStyleText`.
+
+  They were run again after the lint fix below, all killed.
+* **Rule 2 on macOS,** go1.27.2:
+  * `gofmt -l`: nothing, after `gofmt -w` on two files (an import block's
+    blank line, and a test's alignment).
+  * `make pre-add-check FILES=<the ten Go files>`: "10 file(s) clean".
+  * `make lint`: clean. On the first run, staticcheck ST1023 asked for
+    `b := Dark` in a test.
+  * With `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    all passed, and so did workspace mode.
+  * `go mod tidy -diff`, `make vuln` and `scripts/go-modules.sh --check`
+    were clean.
+  * `make apicheck`: "against v0.7.1, 0 incompatible change(s)".
+  * `make examples`: "clean".
+  * `make release-check`: "170 file(s) clean … apicheck, examples".
+* **The Windows test host,** go1.27.2 windows/amd64:
+  * the `FILES` and no-list `make pre-add-check`, `make lint`, `make
+    vuln` and `make examples`: each exit 0;
+  * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
+  * the step's tests, with the golden tests of `theme`, `tuitest` and
+    `workspace`: passed.

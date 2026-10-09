@@ -155,11 +155,7 @@ func TestWithPalette(t *testing.T) {
 // swatch renders every role, the focus marker and a border, as a package
 // using the theme would.
 func swatch(c tuitest.Case) string {
-	p := colorprofile.ASCII
-	if c.Color {
-		p = colorprofile.TrueColor
-	}
-	th := New(p, Unknown, glyph.For(c.UTF8))
+	th := New(c.Profile(), Unknown, c.Glyphs())
 	s := th.Styles
 	var b strings.Builder
 	b.WriteString(th.Glyphs.Focus + " " + s.FocusTitle.Render("Focused title") + "\n")
