@@ -89,6 +89,12 @@ and `zoom`, and two commands with one slash name cannot both register.
 - **Every request is audited** when you pass `command.WithAuditor`.
   `command.SlogAuditor(logger)` writes a record per request to your
   logger, with `secret` values masked.
+- **A request's arguments are capped** at `command.DefaultMaxArgBytes`
+  (1 MiB): its `Args` and `Raw`, a slash line's tail, and the words
+  `ParseArgs` reads, each checked before anything parses it. Larger is an
+  `*ArgError`, and the audit records no arguments.
+  `command.WithMaxArgBytes(n)` sets another limit; below 1 keeps the
+  default.
 - **Three kinds.** An `Action` runs its handler. A `Prompt` expands into
   text for your agent and sends a `PromptMsg`. A `Forward` sends
   `/name args` to the agent, as ACP's available commands are run.
@@ -222,6 +228,14 @@ Review the staged changes. Focus on $FOCUS. $ARGUMENTS
 - **IDs and slash names come from the path:** `git/commit.md` from the
   user's directory is `user.git.commit`, typed `/git:commit`. A file
   without `danger` is `Mutating`.
+- **Limits.** `LoadDir` reads at most `command.DefaultMaxFileBytes`
+  (256 KiB) per file, `DefaultMaxFiles` (1,000) files and
+  `DefaultMaxDepth` (8) directory levels below the root. Past each, it
+  returns an error wrapping `ErrFileTooLarge`, `ErrTooManyFiles` or
+  `ErrTooDeep`, and the files within the limits still load.
+  `command.LoadDirWith(fsys, source, command.WithMaxFileBytes(n), …)`
+  sets others, with `WithMaxFiles` and `WithMaxDepth`; below 1 keeps the
+  default. An expanded prompt over 1 MiB is an `*ArgError`.
 
 ## MCP prompts and ACP commands
 

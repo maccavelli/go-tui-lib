@@ -24,20 +24,22 @@ below).
 ## Packages
 
 ```text
- launch        start the TUI from a CLI   → command, glyph, termcap, internal/enum; bubbletea, colorprofile, x/term
+ launch        start the TUI from a CLI   → command, glyph, termcap, internal/enum, internal/limits; bubbletea, colorprofile, x/term
  launch/launchtest  fake streams for tests → launch, termcap (tests)
- workspace     Bubble Tea pane host       → layout, theme, glyph, internal/cells, command, when; bubbletea, bubbles/key, bubbles/help, colorprofile, x/ansi
- command       the command registry       → when; bubbletea
+ workspace     Bubble Tea pane host       → layout, theme, glyph, internal/cells, internal/limits, internal/sanitize, command, when; bubbletea, bubbles/key, bubbles/help, colorprofile, x/ansi
+ command       the command registry       → when, internal/enum, internal/sanitize; bubbletea
  when          availability expressions   → standard library
  internal/cells  the reused frame buffer  → layout; ultraviolet, x/ansi
- termsvc       terminal services          → termcap; bubbletea, x/ansi
- termcap       capabilities, the probe    → internal/termevent, internal/enum; bubbletea, x/ansi, colorprofile
+ termsvc       terminal services          → termcap, internal/sanitize; bubbletea, x/ansi
+ termcap       capabilities, the probe    → internal/termevent, internal/enum, internal/sanitize; bubbletea, x/ansi, colorprofile
  termcap/termcaptest  fake terminals      → termcap; bubbletea, x/ansi, colorprofile (tests)
  internal/termevent   pass-through events → ultraviolet
  internal/termevent/termeventtest  those events for tests → ultraviolet, bubbletea
  theme         palettes, roles, styles    → glyph, internal/enum; lipgloss, colorprofile
  glyph         Unicode and ASCII glyphs   → internal/enum
  internal/enum  enum names and text forms → standard library
+ internal/sanitize  untrusted display text → x/ansi
+ internal/limits  the window clamp        → standard library
  layout        geometry and state         → standard library
  tuitest       golden rendering           → glyph; x/ansi, colorprofile (tests and examples only)
 ```
@@ -45,17 +47,19 @@ below).
 | Package | What it holds |
 | :--- | :--- |
 | `when` | `Parse` and `MustParse` → `Expr` (`Eval`, `String`, `Keys`), VS Code's when-clause grammar with RE2 regexes; `Check` against `Keys`; `Context`, `Map`, `Layered`, `Value`; typed `Key[T]` |
-| `command` | `Command`, `ID`, `New[A]` and `MustNew[A]` and their options, `SchemaOf` (JSON Schema 2020-12 from Kong-aligned tags), `ArgsOf`, `ArgError`; `Registry` (`NewRegistry` with `WithGate`, `WithAuditor`, `WithPrefixer` and `WithLoop`; `Attach`, a loop that can be detached; `Register`, `ReplaceSource`, `Lookup`, `Slash`, `ParseSlash`, `ParseArgs`, `Complete`, `All`, `Available`, `Watch`, `WatchContext`, `Dispatch`, `Run`, `Cancel`, `CancelAll`, `Remove`, `Version`); `Params` and `Param`; `Format` and `WriteResult`; the policy, `Gate`, `GateFunc`, `AllowIf`, `Decision`, `Auditor`, `SlogAuditor`; the errors, each with its exit status, and `PanicError`; `LoadDir`, `FromMCPPrompts`, `FromACP`; `MCPTools`, `CallMCP`, `ACPCommands`, `Manifest`; `WithLoop` and `LoopMsg`; the messages |
+| `command` | `Command`, `ID`, `New[A]` and `MustNew[A]` and their options, `SchemaOf` (JSON Schema 2020-12 from Kong-aligned tags), `ArgsOf`, `ArgError`; `Registry` (`NewRegistry` with `WithGate`, `WithAuditor`, `WithPrefixer` and `WithLoop`; `Attach`, a loop that can be detached; `Register`, `ReplaceSource`, `Lookup`, `Slash`, `ParseSlash`, `ParseArgs`, `Complete`, `All`, `Available`, `Watch`, `WatchContext`, `Dispatch`, `Run`, `Cancel`, `CancelAll`, `Remove`, `Version`); `Params` and `Param`; `Format` and `WriteResult`; the policy, `Gate`, `GateFunc`, `AllowIf`, `Decision`, `Auditor`, `SlogAuditor`; the errors, each with its exit status, and `PanicError`; `LoadDir` and `LoadDirWith`, with its limits; `WithMaxArgBytes`; `FromMCPPrompts`, `FromACP`; `MCPTools`, `CallMCP`, `ACPCommands`, `Manifest`; `WithLoop` and `LoopMsg`; the messages |
 | `glyph` | `Set` (4 border styles, separators with a cross and four tees, focus marker, ellipsis, scroll, bullet, badge brackets), `Unicode()`, `ASCII()`, `For(utf8)`; `Tier` (`TierUnicode`, `TierLegacy`, `TierASCII`) and `Tier.Set`; every glyph one cell |
 | `launch` | `Choice` and `Flags` (`--mode`, `--tui`, bound natively in each framework); `Streams`, `StreamSource`, `FromSource`; `Config`, `Decide` → `Decision` with `Target`s and a `Reason` token; `Run[M]` with `WithRegistry`, `WithRestorer`, `OnStart`, `WithProgramOptions`, `WithFilter`; `ErrNotStarted`, `ErrCrashed`; `Frame`; `ExitCode`, `ExitError`; `Restorer` |
 | `launch/launchtest` | `Terminal` (a fake terminal stream with a size and typed keys), `Pipe`, `Streams`, `Env` |
 | `internal/enum` | `Name`, `Marshal` and `Unmarshal` over a table of names, for an enum's `String`, `MarshalText` and `UnmarshalText`, on `uint8` or `int` |
 | `theme` | `Palette` for dark, light and unknown backgrounds; `LightDarkColor` and `ProfileColor`; `Styles`; `New(profile, background, glyphs)` with `WithPalette` and `WithPaletteFor`; `FromDark`; `Border(style)`; text forms for `Background` and `BorderStyle` |
 | `layout` | `Rect`, `Size` (fixed, percent, ratio, fill; min, max, shrink order), `Node` (`Pane`, `Split`, `Responsive`, or a custom node), `Solve` → `Plan`; `State` (JSON); the sidebar presets |
-| `workspace` | `Pane` and its optional interfaces, `PlainViewer` among them; `Workspace` (routing, focus, chrome, resize, zoom, hide, overlays, cursor, `View`, `RenderPlain`, `help.KeyMap` and `Help`, the width method, a following theme with `WithGlyphs`, `WithProfile`, `WithBackground` and `GlyphThemeBuilder`, `WithSize`, `SetBackground`, `Panes`, `PaneAs`, `WhenContext`); `Wrap`; `KeyMap`; `Commands` and the context keys |
+| `workspace` | `Pane` and its optional interfaces, `PlainViewer` among them; `Workspace` (routing, focus, chrome, resize, zoom, hide, overlays, cursor, `View`, `RenderPlain`, `help.KeyMap` and `Help`, the width method, a following theme with `WithGlyphs`, `WithProfile`, `WithBackground` and `GlyphThemeBuilder`, `WithSize`, clamped to `MaxSide` and `MaxCells`, `SetBackground`, `Panes`, `PaneAs`, `WhenContext`); `Wrap`; `KeyMap`; `Commands` and the context keys, `FocusedPaneKey()` to `HeightKey()` |
 | `internal/cells` | `Frame`: a reused cell buffer that draws strings into rectangles with a chosen width method |
+| `internal/sanitize` | `Line` for one line of plain text and `Styled` for a pane's view, which keeps SGR and OSC 8 only; `Truncate`, never wider than asked; `Token`; `HasControl` |
+| `internal/limits` | `MaxSide`, `MaxCells` and `Clamp`, the window clamp `workspace` and `launch` share |
 | `termcap` | `Prober` (one batch of queries ended by DA1, a deadline, tea's own replies observed, mode 2031 and its reset, `IsReplyFragment`); `EnvCaps`, the environment's facts with no program; `Caps` of `Fact`s with origin and reason; `Env`, whose lookups ignore case on Windows; `FromEnv` and `Identity`; the keyboard, link and notification views; `TmuxQuery`; `Report` and `Findings` |
-| `termcap/termcaptest` | `Terminal`, a scripted fake terminal; `Profile` and seven profiles; `Run` |
+| `termcap/termcaptest` | `Terminal`, a scripted fake terminal, with `SetRunTimeout`; `Profile` and seven profiles; `Run` |
 | `termsvc` | `Notifier` (OSC 99, 777, 9 or the bell; focus policies; `NotifyResultMsg`; `Sequence`, its bytes for a CLI; `NotifyContext` and `WithBackendTimeout`); `Copy`, `CopyContext`, `CopySequence` and `CopiedMsg`; `Link`, `LinkDisplay`, `LinkPolicy`; prompt marks; `Wrap`; `SanitizeTitle`; the activity beacon; `Pointer`; `ProgressSupported` |
 | `internal/termevent` | `Decode`: the ultraviolet events tea passes through untranslated, as plain values |
 | `internal/termevent/termeventtest` | those events built for tests outside `internal/termevent` |
@@ -173,6 +177,8 @@ termcap/termcaptest/        fake terminals for tests
 launch/                     start the TUI from a program's own CLI
 launch/launchtest/          fake streams for a program's tests
 internal/enum/              enum names and text forms
+internal/sanitize/          the one sanitizer for untrusted display text
+internal/limits/            the window clamp
 internal/cells/             the reused frame buffer, an ultraviolet importer
 internal/termevent/         pass-through events, the other ultraviolet importer
 internal/conformance/       the conformance scan: terminal ownership,
@@ -274,9 +280,10 @@ docs/
     conventions").
   - It reads each package's files for the host's `GOOS`; CI's three
     operating systems cover the rest.
-- **`make fuzz`** fuzzes each fuzz target of `layout`, `when` and
-  `command` for `FUZZTIME` (default 20s): `FuzzSolve`, `FuzzParse`,
-  `FuzzParseSlash` and `FuzzFrontMatter`.
+- **`make fuzz`** fuzzes, in every module, each fuzz target of every
+  package whose tests declare one, for `FUZZTIME` (default 20s):
+  `scripts/go-fuzz.sh -a` finds the packages, so a new target needs no
+  list.
 - **`scripts/go-precheck.sh`** runs, for each module that owns a given
   file (every module when none is given), in the module's directory:
   `gofmt` on its files; with `GOWORK=off`, the same three golangci-lint
@@ -334,8 +341,8 @@ docs/
     - **Linux and macOS:** `go test -race`;
     - **Linux:** `go test -shuffle=on -count=2` and `LC_ALL=C go test`.
   - **`gates`** (Linux):
-    - the fuzz script's test, then `make fuzz`, uploading the three
-      packages' corpora as an artifact on failure;
+    - the fuzz script's test, then `make fuzz`, uploading every
+      package's corpus (`**/testdata/fuzz/`) as an artifact on failure;
     - `go vet` for `freebsd/amd64`, `openbsd/amd64` and `linux/386`, per
       module;
     - `make vet`, `gofmt`, `make tidy-check`, and `make lint` (with

@@ -344,6 +344,18 @@ Bubble Tea writes, so borders after such text line up:
 A pane that pads or truncates its own text can measure the same way with
 `ws.WidthMethod()`, such as `ws.WidthMethod().StringWidth(s)`.
 
+What the workspace does with a pane's view, whatever it holds:
+
+- **Each line is cut and padded to the pane** under the method, and never
+  measures wider: under `WcWidth`, a ZWJ emoji sequence or Hangul jamo cut
+  short stays within the pane, and under `GraphemeWidth` nothing at a
+  line's ends joins the border beside it.
+- **It keeps only styles and links:** SGR sequences, of at most 32
+  parameters, and OSC 8 hyperlinks. Any other escape sequence, such as a
+  cursor move, a window title or a mode, is dropped, as are control,
+  bidirectional and invisible characters. Titles and badges keep no
+  escape sequence at all.
+
 ## Persist the layout
 
 `ws.State()` returns what the user changed: separator moves, as applied,
@@ -377,6 +389,9 @@ version is refused.
     replaces it, and `SetBackground` is the pin.
   - `WithSize(width, height)` is the size it lays out at before the first
     `tea.WindowSizeMsg` (80 × 24 by default), such as for a plain render.
+    Like a `tea.WindowSizeMsg`, it is clamped: each side to
+    `workspace.MaxSide` (4,096) cells, then the height until the area is
+    at most `workspace.MaxCells` (524,288) cells.
   - `WithTheme(theme.New(profile, background, glyph.For(utf8)))` fixes the
     theme instead; the messages then change nothing. Its theme is the
     first, whatever the options' order, and `WithGlyphs`, `WithProfile`
@@ -406,7 +421,8 @@ version is refused.
 `ws.RenderPlain(width)` writes the workspace for a pipe, a log or a screen
 reader: one pane after another, each as its title and badge on one line,
 its content, and a blank line. It has no borders, no colour and no escape
-sequences, and no trailing spaces.
+sequences, and no trailing spaces. Its width is clamped to
+`workspace.MaxSide`.
 
 - **The order** is the focus ring's (`WithFocusRing`'s, else the tree's),
   then the visible panes the ring leaves out, such as a footer that

@@ -441,6 +441,10 @@ check fails.
      (added 2026-10-09);
    * the guides name `LoadDirWith`, `WithMaxArgBytes` and the clamp where
      they describe those calls.
+   * added 2026-10-09, for what Steps 8 and 9 changed:
+     `docs/architecture.md`'s `make fuzz` and CI lines, which named three
+     packages, its package table's new names, and the workspace guide's
+     "Text width" on what a pane's view keeps (D8, D9).
 2. **The tag.** The owner commits, has the agent run the disclosure
    guard, pushes, and with CI green tags `v0.8.0` (annotated, `-m
    "v0.8.0"`).
@@ -1504,3 +1508,104 @@ owner chose to fix each here: `make fuzz` would otherwise fail in CI.
     failed";
   * `go-fuzz_test.sh`: "25 passed, 0 failed";
   * `make fuzz FUZZTIME=3s`: "8 packages ran clean".
+
+### Step 10: the release `v0.8.0`
+
+#### Deviations
+
+No deviation. The step's list of documents gained, dated 2026-10-09,
+what Steps 8 and 9 changed: `docs/architecture.md`'s `make fuzz` and CI
+lines, its package table's new names, and the workspace guide's "Text
+width".
+
+#### The documents
+
+* **`README.md`:** "The current release is `v0.8.0`"; W2's bullet is
+  "since `v0.8.0`", without "Unreleased: on `main`"; and a bullet,
+  "Hardened, since `v0.8.0`".
+* **`docs/guides/commands.md`:** the argument cap and
+  `WithMaxArgBytes`, beside the audit; `LoadDir`'s limits and
+  `LoadDirWith`, with the expansion cap, under "Command files".
+* **`docs/guides/building-workspaces.md`:** the clamp under `WithSize`
+  and `RenderPlain`; and under "Text width", what a pane's view keeps
+  and how its lines are cut (D8, D9).
+* **`docs/architecture.md`:** `internal/sanitize` and `internal/limits` in
+  the package graph, the table and the tree; the new names in the
+  `command`, `workspace` and `termcaptest` rows; `make fuzz`'s discovery;
+  CI's corpus upload.
+
+#### Release notes
+
+`v0.8.0` adds native forms for a program's own CLI (W2) and hardens the
+library (W3). Go 1.27.2 is required. `make apicheck`: "against v0.7.1, 0
+incompatible change(s)"; apidiff lists 75 additions.
+
+* **Additions, W2:**
+  * `command`: `Registry.ParseArgs`, `Params` and `Param`,
+    `Registry.Complete`; `Format`, `FormatText`, `FormatJSON` and
+    `WriteResult`; `(*ArgError).ExitCode` and each error's exit status;
+    `PanicError` and `ErrPanicked`; `MustNew`, `ArgsOf`, `GateFunc`,
+    `AllowIf`, `Registry.WatchContext`.
+  * `workspace`: `RenderPlain`, `PlainViewer` and `Model.PlainView`;
+    `Workspace.Help`; `WithGlyphs`, `WithProfile`, `WithBackground`,
+    `WithSize`, `GlyphThemeBuilder` and `WithGlyphThemeBuilder`.
+  * `termcap.EnvCaps`.
+  * `termsvc`: `Notifier.Sequence` and `CopySequence`, for a CLI to
+    write; `ErrCopyTooLarge`; `Notifier.NotifyContext`, `CopyContext`,
+    `WithBackendTimeout` and `WithCopyTimeout`.
+  * `theme`: `String`, `MarshalText` and `UnmarshalText` for
+    `Background` and `BorderStyle`.
+  * `tuitest`: `Case.Profile`, `Case.Glyphs` and `Fits`.
+* **Additions, W3:**
+  * `command`: `LoadDirWith`, `LoadOption`, `WithMaxFileBytes`,
+    `WithMaxFiles` and `WithMaxDepth`; `DefaultMaxFileBytes`,
+    `DefaultMaxFiles` and `DefaultMaxDepth`; `ErrFileTooLarge`,
+    `ErrTooManyFiles` and `ErrTooDeep`; `WithMaxArgBytes` and
+    `DefaultMaxArgBytes`.
+  * `workspace`: `MaxSide` and `MaxCells`; `FocusedPaneKey()`,
+    `ZoomedKey()`, `HiddenPanesKey()`, `OverlayKey()`, `ModalKey()`,
+    `WidthKey()` and `HeightKey()`.
+  * `termcaptest`: `DefaultRunTimeout` and `(*Terminal).SetRunTimeout`.
+* **Behaviour changes, W2:**
+  * a Loop handler's panic no longer crashes the TUI: it is a
+    `*PanicError`;
+  * a `ThemeBuilder` builds the first theme too;
+  * `CallMCP` encodes a `time.Duration`;
+  * a disabled prober gives the JetBrains reasons;
+  * `termcap.Env` folds case on Windows.
+* **Behaviour changes, W3,** each with its value:
+  * **`LoadDir`'s defaults:** 256 KiB a file, 1,000 files, 8 directory
+    levels; past each, an error, and the rest still load.
+  * **The argument limit:** 1 MiB for a request's `Args` and `Raw`, a
+    slash line's tail, and `ParseArgs`'s words; larger is an `*ArgError`,
+    and its audit record holds no arguments.
+  * **The expansion cap:** an expanded command-file prompt over 1 MiB is
+    an `*ArgError`.
+  * **The window clamp:** 4,096 cells a side and 524,288 cells in all,
+    for `tea.WindowSizeMsg`, `WithSize`, `RenderPlain` and
+    `launch.Decide`.
+  * **`Line` sanitizing:** workspace titles and badges, a beacon's
+    vendor, the terminal's name from its reply and its environment,
+    notifications and window titles lose escape sequences, controls,
+    bidirectional controls and invisible characters (U+200B, U+FEFF,
+    U+2060-2064, U+00AD, tags); a run of line breaks and tabs is one
+    space.
+  * **A pane's view** keeps only SGR (at most 32 parameters) and OSC 8
+    links with printable parameters and URI; every other sequence is
+    dropped.
+  * **A pane's lines** never measure wider than the pane, under either
+    width method.
+  * **`layout`** solves sizes whose products or sums pass an int exactly,
+    and a split whose gaps do not fit hides children in shrink order.
+  * **The view cache** keeps one view per pane and focus state.
+* **Deprecations,** removed in `v0.9.0`: `termcaptest.RunTimeout` (use
+  `(*Terminal).SetRunTimeout`), and `workspace.KeyFocusedPane`,
+  `KeyZoomed`, `KeyHiddenPanes`, `KeyOverlay`, `KeyModal`, `KeyWidth` and
+  `KeyHeight` (use the functions of the same names ending in `Key`).
+
+#### Still to do in this step
+
+* The owner commits; the agent runs the disclosure guard over the
+  outgoing commits; the owner pushes; with CI green, the owner tags
+  `v0.8.0` (annotated, `-m "v0.8.0"`).
+* The consumer smoke test against `v0.8.0`.

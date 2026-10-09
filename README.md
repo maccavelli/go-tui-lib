@@ -18,7 +18,7 @@ pattern, used by every program that needs it.
 
 ## Status
 
-- **The current release is `v0.7.0`.** `v0` means the API may still
+- **The current release is `v0.8.0`.** `v0` means the API may still
   change.
 - **Multi-pane workspaces, since `v0.1.0`.** `layout` arranges panes: a main
   pane with a sidebar on either side, a bottom pane, a footer, responsive
@@ -47,7 +47,7 @@ pattern, used by every program that needs it.
   it cannot start or crashes, with the terminal as it was. Its flag types
   bind natively in the standard `flag` package, Cobra, Kong and
   urfave/cli; `launch/launchtest` tests the path with fake terminals.
-- **Native forms for a program's own CLI, for `v0.8.0`.** `command`
+- **Native forms for a program's own CLI, since `v0.8.0`.** `command`
   parses a command line (`ParseArgs`), describes and completes a command's
   arguments (`Params`, `Complete`), writes a result as text or JSON
   (`WriteResult`), gives each error an exit status, and turns a handler's
@@ -55,7 +55,12 @@ pattern, used by every program that needs it.
   screen reader (`RenderPlain`) and takes its starting glyphs, profile,
   background and size as options; `termcap.EnvCaps` reads the
   environment's facts without a program; `termsvc` returns its bytes for a
-  CLI to write. Unreleased: on `main`.
+  CLI to write.
+- **Hardened, since `v0.8.0`.** Untrusted text, from a pane, a terminal's
+  reply or a beacon, is cleaned before it reaches the screen, and a pane's
+  view keeps only its styles and links. Command files, a request's
+  arguments and the window have limits, and each package that parses
+  input has a fuzz target.
 - **The stack is Charm v2:** `charm.land/bubbletea/v2`,
   `charm.land/lipgloss/v2` and `charm.land/bubbles/v2`, with
   `github.com/charmbracelet/colorprofile` and
