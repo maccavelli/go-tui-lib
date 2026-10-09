@@ -4,11 +4,78 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"path"
 	"strings"
 	"unicode/utf8"
 )
+
+// LoadDir's limits (docs/decisions/0014-PLAN-hardening.md Step 5, finding
+// H4). Each is an error wrapped as "command: <path>: …"; the files within
+// the limits still load.
+var (
+	// ErrFileTooLarge: a command file is over the size limit. It is not
+	// loaded.
+	ErrFileTooLarge = errors.New("the file is over the size limit")
+	// ErrTooManyFiles: the directory holds more command files than the
+	// limit. The ones read before it load, and the walk stops.
+	ErrTooManyFiles = errors.New("there are more command files than the limit")
+	// ErrTooDeep: a directory is nested deeper than the limit. It is not
+	// read.
+	ErrTooDeep = errors.New("the directory is nested deeper than the limit")
+)
+
+// The default limits LoadDir applies.
+const (
+	DefaultMaxFileBytes = 256 << 10 // 256 KiB
+	DefaultMaxFiles     = 1000      // .md files
+	DefaultMaxDepth     = 8         // directory levels below the root
+)
+
+// LoadOption sets a limit of LoadDirWith.
+type LoadOption interface{ applyLoad(*loadConfig) }
+
+type loadConfig struct {
+	maxFileBytes   int64
+	maxFiles, maxD int
+}
+
+type loadOptionFunc func(*loadConfig)
+
+func (f loadOptionFunc) applyLoad(c *loadConfig) { f(c) }
+
+// WithMaxFileBytes sets the largest command file read, in bytes (default
+// DefaultMaxFileBytes). The file is read through a limit, so a size the
+// file system reports is never trusted. A value below 1 keeps the default.
+func WithMaxFileBytes(n int64) LoadOption {
+	return loadOptionFunc(func(c *loadConfig) {
+		if n > 0 {
+			c.maxFileBytes = n
+		}
+	})
+}
+
+// WithMaxFiles sets how many command files are read (default
+// DefaultMaxFiles). A value below 1 keeps the default.
+func WithMaxFiles(n int) LoadOption {
+	return loadOptionFunc(func(c *loadConfig) {
+		if n > 0 {
+			c.maxFiles = n
+		}
+	})
+}
+
+// WithMaxDepth sets how many directory levels below the root are read
+// (default DefaultMaxDepth): files at the root are at level 0. A value
+// below 1 keeps the default.
+func WithMaxDepth(n int) LoadOption {
+	return loadOptionFunc(func(c *loadConfig) {
+		if n > 0 {
+			c.maxD = n
+		}
+	})
+}
 
 // LoadDir reads Markdown command files, *.md, from fsys into Prompt
 // commands from src, a User, Project or Plugin source. A host passes
@@ -34,7 +101,25 @@ import (
 // (docs/decisions/0006-MADR-command-registry.md §6, A6). Files and
 // directories whose names start with "." are skipped. Each file that cannot
 // be read or parsed is an error, and the rest still load.
+//
+// LoadDir applies the default limits: DefaultMaxFileBytes per file,
+// DefaultMaxFiles files and DefaultMaxDepth directory levels. LoadDirWith
+// sets others.
 func LoadDir(fsys fs.FS, src Source) ([]Command, []error) {
+	return LoadDirWith(fsys, src)
+}
+
+// LoadDirWith is LoadDir with limits of its own
+// (docs/decisions/0014-PLAN-hardening.md Step 5): WithMaxFileBytes,
+// WithMaxFiles and WithMaxDepth. A file over the size limit is an error
+// wrapping ErrFileTooLarge; a directory past the depth limit is not read,
+// with one error wrapping ErrTooDeep; and past the file count the walk
+// stops, with one error wrapping ErrTooManyFiles.
+func LoadDirWith(fsys fs.FS, src Source, opts ...LoadOption) ([]Command, []error) {
+	cfg := loadConfig{maxFileBytes: DefaultMaxFileBytes, maxFiles: DefaultMaxFiles, maxD: DefaultMaxDepth}
+	for _, o := range opts {
+		o.applyLoad(&cfg)
+	}
 	ns, err := namespace(src)
 	if err == nil && src.Kind != User && src.Kind != Project && src.Kind != Plugin {
 		err = fmt.Errorf("command: LoadDir reads user, project and plugin commands, not %s", src.Kind)
@@ -43,8 +128,9 @@ func LoadDir(fsys fs.FS, src Source) ([]Command, []error) {
 		return nil, []error{err}
 	}
 	var (
-		cmds []Command
-		errs []error
+		cmds  []Command
+		errs  []error
+		files int
 	)
 	walk := fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
 		switch {
@@ -56,10 +142,17 @@ func LoadDir(fsys fs.FS, src Source) ([]Command, []error) {
 				return fs.SkipDir
 			}
 			return nil
+		case d.IsDir() && p != "." && strings.Count(p, "/") >= cfg.maxD:
+			errs = append(errs, fmt.Errorf("command: %s: %w (%d levels)", p, ErrTooDeep, cfg.maxD))
+			return fs.SkipDir
 		case d.IsDir() || path.Ext(p) != ".md":
 			return nil
+		case files == cfg.maxFiles:
+			errs = append(errs, fmt.Errorf("command: %s: %w (%d files)", p, ErrTooManyFiles, cfg.maxFiles))
+			return fs.SkipAll
 		}
-		c, err := loadFile(fsys, p, src, ns)
+		files++
+		c, err := loadFile(fsys, p, src, ns, cfg.maxFileBytes)
 		if err != nil {
 			errs = append(errs, err)
 			return nil
@@ -73,9 +166,9 @@ func LoadDir(fsys fs.FS, src Source) ([]Command, []error) {
 	return cmds, errs
 }
 
-// loadFile reads one command file.
-func loadFile(fsys fs.FS, p string, src Source, ns string) (Command, error) {
-	data, err := fs.ReadFile(fsys, p)
+// loadFile reads one command file, of at most limit bytes.
+func loadFile(fsys fs.FS, p string, src Source, ns string, limit int64) (Command, error) {
+	data, err := readLimited(fsys, p, limit)
 	if err != nil {
 		return Command{}, fmt.Errorf("command: %s: %w", p, err)
 	}
@@ -115,9 +208,34 @@ func loadFile(fsys fs.FS, p string, src Source, ns string) (Command, error) {
 		if err != nil {
 			return Result{}, err
 		}
-		return Result{Text: expand(body, values, inv.Raw)}, nil
+		text, err := expand(body, values, inv.Raw)
+		if err != nil {
+			return Result{}, err
+		}
+		return Result{Text: text}, nil
 	})
 	return c, nil
+}
+
+// readLimited reads file p of fsys through a limit of limit bytes, so the
+// size the file system reports is never trusted: one byte more than limit
+// is ErrFileTooLarge.
+func readLimited(fsys fs.FS, p string, limit int64) ([]byte, error) {
+	f, err := fsys.Open(p)
+	if err != nil {
+		return nil, err
+	}
+	data, err := io.ReadAll(io.LimitReader(f, limit+1))
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > limit {
+		return nil, fmt.Errorf("%w (%d bytes)", ErrFileTooLarge, limit)
+	}
+	return data, nil
 }
 
 // applyFront sets c's fields from fm, and its arguments and description

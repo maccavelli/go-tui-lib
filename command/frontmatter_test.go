@@ -8,10 +8,10 @@ import (
 
 func TestExpand(t *testing.T) {
 	body := "Focus on $FOCUS. $ARGUMENTS | $lower $$ $(ls) !{ls} ${FOCUS} $MISSING $FOCUS"
-	got := expand(body, map[string]string{"FOCUS": "$ARGUMENTS"}, "the tail")
+	got, err := expand(body, map[string]string{"FOCUS": "$ARGUMENTS"}, "the tail")
 	want := "Focus on $ARGUMENTS. the tail | $lower $$ $(ls) !{ls} ${FOCUS} $MISSING $ARGUMENTS"
-	if got != want {
-		t.Errorf("expand:\n got %q\nwant %q", got, want)
+	if got != want || err != nil {
+		t.Errorf("expand:\n got %q, %v\nwant %q", got, err, want)
 	}
 	// Through the registry: a loaded file's arguments and slash tail.
 	cmds, errs := LoadDir(fstest.MapFS{"r.md": {Data: []byte("Check $WHAT then !{rm -rf /} and $(id): $ARGUMENTS")}}, userSrc)

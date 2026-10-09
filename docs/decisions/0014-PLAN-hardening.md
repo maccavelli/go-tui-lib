@@ -258,7 +258,9 @@ byte-identical for clean inputs.
   `LoadDirWith` with the defaults. It is additive, so `apidiff` stays
   clean, and the defaults are a behaviour change, named in the release
   notes.
-* **`LoadOption`** is opaque, under W0.4, with:
+* **`LoadOption`** is opaque, under W0.4 (D3, 2026-10-09: the defaults are
+  also exported as `DefaultMaxFileBytes`, `DefaultMaxFiles` and
+  `DefaultMaxDepth`, and a value below 1 keeps the default), with:
   * `WithMaxFileBytes(n int64)`, default 256 KiB;
   * `WithMaxFiles(n int)`, default 1,000 `.md` files;
   * `WithMaxDepth(n int)`, default 8 directory levels.
@@ -791,3 +793,113 @@ No deviation.
   * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
   * the step's tests, with `TestRenderAtClamp` and `TestRenderAllocs`:
     passed.
+
+### Step 5: `LoadDir`'s limits and the expansion cap (H4)
+
+#### Deviations
+
+* **D3 (2026-10-09): the defaults are exported, and a value below 1 keeps
+  the default.**
+  * **Found:**
+    * The step gives the default values, but not exported names for
+      them. The code exported `DefaultMaxFileBytes`, `DefaultMaxFiles`
+      and `DefaultMaxDepth`, as Step 6 plans `DefaultMaxArgBytes`.
+    * The step does not say what an option given a value below 1 does.
+  * **The owner's choices:**
+    * keep the three constants exported, so a program can show or reason
+      about the limits;
+    * a value below 1 keeps the default, so a limit cannot be switched
+      off by accident.
+
+    Each option's documentation says so, and `TestLoadDirWithOptions`
+    checks it.
+  * **The others:** unexported constants; or a value below 1 turns the
+    limit off.
+
+#### What was built
+
+* **`command/loaddir.go`:**
+  * `ErrFileTooLarge`, `ErrTooManyFiles` and `ErrTooDeep`;
+  * the three defaults (D3);
+  * `LoadOption`, an opaque interface, with `WithMaxFileBytes`,
+    `WithMaxFiles` and `WithMaxDepth`;
+  * `LoadDirWith(fsys, src, opts...)`. `LoadDir(fsys, src)` keeps its
+    signature and calls it with the defaults: a behaviour change for the
+    release notes.
+* **How each limit is enforced:**
+  * **Size:** `readLimited` opens the file and reads
+    `io.LimitReader(f, limit+1)`, so `Stat` is never trusted. One byte
+    over gives `ErrFileTooLarge`.
+  * **Depth:** a directory with more than the limit's levels below the
+    root gives one `ErrTooDeep` error, and `fs.SkipDir`.
+  * **Count:** the first `.md` file past the limit gives one
+    `ErrTooManyFiles` error, and `fs.SkipAll`. The files before it load.
+  * Each error is wrapped as `command: <path>: …`, with the limit.
+* **`command/expand.go`:** `expand` returns `(string, error)`. It writes
+  through a builder, and stops before passing `maxExpansion` (1 MiB),
+  with an `*ArgError`: "the expanded prompt is over 1048576 bytes". The
+  handler `LoadDir` builds returns that error.
+* **`command/frontmatter_test.go`:** `TestExpand` takes `expand`'s new
+  error and requires it nil. Its expected text did not change.
+* **`command/loadlimits_test.go` (new):**
+  * `TestLoadDirLimits`, over separate file systems:
+    * exactly 256 KiB loads, and one byte over is refused;
+    * 8 MiB is refused, and so is 8 MiB behind an `fs.FS` whose files
+      say they are one byte long;
+    * exactly 1,000 files load, and of 5,000, 1,000 load with one error;
+    * 8 levels down loads, and 9 and 64 levels are refused.
+  * `TestLoadDirWithOptions`: each option and its error, and values
+    below 1 keeping the defaults (D3);
+  * `TestExpandCap`: through the registry, sixteen `$A` of 64 KiB is
+    exactly 1 MiB, and one byte more is an `*ArgError` naming the limit.
+    The arguments stay under Step 6's 1 MiB argument limit.
+
+  The first and last use only names that existed before the step.
+
+#### Checks
+
+* **Rule 3: the probes fail before the fix.** `TestLoadDirLimits` and
+  `TestExpandCap`, on a scratch copy of `bfd92a4`, the commit before this
+  step:
+  * "one byte over 256 KiB: 1 loaded, 0 errors", the same for 8 MiB and
+    for the lying file system;
+  * "5,000 files: 5000 loaded, 0 errors";
+  * "9 levels down: 1 loaded" and "64 levels down: 1 loaded";
+  * "one byte over 1 MiB: 1048592 bytes, <nil>".
+
+  Both pass on the step's code.
+* **Mutations,** on scratch copies of the tree. All five were killed by a
+  failing test:
+  * **S5-1** (the size checked with `Stat`): "8 MiB that says it is 1
+    byte: 1 loaded, 0 errors". Its first form kept the length check after
+    the read, so it still refused the file and survived. That was a
+    mutant weaker than the step's. It was rewritten to trust `Stat`
+    alone, as the step means.
+  * **S5-2** (one level less deep, added): "8 levels down: 0 loaded".
+  * **S5-3** (no file count, added): "5,000 files: 5000 loaded".
+  * **S5-4** (no expansion cap, added): "one byte over 1 MiB: 1048592
+    bytes".
+  * **S5-5** (`WithMaxFiles` ignored, added): "WithMaxFiles(3): 10
+    loaded".
+
+  They were run again after the lint fixes below, all killed.
+* **Rule 2 on macOS,** go1.27.2:
+  * `gofmt -l`: nothing.
+  * `make pre-add-check FILES=<the four Go files>`: "4 file(s) clean".
+  * `make lint`: clean. On the first run, gocritic asked for the depth
+    test as `strings.Count(p, "/") >= cfg.maxD`, which is equivalent, and
+    revive refused a parameter named `max`, now `limit`.
+  * With `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    all passed, and so did workspace mode.
+  * `go mod tidy -diff`, `make vuln` and `scripts/go-modules.sh --check`
+    were clean.
+  * `make apicheck`: "against v0.7.1, 0 incompatible change(s)".
+    `LoadDir`'s signature is unchanged.
+  * `make examples`: "clean".
+  * `make release-check`: "182 file(s) clean … apicheck, examples".
+* **The Windows test host,** go1.27.2 windows/amd64:
+  * the `FILES` and no-list `make pre-add-check`, `make lint`, `make
+    vuln` and `make examples`: each exit 0;
+  * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
+  * the step's tests, with `TestExpand` and the `LoadDir` golden and
+    source tests: passed.
