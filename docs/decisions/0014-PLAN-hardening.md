@@ -635,3 +635,72 @@ No deviation.
     vuln` and `make examples`: each exit 0;
   * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
   * the step's tests, with `TestRenderAllocs`: passed.
+
+### Step 3: the bounded view cache (H1)
+
+No deviation.
+
+#### What was built
+
+* **`workspace/workspace.go`:**
+  * the cache is `map[slotKey]cachedView`, with `slotKey{kind, id,
+    focused}` and `cachedView{width, height, method, themeGen, view}`;
+  * `viewKey` is gone;
+  * `forget` deletes the two slots by key, where it used to scan the
+    whole map.
+* **`workspace/render.go`:** `viewOf` hits only when the slot's width,
+  height, method and theme generation all equal the request. A miss
+  draws the view and replaces the slot. The cache therefore holds at
+  most 2 × (panes + overlays) views.
+* **`workspace/cache_test.go` (new):** `TestViewCacheBounded`. It runs:
+  1. two panes and an overlay;
+  2. 500 resizes, 200 theme changes and two method changes, with a render
+     after each.
+
+  It then checks:
+  * the cache holds at most 6;
+  * an unchanged `Changer` is not drawn again;
+  * a resized one is, and the slot is replaced.
+* **The existing cache tests pass unchanged:**
+  * `TestPopEvictsTheOverlay`;
+  * `TestSetPaneDropsTheCachedView`;
+  * the theme restyling tests;
+  * `TestRenderAllocs`: a full frame makes 441 allocations, and 646
+    under `-race`, as before the step.
+
+#### Checks
+
+* **Rule 3: the probe fails before the fix.** `TestViewCacheBounded`, on
+  a scratch copy of `d161122`, the commit before this step: "914 cached
+  views, want at most 6 (2 × (panes + overlays))". It passes on the
+  step's code.
+* **Mutations,** on scratch copies of the tree. All four were killed by a
+  failing test:
+  * **S3-1** (a miss adds a slot, by putting the theme generation in the
+    key): "603 cached views, want at most 6". Its first form left
+    `forget`'s positional keys short of the new field and did not build.
+    That is not a kill, so it was rewritten to build.
+  * **S3-2** (a hit ignores the theme generation, added):
+    `TestFollowingThemeRestyles`, "a view cached before the theme change
+    was not drawn again", and `TestSetThemeRedraws`.
+  * **S3-3** (a hit ignores the size, added): "a resized Changer was not
+    drawn again".
+  * **S3-4** (`forget` leaves the focused slot, added):
+    `TestSetPaneDropsTheCachedView` and `TestPopEvictsTheOverlay`.
+* **Rule 2 on macOS,** go1.27.2:
+  * `gofmt -l`: nothing.
+  * `make pre-add-check FILES=<the three Go files>`: "3 file(s) clean".
+  * `make lint`: clean.
+  * With `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    all passed, and so did workspace mode.
+  * `go mod tidy -diff`, `make vuln` and `scripts/go-modules.sh --check`
+    were clean.
+  * `make apicheck`: "against v0.7.1, 0 incompatible change(s)".
+  * `make examples`: "clean".
+  * `make release-check`: "178 file(s) clean … apicheck, examples".
+* **The Windows test host,** go1.27.2 windows/amd64:
+  * the `FILES` and no-list `make pre-add-check`, `make lint`, `make
+    vuln` and `make examples`: each exit 0;
+  * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
+  * the step's test, with `TestRenderAllocs` and the theme, pop and
+    pane-replacement tests: passed.

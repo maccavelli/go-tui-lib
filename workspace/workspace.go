@@ -139,7 +139,7 @@ type Workspace struct {
 	overlays []Overlay
 	sizes    map[layout.PaneID]SizeMsg
 	osizes   map[string]SizeMsg // each open overlay's last content size
-	cache    map[viewKey]string
+	cache    map[slotKey]cachedView
 	ids      []layout.PaneID   // every pane's ID, sorted, for Broadcast
 	frame    *cells.Frame      // the reused frame buffer
 	method   ansi.Method       // how the frame and its views measure
@@ -169,16 +169,25 @@ const (
 	overlayView
 )
 
-// viewKey names a cached view: whose it is, and everything it was drawn
-// under (docs/decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md §2 and
-// amendment A1, Q5).
-type viewKey struct {
-	kind          viewKind
-	id            string
+// slotKey names a cache slot: whose view it holds, and whether it was drawn
+// focused. A pane or an overlay has at most two slots, so the cache holds at
+// most 2 × (panes + overlays) views
+// (docs/decisions/0014-PLAN-hardening.md Step 3, finding H1).
+type slotKey struct {
+	kind    viewKind
+	id      string
+	focused bool
+}
+
+// cachedView is a slot's view, and everything it was drawn under
+// (docs/decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md §2 and
+// amendment A1, Q5). A hit needs every field to equal the request; a miss
+// replaces the slot.
+type cachedView struct {
 	width, height int
-	focused       bool
 	method        ansi.Method
 	themeGen      uint64
+	view          string
 }
 
 type drag struct {
@@ -314,7 +323,7 @@ func New(root layout.Node, panes map[layout.PaneID]Pane, opts ...Option) *Worksp
 		height: fallbackHeight,
 		sizes:  map[layout.PaneID]SizeMsg{},
 		osizes: map[string]SizeMsg{},
-		cache:  map[viewKey]string{},
+		cache:  map[slotKey]cachedView{},
 		method: ansi.WcWidth,
 		dirty:  true,
 		follow: true,
@@ -453,10 +462,10 @@ func (w *Workspace) SetPane(id layout.PaneID, p Pane) tea.Cmd {
 	return w.resolve()
 }
 
-// forget drops every cached view of the pane or overlay id, at every size
-// it was drawn at.
+// forget drops the cached views of the pane or overlay id: its two slots.
 func (w *Workspace) forget(kind viewKind, id string) {
-	maps.DeleteFunc(w.cache, func(k viewKey, _ string) bool { return k.kind == kind && k.id == id })
+	delete(w.cache, slotKey{kind, id, false})
+	delete(w.cache, slotKey{kind, id, true})
 }
 
 // SetState replaces the layout state.

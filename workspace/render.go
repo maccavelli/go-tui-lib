@@ -141,16 +141,19 @@ func placeCursor(p Pane, in layout.Rect) *tea.Cursor {
 
 // viewOf asks a pane for its view, unless it is a Changer reporting no change
 // and its view is cached under the same size, focus, width method and theme.
+// Each pane has one slot per focus state, which a miss replaces.
 func (w *Workspace) viewOf(kind viewKind, id string, p Pane, width, height int, focused bool) string {
-	k := viewKey{kind: kind, id: id, width: width, height: height, focused: focused, method: w.method, themeGen: w.themeGen}
+	k := slotKey{kind: kind, id: id, focused: focused}
+	want := cachedView{width: width, height: height, method: w.method, themeGen: w.themeGen}
 	if c, ok := p.(Changer); ok && !c.Changed() {
-		if v, ok := w.cache[k]; ok {
-			return v
+		if got, ok := w.cache[k]; ok && got.width == want.width && got.height == want.height &&
+			got.method == want.method && got.themeGen == want.themeGen {
+			return got.view
 		}
 	}
-	v := clip(w.method, p.View(width, height), width, height)
-	w.cache[k] = v
-	return v
+	want.view = clip(w.method, p.View(width, height), width, height)
+	w.cache[k] = want
+	return want.view
 }
 
 // clip makes s exactly width × height cells, measured with m: lines
