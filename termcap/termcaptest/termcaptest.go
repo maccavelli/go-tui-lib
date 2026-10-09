@@ -165,9 +165,15 @@ func Silent() Profile {
 // terminal sees every mode restored.
 type StopMsg struct{}
 
-// RunTimeout bounds each wait in Run: for the CapsMsg, and for the program
-// to quit after StopMsg.
-var RunTimeout = 10 * time.Second
+// DefaultRunTimeout bounds each wait in Run, for the CapsMsg and for the
+// program to quit after StopMsg, unless SetRunTimeout sets another.
+const DefaultRunTimeout = 10 * time.Second
+
+// RunTimeout bounds each wait in Run, for a Terminal without a timeout of
+// its own. A value below 1 is DefaultRunTimeout. It is removed in v0.9.0.
+//
+// Deprecated: use (*Terminal).SetRunTimeout.
+var RunTimeout = DefaultRunTimeout
 
 // Terminal is a scripted fake terminal speaking a Profile.
 type Terminal struct {
@@ -180,6 +186,7 @@ type Terminal struct {
 	painted []string        // the queries painted as text
 	flags   []int           // the Kitty keyboard flag stack
 	input   chan string     // replies, in order
+	timeout time.Duration   // each wait in Run, or 0 for the default
 }
 
 // NewTerminal returns a fake terminal that answers as p does.
@@ -193,12 +200,34 @@ func Run(tb testing.TB, model tea.Model, p Profile) termcap.Caps {
 	return NewTerminal(p).Run(tb, model)
 }
 
+// SetRunTimeout sets how long each wait in Run lasts, for this terminal
+// alone, and returns t (docs/decisions/0014-PLAN-hardening.md Step 8). A
+// value below 1 takes the default back: RunTimeout while it is kept, then
+// DefaultRunTimeout.
+func (t *Terminal) SetRunTimeout(d time.Duration) *Terminal {
+	t.timeout = max(d, 0)
+	return t
+}
+
+// runTimeout is each wait in Run: the terminal's own, else RunTimeout,
+// else DefaultRunTimeout.
+func (t *Terminal) runTimeout() time.Duration {
+	switch {
+	case t.timeout > 0:
+		return t.timeout
+	case RunTimeout > 0:
+		return RunTimeout
+	}
+	return DefaultRunTimeout
+}
+
 // Run runs model as a tea.Program against the terminal until it has
 // received a termcap.CapsMsg, sends it StopMsg, waits for it to quit, and
-// returns that CapsMsg's Caps. It fails tb when either wait passes
-// RunTimeout, or the program fails.
+// returns that CapsMsg's Caps. It fails tb when either wait passes the
+// terminal's timeout (SetRunTimeout), or the program fails.
 func (t *Terminal) Run(tb testing.TB, model tea.Model) termcap.Caps {
 	tb.Helper()
+	timeout := t.runTimeout()
 	pr, pw := io.Pipe()
 	stop := make(chan struct{})
 	go func() {
@@ -242,10 +271,10 @@ func (t *Terminal) Run(tb testing.TB, model tea.Model) termcap.Caps {
 	case caps = <-w.caps:
 	case err := <-done:
 		tb.Fatalf("%s: the program exited before its CapsMsg: %v", t.profile.Name, err)
-	case <-time.After(RunTimeout):
+	case <-time.After(timeout):
 		prog.Kill()
 		<-done
-		tb.Fatalf("%s: no CapsMsg within %v", t.profile.Name, RunTimeout)
+		tb.Fatalf("%s: no CapsMsg within %v", t.profile.Name, timeout)
 	}
 	prog.Send(StopMsg{})
 	select {
@@ -253,10 +282,10 @@ func (t *Terminal) Run(tb testing.TB, model tea.Model) termcap.Caps {
 		if err != nil {
 			tb.Fatalf("%s: %v", t.profile.Name, err)
 		}
-	case <-time.After(RunTimeout):
+	case <-time.After(timeout):
 		prog.Kill()
 		<-done
-		tb.Fatalf("%s: the program did not quit within %v of StopMsg", t.profile.Name, RunTimeout)
+		tb.Fatalf("%s: the program did not quit within %v of StopMsg", t.profile.Name, timeout)
 	}
 	return caps
 }

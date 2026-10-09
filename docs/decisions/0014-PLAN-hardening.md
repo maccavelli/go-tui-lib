@@ -1194,3 +1194,97 @@ No deviation.
   * the step's tests, with `TestSolverProperties`, `TestShrinkOrder`,
     `TestClaims`, `TestHideWhenMinimumsDoNotFit` and
     `TestPresetDiagrams`: passed.
+
+### Step 8: no mutable package variables (H11)
+
+#### Deviations
+
+No deviation. Two points the step leaves open were settled as D3 settled
+them for `LoadDir`: `SetRunTimeout` with a value below 1, and a
+`RunTimeout` below 1, each take the default back.
+
+#### What was built
+
+* **`termcap/termcaptest/termcaptest.go`:**
+  * `const DefaultRunTimeout = 10 * time.Second`;
+  * `(*Terminal) SetRunTimeout(d) *Terminal`. A value below 1 takes the
+    default back.
+  * `Run` reads its timeout once, from `runTimeout`: the terminal's own,
+    else `RunTimeout` when above 0, else `DefaultRunTimeout`. Both waits
+    and both failure messages use it.
+  * `RunTimeout` starts at `DefaultRunTimeout`, is marked
+    `// Deprecated: use (*Terminal).SetRunTimeout.`, says it is removed
+    in v0.9.0, and is still read.
+* **`workspace/context.go`:**
+  * the seven keys are unexported variables, `ctxFocusedPane` to
+    `ctxHeight`, and `ContextKeys` and `WhenContext` read only those;
+  * `FocusedPaneKey()`, `ZoomedKey()`, `HiddenPanesKey()`,
+    `OverlayKey()`, `ModalKey()`, `WidthKey()` and `HeightKey()` return
+    them, by value;
+  * the seven `Key…` variables keep their names and values, each marked
+    `// Deprecated: use …Key.`, with a note that reassigning one changes
+    nothing the workspace publishes and that they are removed in v0.9.0.
+* **`workspace/context_test.go`:** the four uses of the variables now use
+  the functions, and `TestKeyFunctions` checks that the seven functions
+  give seven distinct keys, by name and kind, as `ContextKeys` lists them
+  and `WhenContext` publishes them.
+* **`workspace/contextkeys_test.go` (new):** `TestKeysIgnoreReassignment`
+  reassigns all seven variables to `bogus.…` keys, and checks that
+  `WhenContext` and `ContextKeys` still give the `workspace.…` keys and
+  never the bogus ones. It uses only names that existed before the step,
+  and is in package `workspace`, where staticcheck does not report the
+  deprecated names.
+* **`termcap/termcaptest/termcaptest_test.go`:** `TestSetRunTimeout`:
+  * a silent terminal with `SetRunTimeout(50ms)` fails its `Run`, through
+    a fake `testing.TB`, with "silent: no CapsMsg within 50ms", well
+    within 5 s;
+  * the fall-back table: the terminal's own value, `RunTimeout`, and
+    `DefaultRunTimeout`, with values below 1 at each level.
+
+#### Checks
+
+* **Rule 3: the probe fails before the fix.** `TestKeysIgnoreReassignment`,
+  on a scratch copy of `e521b13`, the commit before this step: 29
+  failures, among them "WhenContext does not publish
+  workspace.focusedPane", "WhenContext publishes the reassigned
+  bogus.focusedPane" and "ContextKeys lists the reassigned
+  bogus.focusedPane". It passes on the step's code.
+  `TestSetRunTimeout` needs the step's new names, so it cannot run
+  before it; mutations S8-4 to S8-7 show it fails.
+* **Mutations,** on scratch copies of the tree. All seven were killed by a
+  failing test, none by a build failure:
+  * **S8-1** (`WhenContext` reads `KeyZoomed`): "WhenContext publishes
+    the reassigned bogus.zoomed".
+  * **S8-2** (`ContextKeys` reads `KeyWidth`, added): "ContextKeys lists
+    the reassigned bogus.width".
+  * **S8-3** (`HeightKey` returns the width's key, added): "the functions
+    give 6 distinct keys". A first version of `TestKeyFunctions` built a
+    map of the functions' keys and would not have seen it; the count and
+    a name-by-name check were added before the run.
+  * **S8-4** (`Run` ignores the terminal's timeout, added): "Run with a
+    50ms timeout took 10.001234917s".
+  * **S8-5** (`SetRunTimeout` ignored, added): Run's failure was
+    `silent: no CapsMsg within 10s`.
+  * **S8-6** (a `RunTimeout` below 1 taken, added): "SetRunTimeout(0s)
+    with RunTimeout -1s: -1s, want 10s".
+  * **S8-7** (a terminal's value below 1 kept, added): "SetRunTimeout(-1s)
+    with RunTimeout 3s: -1s, want 3s".
+* **Rule 2 on macOS,** go1.27.2:
+  * `gofmt -l`: nothing.
+  * `make pre-add-check FILES=<the five Go files>`: "5 file(s) clean".
+  * `make lint`: clean.
+  * With `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    all passed, and so did workspace mode.
+  * `go mod tidy -diff`, `make vuln` and `scripts/go-modules.sh --check`
+    were clean.
+  * `make apicheck`: "against v0.7.1, 0 incompatible change(s)". The
+    step adds `DefaultRunTimeout`, `SetRunTimeout` and the seven key
+    functions; `scripts/apicheck.allow` is unchanged.
+  * `make examples`: "clean".
+  * `make release-check`: "185 file(s) clean … apicheck, examples".
+* **The Windows test host,** go1.27.2 windows/amd64:
+  * the `FILES` and no-list `make pre-add-check`, `make lint`, `make
+    vuln` and `make examples`: each exit 0;
+  * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
+  * the step's tests, with `TestContextKeys`, `TestWhenContextLayers`,
+    `TestEachProfile` and `TestSilentEndsByTimeout`: passed.

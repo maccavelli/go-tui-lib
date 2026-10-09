@@ -47,7 +47,7 @@ func TestWhenContextLayers(t *testing.T) {
 	if v, _ := c.Value("workspace.overlay"); v.String() != "" {
 		t.Errorf("workspace.overlay with none open = %q", v.String())
 	}
-	if v, _ := workspace.KeyModal.Get(c); v {
+	if v, _ := workspace.ModalKey().Get(c); v {
 		t.Error("workspace.modal with none open")
 	}
 }
@@ -57,13 +57,13 @@ func TestContextKeys(t *testing.T) {
 	drain(ws, ws.Toggle("metrics"))
 	drain(ws, ws.Zoom("session"))
 	c := ws.WhenContext()
-	if v, ok := workspace.KeyZoomed.Get(c); !ok || !v {
+	if v, ok := workspace.ZoomedKey().Get(c); !ok || !v {
 		t.Error("workspace.zoomed is not true")
 	}
-	if v, ok := workspace.KeyHiddenPanes.Get(c); !ok || !slices.Contains(v, "metrics") || !slices.Equal(v, paneStrings(ws.Plan().Hidden)) {
+	if v, ok := workspace.HiddenPanesKey().Get(c); !ok || !slices.Contains(v, "metrics") || !slices.Equal(v, paneStrings(ws.Plan().Hidden)) {
 		t.Errorf("workspace.hiddenPanes = %v, want Plan().Hidden %v", v, ws.Plan().Hidden)
 	}
-	if v, ok := workspace.KeyWidth.Get(c); !ok || v != 120 {
+	if v, ok := workspace.WidthKey().Get(c); !ok || v != 120 {
 		t.Errorf("workspace.width = %d", v)
 	}
 	keys := workspace.ContextKeys()
@@ -85,4 +85,49 @@ func paneStrings(ids []layout.PaneID) []string {
 		out[i] = string(id)
 	}
 	return out
+}
+
+// TestKeyFunctions: each key function returns the key the workspace
+// publishes and ContextKeys lists, by name and kind
+// (docs/decisions/0014-PLAN-hardening.md Step 8).
+func TestKeyFunctions(t *testing.T) {
+	keys := workspace.ContextKeys()
+	fns := map[string]when.Kind{
+		workspace.FocusedPaneKey().Name: workspace.FocusedPaneKey().Kind(),
+		workspace.ZoomedKey().Name:      workspace.ZoomedKey().Kind(),
+		workspace.HiddenPanesKey().Name: workspace.HiddenPanesKey().Kind(),
+		workspace.OverlayKey().Name:     workspace.OverlayKey().Kind(),
+		workspace.ModalKey().Name:       workspace.ModalKey().Kind(),
+		workspace.WidthKey().Name:       workspace.WidthKey().Kind(),
+		workspace.HeightKey().Name:      workspace.HeightKey().Kind(),
+	}
+	if len(fns) != 7 || len(keys) != 7 {
+		t.Errorf("the functions give %d distinct keys, and ContextKeys %d; want 7 each", len(fns), len(keys))
+	}
+	for name, kind := range fns {
+		if k, ok := keys[name]; !ok || k != kind {
+			t.Errorf("%s: ContextKeys has %v, %v; want %v", name, k, ok, kind)
+		}
+	}
+	for _, c := range [][2]string{
+		{workspace.FocusedPaneKey().Name, "workspace.focusedPane"}, {workspace.ZoomedKey().Name, "workspace.zoomed"},
+		{workspace.HiddenPanesKey().Name, "workspace.hiddenPanes"}, {workspace.OverlayKey().Name, "workspace.overlay"},
+		{workspace.ModalKey().Name, "workspace.modal"}, {workspace.WidthKey().Name, "workspace.width"},
+		{workspace.HeightKey().Name, "workspace.height"},
+	} {
+		if c[0] != c[1] {
+			t.Errorf("a key function returns %s, want %s", c[0], c[1])
+		}
+	}
+	ws, _ := rig(t)
+	c := ws.WhenContext()
+	if v, ok := workspace.FocusedPaneKey().Get(c); !ok || v != string(ws.Focused()) {
+		t.Errorf("FocusedPaneKey = %q, %v; want %q", v, ok, ws.Focused())
+	}
+	if v, ok := workspace.HeightKey().Get(c); !ok || v <= 0 {
+		t.Errorf("HeightKey = %d, %v", v, ok)
+	}
+	if v, ok := workspace.OverlayKey().Get(c); !ok || v != "" {
+		t.Errorf("OverlayKey with none open = %q, %v", v, ok)
+	}
 }

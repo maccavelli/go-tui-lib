@@ -1,7 +1,10 @@
 package termcaptest
 
 import (
+	"fmt"
+	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -310,5 +313,66 @@ func TestPaintingTerminal(t *testing.T) {
 	}
 	if got := term.Painted(); len(got) != 2 || got[0] != "\x1b[c" || got[1] != "\x1b]11;?\x07" {
 		t.Fatalf("painted %q, want the two queries and not the cursor mode", got)
+	}
+}
+
+// fatalTB records a Run's failure, and ends its goroutine as testing.T's
+// Fatalf does.
+type fatalTB struct {
+	testing.TB
+	mu   sync.Mutex
+	msgs []string
+}
+
+func (f *fatalTB) Helper() {}
+
+func (f *fatalTB) Errorf(format string, args ...any) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.msgs = append(f.msgs, fmt.Sprintf(format, args...))
+}
+
+func (f *fatalTB) Fatalf(format string, args ...any) {
+	f.Errorf(format, args...)
+	runtime.Goexit()
+}
+
+// TestSetRunTimeout: a terminal's own timeout bounds its Run, and below 1
+// takes RunTimeout back, then DefaultRunTimeout
+// (docs/decisions/0014-PLAN-hardening.md Step 8, finding H11).
+func TestSetRunTimeout(t *testing.T) {
+	tb := &fatalTB{}
+	done := make(chan struct{})
+	start := time.Now()
+	go func() {
+		defer close(done)
+		NewTerminal(Silent()).SetRunTimeout(50*time.Millisecond).Run(tb, newApp(termcap.WithTimeout(time.Minute)))
+	}()
+	<-done
+	if d := time.Since(start); d > 5*time.Second {
+		t.Errorf("Run with a 50ms timeout took %v", d)
+	}
+	if len(tb.msgs) != 1 || tb.msgs[0] != "silent: no CapsMsg within 50ms" {
+		t.Errorf("Run's failures: %q", tb.msgs)
+	}
+
+	saved := RunTimeout
+	t.Cleanup(func() { RunTimeout = saved })
+	for _, c := range []struct {
+		set, run, want time.Duration
+	}{
+		{0, 3 * time.Second, 3 * time.Second},
+		{time.Second, 3 * time.Second, time.Second},
+		{-time.Second, 3 * time.Second, 3 * time.Second},
+		{0, 0, DefaultRunTimeout},
+		{0, -time.Second, DefaultRunTimeout},
+	} {
+		RunTimeout = c.run
+		if got := NewTerminal(Silent()).SetRunTimeout(c.set).runTimeout(); got != c.want {
+			t.Errorf("SetRunTimeout(%v) with RunTimeout %v: %v, want %v", c.set, c.run, got, c.want)
+		}
+	}
+	if DefaultRunTimeout != 10*time.Second {
+		t.Errorf("DefaultRunTimeout = %v", DefaultRunTimeout)
 	}
 }
