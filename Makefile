@@ -95,10 +95,10 @@ vuln: ## Runs govulncheck (opt-in; requires govulncheck on PATH/GOBIN)
 # (docs/decisions/0002-PLAN-multi-pane-workspace-layouts.md Step 5,
 # docs/decisions/0006-PLAN-command-registry.md Step 2).
 FUZZTIME ?= 20s
-fuzz: ## Fuzzes every layout, when and command fuzz target for FUZZTIME each (default 20s)
-	@./scripts/go-fuzz.sh -t $(FUZZTIME) -m 1 ./layout
-	@./scripts/go-fuzz.sh -t $(FUZZTIME) -m 1 ./when
-	@./scripts/go-fuzz.sh -t $(FUZZTIME) -m 1 ./command
+# The packages are found, not listed: every package whose tests declare a
+# fuzz target, per module (docs/decisions/0014-PLAN-hardening.md Step 9).
+fuzz: ## Fuzzes every fuzz target, found in every package of every module, for FUZZTIME each (default 20s)
+	$(call each_module,$(CURDIR)/scripts/go-fuzz.sh -a -t $(FUZZTIME) -m 1 ./...)
 
 # The API diff gate: an incompatible change since the previous tag fails unless
 # scripts/apicheck.allow lists it (docs/decisions/0014-PLAN-api-policy-gates.md Step 4).

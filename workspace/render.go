@@ -3,6 +3,7 @@ package workspace
 import (
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -170,9 +171,13 @@ func clip(m ansi.Method, s string, width, height int) string {
 		if n > 0 {
 			b.WriteByte('\n')
 		}
-		line = m.Truncate(sanitize.Styled(line), width, "")
-		b.WriteString(line)
-		pad(&b, width-m.StringWidth(line))
+		line = sanitize.Truncate(sanitize.Styled(line), width, m, "")
+		if m == ansi.GraphemeWidth && beyondArabic(line) {
+			b.WriteString(closed(m, line, width))
+		} else {
+			b.WriteString(line)
+			pad(&b, width-m.StringWidth(line))
+		}
 		n++
 	}
 	for ; n < height; n++ {
@@ -182,6 +187,66 @@ func clip(m ansi.Method, s string, width, height int) string {
 		pad(&b, width)
 	}
 	return b.String()
+}
+
+// withoutFirst is s without its first character, keeping the escape
+// sequences before it.
+func withoutFirst(s string) string {
+	i := 0
+	for i < len(s) && s[i] == ansi.ESC {
+		_, _, n, _ := ansi.DecodeSequence(s[i:], 0, nil)
+		i += max(n, 1)
+	}
+	if i >= len(s) {
+		return s
+	}
+	_, size := utf8.DecodeRuneInString(s[i:])
+	return s[:i] + s[i+size:]
+}
+
+// beyondArabic reports whether s holds a character from U+0600 up, whose
+// UTF-8 lead byte is 0xD8 or more: every Unicode Prepend character is one.
+func beyondArabic(s string) bool {
+	for i := range len(s) {
+		if s[i] >= 0xd8 {
+			return true
+		}
+	}
+	return false
+}
+
+// closed is line, at most width cells under m, padded to exactly width
+// cells, with nothing at its start that joins the character before it and
+// nothing at its end that joins the character after it. Measured with
+// GraphemeWidth, widths do not add up across a join: a Unicode Prepend
+// character joins the next character, and a spacing mark joins the one
+// before it, into a grapheme as wide as the first
+// (docs/decisions/0014-PLAN-hardening.md Step 9, D8). So a mark that opens
+// the line, which has no base in it, is left out; the padded line is
+// measured, and padded again; and a full line that ends with a Prepend
+// gives up its last cell, so that a space ends it. A pane's borders beside
+// the line stay their own.
+func closed(m ansi.Method, line string, width int) string {
+	if width == 0 {
+		return ""
+	}
+	for range len(line) {
+		if line == "" || m.StringWidth("|"+line) == m.StringWidth(line)+1 {
+			break
+		}
+		line = withoutFirst(line)
+	}
+	for range 2 {
+		out := line + strings.Repeat(" ", max(width-m.StringWidth(line), 0))
+		for i := 0; i < width && m.StringWidth(out) < width; i++ {
+			out += " "
+		}
+		if m.StringWidth(out+"x") == m.StringWidth(out)+1 {
+			return out
+		}
+		line = sanitize.Truncate(line, width-1, m, "")
+	}
+	return strings.Repeat(" ", width) // not reached: the second line ends with a space
 }
 
 // spaces is the run pad writes from.
@@ -231,9 +296,12 @@ func (w *Workspace) title(p Pane, id string, focused bool, width int) string {
 	if b, ok := p.(Badged); ok && b.Badge() != "" {
 		label += " " + t.Glyphs.BadgeOpen + sanitize.Line(b.Badge()) + t.Glyphs.BadgeClose
 	}
-	label = w.method.Truncate(label, width, t.Glyphs.Ellipsis)
+	label = sanitize.Truncate(label, width, w.method, t.Glyphs.Ellipsis)
 	if pad := width - w.method.StringWidth(label); pad > 0 {
 		label += strings.Repeat(" ", pad)
+	}
+	for i := 0; w.method == ansi.GraphemeWidth && i < width && w.method.StringWidth(label) < width; i++ {
+		label += " " // a Prepend character joined a space: see closed
 	}
 	return style.Render(label)
 }
@@ -266,7 +334,7 @@ func (w *Workspace) renderBox(r layout.Rect, p Pane, kind viewKind, id string, f
 		label += " " + t.Glyphs.BadgeOpen + sanitize.Line(bd.Badge()) + t.Glyphs.BadgeClose
 	}
 	label += " "
-	label = w.method.Truncate(label, max(in.W-1, 0), t.Glyphs.Ellipsis)
+	label = sanitize.Truncate(label, max(in.W-1, 0), w.method, t.Glyphs.Ellipsis)
 	fill := in.W - 1 - w.method.StringWidth(label)
 	var out strings.Builder
 	out.WriteString(edge.Render(b.TopLeft+b.Top) + tstyle.Render(label) + edge.Render(strings.Repeat(b.Top, max(fill, 0))+b.TopRight))

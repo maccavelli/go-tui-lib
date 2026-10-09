@@ -104,8 +104,9 @@ jobs:
           cache-dependency-path: '**/go.sum'
       # Each fuzz target for 20 s; a failing input is kept as an artifact
       # (docs/decisions/0002-PLAN-multi-pane-workspace-layouts.md Step 5,
-      # docs/decisions/0006-PLAN-command-registry.md Steps 2 and 4). Only
-      # layout, when and command, in the root module, have fuzz targets.
+      # docs/decisions/0006-PLAN-command-registry.md Steps 2 and 4). make
+      # fuzz finds the packages with targets itself, and the artifact takes
+      # every package's corpus (docs/decisions/0014-PLAN-hardening.md Step 9).
       - name: fuzz
         shell: bash
         env:
@@ -118,10 +119,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: fuzz-corpus
-          path: |
-            layout/testdata/fuzz/
-            when/testdata/fuzz/
-            command/testdata/fuzz/
+          path: '**/testdata/fuzz/'
           if-no-files-found: ignore
           retention-days: 14
       # Targets the matrix does not run: a build-tag gap fails here

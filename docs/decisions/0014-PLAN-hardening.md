@@ -395,6 +395,38 @@ does.
   (`termcaptest.go:387-492`).
 * **CI.** Every target runs for 20 s in CI. A failure's corpus is
   uploaded and becomes a seed in a fix's commit.
+* **D8 (2026-10-09): Prepend characters and padding.** `FuzzClip` found
+  that under `ansi.GraphemeWidth` a Unicode Prepend character joins the
+  next character into one grapheme, so widths do not add up and `clip`
+  pads a line short: `clip("\u0605", 3, …)` is 2 cells wide. It predates
+  this step. `clip` and `title` measure the padded line under
+  `GraphemeWidth`, and pad again until it is the width; `FuzzRender` also
+  runs under `GraphemeWidth`; a regression test covers it.
+
+  Widened the same day, by the owner: further fuzzing showed that under
+  `WcWidth`, the default, x/ansi's `Truncate` cuts by grapheme cluster
+  while `StringWidth` adds up runes, so a family emoji cut to 2-5 cells
+  stays 6, Hangul jamo cut to 2 stays 4, and a Devanagari conjunct cut to
+  1 stays 2; such a line paints over a pane's border. `sanitize.Truncate`
+  becomes the workspace's one truncation, with a tail: under `WcWidth` it
+  cuts rune by rune, keeping escape sequences whole, and its result never
+  measures wider than asked. `clip`, `title` and `renderBox`'s label call
+  it.
+* **D9 (2026-10-09): `Styled` keeps an allow-list.** `FuzzClip` and
+  `FuzzRender` found that `Styled`, which D1 had keep each complete
+  escape sequence, lets a pane's view send any sequence through `clip`: a
+  body holding `ESC SP X` shortens its frame row from 20 cells to 5, and
+  `ESC # 8` (DECALN), `ESC SP G` and an OSC carrying `\r` pass. It
+  predates this step. `Styled` now keeps only SGR (CSI digits, `;` and
+  `:`, ending in `m`) and OSC 8 hyperlinks whose parameters and URI are
+  printable ASCII, and drops every other sequence. This replaces D1's
+  rule; `TestStyled` covers it.
+
+  Found the same day, while executing it: `FuzzRender` made `Render`
+  panic inside x/ansi v0.11.8's parser, which Bubble Tea's renderer runs
+  over every frame, with an SGR of 33 parameters (`index out of range
+  [32] with length 32`). It predates this step, since `Styled` kept every
+  CSI. The allow-list keeps an SGR of at most 32 parameters.
 
 **Mutation S9-1:** discovery skips `workspace`. `go-fuzz_test.sh`'s count
 check fails.
@@ -1288,3 +1320,187 @@ them for `LoadDir`: `SetRunTimeout` with a value below 1, and a
   * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
   * the step's tests, with `TestContextKeys`, `TestWhenContextLayers`,
     `TestEachProfile` and `TestSilentEndsByTimeout`: passed.
+
+### Step 9: fuzz discovery and new targets (H9)
+
+#### Deviations
+
+The new targets found four defects, each older than this step, and the
+owner chose to fix each here: `make fuzz` would otherwise fail in CI.
+
+* **D8 (2026-10-09): widths that do not add up.**
+  * **Found:**
+    * `FuzzClip`: under `GraphemeWidth`, a Unicode Prepend character
+      joins the next character into one grapheme as wide as itself, so
+      `clip("\u0605", 3, …)` padded to 2 cells, and a bordered pane's row
+      came out short.
+    * Fuzzing on: under `WcWidth`, the default, x/ansi v0.11.8's
+      `Truncate` cuts by grapheme cluster while its `StringWidth` adds up
+      runes, so a family emoji cut to 2-5 cells stayed 6, Hangul jamo cut
+      to 2 stayed 4, a Devanagari conjunct cut to 1 stayed 2, and the line
+      painted over the pane's right border.
+    * While executing: a spacing mark (U+0D40) opening a line joined the
+      left border, and U+FE0F opening one widened it.
+  * **The owner's choices:** fix it in this step by measuring; then, with
+    the second finding, own the truncation:
+    * `sanitize.Truncate(s, cells, m, tail)` is the workspace's one
+      truncation. Its result never measures wider than `cells`: under
+      `WcWidth` it cuts rune by rune, keeping escape sequences whole, and
+      under `GraphemeWidth` it checks x/ansi's result.
+    * `clip`, `title` and `renderBox`'s label call it.
+    * Under `GraphemeWidth`, a line holding a character from U+0600 up is
+      closed: nothing that opens it joins the character before it, and
+      nothing that ends it joins the one after it. Each end must measure
+      exactly one cell more with a border glyph beside it. The padded
+      line is measured and padded again. A full line that ends with a
+      Prepend gives up its last cell.
+    * `title`'s padding is measured under `GraphemeWidth` too.
+  * **The others:** drop the Prepend characters in `sanitize` (it would
+    not have covered the Indic Prepend letters, the spacing marks or the
+    truncation); or a separate record, with Step 9 unable to commit
+    meanwhile.
+  * **Not covered:** two panes with chrome `None` and no gap put their
+    text side by side, so a Hangul jamo sequence could join across them.
+    Borders and separators put a glyph between panes; `FuzzRender` checks
+    those.
+* **D9 (2026-10-09): `Styled` keeps an allow-list.**
+  * **Found:** `FuzzClip` and `FuzzRender`: `Styled`, which D1 had keep
+    every complete escape sequence, passed any sequence through `clip`.
+    `ESC SP X` shortened a frame row from 20 cells to 5, and `ESC # 8`
+    (DECALN), `ESC SP G` and an OSC carrying `\r` passed. While
+    executing: an SGR of 33 parameters made x/ansi v0.11.8's parser,
+    which Bubble Tea's renderer runs over every frame, panic inside
+    `Render` (`index out of range [32] with length 32`).
+  * **The owner's choice:** an allow-list. `Styled` keeps only an SGR
+    (CSI digits, `;` and `:`, at most 32 parameters, final `m`) and an OSC
+    8 hyperlink whose parameters and URI are printable ASCII, and drops
+    every other sequence. This replaces D1's rule.
+  * **The other:** a separate record.
+
+#### What was built
+
+* **Discovery:**
+  * `scripts/go-fuzz.sh -a PATTERN...` lists the packages with
+    `go list`, and fuzzes each package whose test files, its own or an
+    external test package's, declare a `func Fuzz`; the others are
+    skipped. MIN applies to each. Finding no package is an error. `-l`
+    prints the packages found and fuzzes nothing. A failure names the
+    package's directory.
+  * `scripts/go-fuzz_test.sh` gains the cases: a module with a target in
+    its own tests, one in an external test package, tests without a
+    target and no tests; listing, fuzzing, skipping and refusing; a
+    failing target found by discovery; and the repository's own packages
+    with targets, found by discovery and by an independent `git
+    ls-files` and `grep`, compared, with at least 8 of them.
+  * `make fuzz` runs `go-fuzz.sh -a -t $(FUZZTIME) -m 1 ./...` in every
+    module, through `each_module`.
+  * CI uploads `**/testdata/fuzz/` on failure, and its comment no longer
+    lists the packages.
+* **The ten targets,** each with the PLAN's invariant and seeds from the
+  existing tests' inputs:
+  * `termcap/fuzz_test.go`: `FuzzProberReplies` (ten kinds of reply,
+    termcaptest's replies written out, since termcaptest imports
+    termcap; a query added with `WithQuery` records any raw reply over
+    `maxReply`), `FuzzParseTmux` (also: no empty or untrimmed list
+    entry), `FuzzEnumText` (the seven enums, exact names) and
+    `FuzzColorFGBG`;
+  * `termsvc/fuzz_test.go`: `FuzzSanitizers`, which takes Link's output
+    apart at its OSC 8 wrapper;
+  * `layout/fuzz_test.go`: `FuzzState`, solving `SidebarRightBottom` at
+    120 x 40 and 30 x 8, seeded with its resizable separators;
+  * `workspace/fuzz_test.go`: `FuzzClip` (also: no line joins a border
+    glyph on either side) and `FuzzRender` (under both width methods and
+    both glyph tables). It reads a cell rune by rune under `WcWidth`,
+    and under `GraphemeWidth` as ultraviolet's renderer segments a frame.
+    It accepts a combining mark on an edge's glyph. It does not use
+    `Method.Cut`, whose `WcWidth` form ignores `left` in x/ansi v0.11.8.
+  * `launch/fuzz_test.go`: `FuzzDecideEnv`, over Linux and Windows, with a
+    controlling terminal that opens or fails at a fuzzed size;
+  * `internal/sanitize/fuzz_test.go`: `FuzzLine`, against the drop set
+    written out apart from `dropped`.
+* **The fixes:**
+  * D8 in `internal/sanitize/sanitize.go` (`Truncate`, `byRune`) and
+    `workspace/render.go` (`clip`, `closed`, `withoutFirst`,
+    `beyondArabic`, `title`, `renderBox`);
+  * D9 in `internal/sanitize/sanitize.go` (`kept`, `maxSGRParams`).
+* **The tests:**
+  * `workspace/prepend_test.go` (new): `TestPrependPadding` and
+    `TestClipNeverWider`, using only names that existed before the step;
+  * `TestStyled` gains 16 rows, and `TestTruncate` is new;
+  * every input fuzzing found is a seed of `FuzzClip` or `FuzzRender`.
+
+#### Checks
+
+* **Rule 3: the probes fail before the fix,** each on a scratch copy of
+  `d61c50d`, the commit before this step:
+  * the new `go-fuzz_test.sh` against that commit's `go-fuzz.sh`: "16
+    passed, 9 failed", among them the usage error for `-a` and "the
+    repository's packages with targets are all found";
+  * `TestPrependPadding` and `TestClipNeverWider`: 25 failures, among
+    them `clip("\u0605", 3)` at 2 cells and the family emoji clipped to 2
+    at 6 cells;
+  * the new `TestStyled`, in that commit's test file: 14 failures, among
+    them `ESC b`, `S8C1T` and the SGR of 33 parameters kept;
+  * the seeds of `FuzzClip` and `FuzzRender`: 23 seeds failed, and the
+    SGR seed panicked.
+* **Mutations,** on scratch copies of the tree, every one killed by a
+  failing test, none by a build failure:
+  * discovery, with `go-fuzz_test.sh` as the test: S9-1 (the PLAN's,
+    discovery skips `workspace`), S9-1b (external test packages
+    ignored), S9-1c (finding nothing passes), S9-1d (`-l` fuzzes) and
+    S9-1e (a failure names the import path);
+  * the targets: S9-2 (`Line` keeps U+00AD), S9-3 (replies over
+    `maxReply` parsed), S9-4 (the version kept raw), S9-5 and S9-6
+    (`ParseTmux`), S9-7 (enum names read without case), S9-8 and S9-9
+    (`colorFGBG`), S9-10 to S9-12 (`termsvc`'s vendor, link text and
+    title), S9-13 (an unknown state version), S9-14 (`clip` unpadded),
+    S9-15 (a right edge not drawn), S9-16 and S9-17 (`Decide` on Windows,
+    and unclamped);
+  * D8 and D9: S9-18 to S9-21 and S9-29, S9-30 (`closed`, `clip` and
+    `title`), S9-22 to S9-24 (`Truncate`), S9-25 to S9-28 and S9-31
+    (`kept`).
+
+  Four were reworked:
+  * S9-4 removed the file's only use of `sanitize` and did not build; it
+    was rewritten to compile.
+  * S9-1d left an empty `if` body, a syntax error; it was rewritten as a
+    no-op.
+  * S9-1e first survived: the test's pattern matched the import path
+    too. The check now requires the named path to be a directory.
+  * S9-28 first survived: no row held an OSC 8 without its separator,
+    and one was added.
+* **Fuzzing,** on scratch copies:
+  * the four findings above, each fixed and seeded;
+  * then `FuzzRender` for 180 s and `FuzzClip` for 60 s, clean;
+  * every target for 30 s through `go-fuzz.sh -a`, clean;
+  * `make fuzz` at CI's 20 s, through the makefile: "8 packages ran
+    clean", with `go-fuzz_test.sh` at "25 passed, 0 failed".
+
+  `FuzzRender` once reported a cell its oracle had cut wrongly: x/ansi's
+  decoder takes an ASCII byte alone even when a spacing mark follows,
+  where ultraviolet takes the whole cluster. The oracle now cuts as
+  ultraviolet does; the workspace was right.
+* **x/ansi v0.11.8,** found along the way and worked around rather than
+  changed: `Method.Cut` and `CutWc` ignore `left` under `WcWidth`;
+  `TruncateWc` can return a string wider than asked; and the parser
+  panics on an SGR of 33 parameters.
+* **Rule 2 on macOS,** go1.27.2:
+  * `gofmt -l`: nothing; `shellcheck` on both scripts: clean.
+  * `make pre-add-check FILES=<the ten Go files>`: "10 file(s) clean".
+  * `make lint`: clean.
+  * With `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    all passed, and so did workspace mode, with the golden files and
+    `TestRenderAllocs` unchanged.
+  * `go mod tidy -diff`, `make vuln` and `scripts/go-modules.sh --check`
+    were clean.
+  * `make apicheck`: "against v0.7.1, 0 incompatible change(s)".
+  * `make examples`: "clean".
+  * `make release-check`: "186 file(s) clean … apicheck, examples".
+* **The Windows test host,** go1.27.2 windows/amd64:
+  * the `FILES` and no-list `make pre-add-check`, `make lint`, `make
+    vuln` and `make examples`: each exit 0;
+  * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
+  * the step's tests and every fuzz target's seeds: "24 passed, 0
+    failed";
+  * `go-fuzz_test.sh`: "25 passed, 0 failed";
+  * `make fuzz FUZZTIME=3s`: "8 packages ran clean".

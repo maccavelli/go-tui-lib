@@ -98,6 +98,41 @@ check "no package is a usage error" 2 "$(run "$WORK/clean")"
 check "a non-numeric minimum is a usage error" 2 "$(run "$WORK/clean" -m x ./)"
 check "a zero minimum is a usage error" 2 "$(run "$WORK/clean" -m 0 ./)"
 check "an unknown flag is a usage error" 2 "$(run "$WORK/clean" -z ./)"
+check "-l without -a is a usage error" 2 "$(run "$WORK/clean" -l ./)"
+check "-a with no pattern is a usage error" 2 "$(run "$WORK/clean" -a)"
+
+# 5. Discovery (docs/decisions/0014-PLAN-hardening.md Step 9): a module
+#    with a target in a package's own tests (a), one in an external test
+#    package (d), tests without a target (b) and no tests at all (c).
+mkdir -p "$WORK/disc/a" "$WORK/disc/b" "$WORK/disc/c" "$WORK/disc/d"
+printf 'module example.com/disc\n\ngo 1.27.1\n' >"$WORK/disc/go.mod"
+for p in a b c d; do printf 'package %s\n' "$p" >"$WORK/disc/$p/$p.go"; done
+printf 'package a\n\nimport "testing"\n\nfunc FuzzA(f *testing.F) {\n\tf.Add(1)\n\tf.Fuzz(func(t *testing.T, n int) {})\n}\n' >"$WORK/disc/a/a_test.go"
+printf 'package b\n\nimport "testing"\n\nfunc TestB(t *testing.T) {}\n' >"$WORK/disc/b/b_test.go"
+printf 'package d_test\n\nimport "testing"\n\nfunc FuzzD(f *testing.F) {\n\tf.Add(1)\n\tf.Fuzz(func(t *testing.T, n int) {})\n}\n' >"$WORK/disc/d/d_test.go"
+check "discovery lists the packages with targets" 0 "$(run "$WORK/disc" -a -l ./...)"
+check "the list is a and d" "example.com/disc/a example.com/disc/d" "$(tr '\n' ' ' <"$WORK/out" | sed 's/ $//')"
+check "discovery fuzzes them" 0 "$(run "$WORK/disc" -a -t 1s -m 1 ./...)"
+check "each target is fuzzed once" 2 "$(grep -c '^go-fuzz: Fuzz[AD] for 1s ' "$WORK/out" || true)"
+check "a package with no target is skipped" 0 "$(grep -c 'example.com/disc/[bc]' "$WORK/out" || true)"
+check "the run names two packages" 1 "$(grep -c '^go-fuzz: 2 packages ran clean$' "$WORK/out" || true)"
+check "no package with a target is refused" 1 "$(run "$WORK/disc" -a -l ./b/... ./c/...)"
+rm -rf "$WORK/boom/testdata"
+rc="$(run "$WORK/boom" -a -t 5s -m 1 ./...)"
+if [ "$rc" -ne 0 ]; then rc=nonzero; fi
+check "a failing target found by discovery fails the run" nonzero "$rc"
+named="$(sed -n 's/.*Go wrote the failing input under \(.*\)$/\1/p' "$WORK/out" | tail -1)"
+check "its failure names the directory the input is in" yes "$([ -n "$named" ] && [ -d "$named" ] && echo yes || echo no)"
+
+# 6. The repository's own fuzz targets: discovery finds exactly the
+#    packages whose tracked test files declare one, so a package cannot be
+#    left out of make fuzz.
+mod="$(cd "$ROOT" && GOWORK=off go list -m)"
+want="$(cd "$ROOT" && git ls-files --cached --others --exclude-standard '*_test.go' | grep -v '/testdata/' | xargs grep -l '^func Fuzz' |
+	xargs -n1 dirname | sort -u | sed "s|^|$mod/|" | tr '\n' ' ' | sed 's/ $//')"
+got="$(cd "$ROOT" && GOWORK=off "$FUZZ" -a -l ./... | sort | tr '\n' ' ' | sed 's/ $//')" || got="discovery failed"
+check "the repository's packages with targets are all found" "$want" "$got"
+check "the repository has fuzz targets in at least 8 packages" yes "$([ "$(echo "$got" | wc -w)" -ge 8 ] && echo yes || echo no)"
 
 echo "go-fuzz_test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
