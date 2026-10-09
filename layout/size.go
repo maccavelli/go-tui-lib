@@ -3,6 +3,8 @@ package layout
 import (
 	"cmp"
 	"fmt"
+	"math"
+	"math/bits"
 	"slices"
 	"strconv"
 	"strings"
@@ -215,11 +217,17 @@ func (s Split) resizeKey(i int) string {
 
 // allocate gives each child in kids a length out of total, less a gap
 // between neighbours, and returns the lengths of the children it kept, in
-// order. Children it could not fit are dropped, in shrink order.
+// order. Children it could not fit are dropped, in shrink order: gaps that
+// do not fit are a split that does not fit
+// (docs/decisions/0014-PLAN-hardening.md Step 7, D7).
 func allocate(children []Child, kids []int, total, gap int) (sizes []int, kept []int) {
 	kept = slices.Clone(kids)
 	for {
-		sizes = fit(children, kept, total-gap*max(len(kept)-1, 0))
+		avail := -1 // the gaps do not fit
+		if g := max(len(kept)-1, 0); g == 0 || gap <= total/g {
+			avail = total - gap*g
+		}
+		sizes = fit(children, kept, avail)
 		if sizes != nil || len(kept) <= 1 {
 			break
 		}
@@ -248,17 +256,23 @@ func dropFirst(children []Child, kept []int) int {
 }
 
 // fit sizes the kept children to exactly avail cells, or returns nil when
-// their minimums do not fit.
+// their minimums do not fit. No sum it takes can overflow: each is checked
+// against avail before it grows (docs/decisions/0014-PLAN-hardening.md
+// Step 7, H10).
 func fit(children []Child, kept []int, avail int) []int {
+	if avail < 0 {
+		return nil
+	}
 	n := len(kept)
 	sizes := make([]int, n)
 	minSum := 0
 	for k, i := range kept {
-		minSum += children[i].Size.Min
-		sizes[k] = children[i].Size.Min
-	}
-	if avail < 0 || minSum > avail {
-		return nil
+		m := children[i].Size.Min
+		if minSum > avail-m {
+			return nil
+		}
+		minSum += m
+		sizes[k] = m
 	}
 	// Claims: fixed cells, then percentages and ratios floored, each
 	// clamped. Remainders are kept for the largest-remainder pass.
@@ -269,18 +283,20 @@ func fit(children []Child, kept []int, avail int) []int {
 		case KindFixed:
 			sizes[k] = sz.clamp(sz.N)
 		case KindPercent:
-			sizes[k] = sz.clamp(avail * sz.N / 100)
-			rem[k] = (avail * sz.N % 100) * 1000 / 100
+			q, r := mulDiv(avail, sz.N, 100)
+			sizes[k] = sz.clamp(q)
+			rem[k], _ = mulDiv(r, 1000, 100)
 		case KindRatio:
-			sizes[k] = sz.clamp(avail * sz.N / sz.D)
-			rem[k] = (avail * sz.N % sz.D) * 1000 / sz.D
+			q, r := mulDiv(avail, sz.N, sz.D)
+			sizes[k] = sz.clamp(q)
+			rem[k], _ = mulDiv(r, 1000, sz.D)
 		case KindFill:
 			sizes[k] = sz.clamp(0)
 		}
 	}
-	left := avail - sum(sizes)
-	if left < 0 {
-		return shrink(children, kept, sizes, -left)
+	left, over := room(avail, sizes)
+	if over {
+		return shrink(children, kept, sizes, avail)
 	}
 	left = share(children, kept, sizes, left, func(s Size) bool { return s.Kind == KindFill })
 	left = byRemainder(children, kept, sizes, rem, left)
@@ -304,29 +320,28 @@ func fit(children []Child, kept []int, avail int) []int {
 func share(children []Child, kept []int, sizes []int, left int, takes func(Size) bool) int {
 	for left > 0 {
 		var open []int
-		weights := 0
 		for k, i := range kept {
 			sz := children[i].Size
 			if takes(sz) && (sz.Max == 0 || sizes[k] < sz.Max) {
 				open = append(open, k)
-				weights += sz.weight()
 			}
 		}
 		if len(open) == 0 {
 			return left
 		}
+		shift, weights := weightSum(children, kept, open)
 		given := 0
 		type part struct{ k, rem int }
 		parts := make([]part, 0, len(open))
 		for _, k := range open {
 			sz := children[kept[k]].Size
-			n := left * sz.weight() / weights
+			n, r := mulDiv(left, sz.weight()>>shift, weights)
 			if sz.Max > 0 {
 				n = min(n, sz.Max-sizes[k])
 			}
 			sizes[k] += n
 			given += n
-			parts = append(parts, part{k, left * sz.weight() % weights})
+			parts = append(parts, part{k, r})
 		}
 		rest := left - given
 		slices.SortStableFunc(parts, func(a, b part) int { return cmp.Compare(b.rem, a.rem) })
@@ -346,6 +361,47 @@ func share(children []Child, kept []int, sizes []int, left int, takes func(Size)
 		left = rest
 	}
 	return 0
+}
+
+// weightSum is the open children's weights summed, each shifted right by
+// shift bits, the fewest that keep the sum within an int. Every weight
+// shifts alike, so the proportions stay; the sum is at least 1, since a
+// sum that overflowed held a weight of 2 or more.
+func weightSum(children []Child, kept, open []int) (shift, sum int) {
+	for shift = 0; ; shift++ {
+		sum = 0
+		fits := true
+		for _, k := range open {
+			w := children[kept[k]].Size.weight() >> shift
+			if sum > math.MaxInt-w {
+				fits = false
+				break
+			}
+			sum += w
+		}
+		if fits {
+			return shift, sum
+		}
+	}
+}
+
+// mulDiv is a*b/d and its remainder, with a*b in 128 bits so that it
+// cannot overflow. Every caller has a and b at least 0, d above 0, and b <=
+// d or a < d, so the quotient fits; outside that, it is 0, 0 rather than a
+// panic in Div64.
+func mulDiv(a, b, d int) (q, r int) {
+	if a < 0 || b < 0 || d <= 0 {
+		return 0, 0
+	}
+	hi, lo := bits.Mul64(uint64(a), uint64(b))
+	if hi >= uint64(d) {
+		return 0, 0
+	}
+	qu, ru := bits.Div64(hi, lo, uint64(d))
+	if qu > math.MaxInt || ru > math.MaxInt {
+		return 0, 0
+	}
+	return int(qu), int(ru)
 }
 
 // byRemainder gives left cells, one each, to the percentage and ratio
@@ -371,9 +427,13 @@ func byRemainder(children []Child, kept []int, sizes []int, rem []int, left int)
 	return left
 }
 
-// shrink takes over cells from the children, in shrink order, down to their
-// Min. fit has checked that the minimums fit, so it always succeeds.
-func shrink(children []Child, kept []int, sizes []int, over int) []int {
+// shrink brings the children's claims, which exceed avail, down to exactly
+// avail cells: in shrink order, each gives up cells down to its Min until
+// they fit. It works from the other end, so it needs no total that could
+// overflow: every child keeps its Min, and what avail has beyond the
+// minimums goes to the children that shrink last, each up to its claim.
+// fit has checked that the minimums fit, so it always succeeds.
+func shrink(children []Child, kept []int, sizes []int, avail int) []int {
 	order := make([]int, len(kept))
 	for k := range order {
 		order[k] = k
@@ -384,21 +444,28 @@ func shrink(children []Child, kept []int, sizes []int, over int) []int {
 		}
 		return cmp.Compare(b, a) // later first
 	})
+	budget := avail
 	for _, k := range order {
-		take := min(over, sizes[k]-children[kept[k]].Size.Min)
-		sizes[k] -= take
-		over -= take
-		if over == 0 {
-			break
-		}
+		budget -= children[kept[k]].Size.Min
+	}
+	for _, k := range slices.Backward(order) {
+		m := children[kept[k]].Size.Min
+		extra := min(sizes[k]-m, budget)
+		sizes[k] = m + extra
+		budget -= extra
 	}
 	return sizes
 }
 
-func sum(xs []int) int {
+// room is what avail has left after xs, or over when xs exceed it. The
+// running total never passes avail, so it cannot overflow.
+func room(avail int, xs []int) (left int, over bool) {
 	t := 0
 	for _, x := range xs {
+		if t > avail-x {
+			return 0, true
+		}
 		t += x
 	}
-	return t
+	return avail - t, false
 }

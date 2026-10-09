@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"math/rand/v2"
 	"reflect"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/maccavelli/go-tui-lib/internal/limits"
 	"github.com/maccavelli/go-tui-lib/tuitest"
 )
 
@@ -557,7 +559,10 @@ func TestSolverProperties(t *testing.T) {
 }
 
 // decode builds a small tree from fuzz bytes, deterministically.
-func decode(data []byte) Node {
+// decode builds a tree from data, with every cell count, ratio and gap
+// shifted left by shift bits (0 to 54, so that none passes an int), to
+// reach the sizes whose products and sums overflow.
+func decode(data []byte, shift int) Node {
 	i, n := 0, 0
 	nextByte := func() int {
 		if i >= len(data) {
@@ -573,17 +578,17 @@ func decode(data []byte) Node {
 			n++
 			return Pane{ID: PaneID(fmt.Sprintf("p%d", n))}
 		}
-		s := Split{Name: fmt.Sprintf("s%d", n), Axis: Axis(b % 2), Gap: nextByte() % 4}
+		s := Split{Name: fmt.Sprintf("s%d", n), Axis: Axis(b % 2), Gap: nextByte() % 4 << shift}
 		for range 1 + nextByte()%4 {
-			sz := Size{Kind: SizeKind(nextByte() % 4), N: nextByte(), D: 1 + nextByte(), Min: nextByte() % 40, Shrink: nextByte()%3 - 1}
+			sz := Size{Kind: SizeKind(nextByte() % 4), N: nextByte() << shift, D: (1 + nextByte()) << shift, Min: nextByte() % 40 << shift, Shrink: nextByte()%3 - 1}
 			if sz.Kind == KindPercent {
-				sz.N %= 101
+				sz.N = sz.N >> shift % 101
 			}
 			if sz.Kind == KindRatio {
 				sz.N %= sz.D + 1
 			}
 			if m := nextByte(); m%2 == 0 {
-				sz.Max = sz.Min + m%60
+				sz.Max = sz.Min + m%60<<shift
 			}
 			s.Children = append(s.Children, Child{Node: build(depth - 1), Size: sz})
 		}
@@ -592,13 +597,19 @@ func decode(data []byte) Node {
 	return build(4)
 }
 
+// FuzzSolve: any tree, at any size up to MaxSide, with its sizes scaled
+// up to 2^54 times (docs/decisions/0014-PLAN-hardening.md Step 7), solves
+// without an error other than a bad size, and every pane and separator
+// stays in its area without overlapping another.
 func FuzzSolve(f *testing.F) {
-	f.Add([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9}, 80, 24)
-	f.Add([]byte{4, 1, 3, 1, 50, 2, 10, 1, 7, 0, 9}, 200, 60)
-	f.Fuzz(func(t *testing.T, data []byte, w, h int) {
-		w, h = abs(w)%400, abs(h)%200
+	f.Add([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9}, 80, 24, uint8(0))
+	f.Add([]byte{4, 1, 3, 1, 50, 2, 10, 1, 7, 0, 9}, 200, 60, uint8(0))
+	f.Add([]byte{4, 1, 3, 1, 50, 2, 10, 1, 7, 0, 9}, 4096, 4096, uint8(54))
+	f.Add([]byte{1, 3, 3, 0, 9, 9, 0, 1, 1, 0, 9, 9, 0, 1, 1, 0, 9, 9, 0, 1}, 100, 1, uint8(50))
+	f.Fuzz(func(t *testing.T, data []byte, w, h int, shift uint8) {
+		w, h = abs(w)%(limits.MaxSide+1), abs(h)%(limits.MaxSide+1)
 		area := Rect{W: w, H: h}
-		p, err := Solve(decode(data), area, State{})
+		p, err := Solve(decode(data, int(shift%55)), area, State{})
 		if err != nil {
 			if errors.Is(err, ErrBadSize) || errors.Is(err, ErrDuplicatePane) || errors.Is(err, ErrBadSplitName) {
 				return
@@ -607,6 +618,28 @@ func FuzzSolve(f *testing.F) {
 		}
 		check(t, "fuzz", p, area, false)
 	})
+}
+
+// TestMulDiv: exact past 64 bits, and 0, 0 where its callers' bounds do
+// not hold, never Div64's panic (docs/decisions/0014-PLAN-hardening.md
+// Step 7).
+func TestMulDiv(t *testing.T) {
+	for _, c := range []struct{ a, b, d, q, r int }{
+		{7, 3, 2, 10, 1},
+		{1 << 62, 1 << 40, 1 << 41, 1 << 61, 0},
+		{1 << 24, 1<<40 + 1, 1<<41 + 3, 8388607, 2199014866947},
+		{math.MaxInt, math.MaxInt, math.MaxInt, math.MaxInt, 0},
+		{-1, 1, 1, 0, 0},      // a below 0
+		{1, -1, 1, 0, 0},      // b below 0
+		{1, 1, 0, 0, 0},       // d of 0
+		{1, 1, -1, 0, 0},      // d below 0
+		{1 << 62, 4, 1, 0, 0}, // the quotient passes 64 bits
+		{1 << 62, 2, 1, 0, 0}, // the quotient passes an int
+	} {
+		if q, r := mulDiv(c.a, c.b, c.d); q != c.q || r != c.r {
+			t.Errorf("mulDiv(%d, %d, %d) = %d, %d; want %d, %d", c.a, c.b, c.d, q, r, c.q, c.r)
+		}
+	}
 }
 
 func abs(x int) int {

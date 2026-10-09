@@ -316,12 +316,20 @@ does.
   `r*1000/d` uses it too.
 * **`share`'s weight sum** saturates. On overflow, every weight is
   shifted right one bit until the sum fits, which keeps the proportions.
-* **`minSum` and `sum`** use a saturating add.
+* **`minSum` and `sum`** use a saturating add. D6 (2026-10-09): not a
+  saturating add, which leaves `shrink` short of the true excess, but
+  exact comparisons: `minSum > avail-m` per child, `t > avail-x` for the
+  claims, and `shrink` hands `avail` out from the last child to shrink,
+  so it needs no total.
+* **D7 (2026-10-09): `allocate`'s gaps,** `gap*(len(kept)-1)`, are
+  checked as `gap > total/(n-1)`; gaps that do not fit are a split that
+  does not fit, and children are hidden in shrink order.
 
 **Tests:**
 
 * `TestLayoutOverflow`, the probe table with exact floors: 8,388,608, and
-  8,388,607 for 2^40+1 over 2^41+3, checked by hand;
+  8,388,607 for 2^40+1 over 2^41+3, checked by hand; with D6's and D7's
+  cases, three `Fixed(2^62)` in 100 cells and a gap of 2^62+1;
 * `FuzzSolve`, widened to widths up to `MaxSide` and sizes taken from the
   input.
 
@@ -1053,3 +1061,136 @@ No deviation.
   * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
   * the step's tests, with `TestAuditMasksSecrets`, `FuzzParseArgs` and
     `FuzzParseSlash`: passed.
+
+### Step 7: overflow-safe layout (H10)
+
+#### Deviations
+
+* **D6 (2026-10-09): exact comparisons, not a saturating add.**
+  * **Found:** on a scratch copy of `d6598a3`, three `Fixed(2^62)`
+    children in 100 cells gave widths of 2^62, 2^62 and 0: the claims'
+    sum wraps. With the step's saturating `sum` in its place, they gave
+    2^62, 101 and 0. `shrink` was told the excess was MaxInt−100, not the
+    true one, stopped short, and a pane still escaped the area.
+  * **The owner's choice:** exact comparisons, and no total that can
+    overflow:
+    * `fit` checks each minimum as `minSum > avail-m` before adding it;
+    * `room` checks the claims as `t > avail-x`, and reports whether they
+      exceed `avail`;
+    * `shrink` takes `avail`, not an excess. Every child keeps its Min,
+      and what is left goes to the children that shrink last, each up to
+      its claim. That is the same result as taking cells from the first
+      to shrink, and the goldens and `TestSolverProperties` passed
+      unchanged.
+  * **The other:** a 128-bit sum and excess, with `shrink` unchanged.
+* **D7 (2026-10-09): `allocate`'s gaps.**
+  * **Found:** the step does not list `total - gap*(len(kept)-1)`, which
+    also overflows. On `d6598a3`, a split with a gap of 2^62+1 and three
+    panes in one cell placed panes 3,074,457,345,618,258,602 cells wide,
+    one at a negative X.
+  * **The owner's choice:** fix it in this step. When `gap > total/(n-1)`,
+    the gaps do not fit, the split does not fit, and children are hidden
+    in shrink order as for any split that does not fit. Positions,
+    `area.X` plus the sizes, are the caller's, and stay out of scope.
+  * **The other:** leave it for a later record.
+
+#### What was built
+
+* **`layout/size.go`:**
+  * `mulDiv(a, b, d)`, a*b/d and its remainder through `bits.Mul64` and
+    `bits.Div64`. Its callers keep a and b at least 0, d above 0, and
+    b <= d or a < d. Outside that it returns 0, 0 rather than Div64's
+    panic. Those guards are what gosec's G115 needs to accept the
+    conversions; see the lint below.
+  * `Percent` and `Ratio` claims, and their remainders scaled to 1000,
+    use it.
+  * `share` sums the open children's weights with `weightSum`, which
+    shifts every weight right by the fewest bits that keep the sum within
+    an int, and divides with `mulDiv`.
+  * `fit`, `room` and `shrink` as D6; `allocate` as D7. `sum` is gone.
+* **`layout/overflow_test.go` (new):** `TestLayoutOverflow`, nine cases,
+  each checked for exact widths and with `check` for tiling and for
+  staying in the area:
+  * `Ratio(2^40, 2^41)` of 2^24: 8,388,608;
+  * `Ratio(2^40+1, 2^41+3)` of 2^24: 8,388,607, the floor of
+    8,388,607.99…, checked by hand;
+  * two `Fill(2^40)` of 2^24: 8,388,608 each;
+  * `Percent(50)` of 2^62: 2^61;
+  * three `Fill(MaxInt)` of 100: 34, 33 and 33;
+  * the remainders of a ratio over 2^61+1, where `r*1000` would
+    overflow: the left cell goes to the larger, 500 against 333;
+  * D6: three `Fixed(2^62)` of 100, giving 100, 0 and 0, and three
+    minimums of 2^62 in 2^62+5 cells, giving one pane of 2^62+5;
+  * D7: a gap of 2^62+1 in one cell, giving one pane of one cell.
+
+  It uses only names that existed before the step.
+* **`layout/layout_test.go`:**
+  * `decode` takes a shift, 0 to 54, that scales every cell count, ratio
+    and gap, so that none passes an int;
+  * `FuzzSolve` takes the shift from its input and sizes up to `MaxSide`
+    (`internal/limits`), with two new seeds at shifts of 54 and 50;
+  * `TestMulDiv`: exact results past 64 bits, and 0, 0 for each guard.
+
+#### Checks
+
+* **Rule 3: the probe fails before the fix.** `TestLayoutOverflow`, on a
+  scratch copy of `d6598a3`, the commit before this step: all nine cases
+  failed. For example, "Ratio(2^40, 2^41) of 2^24: widths map[b:16777216]",
+  "two Fill(2^40) of 2^24: widths map[a:1 b:16777215]" and "gap 2^62+1
+  of 1: widths map[a:3074457345618258603 …]". It passes on the step's
+  code. The widened `FuzzSolve`, against `d6598a3`'s layout, found a pane
+  at Y −5 escaping its area within a second.
+* **Mutations,** on scratch copies of the tree. All twelve were killed by
+  a failing test, none by a build failure:
+  * **S7-1** (`Ratio` back to `avail * N / D`): "Ratio(2^40, 2^41) of
+    2^24: widths map[b:16777216]".
+  * **S7-2** (`Percent` likewise, added): "Percent(50) of 2^62: widths
+    map[b:4611686018427387904]".
+  * **S7-3** (the weights never shift, added): "three Fill(MaxInt) of
+    100: widths map[a:101 b:101 c:101]". Its first form removed the only
+    use of `math` and did not build; it was rewritten to compile.
+  * **S7-4** (`share` back to `left * w / weights`, added): "two
+    Fill(2^40) of 2^24: widths map[a:1 b:16777215]".
+  * **S7-5** (`minSum` unchecked, added): "three Min 2^62 of 2^62+5".
+  * **S7-6** (`room` unchecked, added): "three Fixed(2^62) of 100: widths
+    map[a:4611686018427387904 b:4611686018427387904]".
+  * **S7-7** (`shrink` hands out from the wrong end, added):
+    `TestShrinkOrder`, "widths [10 20 10], want [15 15 10]".
+  * **S7-8** (the gaps unchecked, added): "gap 2^62+1 of 1".
+  * **S7-9** (the remainder scaled as `r * 1000 / D`, added): "remainders
+    of a 2^61 ratio: widths map[a:4 b:4 c:2], want map[a:3 b:5 c:2]". Its
+    first form, the remainder not scaled at all, survived: it changes
+    which of two remainders over different denominators is larger, which
+    no test compares. It was rewritten as the overflow the step removes,
+    with the case added to `TestLayoutOverflow` to kill it.
+  * **S7-10 to S7-12** (each of `mulDiv`'s guards removed, added):
+    `TestMulDiv`, "mulDiv(1, 1, -1) = 0, 1", Div64's "integer overflow"
+    panic, and "mulDiv(4611686018427387904, 2, 1) =
+    -9223372036854775808, 0".
+* **Fuzzing,** `FuzzSolve` for 60 s on a scratch copy of the final code:
+  10,871,325 executions, no failure.
+* **Rule 2 on macOS,** go1.27.2:
+  * `gofmt -l`: nothing.
+  * `make pre-add-check FILES=<the three Go files>`: "3 file(s) clean".
+  * `make lint`: clean. On the first run, gosec's G115 refused `mulDiv`'s
+    conversions between `int` and `uint64` on all three GOOS. The guards
+    above, tried first on a scratch copy, satisfy it; the repository
+    has no `nolint`, and none was added.
+  * With `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    all passed, and so did workspace mode.
+  * `go mod tidy -diff`, `make vuln` and `scripts/go-modules.sh --check`
+    were clean.
+  * `make apicheck`: "against v0.7.1, 0 incompatible change(s)". The
+    step changes no exported name.
+  * `make examples`: "clean".
+  * `make release-check`: "184 file(s) clean … apicheck, examples".
+* **The Windows test host,** go1.27.2 windows/amd64:
+  * a first run, from before the lint fix, failed `make pre-add-check
+    FILES=…` on the same three G115 reports. It was stopped, and its
+    files were removed from the host.
+  * on the final tree: the `FILES` and no-list `make pre-add-check`,
+    `make lint`, `make vuln` and `make examples`, each exit 0;
+  * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
+  * the step's tests, with `TestSolverProperties`, `TestShrinkOrder`,
+    `TestClaims`, `TestHideWhenMinimumsDoNotFit` and
+    `TestPresetDiagrams`: passed.
