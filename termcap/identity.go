@@ -3,6 +3,8 @@ package termcap
 import (
 	"regexp"
 	"strings"
+
+	"github.com/maccavelli/go-tui-lib/internal/sanitize"
 )
 
 // goosWindows is runtime.GOOS on Windows.
@@ -127,11 +129,12 @@ var itermSession = regexp.MustCompile(`^w\d+t\d+p\d+:`)
 // as Apple Terminal, so TERMINAL_EMULATOR comes before it; LC_TERMINAL
 // crosses SSH; Terminator sets VTE_VERSION too; and WT_SESSION is last.
 func FromEnv(env Env, goos string) Identity {
-	id := Identity{Term: env.Getenv("TERM"), TermFeatures: env.Getenv("TERM_FEATURES")}
+	id := Identity{Term: sanitize.Line(env.Getenv("TERM")), TermFeatures: sanitize.Line(env.Getenv("TERM_FEATURES"))}
 	_, tty := env.LookupEnv("SSH_TTY")
 	_, conn := env.LookupEnv("SSH_CONNECTION")
 	id.Remote = tty || conn
 	id.EnvBrand, id.Version = envBrand(env)
+	id.Version = sanitize.Line(id.Version)
 	id.Brand = id.EnvBrand
 	// Over SSH the terminal is the client's, which the host's environment
 	// does not name, so the guess is for a local console only (A5).

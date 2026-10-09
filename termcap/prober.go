@@ -13,6 +13,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/maccavelli/go-tui-lib/internal/sanitize"
 	"github.com/maccavelli/go-tui-lib/internal/termevent"
 )
 
@@ -651,7 +652,7 @@ func parseVersion(r Reply, c *Caps) bool {
 	if !ok {
 		return false
 	}
-	c.Terminal.Set(m.Name, Queried)
+	c.Terminal.Set(sanitize.Line(m.Name), Queried)
 	if strings.HasPrefix(strings.ToLower(m.Name), "tmux") {
 		c.Mux.Set(Tmux, Queried)
 	}

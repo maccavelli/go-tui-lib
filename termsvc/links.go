@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/maccavelli/go-tui-lib/internal/sanitize"
 	"github.com/maccavelli/go-tui-lib/termcap"
 )
 
@@ -42,7 +43,7 @@ type LinkPolicy struct {
 // Openable reports whether rawURL may be opened: it holds no control
 // character and its scheme is one the policy names.
 func (p LinkPolicy) Openable(rawURL string) bool {
-	if strip(rawURL) != rawURL || strings.ContainsAny(rawURL, " ") {
+	if sanitize.HasControl(rawURL) || strings.ContainsAny(rawURL, " ") {
 		return false
 	}
 	u, err := url.Parse(rawURL)

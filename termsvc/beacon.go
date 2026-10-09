@@ -3,7 +3,6 @@ package termsvc
 import (
 	"errors"
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -11,26 +10,18 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/maccavelli/go-tui-lib/internal/sanitize"
 	"github.com/maccavelli/go-tui-lib/termcap"
 )
 
 // TitleRunes is the longest window title SanitizeTitle keeps.
 const TitleRunes = 240
 
-// bidi are the bidirectional controls, which can make a title read
-// differently from what it holds.
-var bidi = []rune{0x061c, 0x200e, 0x200f, 0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2066, 0x2067, 0x2068, 0x2069}
-
 // SanitizeTitle is s fit for View.WindowTitle: escape sequences, controls
 // and bidirectional marks removed, and at most TitleRunes characters. A
 // program not on a terminal sets no title.
 func SanitizeTitle(s string) string {
-	s = strings.Map(func(r rune) rune {
-		if slices.Contains(bidi, r) {
-			return -1
-		}
-		return r
-	}, strip(ansi.Strip(s)))
+	s = sanitize.Line(s)
 	if r := []rune(s); len(r) > TitleRunes {
 		s = string(r[:TitleRunes])
 	}
@@ -114,7 +105,7 @@ func ParseActivity(payload string, now time.Time) (ActivityReport, error) {
 	if at.Sub(now) > ActivityAhead || now.Sub(at) >= ActivityMaxAge {
 		return ActivityReport{}, fmt.Errorf("%w: time %v from %v", ErrActivity, at, now)
 	}
-	return ActivityReport{Vendor: f[0], State: state, At: at}, nil
+	return ActivityReport{Vendor: sanitize.Line(f[0]), State: state, At: at}, nil
 }
 
 // parseActivityState reads a state's name.
@@ -148,12 +139,7 @@ func Pointer(c termcap.Caps, shape string) string {
 	if c.Mux.Value != termcap.NoMux || brand != termcap.BrandGhostty && brand != termcap.BrandKitty {
 		return ""
 	}
-	shape = strings.Map(func(r rune) rune {
-		if r >= 'a' && r <= 'z' || r == '-' {
-			return r
-		}
-		return -1
-	}, shape)
+	shape = sanitize.Token(shape, func(r rune) bool { return r >= 'a' && r <= 'z' || r == '-' })
 	if shape == "" && brand == termcap.BrandGhostty {
 		shape = "default" // kitty resets with an empty OSC 22
 	}

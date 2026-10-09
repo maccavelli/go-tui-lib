@@ -240,7 +240,10 @@ func TestActivity(t *testing.T) {
 	if got := Activity("kilo", ActivityBusy, at); got != "\x1b]777;kilo;activity;1;busy;1700000000123\x07" {
 		t.Errorf("Activity = %q", got)
 	}
-	if got := Activity("ve;n\x1bdor", ActivityDone, at); !strings.HasPrefix(got, "\x1b]777;vendor;activity;") {
+	// "\x1bd" is a whole escape sequence, ESC d, so sanitize.Line drops it,
+	// "d" and all, as a terminal reads it (docs/decisions/0014-PLAN-hardening.md
+	// Step 2); then the ';' goes.
+	if got := Activity("ve;n\x1bdor", ActivityDone, at); !strings.HasPrefix(got, "\x1b]777;venor;activity;") {
 		t.Errorf("vendor not cleaned: %q", got)
 	}
 }

@@ -20,10 +20,10 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/maccavelli/go-tui-lib/internal/sanitize"
 	"github.com/maccavelli/go-tui-lib/termcap"
 )
 
@@ -87,25 +87,10 @@ func CommandExecuted() string { return ansi.FinalTermCmdExecuted() }
 // status (OSC 133 D).
 func CommandFinished(exit int) string { return ansi.FinalTermCmdFinished(strconv.Itoa(exit)) }
 
-// strip removes every control character, C0, DEL and C1, ESC among them,
-// and every byte that is not UTF-8, which would include a C1 control in
-// its 8-bit form; it turns tabs and line breaks into spaces.
-func strip(s string) string {
-	var b strings.Builder
-	for s != "" {
-		r, size := utf8.DecodeRuneInString(s)
-		switch {
-		case r == utf8.RuneError && size == 1:
-		case r == '\t' || r == '\n' || r == '\r':
-			b.WriteByte(' ')
-		case r < 0x20 || r == 0x7f || (r >= 0x80 && r <= 0x9f):
-		default:
-			b.WriteString(s[:size])
-		}
-		s = s[size:]
-	}
-	return b.String()
-}
+// strip is sanitize.Line: escape sequences, controls, bidirectional and
+// invisible characters, and invalid UTF-8 removed, and each run of tabs
+// and line breaks one space (docs/decisions/0014-PLAN-hardening.md Step 2).
+func strip(s string) string { return sanitize.Line(s) }
 
 // lineBreaks is a run of line breaks with the blanks around it.
 var lineBreaks = regexp.MustCompile(`[ \t]*[\r\n]+[ \t]*`)
@@ -116,5 +101,5 @@ var lineBreaks = regexp.MustCompile(`[ \t]*[\r\n]+[ \t]*`)
 // character.
 func clean(s string, cells int) string {
 	s = lineBreaks.ReplaceAllString(ansi.Strip(s), " ")
-	return ansi.Truncate(strings.TrimSpace(strip(s)), cells, "")
+	return ansi.Truncate(strings.TrimSpace(sanitize.Line(s)), cells, "")
 }

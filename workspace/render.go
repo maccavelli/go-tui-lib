@@ -9,6 +9,7 @@ import (
 
 	"github.com/maccavelli/go-tui-lib/glyph"
 	"github.com/maccavelli/go-tui-lib/internal/cells"
+	"github.com/maccavelli/go-tui-lib/internal/sanitize"
 	"github.com/maccavelli/go-tui-lib/layout"
 )
 
@@ -166,7 +167,7 @@ func clip(m ansi.Method, s string, width, height int) string {
 		if n > 0 {
 			b.WriteByte('\n')
 		}
-		line = m.Truncate(line, width, "")
+		line = m.Truncate(sanitize.Styled(line), width, "")
 		b.WriteString(line)
 		pad(&b, width-m.StringWidth(line))
 		n++
@@ -217,6 +218,7 @@ func (w *Workspace) title(p Pane, id string, focused bool, width int) string {
 	if tp, ok := p.(Titled); ok {
 		name = tp.Title()
 	}
+	name = sanitize.Line(name)
 	mark := " "
 	style := t.Styles.Title
 	if focused {
@@ -224,7 +226,7 @@ func (w *Workspace) title(p Pane, id string, focused bool, width int) string {
 	}
 	label := mark + " " + name
 	if b, ok := p.(Badged); ok && b.Badge() != "" {
-		label += " " + t.Glyphs.BadgeOpen + b.Badge() + t.Glyphs.BadgeClose
+		label += " " + t.Glyphs.BadgeOpen + sanitize.Line(b.Badge()) + t.Glyphs.BadgeClose
 	}
 	label = w.method.Truncate(label, width, t.Glyphs.Ellipsis)
 	if pad := width - w.method.StringWidth(label); pad > 0 {
@@ -250,6 +252,7 @@ func (w *Workspace) renderBox(r layout.Rect, p Pane, kind viewKind, id string, f
 	if tp, ok := p.(Titled); ok {
 		name = tp.Title()
 	}
+	name = sanitize.Line(name)
 	mark := ""
 	tstyle := t.Styles.Title
 	if focused {
@@ -257,7 +260,7 @@ func (w *Workspace) renderBox(r layout.Rect, p Pane, kind viewKind, id string, f
 	}
 	label := " " + mark + name
 	if bd, ok := p.(Badged); ok && bd.Badge() != "" {
-		label += " " + t.Glyphs.BadgeOpen + bd.Badge() + t.Glyphs.BadgeClose
+		label += " " + t.Glyphs.BadgeOpen + sanitize.Line(bd.Badge()) + t.Glyphs.BadgeClose
 	}
 	label += " "
 	label = w.method.Truncate(label, max(in.W-1, 0), t.Glyphs.Ellipsis)

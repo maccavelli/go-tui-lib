@@ -7,6 +7,7 @@ import (
 	"charm.land/bubbles/v2/help"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/maccavelli/go-tui-lib/internal/sanitize"
 	"github.com/maccavelli/go-tui-lib/layout"
 )
 
@@ -94,7 +95,7 @@ func (w *Workspace) plainTitle(p Pane, id string) string {
 		g := w.theme.Glyphs
 		name += " " + g.BadgeOpen + bp.Badge() + g.BadgeClose
 	}
-	return strings.Join(strings.Fields(ansi.Strip(name)), " ")
+	return strings.Join(strings.Fields(sanitize.Line(name)), " ")
 }
 
 // plainText is s without escape sequences, trailing spaces on each line,
@@ -102,7 +103,7 @@ func (w *Workspace) plainTitle(p Pane, id string) string {
 func plainText(s string) string {
 	lines := strings.Split(ansi.Strip(s), "\n")
 	for i, l := range lines {
-		lines[i] = strings.TrimRight(l, " \t\r")
+		lines[i] = strings.TrimRight(sanitize.Line(l), " ")
 	}
 	for len(lines) > 0 && lines[len(lines)-1] == "" {
 		lines = lines[:len(lines)-1]

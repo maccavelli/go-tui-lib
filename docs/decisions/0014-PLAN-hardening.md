@@ -141,7 +141,12 @@ package sanitize
 // C1, invalid UTF-8, the Bidi_Control set, U+FEFF, U+2060-2064, U+00AD and
 // tag characters (U+E0000-E007F). It keeps ZWJ, ZWNJ and variation selectors,
 // which emoji need.
+// (D2, 2026-10-09: it also drops U+200B.)
 func Line(s string) string
+
+// Styled is Line for styled text: it keeps each complete escape sequence and
+// filters the text between them as Line does. (Added by D1, 2026-10-09.)
+func Styled(s string) string
 
 // Truncate cuts s to at most cells cells under m, adding nothing.
 func Truncate(s string, cells int, m ansi.Method) string
@@ -170,7 +175,8 @@ func HasControl(s string) bool
   * `title()` and `renderBox` flatten and truncate titles and badges with
     `Line` and `Truncate`;
   * `clip` passes each line through `Line` before truncating, which fixes
-    the fuzz failure;
+    the fuzz failure (D1, 2026-10-09: through `Styled`, which keeps the
+    styling);
   * (added 2026-10-09) `plainTitle` uses `Line`, and `plainText` passes
     each line of a plain body through `Line`, so `RenderPlain` holds
     nothing `Line` drops. The `plain.*` goldens stay byte-identical.
@@ -475,3 +481,157 @@ No deviation.
   * markdownlint: clean, the records' `*` list markers aside;
   * the link check: none broken;
   * the identifier scan: no match.
+
+### Step 2: `internal/sanitize` (C6)
+
+#### Deviations
+
+* **D1 (2026-10-09): `clip` uses `Styled`, not `Line`.**
+  * **Found:** the step has `clip` pass each line through `Line` before
+    truncating. `Line` begins with `ansi.Strip`, and `clip`
+    (`workspace/render.go:158`) handles every pane's styled view on every
+    frame. So every pane would lose its colour, and every colour golden
+    would change, against the step's "byte-identical for clean inputs".
+    The fuzz failure it fixes, `clip("\x1b", 3, 1)`, is a stray ESC, not
+    a whole sequence.
+  * **The owner's choice,** of three: `internal/sanitize` also gets
+    `Styled(s)`. It keeps each complete escape sequence, decoded with
+    x/ansi's parser, and filters the text between them as `Line` does,
+    so stray controls, bidi controls and the rest go. `clip` uses
+    `Styled`. Titles, badges and plain output use `Line`.
+  * **The others:** `clip` drops lone controls itself, a second
+    sanitizer outside `internal/sanitize`; or `Line` as written, which
+    strips every pane's styling.
+* **D2 (2026-10-09): `Line` also drops U+200B.**
+  * **Found:** C6 names U+200B among the characters `SanitizeTitle`
+    wrongly keeps, but the step's drop list for `Line` leaves it out, and
+    it is not a Bidi_Control. The other five C6 names are covered.
+  * **The owner's choice,** of two: `Line` drops U+200B. ZWJ (U+200D) and
+    ZWNJ (U+200C) stay, as emoji and some scripts need them.
+  * **The other:** follow the list exactly, and keep U+200B.
+
+#### What was built
+
+* **`internal/sanitize` (new):**
+  * `Line`, `Styled` (D1), `Truncate`, `Token` and `HasControl`, over one
+    `dropped` set: C0, DEL, C1, the Bidi_Control set, U+200B (D2),
+    U+FEFF, U+2060-2064, U+00AD and the tag characters. Invalid UTF-8 is
+    dropped, and a run of `\r`, `\n`, `\t`, U+2028 and U+2029 becomes
+    one space. ZWJ, ZWNJ, variation selectors and combining marks stay.
+  * `Styled` keeps a complete escape sequence introduced by ESC: a CSI
+    with its final byte, an OSC with BEL or ST, DCS, APC, SOS or PM with
+    ST, or ESC with its final byte. It drops a stray ESC, a sequence cut
+    short, and an 8-bit C1 introducer.
+  * **A fast path.** `Line` and `Styled` first check whether anything
+    would change, and return the input when nothing would, with no
+    allocation. Without it, `TestRenderAllocs` failed under `-race`: "a
+    full 200 x 60 frame: 751 allocations, want at most 650", because
+    `clip` runs `Styled` on every line of every frame. With it, a full
+    frame makes 441 allocations, as on `cb65c6b`, and 648 under
+    `-race`, against 646 on `cb65c6b`. The budget stands.
+* **`termsvc`:**
+  * `strip` is `sanitize.Line`; `clean` calls `Line`;
+  * `SanitizeTitle` is `Line` plus its rune cut, and the `bidi` table is
+    gone;
+  * `ParseActivity` sanitizes the vendor;
+  * `osc99ID` and `Pointer`'s filter call `Token`;
+  * `LinkPolicy.Openable` calls `HasControl`.
+* **`termcap`:**
+  * the XTVERSION name (`prober.go`) passes through `Line`;
+  * so do `TERM_PROGRAM` and `TERM` for `Caps.Terminal` (`env.go`);
+  * so do `Identity`'s `Term`, `TermFeatures` and `Version`
+    (`identity.go`).
+* **`command`:** `isSpaceOrControl` is `c == ' ' || HasControl(string(c))`.
+  It rejects what it rejected before. A slash name with a bidirectional
+  or invisible character is now refused as well, which the step's "as
+  today" did not foresee. Every existing test passes.
+* **`workspace`:**
+  * `title()` and `renderBox` sanitize the title and the badge with
+    `Line`, and truncate as before;
+  * `clip` passes each line through `Styled` (D1);
+  * `plainTitle` uses `Line`, and `plainText` each line through `Line`.
+  * No golden changed, the `plain.*` ones included.
+* **Two expectations for dirty input changed,** as the step allows
+  ("byte-identical for clean inputs"). Each now names the whole escape
+  sequence `Line` removes, as a terminal reads it, where the old `strip`
+  removed only its control bytes:
+  * `TestActivity`: `Activity("ve;n\x1bdor", …)` now gives the vendor
+    "venor", not "vendor", since `\x1bd` is ESC d;
+  * `TestControlBytesAreStripped`'s link: the URL's embedded OSC 8 goes
+    whole, giving "…/x", not "…/]8;;evilx". The text "te\x1bxt" gives
+    "tet", since `\x1bx` is ESC x.
+
+  The notification bytes in that test did not change.
+* **Tests,** new:
+  * `internal/sanitize/sanitize_test.go`: `TestLine` (20 cases),
+    `TestStyled` (10, and agreement with `Line` on text), and
+    `TestTokenAndHasControl`;
+  * `termsvc/sanitize_test.go`: `TestActivityVendorSanitized`, which also
+    covers `SanitizeTitle` over C6's six characters and U+202E, and
+    `Openable`;
+  * `termcap/sanitize_test.go`: `TestXTVersionSanitized`, over the reply,
+    `TERM_PROGRAM`, `TERM` and `TERM_PROGRAM_VERSION`;
+  * `workspace/sanitize_test.go`:
+    * `TestTitleWithLineBreakKeepsBorder`: eight new `evil-title.*`
+      goldens, `Borders` and `Separators`. No line is over the width,
+      every bordered line is exactly the width, no U+202E survives, the
+      top border ends in its corner, and `RenderPlain` is `"evil line [b
+      ]\nbody text\n\n"`. The goldens were read before the commit;
+    * `TestClipSanitizes`, with five cases.
+  * The test files write every non-ASCII character as an escape, so
+    nothing invisible hides in the source.
+
+#### Checks
+
+* **Rule 3: the probes fail before the fix.** The four new test files ran
+  on a scratch copy of `cb65c6b`, the commit before this step, with the
+  new goldens:
+  * `TestXTVersionSanitized`: "Terminal = {Value:evil[2J…term"; the
+    environment's terminal `"x\x1b]0;title\ay\u202e"`; `FromEnv Term
+    = "xterm\u200b"`; `FromEnv Version = "1.2\x1b[31m\u202e"`;
+  * `TestActivityVendorSanitized`: `ParseActivity vendor
+    "ev\x1b[31m\u202eil\u200b"`. `SanitizeTitle` kept each of the six,
+    and `Openable` did not refuse U+202E;
+  * `TestTitleWithLineBreakKeepsBorder`: "line 0: 9 cells, want 30",
+    "line 2 holds U+202E", and `the top border is broken: "╭─ ▸ evil"`;
+  * `TestClipSanitizes`: `clip("\x1b", 3, 1) = "\x1b   "`, "a line 0
+    cells wide, want 3".
+
+  All four pass on the step's code.
+* **Mutations,** on scratch copies of the tree. All 11 were killed by a
+  failing test, none by a build failure:
+  * **S2-1** (`Line` keeps U+202E): `TestLine`, Bidi_Control.
+  * **S2-2** (`Line` drops ZWJ): `TestLine`, the emoji family.
+  * **S2-3** (`renderBox` uses the raw badge):
+    `TestTitleWithLineBreakKeepsBorder`, "line 0: 17 cells, want 30".
+  * **S2-4** (D1, `Styled` drops whole sequences, added): `TestStyled`,
+    the styling lost.
+  * **S2-5** (D1, `Styled` keeps a stray ESC, added): `TestClipSanitizes`.
+  * **S2-6** (`RenderPlain`'s title unsanitized, added): "evil line [b
+    \u202e]".
+  * **S2-7** (the raw vendor, added): `TestActivityVendorSanitized`.
+  * **S2-8** (the raw XTVERSION name, added): `TestXTVersionSanitized`.
+  * **S2-9** (D2, U+200B kept, added): `TestLine`.
+  * **S2-10** and **S2-11** (each fast path passes everything, added):
+    `TestLine` and `TestStyled`.
+
+  The set was run again after the fast paths went in, all killed.
+* **Rule 2 on macOS,** go1.27.2:
+  * `gofmt -l`: nothing.
+  * `make pre-add-check FILES=<the 17 Go files>`: "17 file(s) clean".
+  * `make lint`: clean. On the first run, modernize wanted
+    `strings.SplitSeq` in a test.
+  * With `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    all passed, and so did workspace mode. `-race` first failed
+    `TestRenderAllocs`, which the fast path above fixed.
+  * `go mod tidy -diff`, `make vuln` and `scripts/go-modules.sh --check`
+    were clean.
+  * `make apicheck`: "against v0.7.1, 0 incompatible change(s)".
+  * `make examples`: "clean".
+  * `make release-check`: "173 file(s) clean … apicheck, examples". The
+    new files are untracked; the `FILES` run covers them.
+* **The Windows test host,** go1.27.2 windows/amd64:
+  * the `FILES` and no-list `make pre-add-check`, `make lint`, `make
+    vuln` and `make examples`: each exit 0;
+  * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
+  * the step's tests, with `TestRenderAllocs`: passed.

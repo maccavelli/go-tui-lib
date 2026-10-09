@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/maccavelli/go-tui-lib/internal/sanitize"
 )
 
 // Env is a program's environment, as KEY=value strings. It is converted from
@@ -45,9 +47,9 @@ func (e Env) Getenv(key string) string {
 // COLORFGBG and from the variable appearanceEnv names. A stronger fact
 // already held stands.
 func (c *Caps) setEnv(e Env, goos, appearanceEnv string) {
-	if v := e.Getenv("TERM_PROGRAM"); v != "" {
+	if v := sanitize.Line(e.Getenv("TERM_PROGRAM")); v != "" {
 		c.Terminal.Set(v, Environment)
-	} else if v := e.Getenv("TERM"); v != "" {
+	} else if v := sanitize.Line(e.Getenv("TERM")); v != "" {
 		c.Terminal.Set(v, Environment)
 	}
 

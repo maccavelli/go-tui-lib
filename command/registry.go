@@ -13,6 +13,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/maccavelli/go-tui-lib/internal/sanitize"
 	"github.com/maccavelli/go-tui-lib/when"
 )
 
@@ -222,7 +223,10 @@ func validSlash(id ID, n string) error {
 	return nil
 }
 
-func isSpaceOrControl(c rune) bool { return c <= ' ' || c == 0x7f || (c >= 0x80 && c < 0xa0) }
+// isSpaceOrControl reports whether c is a space, or a character
+// sanitize.Line would change: a control, a bidirectional or invisible
+// character (docs/decisions/0014-PLAN-hardening.md Step 2).
+func isSpaceOrControl(c rune) bool { return c == ' ' || sanitize.HasControl(string(c)) }
 
 // draft is a write in progress: a copy of a snapshot's entries, indexed,
 // and the conflicts the write has met.

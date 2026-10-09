@@ -242,7 +242,10 @@ func TestControlBytesAreStripped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := "\x1b]8;id=a;https://example.com/]8;;evilx\x07text\x1b]8;;\x07"; link != want {
+	// sanitize.Line drops each escape sequence whole: the URL's embedded OSC
+	// 8, and in the text "\x1bx", which is ESC x, as a terminal reads it
+	// (docs/decisions/0014-PLAN-hardening.md Step 2).
+	if want := "\x1b]8;id=a;https://example.com/x\x07tet\x1b]8;;\x07"; link != want {
 		t.Errorf("link %q, want %q", link, want)
 	}
 }

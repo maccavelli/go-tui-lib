@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/maccavelli/go-tui-lib/internal/sanitize"
 	"github.com/maccavelli/go-tui-lib/termcap"
 )
 
@@ -336,13 +337,9 @@ func (n *Notifier) osc99(x Notification) string {
 
 // osc99ID keeps the characters the Kitty protocol allows in an identifier.
 func osc99ID(id string) string {
-	return strings.Map(func(r rune) rune {
-		switch {
-		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', strings.ContainsRune("-_+.", r):
-			return r
-		}
-		return -1
-	}, id)
+	return sanitize.Token(id, func(r rune) bool {
+		return r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("-_+.", r)
+	})
 }
 
 // osc9Text is x as one OSC 9 message. A message that starts with a number
