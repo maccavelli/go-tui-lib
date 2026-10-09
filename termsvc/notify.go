@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -131,6 +132,16 @@ func WithBackend(b Backend) NotifyOption { return func(n *Notifier) { n.backend 
 // only for a completed turn. The policy for that belongs to the program.
 func WithGate(f func(Notification) bool) NotifyOption { return func(n *Notifier) { n.gate = f } }
 
+// defaultBackendTimeout bounds a backend's Notify and a clipboard's Copy.
+const defaultBackendTimeout = 5 * time.Second
+
+// WithBackendTimeout bounds each call of the backend: its context ends d
+// after the call starts, or when the caller's context ends, if sooner.
+// The default is 5 s; d of 0 or less leaves only the caller's context.
+func WithBackendTimeout(d time.Duration) NotifyOption {
+	return func(n *Notifier) { n.timeout = d }
+}
+
 // Text limits, in cells.
 const (
 	TitleCells = 80
@@ -140,11 +151,18 @@ const (
 // Notifier sends notifications that suit the terminal. A program passes it
 // every message, as it does a termcap.Prober, so it learns the terminal's
 // capabilities and focus.
+//
+// A program's own command line, which runs no Bubble Tea program, never
+// sees focus: it passes WithPolicy(Always), gives the notifier
+// termcap.EnvCaps through Update(termcap.CapsMsg{Caps: …}), and writes
+// Sequence's bytes to the terminal itself
+// (docs/decisions/0014-MADR-native-integration-api.md W2).
 type Notifier struct {
 	protocol Protocol
 	policy   Policy
 	backend  Backend
 	gate     func(Notification) bool
+	timeout  time.Duration
 
 	caps       termcap.Caps
 	focused    bool
@@ -154,7 +172,7 @@ type Notifier struct {
 
 // NewNotifier returns a Notifier.
 func NewNotifier(o ...NotifyOption) *Notifier {
-	n := &Notifier{}
+	n := &Notifier{timeout: defaultBackendTimeout}
 	for _, f := range o {
 		f(n)
 	}
@@ -178,30 +196,71 @@ func (n *Notifier) Update(msg tea.Msg) tea.Cmd {
 // Notify returns the command that sends x, and delivers NotifyResultMsg
 // to say what it did. The title and body are cleaned first: escape
 // sequences removed, line breaks collapsed to a space, controls removed,
-// and cut to TitleCells and BodyCells cells.
+// and cut to TitleCells and BodyCells cells. It is NotifyContext under
+// context.Background().
 func (n *Notifier) Notify(x Notification) tea.Cmd {
+	return n.NotifyContext(context.Background(), x)
+}
+
+// NotifyContext is Notify, with a backend called under ctx, bounded by
+// WithBackendTimeout. A backend that fails, its deadline included, gives
+// SkipFailed with its error in Err.
+func (n *Notifier) NotifyContext(ctx context.Context, x Notification) tea.Cmd {
 	x.Title, x.Body = clean(x.Title, TitleCells), clean(x.Body, BodyCells)
-	if skip := n.skip(x); skip != NotSkipped {
-		return result(NotifyResultMsg{Notification: x, Skipped: skip})
-	}
 	if n.backend != nil {
-		b := n.backend
+		if skip := n.skip(x, false); skip != NotSkipped {
+			return result(NotifyResultMsg{Notification: x, Skipped: skip})
+		}
+		b, d := n.backend, n.timeout
 		return func() tea.Msg {
-			if err := b.Notify(context.Background(), x); err != nil {
+			ctx, cancel := bounded(ctx, d)
+			defer cancel()
+			if err := b.Notify(ctx, x); err != nil {
 				return NotifyResultMsg{Notification: x, Skipped: SkipFailed, Err: err}
 			}
 			return NotifyResultMsg{Notification: x, Sent: true}
 		}
 	}
-	return tea.Sequence(tea.Raw(n.encode(x)), result(NotifyResultMsg{Notification: x, Sent: true}))
+	seq, skip := n.bytesFor(x)
+	if skip != NotSkipped {
+		return result(NotifyResultMsg{Notification: x, Skipped: skip})
+	}
+	return tea.Sequence(tea.Raw(seq), result(NotifyResultMsg{Notification: x, Sent: true}))
+}
+
+// Sequence is the bytes Notify would write to the terminal for x, cleaned
+// and encoded as Notify does, with the same numbering, or "" and why it
+// would send nothing. It is for a program that writes to the terminal
+// itself, such as its own command line. It ignores WithBackend: the bytes
+// are the terminal's.
+func (n *Notifier) Sequence(x Notification) (string, SkipReason) {
+	x.Title, x.Body = clean(x.Title, TitleCells), clean(x.Body, BodyCells)
+	return n.bytesFor(x)
+}
+
+// bytesFor is Sequence for a cleaned x.
+func (n *Notifier) bytesFor(x Notification) (string, SkipReason) {
+	if skip := n.skip(x, true); skip != NotSkipped {
+		return "", skip
+	}
+	return n.encode(x), NotSkipped
+}
+
+// bounded is ctx, ending d from now as well when d is positive.
+func bounded(ctx context.Context, d time.Duration) (context.Context, context.CancelFunc) {
+	if d > 0 {
+		return context.WithTimeout(ctx, d)
+	}
+	return context.WithCancel(ctx)
 }
 
 func result(m NotifyResultMsg) tea.Cmd { return func() tea.Msg { return m } }
 
-// skip is why x is not to be sent, or NotSkipped.
-func (n *Notifier) skip(x Notification) SkipReason {
+// skip is why x is not to be sent, or NotSkipped: to the terminal, or
+// else through the backend.
+func (n *Notifier) skip(x Notification, terminal bool) SkipReason {
 	switch {
-	case n.policy == Never || n.backend == nil && n.chosen() == Off:
+	case n.policy == Never || terminal && n.chosen() == Off:
 		return SkipDisabled
 	case x.Title == "" && x.Body == "":
 		return SkipEmpty

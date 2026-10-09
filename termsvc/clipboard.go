@@ -2,6 +2,8 @@ package termsvc
 
 import (
 	"context"
+	"errors"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -12,6 +14,10 @@ import (
 // MaxCopyBytes is the largest payload Copy sends. A terminal route may
 // truncate or refuse a longer OSC 52 without saying so.
 const MaxCopyBytes = 100_000
+
+// ErrCopyTooLarge is CopySequence's error for a payload over MaxCopyBytes.
+// Copy reports the same payload as Failed, with no Err.
+var ErrCopyTooLarge = errors.New("termsvc: copy: the text is over MaxCopyBytes")
 
 // Status is what is known about a copy.
 type Status uint8
@@ -59,18 +65,34 @@ type Clipboard interface {
 // CopyOption configures Copy.
 type CopyOption func(*copyConfig)
 
-type copyConfig struct{ clipboard Clipboard }
+type copyConfig struct {
+	clipboard Clipboard
+	timeout   time.Duration
+}
 
 // WithClipboard copies through b, which confirms or fails, instead of the
 // terminal.
 func WithClipboard(b Clipboard) CopyOption { return func(c *copyConfig) { c.clipboard = b } }
 
+// WithCopyTimeout bounds the clipboard's Copy: its context ends d after the
+// call starts, or when the caller's context ends, if sooner. The default
+// is 5 s; d of 0 or less leaves only the caller's context.
+func WithCopyTimeout(d time.Duration) CopyOption { return func(c *copyConfig) { c.timeout = d } }
+
 // Copy writes text to the clipboard, and delivers CopiedMsg. With
 // WithClipboard it goes through the program's clipboard; otherwise through
 // OSC 52, and inside tmux also wrapped for passthrough. A payload over
-// MaxCopyBytes is not sent, and fails.
+// MaxCopyBytes is not sent, and fails. It is
+// CopyContext under context.Background().
 func Copy(c termcap.Caps, text string, o ...CopyOption) tea.Cmd {
-	var cfg copyConfig
+	return CopyContext(context.Background(), c, text, o...)
+}
+
+// CopyContext is Copy, with the clipboard called under ctx, bounded by
+// WithCopyTimeout. A clipboard that fails, its deadline included, gives
+// Failed with its error in Err.
+func CopyContext(ctx context.Context, c termcap.Caps, text string, o ...CopyOption) tea.Cmd {
+	cfg := copyConfig{timeout: defaultBackendTimeout}
 	for _, f := range o {
 		f(&cfg)
 	}
@@ -78,8 +100,11 @@ func Copy(c termcap.Caps, text string, o ...CopyOption) tea.Cmd {
 		return copied(CopiedMsg{Status: Failed})
 	}
 	if b := cfg.clipboard; b != nil {
+		d := cfg.timeout
 		return func() tea.Msg {
-			if err := b.Copy(context.Background(), text); err != nil {
+			ctx, cancel := bounded(ctx, d)
+			defer cancel()
+			if err := b.Copy(ctx, text); err != nil {
 				return CopiedMsg{Status: Failed, Route: RouteBackend, Err: err}
 			}
 			return CopiedMsg{Status: Confirmed, Route: RouteBackend}
@@ -94,6 +119,22 @@ func Copy(c termcap.Caps, text string, o ...CopyOption) tea.Cmd {
 }
 
 func copied(m CopiedMsg) tea.Cmd { return func() tea.Msg { return m } }
+
+// CopySequence is the bytes Copy has written for text without a clipboard:
+// OSC 52, and inside tmux the same again wrapped for passthrough, with its
+// route. It is for a program that writes to the terminal itself, such as
+// its own command line. A text over MaxCopyBytes gives ErrCopyTooLarge and
+// no bytes.
+func CopySequence(c termcap.Caps, text string) (string, Route, error) {
+	if len(text) > MaxCopyBytes {
+		return "", RouteNone, ErrCopyTooLarge
+	}
+	seq := ansi.SetSystemClipboard(text)
+	if c.Mux.Value == termcap.Tmux {
+		return seq + Wrap(c, seq), RouteOSC52Tmux, nil
+	}
+	return seq, RouteOSC52, nil
+}
 
 // CopyPlan is the routes to try, in order: the program's clipboard, tmux's
 // buffer inside tmux, OSC 52, and OSC 52 wrapped for tmux inside tmux. A

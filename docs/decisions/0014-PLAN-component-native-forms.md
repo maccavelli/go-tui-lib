@@ -1303,3 +1303,112 @@ No deviation.
     passed. The filter matched no `launch` test there; `launch`'s tests,
     which read the environment through `Getenv`, ran in the shuffled
     suite above.
+
+### Step 9: `termsvc`'s byte forms and contexts
+
+No deviation.
+
+#### What was built
+
+* **`termsvc/notify.go`:**
+  * **`WithBackendTimeout(d)`,** with a 5 s default
+    (`defaultBackendTimeout`); `d` of 0 or less leaves only the caller's
+    context.
+  * **`NotifyContext(ctx, x)`:** a backend is called under `bounded(ctx,
+    d)`, and an error, its deadline's included, gives `SkipFailed` with
+    the error in `Err`. `Notify` is `NotifyContext(context.Background(),
+    x)`.
+  * **`Sequence(x) (string, SkipReason)`:** it cleans `x` and returns
+    `bytesFor(x)`. `NotifyContext`'s terminal path uses the same
+    `bytesFor`, so the two share one encoder and one numbering.
+    `Sequence` ignores `WithBackend`, as documented: its bytes are the
+    terminal's.
+  * `skip` takes whether the bytes are the terminal's. That replaces the
+    old `n.backend == nil` test, with the same result on each path.
+  * The `Notifier` documentation says what a CLI does: `WithPolicy(Always)`,
+    `termcap.EnvCaps` through `Update(termcap.CapsMsg{…})`, and
+    `Sequence`'s bytes written by the program.
+* **`termsvc/clipboard.go`:**
+  * `ErrCopyTooLarge`;
+  * `WithCopyTimeout(d)`, with the same default;
+  * `CopyContext(ctx, c, text, opts...)`, with `Copy` as
+    `CopyContext(context.Background(), …)`;
+  * `CopySequence(c, text) (string, Route, error)`: `ansi.SetSystemClipboard(text)`,
+    the bytes `tea.SetClipboard` makes Bubble Tea write (bubbletea
+    v2.0.10 `tea.go:821-822`), and inside tmux the same again through
+    `Wrap`. Over `MaxCopyBytes` it gives "", `RouteNone` and
+    `ErrCopyTooLarge`.
+* **Kept as it was:** `Copy`'s too-large result is still
+  `CopiedMsg{Status: Failed}` with no `Err`. The agent first gave it
+  `ErrCopyTooLarge` too, which the step does not ask for.
+  `TestCopyStatus` (`termsvc/services_test.go:72`) asserts no `Err`, so
+  that change was taken back, and the test stands unchanged.
+  `ErrCopyTooLarge`'s documentation says Copy reports the payload without
+  it.
+* **Tests,** in `termsvc/forms_test.go` (new):
+  * `TestSequenceMatchesNotify`:
+    * `Sequence` equals `Notify`'s bytes over two terminals, five
+      protocols and five notifications, with escapes, a long body, an
+      ID and an urgency;
+    * one numbering across `Sequence` and `Notify` (n1, n2, n3);
+    * each `SkipReason`, and `WithBackend` ignored.
+  * `TestCopySequence`: it equals what `Copy` writes, plain and inside
+    tmux, for "hello", "" and exactly `MaxCopyBytes`, with the same
+    route. One byte over gives `ErrCopyTooLarge`.
+  * `TestBackendDeadline`, under `testing/synctest`: the deadline both a
+    backend and a clipboard see:
+    * the 5 s default, and a timeout of their own;
+    * the caller's sooner deadline, and their own timeout when it is
+      sooner;
+    * no timeout with the caller's deadline, and neither;
+    * `Notify` and `Copy` on the 5 s default.
+  * `TestBackendTimeout`, under `testing/synctest`:
+    * a backend blocking on `ctx` gives `SkipFailed` with
+      `DeadlineExceeded` after exactly 20 ms;
+    * a clipboard gives `Failed` on `RouteBackend`;
+    * a cancelled caller gives `Canceled`.
+
+#### Checks
+
+* **Mutations,** on scratch copies of the tree. All eight were killed by
+  a failing test, none by a build failure:
+  * **S9-1** (the backend gets `context.Background()`): "the default,
+    backend: deadline … (false), want 5s".
+  * **S9-2** (the clipboard gets `context.Background()`, added): the same
+    for the clipboard.
+  * **S9-3** (`Sequence` numbers apart, added): `notification 2:
+    "\x1b]99;i=n1;b\a" has no i=n2`.
+  * **S9-4** (no tmux wrap, added): `TestCopySequence` failed for tmux.
+  * **S9-5** (no default timeout, added): "the default, backend: … want
+    5s".
+  * **S9-6** (`Sequence` honours `WithBackend`, added): "with a backend"
+    got no bytes.
+  * **S9-7** (no size limit, added): "one byte over" returned bytes.
+  * **S9-8** (the caller's context dropped, added): "the caller's sooner
+    deadline, backend: deadline 1s (true), want 200ms".
+
+  Three needed a second form:
+  * S9-1 and S9-2 first did not compile, because the bounded `ctx` was
+    left unused, so they were rewritten to drop it.
+  * S9-3 first survived. `Notify` now encodes through the same
+    `bytesFor`, so breaking the numbering broke both sides alike. The
+    test gained the explicit numbering check, and S9-3 then failed it.
+* **Rule 2 on macOS,** go1.27.2:
+  * `gofmt -l`: nothing.
+  * `make pre-add-check FILES=<the three Go files>`: "3 file(s) clean".
+  * `make lint`: clean. On the first run, revive's confusing-naming
+    refused the unexported `sequence` beside `Sequence`, and it is now
+    `bytesFor`. The mutations were run again on the renamed code, all
+    killed.
+  * With `GOWORK=off`, `-race`, `-shuffle=on -count=2` and `LC_ALL=C`
+    all passed, and so did workspace mode.
+  * `go mod tidy -diff`, `make vuln` ("No vulnerabilities found.") and
+    `scripts/go-modules.sh --check` were clean.
+  * `make apicheck`: "against v0.7.1, 0 incompatible change(s)".
+  * `make examples`: "clean".
+  * `make release-check`: "169 file(s) clean … apicheck, examples".
+* **The Windows test host,** go1.27.2 windows/amd64:
+  * the `FILES` and no-list `make pre-add-check`, `make lint`, `make
+    vuln` and `make examples`: each exit 0;
+  * `GOWORK=off go test -count=2 -shuffle=on ./...`: exit 0;
+  * the step's tests, with `termsvc`'s notify and copy tests: passed.
