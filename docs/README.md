@@ -39,7 +39,7 @@ it was when they were written
 | 0013 | PLAN | [Implement the `launch` package with native types for every CLI framework, and release `v0.7.0`](decisions/0013-PLAN-cli-integration-helpers.md) | complete; Step 11 released as `v0.7.1` |
 | 0014 | MADR | [Make go-tui-lib's API natively integrable from any Go CLI: native types and component forms, hardening, and canonicalization during `v0`](decisions/0014-MADR-native-integration-api.md) | accepted; A1 recorded |
 | 0014 | PLAN | [W0: the API diff gate, conformance bans, the collision check, the glossary, the framework-example harness and the conventions](decisions/0014-PLAN-api-policy-gates.md) | complete |
-| 0014 | PLAN | [W2: native forms in `command`, `workspace`, `termcap`, `termsvc`, `theme` and `tuitest`](decisions/0014-PLAN-component-native-forms.md) | in-progress |
+| 0014 | PLAN | [W2: native forms in `command`, `workspace`, `termcap`, `termsvc`, `theme` and `tuitest`](decisions/0014-PLAN-component-native-forms.md) | complete |
 | 0014 | PLAN | [W3: bounded input, one sanitizer, overflow-safe layout, no mutable package variables, wider fuzzing; release `v0.8.0`](decisions/0014-PLAN-hardening.md) | proposed |
 | 0014 | PLAN | [W4: renames with deprecation aliases, opaque options, one enum helper, JSON v2, structured errors; release `v0.9.0` and `v0.10.0`](decisions/0014-PLAN-canonicalization.md) | proposed |
 | 0014 | REPORT | [An API assessment of `v0.6.0`, and how Go CLIs and agent tools integrate a TUI](reports/0014-REPORT-api-assessment-and-integration-research.md) | — |

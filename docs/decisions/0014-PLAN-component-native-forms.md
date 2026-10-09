@@ -1,6 +1,6 @@
 ---
-status: in-progress
-date: 2026-10-08
+status: complete
+date: 2026-10-09
 associated-madr: "0014-MADR-native-integration-api.md"
 ---
 # Implement W2: native forms in `command`, `workspace`, `termcap`, `termsvc`, `theme` and `tuitest`
@@ -1619,3 +1619,77 @@ No deviation.
 
 **Done when** `make examples` passes, with the new cases: it does, on
 both hosts.
+
+### Step 12: close-out
+
+No deviation.
+
+The owner committed Step 11 and pushed `main` to `5988f79`. Verification
+was then run on that commit, item by item.
+
+* **`command`:**
+  * a panicking handler or gate is an error, and the TUI keeps running
+    (Step 2, D1);
+  * every error has its A1 status (Step 2, D2);
+  * `ArgsOf`, `MustNew`, `AllowIf`, `GateFunc` and `WatchContext` work
+    (Step 3);
+  * `WriteResult` matches `CallMCP`, and the MCP goldens are unchanged
+    (Step 4);
+  * `ParseArgs`, `Params` and `Complete` work (Step 5, D3, D4).
+    `FuzzParseArgs` ran 1,261,071 executions with no failure, and
+    `make fuzz` runs it.
+* **`workspace`:**
+  * the options set the first theme and size (Step 6, D5);
+  * `RenderPlain` is linear and plain (Step 7, D6);
+  * `Help` uses the glyphs (Step 7, D7).
+* **`termcap`:** `EnvCaps` equals a disabled prober's facts, and lookups
+  fold on Windows, where the test host ran them (Step 8, D9).
+* **`termsvc`:** the byte forms match `Notify` and `Copy`, and backends
+  see a deadline (Step 9).
+* **`theme` and `tuitest`:** the enum text forms work, the case helpers
+  leave every golden byte-identical, and `Fits` works (Step 10).
+* **The rest:**
+  * **Every mutation fails as named.** All 67 were killed by a failing
+    test or gate, none by a build failure in the end: S2 (6), S3 (6), S4
+    (6), S5 (9), S6 (7), S7 (8), S8 (6), S9 (8), S10 (7), S11 (4). The
+    ones that first did not compile, or first survived, are recorded in
+    their steps.
+  * **`make apicheck` shows additions only:** "against v0.7.1, 0
+    incompatible change(s)". apidiff run on a scratch copy of the script
+    without `-incompatible` lists 43 changes against `v0.7.1`, each one
+    "…: added".
+  * **The guides' examples run:** `make examples` gave 46 cases and 10
+    excerpts, "clean", on both hosts (Step 11).
+  * **Rule 2's checks are clean** on macOS and the Windows test host,
+    step by step.
+  * **On `5988f79`:**
+    * the step tests, run together with
+      `GOWORK=off go test -count=1 -v -run '<every W2 test>' ./...`,
+      gave 42 `--- PASS` and no failure or skip;
+    * `make release-check` gave "173 file(s) clean in 1 module(s)
+      (gofmt, golangci-lint, go vet, go test, go mod tidy, govulncheck,
+      apicheck, examples)";
+    * CI run `37939515240` passed every job: `modules`, `gates`, and
+      `test` on ubuntu-24.04, macos-15 and windows-2025.
+
+**Outside this PLAN, between Steps 7 and 8:**
+[0016-MADR-go-1-27-2-for-go-2026-6604.md](0016-MADR-go-1-27-2-for-go-2026-6604.md)
+moved the toolchain floor to Go 1.27.2 (D8), and Steps 7 to 12 ran on
+it.
+
+**Left for W3's release step:**
+
+* the `v0.8.0` release notes. They list:
+  * every addition above;
+  * the behaviour changes:
+    * a Loop handler's panic no longer crashes the TUI (Step 2);
+    * a `ThemeBuilder` now builds the first theme (Step 6);
+    * `CallMCP` encodes a `time.Duration` (Step 4);
+    * a disabled prober gives the JetBrains reasons (D9);
+    * `termcap.Env` folds case on Windows (Step 8);
+  * the Go 1.27.2 floor (0016);
+* the README's "current release" line (Step 11).
+
+Every Verification item holds. This PLAN is `complete`, and
+0014-MADR-native-integration-api stays `accepted`. The release is the
+last step of [0014-PLAN-hardening.md](0014-PLAN-hardening.md), W3.
