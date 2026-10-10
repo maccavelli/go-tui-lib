@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-10-09
 associated-madr: "0014-MADR-native-integration-api.md"
 ---
@@ -1666,3 +1666,61 @@ incompatible change(s)"; apidiff lists 75 additions.
   with "FAIL: Decide: …" and exit status 1.
 
 Step 10 is done.
+
+### Step 11: close-out
+
+#### Deviations
+
+No deviation.
+
+#### Verification, item by item
+
+* **Each finding's probe fails at the commit before its fix, and passes
+  after:** C6 (Step 2), H1 (Step 3), H3 (Step 4), H4 (Step 5), H5
+  (Step 6), H10 (Step 7) and H11 (Step 8), each in its step's Rule 3
+  check, on a scratch copy of the commit before it. Holds.
+* **`internal/sanitize` is the only sanitizer, and every display path
+  uses it (S2-1 to S2-3):** the mutations were killed in Step 2. On
+  `25134bc`, outside `internal/sanitize`, `ansi.Strip` is called three
+  times, and each result goes through `Line`: `termsvc`'s `clean`;
+  `workspace`'s `plainText`; and `Model.PlainView`, whose result
+  `RenderPlain` passes to `plainText`. No other library code removes
+  controls or escape sequences. Holds.
+* **The cache and window are bounded (S3-1, S4-1):** both killed. Holds.
+* **`LoadDir`, arguments and expansion are limited (S5-1, S6-1):** both
+  killed; S6-1 by the bytes allocated as well (D4). Holds.
+* **`layout` is overflow-safe (S7-1):** killed, with eleven more, and the
+  gaps by D7. Holds, for 64-bit ints, where its cases build (D10).
+* **No exported variable changes behaviour (S8-1):** killed. Holds.
+* **`make fuzz` finds every target, including the ten new ones, and each
+  runs (S9-1):** S9-1 was killed by `go-fuzz_test.sh`'s comparison of
+  discovery with an independent listing. `make fuzz` ran 19 targets in 8
+  packages at 20 s (Step 9) and at 3 s on Windows (below). Holds.
+* **`v0.8.0` is tagged, the smoke test runs, and `make apicheck` shows
+  additions only:** tagged at `f6c9f9b`; the smoke test ran (Step 10);
+  against `v0.7.1`, 0 incompatible changes and 75 additions, and now
+  "against v0.8.0, 0 incompatible change(s)". Holds.
+* **Rule 2's checks are clean on macOS and the Windows test host,** on
+  `25134bc`. Holds:
+  * **macOS,** go1.27.2: `make release-check`, "193 file(s) clean";
+    `make lint`; the cross `go vet` for `freebsd/amd64`, `openbsd/amd64`
+    and `linux/386`; `-race`, `-shuffle=on -count=2`, `LC_ALL=C` and
+    workspace mode; `go mod tidy -diff`, `make vuln`, `make apicheck`,
+    `make examples` and `scripts/go-modules.sh --check`; and CI's other
+    gates, `shellcheck` 0.11.0, `markdownlint-cli2`, `actionlint` 1.7.12,
+    `go-precheck_test.sh` ("12 passed") and `go-fuzz_test.sh` ("25
+    passed"). All clean.
+  * **Windows,** go1.27.2 windows/amd64: `make pre-add-check`, `make
+    lint`, `make vuln` and `make examples`, each exit 0; `go test
+    -count=2 -shuffle=on ./...`, exit 0; the fuzz targets' seeds and the
+    sanitizing tests, none failed; `go-fuzz_test.sh`, "25 passed, 0
+    failed"; `make fuzz FUZZTIME=3s`, "8 packages ran clean".
+  * CI run `38009381864` on `66b30d0` passed.
+
+#### The rest of the close-out
+
+* **This PLAN is `complete`,** and its row in `docs/README.md` says so.
+  0014-MADR-native-integration-api stays `accepted`; W4 and W5 remain.
+* **W2's PLAN** notes its release in `v0.8.0`.
+* **`scripts/apicheck.allow`** has no entry, as it had none during W3:
+  every change was an addition.

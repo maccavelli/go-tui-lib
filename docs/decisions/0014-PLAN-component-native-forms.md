@@ -1693,3 +1693,11 @@ it.
 Every Verification item holds. This PLAN is `complete`, and
 0014-MADR-native-integration-api stays `accepted`. The release is the
 last step of [0014-PLAN-hardening.md](0014-PLAN-hardening.md), W3.
+
+### Released (2026-10-09)
+
+W2 was released in `v0.8.0` with W3, tagged at `f6c9f9b`
+([0014-PLAN-hardening.md](0014-PLAN-hardening.md) Step 10). The release
+notes there list every item above, and the README says "since `v0.8.0`".
+The consumer smoke test against `v0.8.0` ran `ParseArgs`, `WriteResult`
+and `RenderPlain` from the published module.
