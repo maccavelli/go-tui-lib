@@ -1042,3 +1042,91 @@ No deviation.
   * `when.Parse`'s errors are `*SyntaxError`, with the same texts.
   * `termcap`'s unknown-name errors wrap `ErrUnknownName`.
   * The three `…Func` adapters are new.
+
+### Step 8: the release `v0.9.0`
+
+#### Deviations
+
+No deviation. Where the step left a choice, the agent chose:
+
+* **The migration table** is a new guide, `docs/guides/migrating.md`,
+  with a section per release, so `v0.10.0`'s removals join it; `README.md`
+  and `docs/README.md` link it.
+* **`docs/guides/terminal-capabilities.md`** still said `WithGate(f)`,
+  which Step 4's pass over the guides missed; it says
+  `WithNotifyFilter(f)`.
+
+#### The documents
+
+* **`docs/guides/migrating.md` (new),** "Migrating to `v0.9.0`": the
+  renamed names, old to new, through `v0.9.x`; the removed names and what
+  to use; what changed (opaque options, enum text, `termcap`'s JSON v2,
+  `ParseTmux`, `SyntaxError`, `ErrUnknownName`, `jsontext.Value`); and the
+  additions.
+* **`README.md`:** "The current release is `v0.9.0`", with the
+  deprecation window and a link to the migration guide; a bullet, "One
+  name for each idea, since `v0.9.0`"; an "I want to…" row.
+* **`docs/README.md`:** an "I want to…" row for the migration guide.
+* **`docs/architecture.md`:** `command`'s row says `Verdict`,
+  `AuditorFunc` and `WhenContext`, where it said `Decision`, as Step 3
+  left for this step; `when`'s, `SyntaxError`; `termcap`'s, `NewProber`,
+  JSON v2 and `ErrUnknownName`; `termsvc`'s, `WithNotifyFilter`,
+  `BackendFunc` and `ClipboardFunc`; `layout`'s, the presets' `With…`
+  options.
+* **`docs/glossary.md`:** `Verdict` and `WhenContext` move from
+  "Reserved by accepted records", now empty, to "Built from those
+  records".
+* **The guides:** `terminal-capabilities.md` names `WithNotifyFilter`,
+  `BackendFunc` and `ClipboardFunc`; `commands.md`, `AuditorFunc`.
+  `make examples` stays "clean".
+
+#### Release notes
+
+`v0.9.0` gives the API one name for each idea (0014-MADR W4). Go 1.27.2 is
+required. Against `v0.8.0`, apidiff reports 14 incompatible changes, each
+listed in `scripts/apicheck.allow`, and 75 compatible ones.
+
+* **Deprecated,** working through `v0.9.x` and removed in `v0.10.0`:
+  * `command.Decision` (use `Verdict`), `Record.Decision` (use
+    `Record.Verdict`), and `Request.Context` and `Invocation.Context`
+    (use `WhenContext`). `SlogAuditor` logs under the key `decision`
+    until `v0.10.0`, then `verdict`.
+  * `termcap.New` (use `NewProber`).
+  * `layout.SidebarWidth`, `BottomHeight`, `MainSize`, `BottomSpan`,
+    `Footer`, `Gap`, `Breakpoints` and `NoResponsive` (use `With…`, and
+    `WithoutResponsive`).
+  * `workspace.WithMouse` (use `WithoutMouse`; the mouse is handled by
+    default).
+  * `termsvc.WithGate` (use `WithNotifyFilter`).
+* **Removed,** deprecated in `v0.8.0`: `termcaptest.RunTimeout` and the
+  seven `workspace.Key…` variables.
+* **Breaking: opaque option types.** `command.Option`, `RegistryOption`,
+  `termcap.Option`, `termsvc.NotifyOption`, `workspace.Option` and
+  `WrapOption` are interfaces with an unexported method. A program's own
+  `func(*T)` used as one no longer compiles; the package's functions
+  still make every option.
+* **Behaviour changes:**
+  * **Enum text.** 21 enums gain `MarshalText` and `UnmarshalText`, and
+    those without `String` gain it, with D2's tokens: their JSON is the
+    token, where it was a number. Every enum's out-of-range value prints
+    `Type(N)`; `termcap`'s seven, `command.Format`, `glyph.Tier`,
+    `launch`'s two, `theme`'s two, and `termsvc`'s `ActivityState` and
+    `SkipReason` printed the bare number.
+  * **`termcap`'s JSON is v2:** `<>&` are not escaped; a duplicate name
+    and invalid UTF-8 are refused on reading, and a name matches in its
+    own case only; a program's own invalid UTF-8 is written as U+FFFD
+    (D3).
+  * **`termcap.ParseTmux`** cleans its fields with `internal/sanitize`
+    (D3).
+  * **`when.Parse`'s errors** are `*SyntaxError`, with the texts as
+    before.
+  * **`termcap`'s unknown-name errors** wrap `ErrUnknownName`, with the
+    texts as before.
+* **Additions:** `command.Verdict`, `Record.Verdict`,
+  `Request.WhenContext`, `Invocation.WhenContext` and `AuditorFunc`;
+  `termcap.NewProber` and `ErrUnknownName`; `layout`'s eight `With…` and
+  `Without…` options; `workspace.WithoutMouse`; `termsvc.WithNotifyFilter`,
+  `BackendFunc` and `ClipboardFunc`; `when.SyntaxError`; and the enums'
+  text methods.
+* **Unchanged for a program:** `command`'s `json.RawMessage` fields are
+  spelled `jsontext.Value`, the same type in Go 1.27.

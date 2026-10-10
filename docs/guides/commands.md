@@ -88,7 +88,8 @@ and `zoom`, and two commands with one slash name cannot both register.
   one command (see "Run commands from your own CLI").
 - **Every request is audited** when you pass `command.WithAuditor`.
   `command.SlogAuditor(logger)` writes a record per request to your
-  logger, with `secret` values masked.
+  logger, with `secret` values masked; `command.AuditorFunc` makes an
+  auditor of a function.
 - **A request's arguments are capped** at `command.DefaultMaxArgBytes`
   (1 MiB): its `Args` and `Raw`, a slash line's tail, and the words
   `ParseArgs` reads, each checked before anything parses it. Larger is an

@@ -18,8 +18,9 @@ pattern, used by every program that needs it.
 
 ## Status
 
-- **The current release is `v0.8.0`.** `v0` means the API may still
-  change.
+- **The current release is `v0.9.0`.** `v0` means the API may still
+  change, and a renamed name keeps working for one minor release:
+  [the migration guide](docs/guides/migrating.md) lists them.
 - **Multi-pane workspaces, since `v0.1.0`.** `layout` arranges panes: a main
   pane with a sidebar on either side, a bottom pane, a footer, responsive
   folds and saved state. `workspace` hosts them in a Bubble Tea program,
@@ -61,6 +62,11 @@ pattern, used by every program that needs it.
   view keeps only its styles and links. Command files, a request's
   arguments and the window have limits, and each package that parses
   input has a fuzz target.
+- **One name for each idea, since `v0.9.0`.** Renamed names, with the
+  old ones deprecated until `v0.10.0`; opaque option types; text forms for
+  every enum; `when.SyntaxError`, `termcap.ErrUnknownName` and a `…Func`
+  adapter for each hook; and `encoding/json/v2` in `command` and
+  `termcap`.
 - **The stack is Charm v2:** `charm.land/bubbletea/v2`,
   `charm.land/lipgloss/v2` and `charm.land/bubbles/v2`, with
   `github.com/charmbracelet/colorprofile` and
@@ -92,6 +98,7 @@ repository as it is now.
 | know the rules every TUI package follows | [AGENTS.md, TUI conventions](AGENTS.md#tui-conventions) |
 | know what a type name means across the packages | [the glossary](docs/glossary.md) |
 | contribute: checks, records and commit rules | [AGENTS.md](AGENTS.md) |
+| move to a new release's names | [the migration guide](docs/guides/migrating.md) |
 | add a module, or release one | [the releasing guide](docs/guides/releasing.md) |
 
 ## License

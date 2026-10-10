@@ -111,6 +111,7 @@ it was when they were written
 | know why an adapter such as glamour is a separate Go module, and how it is released | [0010-MADR](decisions/0010-MADR-nested-adapter-modules.md) |
 | add a nested module to the repository | [guides/releasing.md](guides/releasing.md#add-a-module) |
 | release the root, an adapter, or a change that spans both | [guides/releasing.md](guides/releasing.md) |
+| move my program to a new release's names | [guides/migrating.md](guides/migrating.md) |
 | know which gates run per module, and why with `GOWORK=off` | [AGENTS.md, Modules](../AGENTS.md#modules) |
 | use the command registry from Cobra or Kong | [guides/commands.md](guides/commands.md#run-commands-from-your-own-cli) |
 | see what Cobra, fang, Kong and glamour do that the library's rules must answer | [0010-REPORT, §6–§10](reports/0010-REPORT-nested-modules-and-adapter-sources.md) |

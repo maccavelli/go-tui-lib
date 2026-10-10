@@ -212,8 +212,9 @@ return m, n.Notify(termsvc.Notification{Title: "Done", Body: "3 files changed"})
   `failed`), and a backend's `Err`.
 - **Text is cleaned:** escape sequences and controls removed, line breaks
   collapsed, cut to 80 cells for the title and 240 for the body.
-  `WithGate(f)` lets you decide last, such as for completed turns only;
-  `WithBackend(b)` sends through a desktop API you supply.
+  `WithNotifyFilter(f)` lets you decide last, such as for completed turns
+  only; `WithBackend(b)` sends through a desktop API you supply, and
+  `termsvc.BackendFunc` makes one of a function.
 - **A backend runs under a deadline:** 5 s by default,
   `WithBackendTimeout(d)` to change it. `NotifyContext(ctx, x)` also
   ends it with your context; a backend that misses the deadline gives
@@ -231,7 +232,7 @@ return m, n.Notify(termsvc.Notification{Title: "Done", Body: "3 files changed"})
 - **`termsvc.Copy(caps, text)`** writes OSC 52 through tea, and inside tmux
   also wraps it for passthrough. It delivers `CopiedMsg`: `Unconfirmed`,
   because OSC 52 never replies. With `WithClipboard(b)` your clipboard
-  confirms or fails. Over 100,000 bytes it fails and sends nothing.
+  confirms or fails; `termsvc.ClipboardFunc` makes one of a function. Over 100,000 bytes it fails and sends nothing.
   `CopyContext` and `WithCopyTimeout` bound your clipboard as
   `NotifyContext` and `WithBackendTimeout` bound a backend.
 - **`termsvc.CopySequence(caps, text)`** returns the bytes `Copy` has

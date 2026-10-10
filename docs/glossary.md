@@ -30,13 +30,8 @@ are the only ones; none is added.
 
 ## Reserved by accepted records
 
-These names are taken by records that are accepted but not yet built. A
-later record does not reuse them for something else.
-
-| Name | Package | Record | Means |
-| :--- | :--- | :--- | :--- |
-| `Verdict` | `command` | 0014-MADR W4 | a gate's answer, today `command.Decision` |
-| `WhenContext` | `command` | 0014-MADR W4 | `Request`'s and `Invocation`'s `when.Context` field, today `Context` |
+None today. A name an accepted record takes before it is built is listed
+here, and a later record does not reuse it for something else.
 
 ## Built from those records
 
@@ -47,7 +42,10 @@ reserved here and are now built
 `command`'s `Format`, `Param`, `PanicError` and `LoadOption`, and
 `workspace`'s `PlainViewer` and `GlyphThemeBuilder`, in `v0.8.0`
 ([0014-PLAN-component-native-forms](decisions/0014-PLAN-component-native-forms.md),
-[0014-PLAN-hardening](decisions/0014-PLAN-hardening.md)). Each has one
+[0014-PLAN-hardening](decisions/0014-PLAN-hardening.md)); and `command`'s
+`Verdict` and `WhenContext`, in `v0.9.0`
+([0014-PLAN-canonicalization](decisions/0014-PLAN-canonicalization.md)).
+Each has one
 meaning, as its package documents it. `Decision` and `Terminal` are in
 "Deliberate" above.
 
