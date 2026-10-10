@@ -79,14 +79,15 @@ class Runner:
         self.out = ""
         self.raw = b""
 
-    def run(self, directory, *args, go="go"):
+    def run(self, directory, *args, go="go", env=None):
         """The script's exit status, with its stdout and stderr together in
         self.out, as the shell test's run read them, and stdout's bytes in
         self.raw. go is the go command the script runs."""
         cmd = [sys.executable, MODULES] if MODULES.endswith(".py") else [MODULES]
         r = subprocess.run(cmd + list(args), cwd=directory, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                           env={**os.environ, "GO": go, "GOWORK": "off"}, check=False)
+                           env={**os.environ, "GO": go, "GOWORK": "off", **(env or {})}, check=False)
         self.raw = r.stdout
+        self.err = r.stderr.decode("utf-8", "replace")
         self.out = (r.stdout + r.stderr).decode("utf-8", "replace").replace("\r\n", "\n")
         return r.returncode
 
@@ -196,6 +197,9 @@ func main() {
 	cmd := exec.Command(os.Getenv("SPELL_REAL"), os.Args[1:]...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, &out, os.Stderr
 	err := cmd.Run()
+	if w := os.Getenv("SPELL_WARN"); w != "" {
+		_, _ = os.Stderr.WriteString(w + "\\n")
+	}
 	top, link := os.Getenv("SPELL_TOP"), os.Getenv("SPELL_LINK")
 	for _, line := range strings.SplitAfter(out.String(), "\\n") {
 		if strings.HasPrefix(line, top) {
@@ -210,8 +214,9 @@ func main() {
 }
 """)
     exe = os.path.join(work, "bin", "spell-go" + (".exe" if os.name == "nt" else ""))
-    subprocess.run(["go", "build", "-o", exe, "."], cwd=src, check=True,
-                   env={**os.environ, "GOWORK": "off", "CGO_ENABLED": "0"})
+    if not os.path.exists(exe):
+        subprocess.run(["go", "build", "-o", exe, "."], cwd=src, check=True,
+                       env={**os.environ, "GOWORK": "off", "CGO_ENABLED": "0"})
     os.environ.update({"SPELL_REAL": shutil.which("go"), "SPELL_TOP": top, "SPELL_LINK": link})
     return exe
 
@@ -251,6 +256,21 @@ def case9(r, work):
     check("the listing has no \\r", 0, r.raw.count(b"\r"))
 
 
+def case10(r, work):
+    # 10. A line go writes to stderr while it succeeds, such as a warning,
+    #     is not a module: the list and --check are unchanged, and the line
+    #     reaches stderr (docs/decisions/0017-PLAN-python-repository-scripts.md
+    #     D2). The go here writes one through the speller, reporting each
+    #     directory as it is.
+    two = os.path.join(work, "two")
+    warner = speller(work, "//no-such-prefix//", "//no-such-prefix//")
+    warn = {"SPELL_WARN": "go: warning: a note from go"}
+    check("listing with a warning exits 0", 0, r.run(two, go=warner, env=warn))
+    check("the warning is not listed", ".\nsub\n", r.raw.decode().replace("\r\n", "\n"))
+    check("the warning reaches stderr", True, "go: warning: a note from go" in r.err)
+    check("--check with a warning passes", 0, r.run(two, "--check", go=warner, env=warn))
+
+
 def main():
     work = tempfile.mkdtemp()
     try:
@@ -265,6 +285,7 @@ def main():
         case("7. an unknown argument", case7, r, work)
         case("8. another spelling of the directories", case8, r, work)
         case("9. line endings", case9, r, work)
+        case("10. a warning from go", case10, r, work)
     finally:
         shutil.rmtree(work, ignore_errors=True)
     print(f"go-modules_test: {passed} passed, {failed} failed")

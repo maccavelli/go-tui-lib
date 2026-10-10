@@ -143,6 +143,10 @@ case 6's fault is fixed here. The owner approves.
   file.
 * **Mutation P2-1:** `--check` ignores a `go.mod` that `go.work` omits;
   the test.
+* **2026-10-10, D2:** the module list comes from `go list`'s stdout
+  alone; a warning on its stderr passes through to stderr, and a failure
+  prints what `go` wrote, as before. A case pins it, and mutation P2-2
+  reads stderr into the list again.
 
 ### Phase 3: `go-apicheck`
 
@@ -347,3 +351,22 @@ Three other things found on the way, none changing the scope:
 * **After the fix,** "27 passed, 0 failed" with a warm cache and with an
   empty one, on macOS and on the Windows test host (Python 3.14.7). The
   empty caches were cleaned with `go clean -modcache` and removed.
+
+### Phase 2: `go-modules`
+
+#### Deviations
+
+* **D2 (2026-10-10): `go list`'s stderr was read as module directories.**
+  * **Found,** porting `go-modules.sh`: it ran `dirs="$(… go list -m -f
+    '{{.Dir}}' 2>&1)"`, reading stderr with stdout so that a failure could
+    print `go`'s error. On success, a line `go` wrote to stderr, such as a
+    warning, became a "directory": `git -C` fails on it, so it is kept as
+    a directory outside the repository, printed in the list, and reported
+    by `--check` as a module with no tracked `go.mod`. The agent ported it
+    as it was, as rule 3 and the out-of-scope list require, and named it in
+    the handoff.
+  * **The owner's choice:** fix it in this phase. The list comes from
+    `go list`'s stdout alone; on success, anything `go` wrote to stderr
+    passes through to the script's stderr; on failure, the message and
+    `go`'s output, indented, are as before.
+  * **The other:** keep the port faithful, and leave it to a later record.

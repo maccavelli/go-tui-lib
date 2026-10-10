@@ -78,20 +78,22 @@ def main(argv):
     # The modules go.work lists, relative to the root. git turns each
     # directory into a path relative to the repository, whatever form the go
     # command gives it: on Windows `go list` prints C:\Users\..., where git's
-    # own top level is C:/Users/... (0010-PLAN deviation D1). Its output and
-    # errors are read together, as the shell script read them.
+    # own top level is C:/Users/... (0010-PLAN deviation D1). The list is
+    # go's stdout alone: what it writes to stderr, such as a warning, passes
+    # through, and is never taken for a directory (0017-PLAN D2).
     try:
         r = subprocess.run([go, "list", "-m", "-f", "{{.Dir}}"], stdout=subprocess.PIPE,
-                           stderr=subprocess.STDOUT, env={**os.environ, "GOWORK": f"{root}/go.work"},
+                           stderr=subprocess.PIPE, env={**os.environ, "GOWORK": f"{root}/go.work"},
                            check=False)
-        out, rc = r.stdout.decode("utf-8", "replace"), r.returncode
+        out, err, rc = r.stdout.decode("utf-8", "replace"), r.stderr.decode("utf-8", "replace"), r.returncode
     except OSError as e:
-        out, rc = str(e), 127
+        out, err, rc = "", str(e), 127
     if rc != 0:
         print("go-modules: go list -m failed in workspace mode:", file=sys.stderr)
-        for line in out.rstrip("\n").split("\n"):
+        for line in (out + err).rstrip("\n").split("\n"):
             print(f"  {line}", file=sys.stderr)
         return failed
+    sys.stderr.write(err)
     listed = []
     for d in out.splitlines():
         if not d:
