@@ -116,24 +116,34 @@ type Backend interface {
 	Notify(ctx context.Context, x Notification) error
 }
 
-// NotifyOption configures a Notifier.
-type NotifyOption func(*Notifier)
+// NotifyOption configures a Notifier. It is opaque: only this package's
+// functions make one.
+type NotifyOption interface{ apply(*Notifier) }
+
+// notifyOptionFunc is a function used as a NotifyOption.
+type notifyOptionFunc func(*Notifier)
+
+func (f notifyOptionFunc) apply(n *Notifier) { f(n) }
 
 // WithProtocol sets the protocol. The default is Auto.
-func WithProtocol(p Protocol) NotifyOption { return func(n *Notifier) { n.protocol = p } }
+func WithProtocol(p Protocol) NotifyOption {
+	return notifyOptionFunc(func(n *Notifier) { n.protocol = p })
+}
 
 // WithPolicy sets when notifications are sent. The default is
 // WhenUnfocused.
-func WithPolicy(p Policy) NotifyOption { return func(n *Notifier) { n.policy = p } }
+func WithPolicy(p Policy) NotifyOption { return notifyOptionFunc(func(n *Notifier) { n.policy = p }) }
 
 // WithBackend sends notifications through b instead of the terminal.
-func WithBackend(b Backend) NotifyOption { return func(n *Notifier) { n.backend = b } }
+func WithBackend(b Backend) NotifyOption {
+	return notifyOptionFunc(func(n *Notifier) { n.backend = b })
+}
 
 // WithNotifyFilter lets f decide, last, whether a notification is sent,
 // such as only for a completed turn. The policy for that belongs to the
 // program.
 func WithNotifyFilter(f func(Notification) bool) NotifyOption {
-	return func(n *Notifier) { n.gate = f }
+	return notifyOptionFunc(func(n *Notifier) { n.gate = f })
 }
 
 // WithGate is WithNotifyFilter.
@@ -149,7 +159,7 @@ const defaultBackendTimeout = 5 * time.Second
 // after the call starts, or when the caller's context ends, if sooner.
 // The default is 5 s; d of 0 or less leaves only the caller's context.
 func WithBackendTimeout(d time.Duration) NotifyOption {
-	return func(n *Notifier) { n.timeout = d }
+	return notifyOptionFunc(func(n *Notifier) { n.timeout = d })
 }
 
 // Text limits, in cells.
@@ -184,7 +194,7 @@ type Notifier struct {
 func NewNotifier(o ...NotifyOption) *Notifier {
 	n := &Notifier{timeout: defaultBackendTimeout}
 	for _, f := range o {
-		f(n)
+		f.apply(n)
 	}
 	return n
 }

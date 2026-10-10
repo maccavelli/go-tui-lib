@@ -28,8 +28,14 @@ type Model[M Bubble[M]] struct {
 	keys    func(m M) []key.Binding
 }
 
-// WrapOption overrides one of the methods Wrap finds by type assertion.
-type WrapOption[M Bubble[M]] func(*Model[M])
+// WrapOption overrides one of the methods Wrap finds by type assertion. It
+// is opaque: only this package's functions make one.
+type WrapOption[M Bubble[M]] interface{ apply(*Model[M]) }
+
+// wrapOptionFunc is a function used as a WrapOption.
+type wrapOptionFunc[M Bubble[M]] func(*Model[M])
+
+func (f wrapOptionFunc[M]) apply(m *Model[M]) { f(m) }
 
 // Wrap hosts m as a pane. For each of these, Wrap uses the model's own
 // method when it has one, unless an option replaces it:
@@ -45,34 +51,34 @@ type WrapOption[M Bubble[M]] func(*Model[M])
 func Wrap[M Bubble[M]](m M, opts ...WrapOption[M]) *Model[M] {
 	p := &Model[M]{M: m}
 	for _, o := range opts {
-		o(p)
+		o.apply(p)
 	}
 	return p
 }
 
 // OnSize replaces how the model is told its size.
 func OnSize[M Bubble[M]](f func(m *M, width, height int)) WrapOption[M] {
-	return func(p *Model[M]) { p.onSize = f }
+	return wrapOptionFunc[M](func(p *Model[M]) { p.onSize = f })
 }
 
 // OnFocus replaces how the model is told it has the keyboard.
 func OnFocus[M Bubble[M]](f func(m *M) tea.Cmd) WrapOption[M] {
-	return func(p *Model[M]) { p.onFocus = f }
+	return wrapOptionFunc[M](func(p *Model[M]) { p.onFocus = f })
 }
 
 // OnBlur replaces how the model is told it lost the keyboard.
 func OnBlur[M Bubble[M]](f func(m *M)) WrapOption[M] {
-	return func(p *Model[M]) { p.onBlur = f }
+	return wrapOptionFunc[M](func(p *Model[M]) { p.onBlur = f })
 }
 
 // WithCursor replaces where the model's cursor is, in the pane's cells.
 func WithCursor[M Bubble[M]](f func(m M) *tea.Cursor) WrapOption[M] {
-	return func(p *Model[M]) { p.cursor = f }
+	return wrapOptionFunc[M](func(p *Model[M]) { p.cursor = f })
 }
 
 // WithKeys gives the model's bindings, for a help footer.
 func WithKeys[M Bubble[M]](f func(m M) []key.Binding) WrapOption[M] {
-	return func(p *Model[M]) { p.keys = f }
+	return wrapOptionFunc[M](func(p *Model[M]) { p.keys = f })
 }
 
 // Update handles the workspace's size and focus messages, and passes every

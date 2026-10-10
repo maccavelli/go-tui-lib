@@ -45,38 +45,44 @@ type Query struct {
 	Parse func(r Reply, c *Caps) bool   // true when r answered it
 }
 
-// Option configures a Prober.
-type Option func(*Prober)
+// Option configures a Prober. It is opaque: only this package's functions
+// make one.
+type Option interface{ apply(*Prober) }
+
+// optionFunc is a function used as an Option.
+type optionFunc func(*Prober)
+
+func (f optionFunc) apply(p *Prober) { f(p) }
 
 // WithTimeout sets how long the probe waits for its sentinel. The default
 // is DefaultTimeout.
-func WithTimeout(d time.Duration) Option { return func(p *Prober) { p.timeout = d } }
+func WithTimeout(d time.Duration) Option { return optionFunc(func(p *Prober) { p.timeout = d }) }
 
 // WithQuery adds a query to the batch, after the built-in queries and
 // before the sentinel.
-func WithQuery(q Query) Option { return func(p *Prober) { p.added = append(p.added, q) } }
+func WithQuery(q Query) Option { return optionFunc(func(p *Prober) { p.added = append(p.added, q) }) }
 
 // WithoutHeuristic sends the gated queries to every terminal, even those
 // the heuristic would spare: Apple Terminal, and SSH peers the environment
 // does not name.
-func WithoutHeuristic() Option { return func(p *Prober) { p.ungated = true } }
+func WithoutHeuristic() Option { return optionFunc(func(p *Prober) { p.ungated = true }) }
 
 // WithOverride sets facts the program knows better, from a flag or a file.
 // f runs on the facts the prober starts from, and again on every Caps it
 // hands out. f should set each fact with origin Override, so that no reply
 // replaces it.
 func WithOverride(f func(*Caps)) Option {
-	return func(p *Prober) { p.overrides = append(p.overrides, f) }
+	return optionFunc(func(p *Prober) { p.overrides = append(p.overrides, f) })
 }
 
 // WithoutColorSchemeUpdates never subscribes to mode 2031, so the terminal
 // sends no DSR 997 reports after the probe, and Restore is always empty.
-func WithoutColorSchemeUpdates() Option { return func(p *Prober) { p.noScheme = true } }
+func WithoutColorSchemeUpdates() Option { return optionFunc(func(p *Prober) { p.noScheme = true }) }
 
 // WithoutBackgroundRequest leaves the OSC 11 background query out of the
 // batch, and tea.RequestBackgroundColor out of the follow-up to each DSR 997
 // report.
-func WithoutBackgroundRequest() Option { return func(p *Prober) { p.noBackground = true } }
+func WithoutBackgroundRequest() Option { return optionFunc(func(p *Prober) { p.noBackground = true }) }
 
 // WithDisabled sends nothing. Init returns nil, and the first tea.EnvMsg
 // delivers a CapsMsg holding only the environment's facts, with the
@@ -84,18 +90,20 @@ func WithoutBackgroundRequest() Option { return func(p *Prober) { p.noBackground
 // EnvCaps gives the same facts without a program. A program run
 // without input, tea.WithInput(nil), must not probe: tea skips its own
 // queries then, but the replies to the prober's would reach the shell.
-func WithDisabled() Option { return func(p *Prober) { p.disabled = true } }
+func WithDisabled() Option { return optionFunc(func(p *Prober) { p.disabled = true }) }
 
 // WithGOOS reads the terminal's identity for goos instead of
 // runtime.GOOS: for a test, or for a wish server, whose own operating
 // system is not the SSH client's.
-func WithGOOS(goos string) Option { return func(p *Prober) { p.goos = goos } }
+func WithGOOS(goos string) Option { return optionFunc(func(p *Prober) { p.goos = goos }) }
 
 // WithAppearanceEnv names an environment variable the program sets to
 // "dark" or "light", such as MYAPP_APPEARANCE. It is also read with an LC_
 // prefix, because a default sshd forwards LC_* variables. It outranks
 // COLORFGBG and the desktop hook, and a terminal's reply outranks it.
-func WithAppearanceEnv(name string) Option { return func(p *Prober) { p.appearanceEnv = name } }
+func WithAppearanceEnv(name string) Option {
+	return optionFunc(func(p *Prober) { p.appearanceEnv = name })
+}
 
 // WithAppearanceHook asks the desktop whether it is dark, through f: the
 // macOS appearance, the XDG portal or the Windows registry, which need a
@@ -103,7 +111,7 @@ func WithAppearanceEnv(name string) Option { return func(p *Prober) { p.appearan
 // command, after the first tea.EnvMsg; it reports ok false when it cannot
 // tell. Its answer outranks COLORFGBG only.
 func WithAppearanceHook(f func() (dark, ok bool)) Option {
-	return func(p *Prober) { p.appearanceHook = f }
+	return optionFunc(func(p *Prober) { p.appearanceHook = f })
 }
 
 // WithConsoleHost asks, on Windows, whether the console is the classic
@@ -111,7 +119,7 @@ func WithAppearanceHook(f func() (dark, ok bool)) Option {
 // supplies. f runs once, as a command, after the first tea.EnvMsg; it
 // reports ok false when it cannot tell.
 func WithConsoleHost(f func() (classic, ok bool)) Option {
-	return func(p *Prober) { p.consoleHost = f }
+	return optionFunc(func(p *Prober) { p.consoleHost = f })
 }
 
 // Prober learns the terminal's capabilities from one batch of queries that
@@ -194,7 +202,7 @@ type consoleMsg struct {
 func NewProber(o ...Option) *Prober {
 	p := &Prober{timeout: DefaultTimeout, goos: runtime.GOOS}
 	for _, f := range o {
-		f(p)
+		f.apply(p)
 	}
 	for _, f := range p.overrides {
 		f(&p.caps)

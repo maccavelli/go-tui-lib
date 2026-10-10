@@ -73,11 +73,11 @@ const DefaultMaxArgBytes = 1 << 20
 // words ParseArgs reads, each on its own. Larger is an *ArgError before
 // anything parses it. A value below 1 keeps DefaultMaxArgBytes.
 func WithMaxArgBytes(n int) RegistryOption {
-	return func(r *Registry) {
+	return registryOptionFunc(func(r *Registry) {
 		if n > 0 {
 			r.maxArg = n
 		}
-	}
+	})
 }
 
 // tooLarge is the error for n bytes of arguments, or nil when they fit.
@@ -117,20 +117,30 @@ type loopState struct {
 	done chan struct{}
 }
 
-// RegistryOption configures NewRegistry.
-type RegistryOption func(*Registry)
+// RegistryOption configures NewRegistry. It is opaque: only this package's
+// functions make one.
+type RegistryOption interface{ apply(*Registry) }
+
+// registryOptionFunc is a function used as a RegistryOption.
+type registryOptionFunc func(*Registry)
+
+func (f registryOptionFunc) apply(r *Registry) { f(r) }
 
 // WithGate sets the gate the policy asks. Without one, a request the
 // policy would ask about is refused.
-func WithGate(g Gate) RegistryOption { return func(r *Registry) { r.policy.gate = g } }
+func WithGate(g Gate) RegistryOption {
+	return registryOptionFunc(func(r *Registry) { r.policy.gate = g })
+}
 
 // WithAuditor sets the auditor every request is recorded to.
-func WithAuditor(a Auditor) RegistryOption { return func(r *Registry) { r.auditor = a } }
+func WithAuditor(a Auditor) RegistryOption {
+	return registryOptionFunc(func(r *Registry) { r.auditor = a })
+}
 
 // WithPrefixer replaces the rule that names a loaded command's slash
 // prefix when its name is taken.
 func WithPrefixer(f func(Source) string) RegistryOption {
-	return func(r *Registry) { r.prefixer = f }
+	return registryOptionFunc(func(r *Registry) { r.prefixer = f })
 }
 
 // WithLoop gives the registry the program's event loop: send is the
@@ -143,7 +153,7 @@ func WithPrefixer(f func(Source) string) RegistryOption {
 // WithLoop is a permanent Attach, for a registry whose program runs for its
 // whole life.
 func WithLoop(send func(tea.Msg)) RegistryOption {
-	return func(r *Registry) { r.loop.Store(&loopState{send: send}) }
+	return registryOptionFunc(func(r *Registry) { r.loop.Store(&loopState{send: send}) })
 }
 
 // NewRegistry returns a registry at version 0 holding only its own
@@ -153,7 +163,7 @@ func NewRegistry(o ...RegistryOption) *Registry {
 	r.policy.always = map[alwaysKey]Verdict{}
 	r.running.runs = map[ID]map[uint64]context.CancelFunc{}
 	for _, f := range o {
-		f(r)
+		f.apply(r)
 	}
 	d := r.draftOf(&snapshot{}, nil)
 	for _, c := range r.builtins() {

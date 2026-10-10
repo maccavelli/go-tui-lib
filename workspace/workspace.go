@@ -196,8 +196,14 @@ type drag struct {
 	last int
 }
 
-// Option configures a Workspace.
-type Option func(*Workspace)
+// Option configures a Workspace. It is opaque: only this package's
+// functions make one.
+type Option interface{ apply(*Workspace) }
+
+// optionFunc is a function used as an Option.
+type optionFunc func(*Workspace)
+
+func (f optionFunc) apply(w *Workspace) { f(w) }
 
 // ThemeBuilder makes the theme for a colour profile and a background. It
 // chooses its own glyphs.
@@ -220,7 +226,7 @@ type GlyphThemeBuilder func(p colorprofile.Profile, bg theme.Background, g glyph
 // WithGlyphThemeBuilder after it makes the workspace follow from there
 // (docs/decisions/0014-PLAN-component-native-forms.md D5).
 func WithTheme(t theme.Theme) Option {
-	return func(w *Workspace) { w.theme, w.follow, w.themed = t, false, true }
+	return optionFunc(func(w *Workspace) { w.theme, w.follow, w.themed = t, false, true })
 }
 
 // WithThemeBuilder makes the workspace follow the terminal, building its
@@ -230,33 +236,35 @@ func WithTheme(t theme.Theme) Option {
 // them, such as with theme.WithPaletteFor. b chooses its own glyphs, so
 // WithGlyphs does not reach it; a GlyphThemeBuilder is given them.
 func WithThemeBuilder(b ThemeBuilder) Option {
-	return func(w *Workspace) { w.builder, w.follow = b, true }
+	return optionFunc(func(w *Workspace) { w.builder, w.follow = b, true })
 }
 
 // WithGlyphThemeBuilder is WithThemeBuilder for a builder that is given the
 // glyphs in use. It wins over a WithThemeBuilder.
 func WithGlyphThemeBuilder(b GlyphThemeBuilder) Option {
-	return func(w *Workspace) { w.gbuilder, w.follow = b, true }
+	return optionFunc(func(w *Workspace) { w.gbuilder, w.follow = b, true })
 }
 
 // WithGlyphs sets the starting glyphs (default Unicode), for the default
 // builder and a GlyphThemeBuilder, so a program's own command line can pass
 // launch's choice of glyph tier.
-func WithGlyphs(g glyph.Set) Option { return func(w *Workspace) { w.glyphs = g } }
+func WithGlyphs(g glyph.Set) Option { return optionFunc(func(w *Workspace) { w.glyphs = g }) }
 
 // WithProfile sets the starting colour profile (default ANSI256). A
 // tea.ColorProfileMsg replaces it.
-func WithProfile(p colorprofile.Profile) Option { return func(w *Workspace) { w.profile = p } }
+func WithProfile(p colorprofile.Profile) Option {
+	return optionFunc(func(w *Workspace) { w.profile = p })
+}
 
 // WithBackground sets the starting background (default Unknown). A
 // tea.BackgroundColorMsg replaces it; SetBackground is the way to pin one.
-func WithBackground(bg theme.Background) Option { return func(w *Workspace) { w.bg = bg } }
+func WithBackground(bg theme.Background) Option { return optionFunc(func(w *Workspace) { w.bg = bg }) }
 
 // WithSize sets the size the workspace lays out at before its first
 // tea.WindowSizeMsg (default 80 by 24), such as a plain render's. It is
 // clamped as a WindowSizeMsg is.
 func WithSize(width, height int) Option {
-	return func(w *Workspace) { w.width, w.height = clampSize(width, height) }
+	return optionFunc(func(w *Workspace) { w.width, w.height = clampSize(width, height) })
 }
 
 // The largest window the workspace draws
@@ -280,45 +288,45 @@ func clampSize(w, h int) (int, int) { return limits.Clamp(w, h) }
 // a program that runs its own probe or must send nothing unasked. By default
 // Init asks, so a following theme learns whether the background is light or
 // dark.
-func WithoutBackgroundQuery() Option { return func(w *Workspace) { w.noQuery = true } }
+func WithoutBackgroundQuery() Option { return optionFunc(func(w *Workspace) { w.noQuery = true }) }
 
 // WithKeyMap replaces the workspace's bindings.
-func WithKeyMap(k KeyMap) Option { return func(w *Workspace) { w.keys = k } }
+func WithKeyMap(k KeyMap) Option { return optionFunc(func(w *Workspace) { w.keys = k }) }
 
 // WithChrome sets what is drawn around panes (default Borders).
-func WithChrome(c Chrome) Option { return func(w *Workspace) { w.chrome = c } }
+func WithChrome(c Chrome) Option { return optionFunc(func(w *Workspace) { w.chrome = c }) }
 
 // WithPaneChrome overrides the chrome for one pane, such as None for a
 // one-row status footer.
 func WithPaneChrome(id layout.PaneID, c Chrome) Option {
-	return func(w *Workspace) {
+	return optionFunc(func(w *Workspace) {
 		if w.chromes == nil {
 			w.chromes = map[layout.PaneID]Chrome{}
 		}
 		w.chromes[id] = c
-	}
+	})
 }
 
 // WithBorder sets the border style for Borders chrome and overlays (default
 // rounded).
-func WithBorder(s theme.BorderStyle) Option { return func(w *Workspace) { w.border = s } }
+func WithBorder(s theme.BorderStyle) Option { return optionFunc(func(w *Workspace) { w.border = s }) }
 
 // WithFocusRing sets the order focus moves in (default: tree order).
 func WithFocusRing(ids ...layout.PaneID) Option {
-	return func(w *Workspace) { w.ring = slices.Clone(ids) }
+	return optionFunc(func(w *Workspace) { w.ring = slices.Clone(ids) })
 }
 
 // WithState restores a saved layout state.
-func WithState(s layout.State) Option { return func(w *Workspace) { w.state = s } }
+func WithState(s layout.State) Option { return optionFunc(func(w *Workspace) { w.state = s }) }
 
 // WithoutMouse turns mouse handling off. It is on by default, and does
 // nothing until the program sets a mouse mode.
-func WithoutMouse() Option { return func(w *Workspace) { w.mouse = false } }
+func WithoutMouse() Option { return optionFunc(func(w *Workspace) { w.mouse = false }) }
 
 // WithMouse turns mouse handling on or off.
 //
 // Deprecated: use WithoutMouse, since handling is on by default (0014-MADR W4).
-func WithMouse(on bool) Option { return func(w *Workspace) { w.mouse = on } }
+func WithMouse(on bool) Option { return optionFunc(func(w *Workspace) { w.mouse = on }) }
 
 // WithWidthMethod fixes how the workspace measures text, and stops it
 // following the terminal's mode 2027 report. By default it measures with
@@ -327,11 +335,11 @@ func WithMouse(on bool) Option { return func(w *Workspace) { w.mouse = on } }
 // Bubble Tea does (docs/decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md
 // §3). WithWidthMethod(ansi.GraphemeWidth) restores v0.1's measurement.
 func WithWidthMethod(m ansi.Method) Option {
-	return func(w *Workspace) { w.method, w.pinned = m, true }
+	return optionFunc(func(w *Workspace) { w.method, w.pinned = m, true })
 }
 
 // WithFocus sets the pane focused first (default: the first of the ring).
-func WithFocus(id layout.PaneID) Option { return func(w *Workspace) { w.focus = id } }
+func WithFocus(id layout.PaneID) Option { return optionFunc(func(w *Workspace) { w.focus = id }) }
 
 // New hosts panes in root. Panes the tree never places are kept, and can be
 // shown by a later SetLayout.
@@ -358,7 +366,7 @@ func New(root layout.Node, panes map[layout.PaneID]Pane, opts ...Option) *Worksp
 	maps.Copy(w.panes, panes)
 	w.ids = slices.Sorted(maps.Keys(w.panes))
 	for _, o := range opts {
-		o(w)
+		o.apply(w)
 	}
 	// The first theme is built once every option has applied
 	// (docs/decisions/0014-PLAN-component-native-forms.md Step 6).

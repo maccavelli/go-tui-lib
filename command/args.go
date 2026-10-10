@@ -31,8 +31,14 @@ func (e *ArgError) Error() string {
 // (docs/decisions/0014-MADR-native-integration-api.md A1).
 func (e *ArgError) ExitCode() int { return 2 }
 
-// Option sets a field of the Command New builds.
-type Option func(*Command)
+// Option sets a field of the Command New builds. It is opaque: only this
+// package's functions make one.
+type Option interface{ apply(*Command) }
+
+// optionFunc is a function used as an Option.
+type optionFunc func(*Command)
+
+func (f optionFunc) apply(c *Command) { f(c) }
 
 // New builds a command whose arguments decode into A. The schema is
 // SchemaOf[A], which must be an object; the registry checks arguments
@@ -70,7 +76,7 @@ func New[A any](id ID, title string, run func(ctx context.Context, inv *Invocati
 		}),
 	}
 	for _, o := range opts {
-		o(&c)
+		o.apply(&c)
 	}
 	if c.Danger == 0 {
 		return Command{}, errors.New("command: " + string(id) + ": no WithDanger; declare ReadOnly, UI, Mutating or Destructive")
@@ -100,58 +106,58 @@ func ArgsOf[A any](a A) (json.RawMessage, error) {
 }
 
 // WithDescription sets Description.
-func WithDescription(s string) Option { return func(c *Command) { c.Description = s } }
+func WithDescription(s string) Option { return optionFunc(func(c *Command) { c.Description = s }) }
 
 // WithCategory sets Category.
-func WithCategory(s string) Option { return func(c *Command) { c.Category = s } }
+func WithCategory(s string) Option { return optionFunc(func(c *Command) { c.Category = s }) }
 
 // WithSlash sets the slash name and its aliases.
 func WithSlash(name string, aliases ...string) Option {
-	return func(c *Command) { c.Slash, c.Aliases = name, aliases }
+	return optionFunc(func(c *Command) { c.Slash, c.Aliases = name, aliases })
 }
 
 // WithArgHint sets ArgHint.
-func WithArgHint(s string) Option { return func(c *Command) { c.ArgHint = s } }
+func WithArgHint(s string) Option { return optionFunc(func(c *Command) { c.ArgHint = s }) }
 
 // WithOutput sets Output, the schema of Result.Value.
-func WithOutput(s Schema) Option { return func(c *Command) { c.Output = s } }
+func WithOutput(s Schema) Option { return optionFunc(func(c *Command) { c.Output = s }) }
 
 // WithWhen sets When.
-func WithWhen(expr string) Option { return func(c *Command) { c.When = expr } }
+func WithWhen(expr string) Option { return optionFunc(func(c *Command) { c.When = expr }) }
 
 // WithScope sets Scope.
-func WithScope(s Scope) Option { return func(c *Command) { c.Scope = s } }
+func WithScope(s Scope) Option { return optionFunc(func(c *Command) { c.Scope = s }) }
 
 // WithDanger sets Danger. New requires it.
-func WithDanger(d Danger) Option { return func(c *Command) { c.Danger = d } }
+func WithDanger(d Danger) Option { return optionFunc(func(c *Command) { c.Danger = d }) }
 
 // WithIdempotent marks the command idempotent.
-func WithIdempotent() Option { return func(c *Command) { c.Idempotent = true } }
+func WithIdempotent() Option { return optionFunc(func(c *Command) { c.Idempotent = true }) }
 
 // WithOpenWorld marks the command as reaching outside the program.
-func WithOpenWorld() Option { return func(c *Command) { c.OpenWorld = true } }
+func WithOpenWorld() Option { return optionFunc(func(c *Command) { c.OpenWorld = true }) }
 
 // WithSurfaces sets Surfaces.
-func WithSurfaces(s Surface) Option { return func(c *Command) { c.Surfaces = s } }
+func WithSurfaces(s Surface) Option { return optionFunc(func(c *Command) { c.Surfaces = s }) }
 
 // WithMode sets Mode.
-func WithMode(m Mode) Option { return func(c *Command) { c.Mode = m } }
+func WithMode(m Mode) Option { return optionFunc(func(c *Command) { c.Mode = m }) }
 
 // WithExclusive makes a new run cancel the running one.
-func WithExclusive() Option { return func(c *Command) { c.Exclusive = true } }
+func WithExclusive() Option { return optionFunc(func(c *Command) { c.Exclusive = true }) }
 
 // WithWhileBusy lets the command run while the agent streams.
-func WithWhileBusy() Option { return func(c *Command) { c.WhileBusy = true } }
+func WithWhileBusy() Option { return optionFunc(func(c *Command) { c.WhileBusy = true }) }
 
 // WithHidden keeps the command runnable but unlisted.
-func WithHidden() Option { return func(c *Command) { c.Hidden = true } }
+func WithHidden() Option { return optionFunc(func(c *Command) { c.Hidden = true }) }
 
 // WithMeta sets Meta[key].
 func WithMeta(key string, v any) Option {
-	return func(c *Command) {
+	return optionFunc(func(c *Command) {
 		if c.Meta == nil {
 			c.Meta = map[string]any{}
 		}
 		c.Meta[key] = v
-	}
+	})
 }

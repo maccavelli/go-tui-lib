@@ -18,3 +18,12 @@
 .	- ./workspace.KeyOverlay: removed
 .	- ./workspace.KeyWidth: removed
 .	- ./workspace.KeyZoomed: removed
+
+# docs/decisions/0014-PLAN-canonicalization.md Step 5: the six option
+# types become opaque interfaces (0014-MADR-native-integration-api W0.4).
+.	- ./command.Option: changed from func(*Command) to interface{apply(*Command)}
+.	- ./command.RegistryOption: changed from func(*Registry) to interface{apply(*Registry)}
+.	- ./termcap.Option: changed from func(*Prober) to interface{apply(*Prober)}
+.	- ./termsvc.NotifyOption: changed from func(*Notifier) to interface{apply(*Notifier)}
+.	- ./workspace.Option: changed from func(*Workspace) to interface{apply(*Workspace)}
+.	- ./workspace.WrapOption: changed from func(*Model[M]) to interface{apply(*Model[M])}

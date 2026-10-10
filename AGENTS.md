@@ -142,9 +142,10 @@ needs an exception says so.
    `sharedNames` list both allow it.
 4. **Options.** Option functions are named `With…`, `Without…` or `On…`:
    `On…` names a callback, `With…` sets a value or a provider, and
-   `Without…` turns off a default. New code uses opaque option types. The
-   option types that still expose their structs become opaque in 0014's
-   W4.
+   `Without…` turns off a default. Option types are opaque: an interface
+   with an unexported method, which only the package's own functions
+   satisfy (0014-PLAN-canonicalization Step 5). An option type that is a
+   function over an unexported struct is opaque already.
 5. **Enums.** An exported enum has `String`, `MarshalText` and
    `UnmarshalText`, with stable lowercase tokens. 0014's W4 moves them
    onto one `internal/enum` helper.

@@ -648,3 +648,69 @@ Step 1.
   * **Noted, not changed:** case 6 aborts with no FAIL line when a
     tracked test file is deleted and not yet staged. It is
     0014-PLAN-hardening's code; the owner decides whether it is fixed.
+
+### Step 5: opaque options
+
+#### Deviations
+
+No deviation.
+
+#### What was built
+
+* **The six types,** each `type X interface{ apply(*T) }` with an
+  unexported function adapter whose `apply` calls it:
+  * `command.Option` (`optionFunc`) and `RegistryOption`
+    (`registryOptionFunc`);
+  * `termcap.Option` (`optionFunc`);
+  * `termsvc.NotifyOption` (`notifyOptionFunc`);
+  * `workspace.Option` (`optionFunc`) and `WrapOption[M]`
+    (`wrapOptionFunc[M]`).
+
+  The type names stay. Each doc comment says the type is opaque.
+* **Every constructor** returns the adapter: 61 functions, each one's
+  `return func(…) {…}` wrapped by brace matching, with no other change.
+  `termsvc.WithGate`, which returns `WithNotifyFilter`'s value, needed
+  none. The six loops that apply options call `apply`.
+* **`scripts/apicheck.allow`** lists the six type changes, under a header
+  naming this PLAN and step; the release notes name the break.
+* **`AGENTS.md`,** "API conventions" rule 4: option types are opaque, an
+  interface with an unexported method; a function over an unexported
+  struct is opaque already.
+* **`internal/conformance/options_test.go` (new):** `TestOptionsAreOpaque`
+  plants sources and type-checks them as the scan does, with the source
+  importer. For each type, the library's own option type-checks, so a
+  failing import cannot pass for opacity; and two programs' attempts are
+  refused as not implementing the type: a `func(*T)` literal, and a type
+  of the program's own with both an `apply` and an `Apply` method.
+* **No test, guide or example** wrote an option literal of its own: the
+  library's tests, `make examples` and the guides needed no change.
+
+#### Checks
+
+* **The probe:** `TestOptionsAreOpaque`, on a scratch copy of `ae6e76c`,
+  the commit before this step: 12 failures, both attempts for each of
+  the six types. It passes on the step's code.
+* **Mutations,** on scratch copies of the tree, each reopening one type
+  while the tree still builds; both were killed by the test:
+  * **S5-1** (`workspace.Option`'s method exported as `Apply`): "a type
+    of its own: <nil>". Only the second attempt catches it: a function
+    literal has no `Apply` method either.
+  * **S5-2** (`termsvc.NotifyOption` an alias of its function adapter):
+    "a func literal: <nil>".
+* **`apidiff`:** `make apicheck`, "against v0.8.0, 14 incompatible
+  change(s)", the eight of Step 4 and the six listed here, and "clean".
+* **Rule 2 on macOS,** go1.27.2:
+  * `make pre-add-check FILES=<the 7 Go files>`: "7 file(s) clean".
+  * `make lint`, the cross `go vet`, `-race`, `-shuffle=on -count=2`,
+    `LC_ALL=C`, workspace mode, `go mod tidy -diff`, `make vuln`, `make
+    examples`, `scripts/go-modules.sh --check` and `make release-check`
+    ("197 file(s) clean"): clean.
+  * CI's other checks: `shellcheck`, `markdownlint-cli2`, `actionlint`,
+    `go-precheck_test.sh` ("12 passed") and `go-fuzz_test.sh` ("25
+    passed"): clean.
+* **The Windows test host,** go1.27.2 windows/amd64, with the index synced
+  to the copied tree: `make pre-add-check`, `make lint`, `make vuln` and
+  `make examples`, each exit 0; `go test -count=2 -shuffle=on ./...`,
+  exit 0; `TestOptionsAreOpaque`, the deprecated-name tests and the
+  conformance scan, 7 passed, 0 failed; `go-fuzz_test.sh`, "25 passed, 0 failed";
+  `make fuzz FUZZTIME=3s`, "8 packages ran clean".
