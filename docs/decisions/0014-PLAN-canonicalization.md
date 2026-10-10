@@ -1,6 +1,6 @@
 ---
 status: proposed
-date: 2026-10-07
+date: 2026-10-09
 associated-madr: "0014-MADR-native-integration-api.md"
 ---
 # Implement W4: renames with deprecation aliases, opaque options, one enum helper, JSON v2, structured errors, and the planned records' names; release `v0.9.0` and `v0.10.0`
@@ -52,6 +52,36 @@ By `v0.10.0`, one name means one thing across the library. In detail:
 | the stale `--args` wording | `command/slash.go:12-13`; `docs/guides/commands.md:171-172` |
 | collisions planned in 0007, 0008 and 0009 | 0007-MADR `:259-442`; 0008-MADR `:167-302`; 0009-MADR `:185-760`; the W4 fact sheet |
 
+### Facts re-read before execution (2026-10-09)
+
+W2 (0014-PLAN-component-native-forms), W3 (0014-PLAN-hardening) and the
+Go 1.27.2 floor (0016-PLAN-go-1-27-2-for-go-2026-6604) landed after this
+PLAN was written, and `v0.8.0` is tagged. The agent read every row above
+again on `b6e3cef`. The table above keeps the 2026-10-07 readings; this
+one gives today's lines and what changed. The steps below are annotated
+where it changes them.
+
+| Fact | Today |
+| :--- | :--- |
+| `Decision`, its four constants, `Gate.Decide`, `GateFunc` (W2), `Record.Decision` and the slog key `"decision"` hold; the unexported `verdict` function holds | `command/gate.go:11-18`, `:45`, `:49-52`, `:128`; `command/audit.go:23`, `:47` |
+| `Request.Context` and `Invocation.Context` hold; `admit` reads `req.Context` and builds the `Invocation` with it; the builtin list reads `inv.Context` | `command/handler.go:37`, `:54`; `command/dispatch.go:161`, `:167`; `command/builtin.go:28` |
+| `termcap.New` still has no non-test caller | `termcap/prober.go:194` |
+| `layout`'s bare preset options hold | `layout/presets.go:56-88` |
+| `workspace.WithMouse(on bool)` and `termsvc.WithGate` hold | `workspace/workspace.go:316`; `termsvc/notify.go:134` |
+| The six option types over exported structs hold. Since this PLAN, `command.LoadOption` (W3) and `launch.Option` (0013) are interfaces already, and `layout.PresetOption`, `termcap.ReportOption`, `termsvc.CopyOption`, `theme.Option` and `workspace.CommandOption` are functions over unexported structs, which no third party can write; they stay | `command/args.go:35`, `registry.go:121`; `termcap/prober.go:49`; `termsvc/notify.go:120`; `workspace/workspace.go:200`, `model.go:32` |
+| **Changed, by W2:** `internal/enum` takes `~uint8` and `~int` types, and already serves termcap's seven enums, `command.Format`, `glyph.Tier`, `launch.Choice` and `Target`, and `theme`'s two. 21 enums still lack text forms: `command`'s `Kind`, `Danger`, `Surface`, `Mode`, `SourceKind`, `Origin` and `Decision` (which has `ACPKind`, not `String`); `termsvc`'s eight; `layout`'s three; `workspace`'s two; `when.Kind`. The pins `"Kind(9)"`, `"Origin(99)"` and termcap's `"9"` hold | `internal/enum/enum.go`; `command/command.go:117-289`; `command/registry_test.go:316`, `:321`; `termcap/termcap_test.go:63` |
+| **New, from W3:** `FuzzEnumText` pins that each termcap name `UnmarshalText` takes is the name `MarshalText` gives back | `termcap/fuzz_test.go` |
+| The one-message `tea.Cmd` helper is still written three times and inline twice | `command/dispatch.go:251`; `termsvc/clipboard.go:121`, `notify.go:258`; `termcap/prober.go:528`; `termsvc/links.go:70` |
+| **Changed:** `command` imports JSON v1 in four files, not three: `args.go` (`ArgsOf` returns `json.RawMessage`) as well as `audit.go`, `command.go` (`Schema = json.RawMessage`) and `handler.go`. W2 added v2 imports beside them. `termcap` still marshals `Caps` and the report with v1. `layout/state.go` also uses v1; it is not in this PLAN's scope | `command/args.go:5`, `:94`; `command/command.go:77`; `termcap/caps.go:84`, `:111`; `report.go:72`; `layout/state.go:4` |
+| `when`'s 19 `errorf` sites hold; the two size errors are `fmt.Errorf` with no offset; `parse.go:163` wraps the regex error with `%v`; termcap's unmarshalers share one site, now `enum.Unmarshal` | `when/lex.go:46`; `when/when.go:53`, `:69`; `when/parse.go:163`; `termcap/termcap.go:133` |
+| Hooks without `…Func` adapters: `command.Auditor`, `termsvc.Backend`, `termsvc.Clipboard`. W2 added `GateFunc` | `command/audit.go:11`; `termsvc/notify.go:115`; `termsvc/clipboard.go:61` |
+| **Changed, by W3:** the workspace cuts every line and label with `sanitize.Truncate`, which never returns text wider than asked: rune by rune under WcWidth, and checked under GraphemeWidth, where `clip` also keeps a line's ends from joining a border (0014-PLAN-hardening D8). Tests measure with W2's `tuitest.Fits` under the case's method; `termsvc` and `termcap`'s report truncate by grapheme | `workspace/render.go:174`, `:299`, `:337`; `internal/sanitize/sanitize.go`; `tuitest/case.go:28`; `termsvc/termsvc.go:104`; `termcap/report.go:215-226` |
+| The stale `--args` wording holds | `command/slash.go:13`; `docs/guides/commands.md:191` |
+| **Changed:** the collision check allows six shared names, not five: `Terminal`, in `launch/launchtest` and `termcap/termcaptest`, was added by 0013-PLAN-cli-integration-helpers D5. Its `Decision` entry still says "until v0.10.0" | `internal/conformance/conformance_test.go:470-482`; `docs/glossary.md:28` |
+| **Changed:** the glossary's "Reserved by accepted records" still lists names W2 and W3 have since built: `Format`, `Param`, `PanicError`, `PlainViewer`, `GlyphThemeBuilder` and `LoadOption`. 0007, 0008 and 0009 have not changed since this PLAN | `docs/glossary.md:31-44`; `git log` |
+| **A conflict, resolved by the MADR:** 0014-MADR-native-integration-api A1.5 says W3's deprecated variables, `termcaptest.RunTimeout` and the seven `workspace.Key…`, are removed in `v0.9.0`; so do AGENTS.md's "API conventions" rule 1 (one minor release) and 0014-PLAN-hardening Step 8. This PLAN's Step 9 removed them in `v0.10.0`. They move to Step 4, in `v0.9.0` | `docs/decisions/0014-MADR-native-integration-api.md` A1.5; `AGENTS.md`; Step 9 below |
+| The preconditions hold: `v0.8.0` is tagged at `f6c9f9b`, and `scripts/apicheck.allow` lists nothing | `git tag`; the file |
+
 ### Preconditions
 
 * **`v0.8.0` is tagged** (0014-PLAN-hardening).
@@ -76,7 +106,11 @@ By `v0.10.0`, one name means one thing across the library. In detail:
 
 * **Renaming the five deliberate collisions** (`Context`, `Kind`,
   `Option`, `Origin`, `Pane`). The glossary records them as deliberate,
-  per W0's PLAN. Renaming any needs the owner and a record.
+  per W0's PLAN. Renaming any needs the owner and a record. (2026-10-09:
+  six, with `Terminal`, the two test kits' fake terminal, from
+  0013-PLAN-cli-integration-helpers D5.)
+* **`layout/state.go`'s JSON v1** (added 2026-10-09). The goal names
+  `command` and `termcap` only.
 * **W5's records.**
 
 ## Implementation Steps
@@ -155,6 +189,12 @@ By `v0.10.0`, one name means one thing across the library. In detail:
     * a `HighlighterFunc` adapter;
     * `safetext`'s overlap with `internal/sanitize` noted for its PLAN.
 
+* **Added 2026-10-09:** the glossary moves `Format`, `Param`,
+  `PanicError`, `PlainViewer`, `GlyphThemeBuilder` and `LoadOption` from
+  "Reserved by accepted records" to "Built from those records", since W2
+  and W3 built them; and its deliberate collisions name six, with
+  `Terminal`.
+
 **Done when** the glossary's names and the three amendments agree, and
 each record's index row says "A<n> recorded".
 
@@ -172,9 +212,9 @@ each record's index row says "A<n> recorded".
   * `Request.WhenContext` and `Invocation.WhenContext` are added; the old
     `Context` fields stay, deprecated.
   * `admit` reads `WhenContext`, else `Context`
-    (`command/dispatch.go:107`).
-  * The `Invocation` it builds sets both (`:113`).
-  * `builtin.go:27` reads `WhenContext`.
+    (`command/dispatch.go:107`; 2026-10-09: `:161`).
+  * The `Invocation` it builds sets both (`:113`; 2026-10-09: `:167`).
+  * `builtin.go:27` reads `WhenContext` (2026-10-09: `:28`).
 * **Uses.** Every use in the library, its tests and the guides moves to
   the new names.
 * **Tests:**
@@ -200,6 +240,15 @@ each record's index row says "A<n> recorded".
 * **`termsvc`:** `WithNotifyFilter(func(Notification) bool)`. `WithGate`
   is deprecated, because "gate" is `command`'s permission concept.
 * **Uses.** The library, its tests and the guides move to the new names.
+* **W3's deprecated variables are removed** (added 2026-10-09, by
+  0014-MADR-native-integration-api A1.5): `termcaptest.RunTimeout` and
+  `workspace.KeyFocusedPane`, `KeyZoomed`, `KeyHiddenPanes`,
+  `KeyOverlay`, `KeyModal`, `KeyWidth` and `KeyHeight`, deprecated in
+  `v0.8.0`. `runTimeout` reads the terminal's timeout, else
+  `DefaultRunTimeout`. `workspace/contextkeys_test.go`, which reassigns
+  the variables, is removed with them; `TestKeyFunctions` stays. The
+  eight `apidiff` lines go into `scripts/apicheck.allow` in this step's
+  commit, and the release notes name the removals.
 * **Test:** `TestDeprecatedOptionsStillWork`, one case per old name.
 
 ### Step 5: opaque options
@@ -238,6 +287,11 @@ each record's index row says "A<n> recorded".
   * `when`: `Kind`;
   * and `theme`'s two from W2.
 
+  2026-10-09: `termcap`'s seven, `command.Format`, `glyph.Tier`,
+  `launch.Choice` and `Target`, and `theme`'s two already go through
+  `internal/enum`, by W2; they move to `Names` with the rest.
+  `FuzzEnumText` (W3) keeps pinning termcap's exact names.
+
   Each enum gets `String`, `MarshalText` and `UnmarshalText`; an existing
   `String` keeps its tokens.
 * **`command.Surface`,** a bit set, gets a `SurfaceNames` helper of its
@@ -255,7 +309,9 @@ each record's index row says "A<n> recorded".
 
 * **JSON.**
   * `command`'s v1 imports go: `RawMessage` is `jsontext.Value` under its
-    v2 name.
+    v2 name. (2026-10-09: in four files, `args.go` among them, whose
+    `ArgsOf` returns `json.RawMessage`; the type is the same, so its
+    signature does not change.)
   * `termcap`'s `Caps` and report marshal with v2.
   * The measured differences are named in the notes: `<>&` are no longer
     escaped; nil slices become `[]`; names match case-sensitively;
@@ -273,7 +329,9 @@ each record's index row says "A<n> recorded".
   and `termsvc.ClipboardFunc`, modelled on `HandlerFunc`.
 * **Width.** `AGENTS.md` and the glossary state one rule:
   * the workspace measures with its method, WcWidth until the terminal
-    reports mode 2027 and GraphemeWidth after;
+    reports mode 2027 and GraphemeWidth after (2026-10-09: and cuts with
+    `sanitize.Truncate`, never wider than asked, closing a line's ends
+    under GraphemeWidth, by 0014-PLAN-hardening D8);
   * tests measure with `tuitest.Fits` under the case's method;
   * `termsvc` and `termcap` truncate by grapheme.
 
@@ -303,8 +361,10 @@ each record's index row says "A<n> recorded".
   * `layout`'s bare option names;
   * `workspace.WithMouse`;
   * `termsvc.WithGate`;
-  * `termcaptest.RunTimeout`;
-  * the seven `workspace.Key*` variables, deprecated by W3.
+  * ~~`termcaptest.RunTimeout`;~~
+  * ~~the seven `workspace.Key*` variables, deprecated by W3.~~
+    (2026-10-09: both removed in Step 4, in `v0.9.0`, by
+    0014-MADR-native-integration-api A1.5.)
 * **The audit's slog key** becomes `"verdict"`.
 * **The collision check's `Decision` entry,** dated for `v0.10.0` by
   0013's PLAN, is removed. The check must then pass with `Decision` in
@@ -356,4 +416,20 @@ each record's index row says "A<n> recorded".
 
 ## Execution Record
 
-Not started.
+### Step 1: records
+
+* **Facts re-read (2026-10-09).** The agent read every fact of this PLAN
+  again on `b6e3cef`, after W2, W3, 0016 and `v0.8.0`. The results are in
+  "Facts re-read before execution (2026-10-09)", with the amended lines
+  in "Out of scope" and Steps 2, 3, 4, 6, 7 and 9.
+  * Every fact the steps rest on still holds, at new lines.
+  * W2 and W3 changed five: `internal/enum` already serves twelve enums;
+    `command` imports JSON v1 in four files; the workspace's width is
+    W3's `sanitize.Truncate`; the collision check shares six names; and
+    the glossary still reserves six names that are now built.
+  * W3's deprecated variables are removed in `v0.9.0`, in Step 4, as
+    0014-MADR-native-integration-api A1.5 says, not in `v0.10.0`.
+* **No other record changes.** The MADR already decides each point.
+* **The approval:** the owner wrote "approved to proceed" on 2026-10-09,
+  before this re-read. This amendment awaits the owner's approval before
+  Step 2.
