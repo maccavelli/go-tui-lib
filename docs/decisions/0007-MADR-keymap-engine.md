@@ -981,6 +981,30 @@ The names chosen are checked against
 [0014-MADR-native-integration-api.md](0014-MADR-native-integration-api.md)'s
 glossary, whose W4 PLAN also amends this record's other names.
 
+### A3 (2026-10-09): names from the glossary
+
+Names only; the design stands. Before this record is built, its types take
+the names [docs/glossary.md](../glossary.md) gives, so that none collides
+with a type the library exports or another record plans
+([0014-PLAN-canonicalization.md](0014-PLAN-canonicalization.md) Step 2, with its D1). Where this record says the old name, read the
+new one.
+
+| Was | Is | Why |
+| :--- | :--- | :--- |
+| `type Context string`, `const Global` | `command.Scope` and `command.Global` themselves | `command.Scope` already means where a command applies: `Global`, or a pane, overlay or mode name. `Path` is `[]command.Scope`. In a user's file, global is written as `command.Global`'s text, `"global"` |
+| `Rule.Context`, `Conflict.Context` | `Binding.Scope`, `BindingConflict.Scope` | the fields follow their type |
+| `Origin` | `Location` | `command.Origin` and `termcap.Origin` |
+| `Conflict` | `BindingConflict` | `command.Conflict` |
+| `Rule` | `Binding` | `layout.Rule` |
+| `Result` | `Outcome` | `command.Result` |
+| `Options` | `Settings` | `launch.Config` took the name `Config` |
+| `Match`, the result of `Lookup` | `Resolved` | 0008's `palette.Hit` and `fuzzy.Match` |
+| `Matcher`, `NewMatcher` | `Dispatcher`, `NewDispatcher` | 0008's `fuzzy.Matcher` |
+| the `ConflictKind` constant `Unsupported` | `NotSupported` | `termcap.Unsupported` |
+
+[0007-PLAN-keymap-engine.md](0007-PLAN-keymap-engine.md) takes these names
+when it is next amended, before it runs.
+
 ## More Information
 
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md):

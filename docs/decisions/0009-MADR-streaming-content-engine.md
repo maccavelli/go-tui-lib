@@ -1009,6 +1009,41 @@ theme revision comes from.
 * **C.** `stream` compares the theme it was last given with the new one,
   and drops its caches on a change, with no revision at all.
 
+### A4 (2026-10-09): names from the glossary
+
+Names only; the design stands. Before this record is built, its types take
+the names [docs/glossary.md](../glossary.md) gives, so that none collides
+with a type the library exports or another record plans
+([0014-PLAN-canonicalization.md](0014-PLAN-canonicalization.md) Step 2). Where this record says the old name, read the new one.
+
+| Was | Is | Why |
+| :--- | :--- | :--- |
+| `safetext.Policy` | `safetext.Rules` | `termsvc.Policy`, and `frame.Policy` |
+| `safetext.Filter` | `safetext.Sanitizer` | `inputfilter.Filter`; `Filter` is a message filter |
+| `frame.Policy`, its `Decide` | `frame.Pacer`, its `Pace` | as above |
+| `frame.Plan` | `frame.Release` | `layout.Plan` |
+| `Plan.Mode` | `Release.Gear` | `command.Mode` |
+| `frame.New` | `frame.NewScheduler` | `New` builds only the type named after its package |
+| `frame.Msg` | `frame.FrameMsg` | a message type is named for what it carries |
+| `inputfilter.New` | `inputfilter.NewFilter` | as `frame.New` |
+| `stream.New` | `stream.NewDoc` | as `frame.New` |
+| `stream.Pane` | `stream.DocPane` | `layout.Pane` and `workspace.Pane` |
+| glamourmd's `New`, `FromTheme` | `NewRenderer`, `WithTheme` | as `frame.New`; options are named `With…` |
+| `Highlighter` | with a `HighlighterFunc` adapter | AGENTS.md's API rule for hooks |
+
+* **`Renderer`** in `stream` and in `stream/glamourmd` stays: the
+  adapter's type implements the interface. The glossary records the pair
+  as the one planned deliberate collision, added to "Deliberate" and to
+  `sharedNames` when the adapter is built.
+* **`safetext` and `internal/sanitize`.** 0014-PLAN-hardening built
+  `internal/sanitize`, which `workspace`, `termsvc`, `termcap` and
+  `command` use for untrusted display text. `safetext`'s PLAN decides
+  whether it wraps `internal/sanitize` or replaces it, so that the
+  library keeps one sanitizer.
+
+[0009-PLAN-streaming-content-engine.md](0009-PLAN-streaming-content-engine.md)
+takes these names when it is next amended, before it runs.
+
 ## More Information
 
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md):

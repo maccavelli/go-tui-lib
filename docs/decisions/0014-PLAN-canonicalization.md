@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in-progress
 date: 2026-10-09
 associated-madr: "0014-MADR-native-integration-api.md"
 ---
@@ -155,7 +155,8 @@ where it changes them.
   * **`New`:** only when it returns the type named after the package.
 * **Amendments, each dated, citing this PLAN.** Each changes only names,
   never a design.
-  * **0007-MADR** (`keymap`):
+  * **0007-MADR** (`keymap`) (2026-10-09, D1: `command.Scope` itself;
+    `Options` → `Settings`; `Match` → `Resolved`):
     * `Context` → `Scope` (or `command.Scope` itself);
     * `Origin` → `Location`;
     * `Conflict` → `BindingConflict`;
@@ -165,7 +166,8 @@ where it changes them.
     * `Match` and `Matcher` → `Hit` and `Dispatcher`;
     * the `Rule.Context` and `Conflict.Context` fields → `Scope`;
     * the `Unsupported` constant → `NotSupported`.
-  * **0008-MADR** (`fuzzy`, `palette`):
+  * **0008-MADR** (`fuzzy`, `palette`) (2026-10-09, D1: also
+    `Palette` → `Picker`, with `New` → `NewPicker`):
     * `fuzzy.New` → `NewMatcher`, with `With…` options;
     * `Tier` → `Grade`;
     * `Span` → `Range`;
@@ -431,5 +433,51 @@ each record's index row says "A<n> recorded".
     0014-MADR-native-integration-api A1.5 says, not in `v0.10.0`.
 * **No other record changes.** The MADR already decides each point.
 * **The approval:** the owner wrote "approved to proceed" on 2026-10-09,
-  before this re-read. This amendment awaits the owner's approval before
-  Step 2.
+  before this re-read, and "committed. approved to proceed" after it
+  (`b45e0ee`).
+* **This PLAN** is `in-progress`, and its row in `docs/README.md` follows.
+
+### Step 2: the glossary and the planned records
+
+#### Deviations
+
+* **D1 (2026-10-09): four of Step 2's names, chosen again.**
+  * **Found,** checking every type the three records plan against the
+    library's exported types on `b45e0ee` and against each other:
+    * `keymap.Context` → `Scope` would collide with `command.Scope`,
+      which means the same thing: where a command applies, `Global` or a
+      pane, overlay or mode name.
+    * `keymap.Options` → `Config` would collide with `launch.Config`,
+      built by 0013 after this PLAN's names were chosen.
+    * `keymap.Match` → `Hit` would collide with 0008's `palette.Hit`, and
+      `Match` itself with 0008's `fuzzy.Match`.
+    * 0008's `palette.Palette` would collide with `theme.Palette`; Step 2
+      had not listed it.
+  * **The owner's choices:** `keymap` uses `command.Scope` and
+    `command.Global` itself (the PLAN's "or `command.Scope` itself");
+    `Settings`; `Resolved`; and `palette.Picker`, built by `NewPicker`.
+  * **The others:** a `keymap.Region` type; `BuildOptions`; `Found`; and
+    `Palette` as a deliberate shared name.
+  * Every other new name is free: none is an exported type in the
+    library, and none is planned twice.
+
+#### What was done
+
+* **`docs/glossary.md`:**
+  * the `when` row of "Deliberate" sits under `Context`, where it
+    belongs; it had been listed under `Decision`;
+  * `Format`, `Param`, `PanicError`, `PlainViewer`, `GlyphThemeBuilder`
+    and `LoadOption` move from "Reserved" to "Built", since W2 and W3
+    built them;
+  * "One meaning each" gains Step 2's names: `Verdict`, `WhenContext`,
+    `Decision`, `Policy`, `Plan`, `Rule`, `Span`, `Result`, `Conflict`,
+    `Scope`, `Source`, `Query`, `Tier`, `Filter`, `Renderer` and `New`;
+  * "Names the planned records must not take" records that the three
+    amendments renamed every collision, and that `Renderer` in `stream`
+    and `stream/glamourmd` is the one planned deliberate pair.
+* **0007-MADR-keymap-engine A3, 0008-MADR-command-palette A2 and
+  0009-MADR-streaming-content-engine A4,** each dated, citing this PLAN,
+  and changing names only. Their PLANs take the names when they are
+  next amended, before they run.
+* **`docs/README.md`:** each record's row says its amendment is recorded,
+  and this PLAN's row says `in-progress`.

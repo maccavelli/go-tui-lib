@@ -22,11 +22,11 @@ it was when they were written
 | 0005 | PLAN | [Implement terminal capabilities and services (`termcap`, `termsvc`)](decisions/0005-PLAN-terminal-capabilities-and-services.md) | complete |
 | 0006 | MADR | [Make one command registry the source of every action, for keys, palette, slash commands, the shell and agents, on open standards](decisions/0006-MADR-command-registry.md) | accepted; A1–A13 accepted; §10, A1's front ends and A10–A12 superseded by 0012 |
 | 0006 | PLAN | [Implement the command registry (`when`, `command`, `command/cli`, and the Cobra and Kong front ends)](decisions/0006-PLAN-command-registry.md) | complete |
-| 0007 | MADR | [Bind keys to command IDs through a context-aware keymap engine, with chords, a leader key and VS Code-format user keymaps](decisions/0007-MADR-keymap-engine.md) | accepted; A1, A2 accepted; Q8 open |
+| 0007 | MADR | [Bind keys to command IDs through a context-aware keymap engine, with chords, a leader key and VS Code-format user keymaps](decisions/0007-MADR-keymap-engine.md) | accepted; A1, A2 accepted; A3 recorded; Q8 open |
 | 0007 | PLAN | [Implement the keymap engine](decisions/0007-PLAN-keymap-engine.md) | proposed |
-| 0008 | MADR | [Find and run anything from one command palette, built on an in-repository fuzzy matcher and asynchronous, scoped providers](decisions/0008-MADR-command-palette.md) | accepted; A1 accepted |
+| 0008 | MADR | [Find and run anything from one command palette, built on an in-repository fuzzy matcher and asynchronous, scoped providers](decisions/0008-MADR-command-palette.md) | accepted; A1 accepted; A2 recorded |
 | 0008 | PLAN | [Implement the command palette and the fuzzy matcher](decisions/0008-PLAN-command-palette.md) | proposed |
-| 0009 | MADR | [Stream agent output through a stable-prefix Markdown engine, a frame scheduler, an input filter and a safe-text sanitizer](decisions/0009-MADR-streaming-content-engine.md) | accepted; A1–A3 accepted; Q9 open |
+| 0009 | MADR | [Stream agent output through a stable-prefix Markdown engine, a frame scheduler, an input filter and a safe-text sanitizer](decisions/0009-MADR-streaming-content-engine.md) | accepted; A1–A3 accepted; A4 recorded; Q9 open |
 | 0009 | PLAN | [Implement the streaming content engine](decisions/0009-PLAN-streaming-content-engine.md) | proposed |
 | 0010 | MADR | [Ship the Cobra, Kong and glamour adapters as nested Go modules, released apart from the root and developed through a committed go.work, with every gate run per module and without the workspace](decisions/0010-MADR-nested-adapter-modules.md) | accepted; A1–A3 accepted; the command adapters superseded by 0012 |
 | 0010 | PLAN | [Implement the multi-module repository: go.work, per-module gates, and the release procedure](decisions/0010-PLAN-nested-adapter-modules.md) | complete |
@@ -41,7 +41,7 @@ it was when they were written
 | 0014 | PLAN | [W0: the API diff gate, conformance bans, the collision check, the glossary, the framework-example harness and the conventions](decisions/0014-PLAN-api-policy-gates.md) | complete |
 | 0014 | PLAN | [W2: native forms in `command`, `workspace`, `termcap`, `termsvc`, `theme` and `tuitest`](decisions/0014-PLAN-component-native-forms.md) | complete |
 | 0014 | PLAN | [W3: bounded input, one sanitizer, overflow-safe layout, no mutable package variables, wider fuzzing; release `v0.8.0`](decisions/0014-PLAN-hardening.md) | complete |
-| 0014 | PLAN | [W4: renames with deprecation aliases, opaque options, one enum helper, JSON v2, structured errors; release `v0.9.0` and `v0.10.0`](decisions/0014-PLAN-canonicalization.md) | proposed |
+| 0014 | PLAN | [W4: renames with deprecation aliases, opaque options, one enum helper, JSON v2, structured errors; release `v0.9.0` and `v0.10.0`](decisions/0014-PLAN-canonicalization.md) | in-progress |
 | 0014 | REPORT | [An API assessment of `v0.6.0`, and how Go CLIs and agent tools integrate a TUI](reports/0014-REPORT-api-assessment-and-integration-research.md) | — |
 | 0015 | MADR | [Make the pre-add check fail when gofmt itself fails, and skip a tracked file the work tree no longer has](decisions/0015-MADR-precheck-gofmt-errors.md) | accepted |
 | 0015 | PLAN | [Implement: the pre-add check fails when gofmt fails, and skips a tracked file the work tree no longer has](decisions/0015-PLAN-precheck-gofmt-errors.md) | complete |

@@ -593,6 +593,28 @@ on 2026-10-07. The design stands. What changes is the facts it rests on.
 5. **`Prompt` and `Forward` commands are listed** like any other. When
    one runs, the palette passes its `PromptMsg` through to the program.
 
+### A2 (2026-10-09): names from the glossary
+
+Names only; the design stands. Before this record is built, its types take
+the names [docs/glossary.md](../glossary.md) gives, so that none collides
+with a type the library exports or another record plans
+([0014-PLAN-canonicalization.md](0014-PLAN-canonicalization.md) Step 2, with its D1). Where this record says the old name, read the
+new one.
+
+| Was | Is | Why |
+| :--- | :--- | :--- |
+| `fuzzy.New(query, opts...)` | `fuzzy.NewMatcher(query, opts...)`, its options named `With…` | `New` builds only the type named after its package |
+| `Tier` | `Grade` | `glyph.Tier` |
+| `Span`, `Hit.Spans` | `Range`, `Hit.Ranges` | `layout.Span` |
+| `palette.Query`, its `Context` field | `Input`, its `WhenContext` field | `termcap.Query`; a `when.Context` is a `WhenContext` |
+| `palette.Scope` | `Availability` | `command.Scope` |
+| `Index.With` | `Index.Update` | `With…` names an option |
+| `Palette`, `palette.New` | `Picker`, `palette.NewPicker` | `theme.Palette` |
+| `Walker`, `PathFilter` | each with a `…Func` adapter, `WalkerFunc` and `PathFilterFunc` | AGENTS.md's API rule for hooks. `Provider` has two methods, and `Discoverer`, `Starter`, `Stopper`, `Prefixed` and `Debouncer` are optional capabilities found by type assertion, so none takes an adapter |
+
+[0008-PLAN-command-palette.md](0008-PLAN-command-palette.md) takes these
+names when it is next amended, before it runs.
+
 ## More Information
 
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md):

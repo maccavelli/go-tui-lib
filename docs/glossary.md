@@ -16,9 +16,9 @@ are the only ones; none is added.
 | :--- | :--- | :--- |
 | `Option` | any | each package's own option type, passed to its constructor |
 | `Context` | `layout` | the state a layout tree is arranged with, collecting the plan as each node places its leaves |
-| `Decision` | `command` | a gate's answer: allow or reject, once or always. W4 of [0014-MADR](decisions/0014-MADR-native-integration-api.md) renames it `Verdict` in `v0.10.0`, and the clash ends |
-| | `launch` | the start-up outcome: whether the TUI can start, where, and why |
 | | `when` | the values a when-clause expression reads, by key |
+| `Decision` | `command` | a gate's answer: allow or reject, once or always. W4 of [0014-MADR](decisions/0014-MADR-native-integration-api.md) renames it `Verdict` in `v0.9.0`, keeps `Decision` as a deprecated alias, and removes it in `v0.10.0`, when the clash ends |
+| | `launch` | the start-up outcome: whether the TUI can start, where, and why |
 | `Kind` | `command` | what running a command does: `Action`, `Prompt` or `Forward` |
 | | `when` | the type of a `when.Value` |
 | `Origin` | `command` | what asked for a command to run: a key, the palette, a slash line, the program's CLI, an agent |
@@ -36,39 +36,58 @@ later record does not reuse them for something else.
 | Name | Package | Record | Means |
 | :--- | :--- | :--- | :--- |
 | `Verdict` | `command` | 0014-MADR W4 | a gate's answer, today `command.Decision` |
-| `Format` | `command` | 0014-MADR W2 | how `WriteResult` writes a result: text or JSON |
-| `Param` | `command` | 0014-MADR W2 | one parameter of a command, for flags and completion |
-| `PanicError` | `command` | 0014-MADR W2 | a handler's panic, as an error |
-| `PlainViewer` | `workspace` | 0014-MADR W2 | a pane that can render itself without chrome or colour |
-| `GlyphThemeBuilder` | `workspace` | 0014-MADR W2 | a theme builder that is given the glyphs |
-| `LoadOption` | `command` | 0014-MADR W3 | an option of `LoadDirWith` |
+| `WhenContext` | `command` | 0014-MADR W4 | `Request`'s and `Invocation`'s `when.Context` field, today `Context` |
 
 ## Built from those records
 
 `launch`'s `Choice`, `Config`, `Target`, `Reason`, `Streams`,
 `StreamSource`, `Flags`, `Restorer` and `ExitError`, and `glyph.Tier`, were
 reserved here and are now built
-([0013-PLAN](decisions/0013-PLAN-cli-integration-helpers.md)). Each has one
+([0013-PLAN](decisions/0013-PLAN-cli-integration-helpers.md)). So are
+`command`'s `Format`, `Param`, `PanicError` and `LoadOption`, and
+`workspace`'s `PlainViewer` and `GlyphThemeBuilder`, in `v0.8.0`
+([0014-PLAN-component-native-forms](decisions/0014-PLAN-component-native-forms.md),
+[0014-PLAN-hardening](decisions/0014-PLAN-hardening.md)). Each has one
 meaning, as its package documents it. `Decision` and `Terminal` are in
 "Deliberate" above.
+
+## One meaning each
+
+These names are taken, each for one meaning
+([0014-PLAN-canonicalization](decisions/0014-PLAN-canonicalization.md)
+Step 2). A planned record that needs the idea uses the name below, or one
+of its own.
+
+| Name | Means | Belongs to |
+| :--- | :--- | :--- |
+| `Verdict` | a gate's answer | `command` |
+| `WhenContext` | a `when.Context` of key values; `When` stays a when-expression | `command`, and `workspace`'s method |
+| `Decision` | the start-up outcome, once `command`'s is `Verdict` | `launch` |
+| `Policy` | the notification policy | `termsvc` |
+| `Plan`, `Rule`, `Span` | a solved layout, a responsive rule, how far a bottom pane spans | `layout` |
+| `Result`, `Conflict`, `Scope`, `Source` | what a command produced, a slash name two commands claim, where a command applies, where it came from | `command` |
+| `Query` | a capability query | `termcap` |
+| `Tier` | a glyph set's tier | `glyph` |
+| `Filter` | a message filter, as `launch.WithFilter` takes | a message filter only |
+| `Renderer` | the streaming interface that turns Markdown into styled text | `stream`; an adapter's own `Renderer` implements it |
+| `New` | a constructor of the type named after its package; any other constructor is `NewX` | every package |
 
 ## Names the planned records must not take
 
 [0007-MADR](decisions/0007-MADR-keymap-engine.md),
 [0008-MADR](decisions/0008-MADR-command-palette.md) and
 [0009-MADR](decisions/0009-MADR-streaming-content-engine.md) are accepted
-but unbuilt. Each still names a type that collides with one above:
+but unbuilt. Their amendments of 2026-10-09 (0007 A3, 0008 A2, 0009 A4,
+from [0014-PLAN-canonicalization.md](decisions/0014-PLAN-canonicalization.md)
+Step 2) renamed every type that collided with one above, or with another
+planned one: `keymap.Context`, `Origin`, `Conflict`, `Rule`, `Result`,
+`Options`, `Match` and `Matcher`; `fuzzy.Tier` and `Span`;
+`palette.Query`, `Scope` and `Palette`; `safetext.Policy` and `Filter`;
+and `frame.Policy`, `Plan` and `Msg`.
 
-| Name | Taken by | Planned in |
-| :--- | :--- | :--- |
-| `Context` | `layout`, `when` | 0007 (`keymap.Context`) |
-| `Origin` | `command`, `termcap` | 0007 (`keymap.Origin`) |
-| `Conflict` | `command` | 0007 (`keymap.Conflict`) |
-| `Policy` | `termsvc` | 0009 (`safetext.Policy`, `frame.Policy`) |
-
-[0014-PLAN-canonicalization.md](decisions/0014-PLAN-canonicalization.md)
-Step 2 amends those records with names from this page before they are
-built.
+One planned pair is deliberate: `Renderer`, the interface in `stream`,
+and the type in `stream/glamourmd` that implements it. It is added to
+"Deliberate" and to `sharedNames` when the adapter is built.
 
 ## The rule for a new name
 
