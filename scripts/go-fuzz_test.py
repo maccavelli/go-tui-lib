@@ -69,11 +69,15 @@ class Runner:
         self.work = work
         self.out = ""
 
-    def run(self, directory, *args, env=None):
-        """The script's exit status, with its output in self.out."""
+    def run(self, directory, *args, env=None, stdout_only=False):
+        """The script's exit status, with its output in self.out: stdout and
+        stderr together, as the shell test's run read them, or stdout alone
+        where its case read only that. go writes "go: downloading" lines to
+        stderr on an empty module cache (0017-PLAN D1)."""
         cmd = [sys.executable, FUZZ] if FUZZ.endswith(".py") else [FUZZ]
         r = subprocess.run(cmd + list(args), cwd=directory, stdout=subprocess.PIPE,
-                           stderr=subprocess.STDOUT, env={**os.environ, **(env or {})}, check=False)
+                           stderr=subprocess.PIPE if stdout_only else subprocess.STDOUT,
+                           env={**os.environ, **(env or {})}, check=False)
         # Python on Windows writes \r\n to a pipe; the lines are read as \n.
         self.out = r.stdout.decode("utf-8", "replace").replace("\r\n", "\n")
         return r.returncode
@@ -248,7 +252,7 @@ def case6(r):
     #    be left out of make fuzz.
     mod = go_list_m(ROOT)
     want = " ".join(fuzz_packages(ROOT, mod))
-    rc = r.run(ROOT, "-a", "-l", "./...", env={"GOWORK": "off"})
+    rc = r.run(ROOT, "-a", "-l", "./...", env={"GOWORK": "off"}, stdout_only=True)
     got = " ".join(sorted(r.out.split())) if rc == 0 else "discovery failed"
     check("the repository's packages with targets are all found", want, got)
     check("the repository has fuzz targets in at least 8 packages", "yes", "yes" if len(got.split()) >= 8 else "no")
@@ -273,7 +277,7 @@ def case7(r, work):
     os.remove(os.path.join(repo, "a", "plain_test.go"))
     check("the listing skips tracked test files deleted and not staged", "example.com/gone/a",
           " ".join(fuzz_packages(repo, "example.com/gone")))
-    rc = r.run(repo, "-a", "-l", "./...", env={"GOWORK": "off"})
+    rc = r.run(repo, "-a", "-l", "./...", env={"GOWORK": "off"}, stdout_only=True)
     check("discovery agrees with it", "example.com/gone/a", " ".join(r.out.split()) if rc == 0 else "discovery failed")
 
 

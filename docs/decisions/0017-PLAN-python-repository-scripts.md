@@ -71,7 +71,12 @@ records.
      its summary line has the same counts, plus any case this PLAN adds;
    * the Python tool, run as its callers run it, prints the lines they
      read, byte for byte, and exits with the same code, on a passing and a
-     failing input.
+     failing input;
+   * each case reads the same stream the shell case read: stdout alone,
+     or stdout and stderr together;
+   * the Python test passes with an empty module cache (`GOMODCACHE` a new
+     directory), as on CI, where `go` writes "go: downloading" lines to
+     stderr (2026-10-10, D1).
 4. **Each script:** `#!/usr/bin/env python3`, executable, the standard
    library only, `subprocess.run` with an argument list, never
    `shell=True`; a `main()` returning the exit code; argument handling
@@ -221,7 +226,26 @@ phase. No tag is needed: the scripts are not part of the module's API.
 
 #### Deviations
 
-No deviation. Three things found on the way, none changing the scope:
+* **D1 (2026-10-10): case 6 read discovery's stderr.**
+  * **Found:** CI run `38079124213`, on `ab0ed44`, failed its `fuzz` step:
+    "FAIL the repository's packages with targets are all found", the
+    "got" list holding the eight packages and, around them, "go:
+    downloading" lines and module paths. The shell test's case 6 read only
+    discovery's stdout (`"$FUZZ" -a -l ./... | sort`); the port ran it
+    through `Runner.run`, which merges stderr into the output, as every
+    other case's `run` did. On CI's empty module cache, `go list` writes
+    "go: downloading …" to stderr. The agent's runs on macOS and the
+    Windows test host had warm caches, so the comparison passed. With an
+    empty `GOMODCACHE`, the agent reproduced it: "26 passed, 1 failed".
+    The tag `v0.10.0` was not yet made.
+  * **The owner's choice:** `Runner` keeps stdout apart from the merged
+    output; cases 6 and 7 compare discovery's stdout, as the shell test
+    did; and rule 3 gains two checks for every phase: each case reads the
+    stream its shell case read, and the test passes with an empty module
+    cache.
+  * **The other:** the same fix without the cold-cache check.
+
+Three other things found on the way, none changing the scope:
 
 * **The facts table was wrong about `.gitignore`:** it already ignores
   `__pycache__/`. The agent's search for it matched only `*.py[cod]`.
@@ -311,3 +335,15 @@ No deviation. Three things found on the way, none changing the scope:
     the same label failed at once on the busy directory. The agent
     removed both runs' files on the host, and ran again under a new
     label; the stopped run's directory was gone when it finished.
+
+#### D1's fix and checks
+
+* **The fix:** `Runner.run` takes `stdout_only`; cases 6 and 7 read
+  discovery's list from stdout alone, and every other case reads stdout
+  and stderr together, as each shell case did.
+* **The probe** is the reproduction: with an empty `GOMODCACHE`, before
+  the fix, "FAIL the repository's packages with targets are all found",
+  "26 passed, 1 failed".
+* **After the fix,** "27 passed, 0 failed" with a warm cache and with an
+  empty one, on macOS and on the Windows test host (Python 3.14.7). The
+  empty caches were cleaned with `go clean -modcache` and removed.

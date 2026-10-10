@@ -1322,3 +1322,12 @@ each a removal listed in `scripts/apicheck.allow`, and no other change.
   allows it in two packages.
 * **The repository, not the module:** `scripts/go-fuzz` is Python
   (0017-PLAN Phase 1), with `go-fuzz_test`'s case 6 fixed.
+
+#### Before the tag
+
+* The disclosure guard passed over `386534b..ab0ed44`, the five commits
+  the push sent.
+* CI run `38079124213`, on `ab0ed44`, failed: `go-fuzz_test.py`'s case 6,
+  on CI's empty module cache. The fault and its fix are
+  [0017-PLAN-python-repository-scripts.md](0017-PLAN-python-repository-scripts.md)
+  D1. Nothing was tagged; `v0.10.0` waits for CI on the fix.
