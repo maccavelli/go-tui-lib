@@ -36,10 +36,6 @@ type Invocation struct {
 	Caller  string // the agent's or MCP client's name, for example
 	// WhenContext is the context the command was enabled in; never nil.
 	WhenContext when.Context
-	// Context is WhenContext, set to the same value through v0.9.x.
-	//
-	// Deprecated: use WhenContext (0014-MADR W4).
-	Context when.Context
 }
 
 // Result is what a command produced.
@@ -58,10 +54,6 @@ type Request struct {
 	Caller string
 	// WhenContext is the context When is evaluated in; nil is empty.
 	WhenContext when.Context
-	// Context is read when WhenContext is nil, through v0.9.x.
-	//
-	// Deprecated: use WhenContext (0014-MADR W4).
-	Context when.Context
 	// Gate, when set, is asked instead of the registry's gate, for this
 	// request only, and its answers are not remembered: how a program's
 	// own command line approves one command, from its --yes flag or a

@@ -104,48 +104,6 @@ func WithBreakpoints(foldWidth, hideWidth, hideBottomHeight int) PresetOption {
 // still shrinks and hides panes that do not fit, in shrink order.
 func WithoutResponsive() PresetOption { return func(p *preset) { p.responsive = false } }
 
-// SidebarWidth is WithSidebarWidth.
-//
-// Deprecated: use WithSidebarWidth (0014-MADR W4).
-func SidebarWidth(s Size) PresetOption { return WithSidebarWidth(s) }
-
-// BottomHeight is WithBottomHeight.
-//
-// Deprecated: use WithBottomHeight (0014-MADR W4).
-func BottomHeight(s Size) PresetOption { return WithBottomHeight(s) }
-
-// MainSize is WithMainSize.
-//
-// Deprecated: use WithMainSize (0014-MADR W4).
-func MainSize(s Size) PresetOption { return WithMainSize(s) }
-
-// BottomSpan is WithBottomSpan.
-//
-// Deprecated: use WithBottomSpan (0014-MADR W4).
-func BottomSpan(s Span) PresetOption { return WithBottomSpan(s) }
-
-// Footer is WithFooter.
-//
-// Deprecated: use WithFooter (0014-MADR W4).
-func Footer(id PaneID, rows int) PresetOption { return WithFooter(id, rows) }
-
-// Gap is WithGap.
-//
-// Deprecated: use WithGap (0014-MADR W4).
-func Gap(n int) PresetOption { return WithGap(n) }
-
-// Breakpoints is WithBreakpoints.
-//
-// Deprecated: use WithBreakpoints (0014-MADR W4).
-func Breakpoints(foldWidth, hideWidth, hideBottomHeight int) PresetOption {
-	return WithBreakpoints(foldWidth, hideWidth, hideBottomHeight)
-}
-
-// NoResponsive is WithoutResponsive.
-//
-// Deprecated: use WithoutResponsive (0014-MADR W4).
-func NoResponsive() PresetOption { return WithoutResponsive() }
-
 // SidebarRight is a main pane with a sidebar on its right.
 func SidebarRight(main, side PaneID, o ...PresetOption) Node {
 	return build(main, side, "", false, o)

@@ -387,6 +387,9 @@ each record's index row says "A<n> recorded".
 
 ### Step 10: the release `v0.10.0`, and close-out
 
+0. **2026-10-10, D4:** this step starts after
+   [0017-PLAN-python-repository-scripts.md](0017-PLAN-python-repository-scripts.md)
+   Phase 1 is committed.
 1. **The tag:** commit, the disclosure guard, push, CI, then `v0.10.0`.
 2. **The smoke test** builds the new names, and the old-name program now
    fails to compile, as expected.
@@ -1189,3 +1192,91 @@ listed in `scripts/apicheck.allow`, and 75 compatible ones.
   changes now unlisted; the close-out commit makes the base `v0.9.0`.
 
 Step 8 is done.
+
+### Step 9: the removals (`v0.10.0`)
+
+#### Deviations
+
+No deviation.
+
+#### What was removed
+
+* **`command`:** the `Decision` alias; `Record.Decision`, and the
+  `verdict` method that fell back to it; `Request.Context` and
+  `Invocation.Context`, and `admit`'s fallback to the first, so the
+  `Invocation` it builds sets `WhenContext` alone.
+* **`termcap.New`; `layout`'s eight bare option names;
+  `workspace.WithMouse`; `termsvc.WithGate`.**
+* **The tests of the old names:** `command/rename_test.go` and the
+  `deprecated_test.go` of `layout`, `termcap`, `termsvc` and
+  `workspace`.
+* **Two tests on the old field:** `command/dispatch_test.go:44` and
+  `registry_test.go:193` still set `Request.Context`, which Step 3 had
+  not moved; staticcheck does not report a deprecated name inside its
+  own package. They set `WhenContext`.
+
+#### What changed
+
+* **The audit's slog key** is `"verdict"`, from `Record.Verdict`;
+  `TestSlogAuditor` expects it, and `TestDecisionACPKind` is
+  `TestVerdictACPKind`.
+* **The collision check:** `sharedNames` loses `Decision` and its
+  comment; the glossary loses its two "Deliberate" rows, and says
+  `Decision` is `launch`'s alone. The check passes with `Decision` in
+  `launch` only.
+* **`scripts/apicheck.allow`** lists the 15 removals apidiff reports,
+  taken from its output, under a header naming this step.
+* **`docs/guides/migrating.md`** gains "Migrating to `v0.10.0`": the
+  removed names and what to use, and the slog key.
+
+#### Checks
+
+* **Mutations,** on scratch copies, each one building; both killed by
+  `TestNoTypeNameMeansTwoThings`:
+  * **S9-1** (`command` keeps `Decision`): "Decision is exported by
+    [command launch]: one name, one meaning".
+  * **S9-2** (`sharedNames` keeps the entry): "sharedNames lists Decision
+    [command launch], which fewer than two public packages export".
+* **`apidiff`:** `make apicheck`, "against v0.9.0, 15 incompatible
+  change(s)", each a removal this step lists, and "clean".
+* **Rule 2 on macOS,** go1.27.2:
+  * `make pre-add-check FILES=<the 12 Go files the tree still has>`: "12
+    file(s) clean".
+  * `make lint`, the cross `go vet`, `-race`, `-shuffle=on -count=2`,
+    `LC_ALL=C`, workspace mode, `go mod tidy -diff`, `make vuln`, `make
+    examples`, `scripts/go-modules.sh --check` and `make release-check`
+    ("200 file(s) clean"): clean.
+  * `shellcheck`, `markdownlint-cli2`, `actionlint` and
+    `go-precheck_test.sh` ("12 passed"): clean.
+  * **`go-fuzz_test.sh` exited 1 in the working tree,** with "grep:
+    command/rename_test.go: No such file or directory" for each deleted
+    file and no FAIL line. Its own listing of the fuzz targets, case 6,
+    reads `git ls-files --cached`, which still lists a tracked file that
+    is deleted and not staged. This is the gap Step 4's record names, in
+    0014-PLAN-hardening's script, and the owner's decision on it is still
+    open. On a scratch clone with the same tree and the deletions staged,
+    it passed: "25 passed, 0 failed". CI runs on a commit, where the
+    index matches the tree.
+* **The Windows test host,** go1.27.2 windows/amd64, with the index synced
+  to the copied tree: `make pre-add-check`, `make lint`, `make vuln` and
+  `make examples`, each exit 0; `go test -count=2 -shuffle=on ./...`,
+  exit 0; the collision check, the enum and option checks and
+  `command`'s audit tests, 6 passed, 0 failed; `go-fuzz_test.sh`, "25
+  passed, 0 failed"; `make fuzz FUZZTIME=3s`, "8 packages ran clean".
+* **For Step 10's notes:** the 15 removals, and the slog key.
+
+#### After the step
+
+* **D4 (2026-10-10): Step 10 waits for the scripts' first port.**
+  * **Found:** `go-fuzz_test.sh`'s case 6 stopped again in Step 9, as
+    Step 4 recorded, while the deleted test files were not staged. The
+    owner asked for the fix, and why the scripts are shell, when the
+    owner's global rules ask for Python for such logic.
+  * **The owner's choices:** the scripts move to Python, standard library
+    only, by a record of their own,
+    [0017-MADR-python-repository-scripts.md](0017-MADR-python-repository-scripts.md)
+    and its PLAN, whose Phase 1 ports `go-fuzz` with the case-6 fix; and
+    Step 10 starts after that phase is committed, so the release's
+    close-out records a `go-fuzz_test` that passes in every tree state.
+  * **The others:** port `go-fuzz_test` alone, or patch case 6 in shell
+    and port later; and run Step 10 first.

@@ -41,7 +41,7 @@ func TestDispatchLoop(t *testing.T) {
 		}
 	}
 	ran.Store(false)
-	res := resultOf(t, collect(r.Dispatch(t.Context(), Request{ID: "a", Origin: OriginKey, Context: mapOf("off")})))
+	res := resultOf(t, collect(r.Dispatch(t.Context(), Request{ID: "a", Origin: OriginKey, WhenContext: mapOf("off")})))
 	if ran.Load() || !errors.Is(res.Err, ErrUnavailable) {
 		t.Errorf("with its When false: ran %v, %v", ran.Load(), res.Err)
 	}

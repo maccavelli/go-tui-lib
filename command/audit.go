@@ -22,15 +22,11 @@ func (f AuditorFunc) Audit(r Record) { f(r) }
 // failed before the policy was asked. Duration is the handler's, and zero
 // when the handler did not run.
 type Record struct {
-	ID      ID
-	Origin  Origin
-	Caller  string
-	Args    jsontext.Value
-	Verdict Verdict
-	// Decision is Verdict, set to the same value through v0.9.x.
-	//
-	// Deprecated: use Verdict (0014-MADR W4).
-	Decision Verdict
+	ID       ID
+	Origin   Origin
+	Caller   string
+	Args     jsontext.Value
+	Verdict  Verdict
 	Started  time.Time
 	Duration time.Duration
 	Err      error
@@ -54,9 +50,7 @@ func (a slogAuditor) Audit(r Record) {
 		slog.String("origin", r.Origin.String()),
 		slog.String("caller", r.Caller),
 		slog.String("args", string(r.Args)),
-		// The key stays "decision" through v0.9.x, and is "verdict" in
-		// v0.10.0 (docs/decisions/0014-PLAN-canonicalization.md Step 3).
-		slog.String("decision", r.verdict().ACPKind()),
+		slog.String("verdict", r.Verdict.ACPKind()),
 		slog.Time("started", r.Started),
 		slog.Duration("duration", r.Duration),
 	}
@@ -65,13 +59,4 @@ func (a slogAuditor) Audit(r Record) {
 		attrs = append(attrs, slog.String("err", r.Err.Error()))
 	}
 	a.l.LogAttrs(context.Background(), level, "command", attrs...)
-}
-
-// verdict is r's Verdict, or its deprecated Decision for a Record built
-// with that field alone.
-func (r Record) verdict() Verdict {
-	if r.Verdict != 0 {
-		return r.Verdict
-	}
-	return r.Decision
 }

@@ -7,3 +7,21 @@
 # removes its entries: once the next tag is the base, apidiff no longer
 # prints them, and scripts/go-apicheck.sh fails on them as stale
 # (docs/decisions/0014-PLAN-api-policy-gates.md Step 4).
+
+# docs/decisions/0014-PLAN-canonicalization.md Step 9: the names W4
+# deprecated in v0.9.0, removed in v0.10.0 (0014-MADR-native-integration-api W4).
+.	- ./command.Decision: removed
+.	- ./command.Invocation.Context: removed
+.	- ./command.Record.Decision: removed
+.	- ./command.Request.Context: removed
+.	- ./layout.BottomHeight: removed
+.	- ./layout.BottomSpan: removed
+.	- ./layout.Breakpoints: removed
+.	- ./layout.Footer: removed
+.	- ./layout.Gap: removed
+.	- ./layout.MainSize: removed
+.	- ./layout.NoResponsive: removed
+.	- ./layout.SidebarWidth: removed
+.	- ./termcap.New: removed
+.	- ./termsvc.WithGate: removed
+.	- ./workspace.WithMouse: removed

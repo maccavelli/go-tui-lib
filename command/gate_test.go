@@ -196,7 +196,7 @@ func TestRequestGate(t *testing.T) {
 	}
 }
 
-func TestDecisionACPKind(t *testing.T) {
+func TestVerdictACPKind(t *testing.T) {
 	for d, want := range map[Verdict]string{
 		AllowOnce: "allow_once", AllowAlways: "allow_always", RejectOnce: "reject_once", RejectAlways: "reject_always", 0: "",
 	} {
@@ -239,13 +239,13 @@ func TestSlogAuditor(t *testing.T) {
 	}
 	for k, want := range map[string]any{
 		"msg": "command", "level": "INFO", "id": "readonly", "origin": "key", "caller": "me",
-		"args": `{"a":1}`, "decision": "allow_once",
+		"args": `{"a":1}`, "verdict": "allow_once",
 	} {
 		if ok[k] != want {
 			t.Errorf("record %s = %v, want %v", k, ok[k], want)
 		}
 	}
-	if refused["level"] != "WARN" || refused["decision"] != "reject_once" || !strings.Contains(fmt.Sprint(refused["err"]), "refused") {
+	if refused["level"] != "WARN" || refused["verdict"] != "reject_once" || !strings.Contains(fmt.Sprint(refused["err"]), "refused") {
 		t.Errorf("the refusal's record: %v", refused)
 	}
 	if defaults != 0 {

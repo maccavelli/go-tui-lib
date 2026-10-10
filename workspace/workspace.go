@@ -341,11 +341,6 @@ func WithState(s layout.State) Option { return optionFunc(func(w *Workspace) { w
 // nothing until the program sets a mouse mode.
 func WithoutMouse() Option { return optionFunc(func(w *Workspace) { w.mouse = false }) }
 
-// WithMouse turns mouse handling on or off.
-//
-// Deprecated: use WithoutMouse, since handling is on by default (0014-MADR W4).
-func WithMouse(on bool) Option { return optionFunc(func(w *Workspace) { w.mouse = on }) }
-
 // WithWidthMethod fixes how the workspace measures text, and stops it
 // following the terminal's mode 2027 report. By default it measures with
 // ansi.WcWidth, as Bubble Tea's renderer starts, and switches to

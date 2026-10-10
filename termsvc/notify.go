@@ -203,12 +203,6 @@ func WithNotifyFilter(f func(Notification) bool) NotifyOption {
 	return notifyOptionFunc(func(n *Notifier) { n.gate = f })
 }
 
-// WithGate is WithNotifyFilter.
-//
-// Deprecated: use WithNotifyFilter; a gate is command's permission concept
-// (0014-MADR W4).
-func WithGate(f func(Notification) bool) NotifyOption { return WithNotifyFilter(f) }
-
 // defaultBackendTimeout bounds a backend's Notify and a clipboard's Copy.
 const defaultBackendTimeout = 5 * time.Second
 

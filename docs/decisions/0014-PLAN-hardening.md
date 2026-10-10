@@ -1327,6 +1327,13 @@ them for `LoadDir`: `SetRunTimeout` with a value below 1, and a
 
 ### Step 9: fuzz discovery and new targets (H9)
 
+*2026-10-10:* case 6 of `go-fuzz_test.sh`, added here, stops with no FAIL
+line while a tracked test file is deleted and not staged
+([0014-PLAN-canonicalization.md](0014-PLAN-canonicalization.md) Steps 4
+and 9). The fix is
+[0017-PLAN-python-repository-scripts.md](0017-PLAN-python-repository-scripts.md)
+Phase 1, which ports the script to Python.
+
 #### Deviations
 
 The new targets found four defects, each older than this step, and the

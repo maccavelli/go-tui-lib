@@ -47,6 +47,8 @@ it was when they were written
 | 0015 | PLAN | [Implement: the pre-add check fails when gofmt fails, and skips a tracked file the work tree no longer has](decisions/0015-PLAN-precheck-gofmt-errors.md) | complete |
 | 0016 | MADR | [Move the toolchain floor to Go 1.27.2, the release that fixes GO-2026-6604](decisions/0016-MADR-go-1-27-2-for-go-2026-6604.md) | accepted |
 | 0016 | PLAN | [Implement: the toolchain floor moves to Go 1.27.2](decisions/0016-PLAN-go-1-27-2-for-go-2026-6604.md) | complete |
+| 0017 | MADR | [Write the repository's scripts in Python, standard library only, and port the ten shell scripts](decisions/0017-MADR-python-repository-scripts.md) | accepted |
+| 0017 | PLAN | [Implement Python repository scripts: port the ten shell scripts, `go-fuzz` first with the case-6 fix](decisions/0017-PLAN-python-repository-scripts.md) | proposed |
 
 ## I want to…
 

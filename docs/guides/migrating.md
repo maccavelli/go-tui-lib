@@ -6,6 +6,30 @@ wrapper, alias or field, and is removed in the next
 `staticcheck` reports each use of one as SA1019, so a program can find
 them all before the removal.
 
+## Migrating to `v0.10.0`
+
+`v0.10.0` removes the names `v0.9.0` deprecated
+([0014-PLAN-canonicalization](../decisions/0014-PLAN-canonicalization.md)
+Step 9). A program that builds on `v0.9.x` with no SA1019 report needs no
+change, except for the audit log's key.
+
+### Removed
+
+| Removed | Use |
+| :--- | :--- |
+| `command.Decision` | `command.Verdict` |
+| `command.Record.Decision` | `Record.Verdict` |
+| `command.Request.Context`, `Invocation.Context` | `WhenContext` |
+| `termcap.New` | `termcap.NewProber` |
+| `layout.SidebarWidth`, `BottomHeight`, `MainSize`, `BottomSpan`, `Footer`, `Gap`, `Breakpoints`, `NoResponsive` | `layout.WithSidebarWidth`, `WithBottomHeight`, `WithMainSize`, `WithBottomSpan`, `WithFooter`, `WithGap`, `WithBreakpoints`, `WithoutResponsive` |
+| `workspace.WithMouse` | `workspace.WithoutMouse()`, or nothing: the mouse is handled by default |
+| `termsvc.WithGate` | `termsvc.WithNotifyFilter` |
+
+### Changed
+
+- **`SlogAuditor` logs the verdict under the key `verdict`,** where it was
+  `decision`. A query or alert on the old key needs the new one.
+
 ## Migrating to `v0.9.0`
 
 `v0.9.0` gives the API one name for each idea

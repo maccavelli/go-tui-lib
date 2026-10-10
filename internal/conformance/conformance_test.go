@@ -473,12 +473,9 @@ func TestNoPackageOwnsTheTerminal(t *testing.T) {
 var sharedNames = map[string][]string{
 	"Option":  {"*"},
 	"Context": {"layout", "when"},
-	// Until v0.10.0, when 0014-MADR W4 renames command's to Verdict
-	// (docs/decisions/0013-MADR-cli-integration-helpers.md A1.6).
-	"Decision": {"command", "launch"},
-	"Kind":     {"command", "when"},
-	"Origin":   {"command", "termcap"},
-	"Pane":     {"layout", "workspace"},
+	"Kind":    {"command", "when"},
+	"Origin":  {"command", "termcap"},
+	"Pane":    {"layout", "workspace"},
 	// A fake terminal for tests, in each test kit
 	// (docs/decisions/0013-PLAN-cli-integration-helpers.md D5).
 	"Terminal": {"launch/launchtest", "termcap/termcaptest"},

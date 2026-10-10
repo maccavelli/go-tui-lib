@@ -17,8 +17,6 @@ are the only ones; none is added.
 | `Option` | any | each package's own option type, passed to its constructor |
 | `Context` | `layout` | the state a layout tree is arranged with, collecting the plan as each node places its leaves |
 | | `when` | the values a when-clause expression reads, by key |
-| `Decision` | `command` | a gate's answer: allow or reject, once or always. W4 of [0014-MADR](decisions/0014-MADR-native-integration-api.md) renames it `Verdict` in `v0.9.0`, keeps `Decision` as a deprecated alias, and removes it in `v0.10.0`, when the clash ends |
-| | `launch` | the start-up outcome: whether the TUI can start, where, and why |
 | `Kind` | `command` | what running a command does: `Action`, `Prompt` or `Forward` |
 | | `when` | the type of a `when.Value` |
 | `Origin` | `command` | what asked for a command to run: a key, the palette, a slash line, the program's CLI, an agent |
@@ -45,9 +43,9 @@ reserved here and are now built
 [0014-PLAN-hardening](decisions/0014-PLAN-hardening.md)); and `command`'s
 `Verdict` and `WhenContext`, in `v0.9.0`
 ([0014-PLAN-canonicalization](decisions/0014-PLAN-canonicalization.md)).
-Each has one
-meaning, as its package documents it. `Decision` and `Terminal` are in
-"Deliberate" above.
+Each has one meaning, as its package documents it. `Terminal` is in
+"Deliberate" above; `command.Decision`, `Verdict`'s old name, was removed
+in `v0.10.0`, and `Decision` is `launch`'s alone.
 
 ## One meaning each
 

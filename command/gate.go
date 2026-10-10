@@ -12,11 +12,6 @@ import (
 // Its zero value is "no verdict", which refuses.
 type Verdict uint8
 
-// Decision is the old name of Verdict, kept through v0.9.x.
-//
-// Deprecated: use Verdict (0014-MADR W4).
-type Decision = Verdict
-
 // The verdicts.
 const (
 	AllowOnce    Verdict = iota + 1 // run this time

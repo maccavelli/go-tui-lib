@@ -211,11 +211,6 @@ func NewProber(o ...Option) *Prober {
 	return p
 }
 
-// New returns a Prober.
-//
-// Deprecated: use NewProber (0014-MADR W4).
-func New(o ...Option) *Prober { return NewProber(o...) }
-
 // Init starts the deadline. The batch follows the first tea.EnvMsg.
 func (p *Prober) Init() tea.Cmd {
 	if p.disabled {

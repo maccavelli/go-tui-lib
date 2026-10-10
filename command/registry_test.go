@@ -190,7 +190,7 @@ func TestAvailable(t *testing.T) {
 		{"when", OriginProgram, off, ErrUnavailable},
 		{"hidden", OriginProgram, nil, ErrUnknown},
 	} {
-		res := resultOf(t, collect(k.Dispatch(t.Context(), Request{ID: c.id, Origin: c.origin, Context: c.ctx})))
+		res := resultOf(t, collect(k.Dispatch(t.Context(), Request{ID: c.id, Origin: c.origin, WhenContext: c.ctx})))
 		if !errors.Is(res.Err, c.want) || (c.want == nil) != (res.Err == nil) {
 			t.Errorf("%s from %s: %v, want %v", c.id, c.origin, res.Err, c.want)
 		}

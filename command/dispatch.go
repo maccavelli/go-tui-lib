@@ -161,14 +161,11 @@ func (r *Registry) admit(ctx context.Context, req Request) (*entry, *Invocation,
 	}
 	c := req.WhenContext
 	if c == nil {
-		c = req.Context // the deprecated field, through v0.9.x
-	}
-	if c == nil {
 		c = when.Map(nil)
 	}
 	inv := &Invocation{
 		Command: e.cmd, Args: req.Args, Raw: req.Raw,
-		Origin: req.Origin, Caller: req.Caller, WhenContext: c, Context: c,
+		Origin: req.Origin, Caller: req.Caller, WhenContext: c,
 	}
 	if req.Origin == 0 || req.Origin > OriginProgram {
 		return e, nil, 0, fmt.Errorf("%w: %s: the request's origin is %s", ErrRefused, req.ID, req.Origin)
@@ -267,7 +264,7 @@ func (r *Registry) audit(req Request, e *entry, d Verdict, o outcome, err error)
 	}
 	r.auditor.Audit(Record{
 		ID: req.ID, Origin: req.Origin, Caller: req.Caller, Args: args,
-		Verdict: d, Decision: d, Started: o.started, Duration: o.dur, Err: err,
+		Verdict: d, Started: o.started, Duration: o.dur, Err: err,
 	})
 }
 
