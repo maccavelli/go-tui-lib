@@ -3,6 +3,8 @@ package command
 import (
 	"context"
 	"strings"
+
+	"github.com/maccavelli/go-tui-lib/internal/teamsg"
 )
 
 // The registry's own commands (docs/decisions/0006-MADR-command-registry.md
@@ -52,7 +54,7 @@ func (r *Registry) builtins() []Command {
 		WithDescription("Describes one command: its ID, arguments schema and danger."),
 		WithArgHint("command id"), WithDanger(ReadOnly), WithIdempotent())
 	quit := MustNew(idQuit, "Quit", func(context.Context, *Invocation, NoArgs) (Result, error) {
-		return Result{Cmd: msgCmd(QuitRequestMsg{})}, nil
+		return Result{Cmd: teamsg.Cmd(QuitRequestMsg{})}, nil
 	},
 		WithDescription("Asks the program to quit; the program decides."),
 		WithDanger(UI), WithSurfaces(AllSurfaces&^SurfaceCLI))

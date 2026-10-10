@@ -12,6 +12,9 @@ package glyph
 
 import "github.com/maccavelli/go-tui-lib/internal/enum"
 
+// pkgName is the package's name, as its enums' errors give it.
+const pkgName = "glyph"
+
 // Border is one border style: the same thirteen glyphs, in the same order, as
 // a lipgloss.Border, so the theme package converts it field for field.
 type Border struct {
@@ -131,7 +134,10 @@ const (
 	TierASCII
 )
 
-var tierNames = []string{"unicode", "legacy", "ascii"}
+var tierNames = enum.Names[Tier]{
+	Pkg: pkgName, Type: "Tier",
+	Tokens: []string{"unicode", "legacy", "ascii"},
+}
 
 // Set is the tier's glyph table. TierLegacy, and a tier with no name, give
 // ASCII(), which every terminal draws.
@@ -143,12 +149,12 @@ func (t Tier) Set() Set {
 }
 
 // String is the tier's token: "unicode", "legacy" or "ascii".
-func (t Tier) String() string { return enum.Name(tierNames, t) }
+func (t Tier) String() string { return tierNames.String(t) }
 
 // MarshalText is the tier's token. A tier with no token is an error.
-func (t Tier) MarshalText() ([]byte, error) { return enum.Marshal("glyph", "Tier", tierNames, t) }
+func (t Tier) MarshalText() ([]byte, error) { return tierNames.Marshal(t) }
 
 // UnmarshalText reads a token MarshalText wrote, exactly, case included.
 func (t *Tier) UnmarshalText(b []byte) error {
-	return enum.Unmarshal("glyph", "Tier", tierNames, b, t)
+	return tierNames.Unmarshal(b, t)
 }

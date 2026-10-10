@@ -28,7 +28,12 @@ import (
 	"fmt"
 	"iter"
 	"strings"
+
+	"github.com/maccavelli/go-tui-lib/internal/enum"
 )
+
+// pkgName is the package's name, as its enums' errors give it.
+const pkgName = "command"
 
 // maxIDLength is the longest ID, in bytes, so that an ID is also a valid
 // MCP tool name.
@@ -123,17 +128,19 @@ const (
 	Forward             // sends "/name args" to the agent as PromptMsg; needs no Handler
 )
 
-func (k Kind) String() string {
-	switch k {
-	case Action:
-		return "action"
-	case Prompt:
-		return "prompt"
-	case Forward:
-		return "forward"
-	}
-	return fmt.Sprintf("Kind(%d)", uint8(k))
+var kindNames = enum.Names[Kind]{
+	Pkg: pkgName, Type: "Kind",
+	Tokens: []string{"action", "prompt", "forward"},
 }
+
+// String is the kind's token.
+func (k Kind) String() string { return kindNames.String(k) }
+
+// MarshalText is the kind's token. A kind with no token is an error.
+func (k Kind) MarshalText() ([]byte, error) { return kindNames.Marshal(k) }
+
+// UnmarshalText reads a token MarshalText wrote, exactly, case included.
+func (k *Kind) UnmarshalText(b []byte) error { return kindNames.Unmarshal(b, k) }
 
 // Danger is how much a command can change, which decides who may run it
 // without asking. Its zero value is "not declared", and Register refuses
@@ -148,21 +155,20 @@ const (
 	Destructive                   // cannot be undone, or writes outside the project
 )
 
-func (d Danger) String() string {
-	switch d {
-	case 0:
-		return "undeclared"
-	case ReadOnly:
-		return "read-only"
-	case UI:
-		return "ui"
-	case Mutating:
-		return "mutating"
-	case Destructive:
-		return "destructive"
-	}
-	return fmt.Sprintf("Danger(%d)", uint8(d))
+var dangerNames = enum.Names[Danger]{
+	Pkg: pkgName, Type: "Danger",
+	Tokens: []string{"undeclared", "read-only", "ui", "mutating", "destructive"},
 }
+
+// String is the danger level's token.
+func (d Danger) String() string { return dangerNames.String(d) }
+
+// MarshalText is the danger level's token. A danger level with no token is an
+// error.
+func (d Danger) MarshalText() ([]byte, error) { return dangerNames.Marshal(d) }
+
+// UnmarshalText reads a token MarshalText wrote, exactly, case included.
+func (d *Danger) UnmarshalText(b []byte) error { return dangerNames.Unmarshal(b, d) }
 
 // Surface is a set of the places that offer a command. A Command's zero
 // Surfaces is every surface.
@@ -179,24 +185,22 @@ const (
 	AllSurfaces = SurfaceKey | SurfacePalette | SurfaceSlash | SurfaceCLI | SurfaceAgent
 )
 
-var surfaceNames = []string{"key", "palette", "slash", "cli", "agent"}
-
-// String is the set's names joined with "|", or "none".
-func (s Surface) String() string {
-	if s == 0 {
-		return "none"
-	}
-	var names []string
-	for i, n := range surfaceNames {
-		if s&(1<<i) != 0 {
-			names = append(names, n)
-		}
-	}
-	if rest := s &^ AllSurfaces; rest != 0 {
-		names = append(names, fmt.Sprintf("%#x", uint8(rest)))
-	}
-	return strings.Join(names, "|")
+var surfaceNames = enum.Bits[Surface]{
+	Pkg: pkgName, Type: "Surface", None: "none",
+	Tokens: []string{"key", "palette", "slash", "cli", "agent"},
 }
+
+// String is the set's names joined with "|", or "none". Bits with no
+// name come last, in hex.
+func (s Surface) String() string { return surfaceNames.String(s) }
+
+// MarshalText is String's text. A set with a bit that has no name is an
+// error.
+func (s Surface) MarshalText() ([]byte, error) { return surfaceNames.Marshal(s) }
+
+// UnmarshalText reads "none", or names joined with "|" in any order,
+// exactly, case included.
+func (s *Surface) UnmarshalText(b []byte) error { return surfaceNames.Unmarshal(b, s) }
 
 // Mode is where a command runs.
 type Mode uint8
@@ -207,15 +211,19 @@ const (
 	Async             // inside the tea.Cmd Dispatch returns, under a context Cancel reaches
 )
 
-func (m Mode) String() string {
-	switch m {
-	case Loop:
-		return "loop"
-	case Async:
-		return "async"
-	}
-	return fmt.Sprintf("Mode(%d)", uint8(m))
+var modeNames = enum.Names[Mode]{
+	Pkg: pkgName, Type: "Mode",
+	Tokens: []string{"loop", "async"},
 }
+
+// String is the mode's token.
+func (m Mode) String() string { return modeNames.String(m) }
+
+// MarshalText is the mode's token. A mode with no token is an error.
+func (m Mode) MarshalText() ([]byte, error) { return modeNames.Marshal(m) }
+
+// UnmarshalText reads a token MarshalText wrote, exactly, case included.
+func (m *Mode) UnmarshalText(b []byte) error { return modeNames.Unmarshal(b, m) }
 
 // Scope is where a command applies: Global, or a pane, overlay or mode
 // name.
@@ -244,14 +252,20 @@ const (
 	Plugin                    // a plugin
 )
 
-var sourceKindNames = []string{"builtin", "user", "project", "mcp", "acp", "plugin"}
-
-func (k SourceKind) String() string {
-	if int(k) < len(sourceKindNames) {
-		return sourceKindNames[k]
-	}
-	return fmt.Sprintf("SourceKind(%d)", uint8(k))
+var sourceKindNames = enum.Names[SourceKind]{
+	Pkg: pkgName, Type: "SourceKind",
+	Tokens: []string{"builtin", "user", "project", "mcp", "acp", "plugin"},
 }
+
+// String is the source kind's token.
+func (k SourceKind) String() string { return sourceKindNames.String(k) }
+
+// MarshalText is the source kind's token. A source kind with no token is an
+// error.
+func (k SourceKind) MarshalText() ([]byte, error) { return sourceKindNames.Marshal(k) }
+
+// UnmarshalText reads a token MarshalText wrote, exactly, case included.
+func (k *SourceKind) UnmarshalText(b []byte) error { return sourceKindNames.Unmarshal(b, k) }
 
 // Source is a command's origin: its kind, and the server, agent or
 // plugin's name.
@@ -284,14 +298,19 @@ const (
 	OriginProgram                   // the program itself; When applies, Surfaces do not
 )
 
-var originNames = []string{"unset", "key", "mouse", "palette", "slash", "cli", "agent", "program"}
-
-func (o Origin) String() string {
-	if int(o) < len(originNames) {
-		return originNames[o]
-	}
-	return fmt.Sprintf("Origin(%d)", uint8(o))
+var originNames = enum.Names[Origin]{
+	Pkg: pkgName, Type: "Origin",
+	Tokens: []string{"unset", "key", "mouse", "palette", "slash", "cli", "agent", "program"},
 }
+
+// String is the origin's token.
+func (o Origin) String() string { return originNames.String(o) }
+
+// MarshalText is the origin's token. An origin with no token is an error.
+func (o Origin) MarshalText() ([]byte, error) { return originNames.Marshal(o) }
+
+// UnmarshalText reads a token MarshalText wrote, exactly, case included.
+func (o *Origin) UnmarshalText(b []byte) error { return originNames.Unmarshal(b, o) }
 
 // surface is the surface an origin must be offered on, or 0 when Surfaces
 // do not apply.

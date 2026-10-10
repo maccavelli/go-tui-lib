@@ -5,6 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/maccavelli/go-tui-lib/internal/enum"
 	"github.com/maccavelli/go-tui-lib/layout"
 )
 
@@ -20,6 +21,21 @@ const (
 	// OnPane places the overlay at an offset from a pane's content area.
 	OnPane
 )
+
+var anchorNames = enum.Names[AnchorKind]{
+	Pkg: pkgName, Type: "AnchorKind",
+	Tokens: []string{"center", "below-cursor", "on-pane"},
+}
+
+// String is the anchor kind's token.
+func (k AnchorKind) String() string { return anchorNames.String(k) }
+
+// MarshalText is the anchor kind's token. An anchor kind with no token is an
+// error.
+func (k AnchorKind) MarshalText() ([]byte, error) { return anchorNames.Marshal(k) }
+
+// UnmarshalText reads a token MarshalText wrote, exactly, case included.
+func (k *AnchorKind) UnmarshalText(b []byte) error { return anchorNames.Unmarshal(b, k) }
 
 // Anchor places an overlay.
 type Anchor struct {

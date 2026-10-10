@@ -23,19 +23,22 @@ const (
 	FormatJSON
 )
 
-var formatNames = []string{"text", "json"}
+var formatNames = enum.Names[Format]{
+	Pkg: pkgName, Type: "Format",
+	Tokens: []string{"text", "json"},
+}
 
 // String is the format's token: "text" or "json".
-func (f Format) String() string { return enum.Name(formatNames, f) }
+func (f Format) String() string { return formatNames.String(f) }
 
 // MarshalText is the format's token. A format with no token is an error.
 func (f Format) MarshalText() ([]byte, error) {
-	return enum.Marshal("command", "Format", formatNames, f)
+	return formatNames.Marshal(f)
 }
 
 // UnmarshalText reads a token MarshalText wrote, exactly, case included.
 func (f *Format) UnmarshalText(b []byte) error {
-	return enum.Unmarshal("command", "Format", formatNames, b, f)
+	return formatNames.Unmarshal(b, f)
 }
 
 // WriteResult writes res to w in format f, for a program's own command

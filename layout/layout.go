@@ -26,7 +26,12 @@ import (
 	"iter"
 	"slices"
 	"strings"
+
+	"github.com/maccavelli/go-tui-lib/internal/enum"
 )
+
+// pkgName is the package's name, as its enums' errors give it.
+const pkgName = "layout"
 
 // Rect is a rectangle of terminal cells. X and Y are its top-left cell.
 type Rect struct{ X, Y, W, H int }
@@ -61,6 +66,20 @@ const (
 	// Vertical stacks children, dividing the height.
 	Vertical
 )
+
+var axisNames = enum.Names[Axis]{
+	Pkg: pkgName, Type: "Axis",
+	Tokens: []string{"horizontal", "vertical"},
+}
+
+// String is the axis's token.
+func (a Axis) String() string { return axisNames.String(a) }
+
+// MarshalText is the axis's token. An axis with no token is an error.
+func (a Axis) MarshalText() ([]byte, error) { return axisNames.Marshal(a) }
+
+// UnmarshalText reads a token MarshalText wrote, exactly, case included.
+func (a *Axis) UnmarshalText(b []byte) error { return axisNames.Unmarshal(b, a) }
 
 // PaneID names a pane. IDs are unique within a tree.
 type PaneID string

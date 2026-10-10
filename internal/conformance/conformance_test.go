@@ -56,8 +56,11 @@ type violation struct {
 }
 
 // declared is one exported type name of a public package, by the package's
-// path relative to the repository root.
-type declared struct{ pkg, name string }
+// path relative to the repository root, with the object the scan resolved.
+type declared struct {
+	pkg, name string
+	obj       *types.TypeName
+}
 
 // stderrLog is every function of package log that writes to standard error
 // through the standard logger, or hands that logger or its writer out.
@@ -353,7 +356,7 @@ func scanModule(t *testing.T, root, dir string) ([]violation, []string, []declar
 		if pkg != nil && !slices.Contains(strings.Split(rootRel, "/"), "internal") {
 			for _, name := range pkg.Scope().Names() {
 				if tn, ok := pkg.Scope().Lookup(name).(*types.TypeName); ok && tn.Exported() {
-					decl = append(decl, declared{pkg: rootRel, name: name})
+					decl = append(decl, declared{pkg: rootRel, name: name, obj: tn})
 				}
 			}
 		}

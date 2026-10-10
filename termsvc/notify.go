@@ -9,9 +9,14 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/maccavelli/go-tui-lib/internal/enum"
 	"github.com/maccavelli/go-tui-lib/internal/sanitize"
+	"github.com/maccavelli/go-tui-lib/internal/teamsg"
 	"github.com/maccavelli/go-tui-lib/termcap"
 )
+
+// pkgName is the package's name, as its enums' errors give it.
+const pkgName = "termsvc"
 
 // Notification is a desktop notification.
 type Notification struct {
@@ -31,6 +36,20 @@ const (
 	// Critical is above normal.
 	Critical
 )
+
+var urgencyNames = enum.Names[Urgency]{
+	Pkg: pkgName, Type: "Urgency",
+	Tokens: []string{"normal", "low", "critical"},
+}
+
+// String is the urgency's token.
+func (u Urgency) String() string { return urgencyNames.String(u) }
+
+// MarshalText is the urgency's token. An urgency with no token is an error.
+func (u Urgency) MarshalText() ([]byte, error) { return urgencyNames.Marshal(u) }
+
+// UnmarshalText reads a token MarshalText wrote, exactly, case included.
+func (u *Urgency) UnmarshalText(b []byte) error { return urgencyNames.Unmarshal(b, u) }
 
 // Protocol is how a notification reaches the terminal.
 type Protocol uint8
@@ -52,6 +71,20 @@ const (
 	Off
 )
 
+var protocolNames = enum.Names[Protocol]{
+	Pkg: pkgName, Type: "Protocol",
+	Tokens: []string{"auto", "osc99", "osc777", "osc9", "bell", "off"},
+}
+
+// String is the protocol's token.
+func (p Protocol) String() string { return protocolNames.String(p) }
+
+// MarshalText is the protocol's token. A protocol with no token is an error.
+func (p Protocol) MarshalText() ([]byte, error) { return protocolNames.Marshal(p) }
+
+// UnmarshalText reads a token MarshalText wrote, exactly, case included.
+func (p *Protocol) UnmarshalText(b []byte) error { return protocolNames.Unmarshal(b, p) }
+
 // Policy is when a notification is sent.
 type Policy uint8
 
@@ -69,6 +102,20 @@ const (
 	// not report it (MADR A1, Q6).
 	UnlessFocused
 )
+
+var policyNames = enum.Names[Policy]{
+	Pkg: pkgName, Type: "Policy",
+	Tokens: []string{"when-unfocused", "always", "never", "unless-focused"},
+}
+
+// String is the policy's token.
+func (p Policy) String() string { return policyNames.String(p) }
+
+// MarshalText is the policy's token. A policy with no token is an error.
+func (p Policy) MarshalText() ([]byte, error) { return policyNames.Marshal(p) }
+
+// UnmarshalText reads a token MarshalText wrote, exactly, case included.
+func (p *Policy) UnmarshalText(b []byte) error { return policyNames.Unmarshal(b, p) }
 
 // SkipReason is why Notify sent nothing.
 type SkipReason uint8
@@ -90,15 +137,19 @@ const (
 	SkipFailed
 )
 
-var skipNames = []string{"", "disabled", "empty", "focused", "focus-unknown", "gated", "failed"}
-
-// String is the reason's name, "" when nothing was skipped.
-func (s SkipReason) String() string {
-	if int(s) < len(skipNames) {
-		return skipNames[s]
-	}
-	return strconv.Itoa(int(s))
+var skipNames = enum.Names[SkipReason]{
+	Pkg: pkgName, Type: "SkipReason",
+	Tokens: []string{"", "disabled", "empty", "focused", "focus-unknown", "gated", "failed"},
 }
+
+// String is the reason's token, "" when nothing was skipped.
+func (s SkipReason) String() string { return skipNames.String(s) }
+
+// MarshalText is the reason's token. A reason with no token is an error.
+func (s SkipReason) MarshalText() ([]byte, error) { return skipNames.Marshal(s) }
+
+// UnmarshalText reads a token MarshalText wrote, exactly, case included.
+func (s *SkipReason) UnmarshalText(b []byte) error { return skipNames.Unmarshal(b, s) }
 
 // NotifyResultMsg reports what Notify did. Sent says the notification
 // left: written to the terminal, which does not confirm it, or accepted by
@@ -229,7 +280,7 @@ func (n *Notifier) NotifyContext(ctx context.Context, x Notification) tea.Cmd {
 	x.Title, x.Body = clean(x.Title, TitleCells), clean(x.Body, BodyCells)
 	if n.backend != nil {
 		if skip := n.skip(x, false); skip != NotSkipped {
-			return result(NotifyResultMsg{Notification: x, Skipped: skip})
+			return teamsg.Cmd(NotifyResultMsg{Notification: x, Skipped: skip})
 		}
 		b, d := n.backend, n.timeout
 		return func() tea.Msg {
@@ -243,9 +294,9 @@ func (n *Notifier) NotifyContext(ctx context.Context, x Notification) tea.Cmd {
 	}
 	seq, skip := n.bytesFor(x)
 	if skip != NotSkipped {
-		return result(NotifyResultMsg{Notification: x, Skipped: skip})
+		return teamsg.Cmd(NotifyResultMsg{Notification: x, Skipped: skip})
 	}
-	return tea.Sequence(tea.Raw(seq), result(NotifyResultMsg{Notification: x, Sent: true}))
+	return tea.Sequence(tea.Raw(seq), teamsg.Cmd(NotifyResultMsg{Notification: x, Sent: true}))
 }
 
 // Sequence is the bytes Notify would write to the terminal for x, cleaned
@@ -273,8 +324,6 @@ func bounded(ctx context.Context, d time.Duration) (context.Context, context.Can
 	}
 	return context.WithCancel(ctx)
 }
-
-func result(m NotifyResultMsg) tea.Cmd { return func() tea.Msg { return m } }
 
 // skip is why x is not to be sent, or NotSkipped: to the terminal, or
 // else through the backend.

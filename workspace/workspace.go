@@ -33,10 +33,14 @@ import (
 
 	"github.com/maccavelli/go-tui-lib/glyph"
 	"github.com/maccavelli/go-tui-lib/internal/cells"
+	"github.com/maccavelli/go-tui-lib/internal/enum"
 	"github.com/maccavelli/go-tui-lib/internal/limits"
 	"github.com/maccavelli/go-tui-lib/layout"
 	"github.com/maccavelli/go-tui-lib/theme"
 )
+
+// pkgName is the package's name, as its enums' errors give it.
+const pkgName = "workspace"
 
 // Pane is a component the workspace hosts. View renders it into exactly
 // width × height cells; anything larger is clipped.
@@ -110,6 +114,20 @@ const (
 	// None draws nothing: each pane gets its whole rectangle.
 	None
 )
+
+var chromeNames = enum.Names[Chrome]{
+	Pkg: pkgName, Type: "Chrome",
+	Tokens: []string{"borders", "separators", "none"},
+}
+
+// String is the chrome's token.
+func (c Chrome) String() string { return chromeNames.String(c) }
+
+// MarshalText is the chrome's token. A chrome with no token is an error.
+func (c Chrome) MarshalText() ([]byte, error) { return chromeNames.Marshal(c) }
+
+// UnmarshalText reads a token MarshalText wrote, exactly, case included.
+func (c *Chrome) UnmarshalText(b []byte) error { return chromeNames.Unmarshal(b, c) }
 
 // fallback is the size used before the first tea.WindowSizeMsg, so the
 // first frame is not empty.

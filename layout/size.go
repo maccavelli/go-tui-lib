@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/maccavelli/go-tui-lib/internal/enum"
 )
 
 // SizeKind is how a child claims its split's length.
@@ -23,6 +25,20 @@ const (
 	// KindRatio takes N/D of the split's length.
 	KindRatio
 )
+
+var sizeKindNames = enum.Names[SizeKind]{
+	Pkg: pkgName, Type: "SizeKind",
+	Tokens: []string{"fill", "fixed", "percent", "ratio"},
+}
+
+// String is the size kind's token.
+func (k SizeKind) String() string { return sizeKindNames.String(k) }
+
+// MarshalText is the size kind's token. A size kind with no token is an error.
+func (k SizeKind) MarshalText() ([]byte, error) { return sizeKindNames.Marshal(k) }
+
+// UnmarshalText reads a token MarshalText wrote, exactly, case included.
+func (k *SizeKind) UnmarshalText(b []byte) error { return sizeKindNames.Unmarshal(b, k) }
 
 // Size is a child's claim on its split's length, with bounds. The zero Size
 // is Fill(1).

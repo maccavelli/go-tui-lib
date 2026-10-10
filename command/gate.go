@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"sync"
+
+	"github.com/maccavelli/go-tui-lib/internal/enum"
 )
 
 // Verdict is a gate's answer, with ACP's four permission option kinds.
@@ -23,20 +25,28 @@ const (
 	RejectAlways                    // refuse, and do not ask again for this command and caller
 )
 
+var verdictNames = enum.Names[Verdict]{
+	Pkg: pkgName, Type: "Verdict",
+	Tokens: []string{"", "allow_once", "allow_always", "reject_once", "reject_always"},
+}
+
+// String is the verdict's token, its ACPKind: "" for no verdict.
+func (v Verdict) String() string { return verdictNames.String(v) }
+
+// MarshalText is the verdict's token. A verdict with no token is an error.
+func (v Verdict) MarshalText() ([]byte, error) { return verdictNames.Marshal(v) }
+
+// UnmarshalText reads a token MarshalText wrote, exactly, case included.
+func (v *Verdict) UnmarshalText(b []byte) error { return verdictNames.Unmarshal(b, v) }
+
 // ACPKind is v as ACP's PermissionOptionKind: "allow_once", "allow_always",
-// "reject_once" or "reject_always"; "" for no verdict.
+// "reject_once" or "reject_always"; "" for no verdict, and for a v with no
+// token.
 func (v Verdict) ACPKind() string {
-	switch v {
-	case AllowOnce:
-		return "allow_once"
-	case AllowAlways:
-		return "allow_always"
-	case RejectOnce:
-		return "reject_once"
-	case RejectAlways:
-		return "reject_always"
+	if v > RejectAlways {
+		return ""
 	}
-	return ""
+	return v.String()
 }
 
 func (v Verdict) allows() bool { return v == AllowOnce || v == AllowAlways }

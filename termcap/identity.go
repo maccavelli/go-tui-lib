@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/maccavelli/go-tui-lib/internal/enum"
 	"github.com/maccavelli/go-tui-lib/internal/sanitize"
 )
 
@@ -39,20 +40,23 @@ const (
 	BrandXTerm
 )
 
-var brandNames = []string{
-	"unknown", "apple-terminal", "iterm2", "kitty", "ghostty", "wezterm", "alacritty", "foot",
-	"rio", "contour", "vte", "konsole", "terminator", "windows-terminal", "vscode", "cursor",
-	"windsurf", "zed", "jetbrains", "warp", "mintty", "xterm",
+var brandNames = enum.Names[Brand]{
+	Pkg: pkgName, Type: "Brand",
+	Tokens: []string{
+		"unknown", "apple-terminal", "iterm2", "kitty", "ghostty", "wezterm", "alacritty", "foot",
+		"rio", "contour", "vte", "konsole", "terminator", "windows-terminal", "vscode", "cursor",
+		"windsurf", "zed", "jetbrains", "warp", "mintty", "xterm",
+	},
 }
 
 // String is the brand's name, as the report and JSON print it.
-func (b Brand) String() string { return name(brandNames, b) }
+func (b Brand) String() string { return brandNames.String(b) }
 
 // MarshalText is the brand's name.
-func (b Brand) MarshalText() ([]byte, error) { return marshal(brandNames, "Brand", b) }
+func (b Brand) MarshalText() ([]byte, error) { return brandNames.Marshal(b) }
 
 // UnmarshalText reads a name MarshalText wrote.
-func (b *Brand) UnmarshalText(t []byte) error { return unmarshal(brandNames, "Brand", t, b) }
+func (b *Brand) UnmarshalText(t []byte) error { return brandNames.Unmarshal(t, b) }
 
 // Editor is an editor whose embedded terminal the program runs in. Its
 // terminal answers for the editor, not for the user's terminal.
@@ -66,16 +70,19 @@ const (
 	EditorEmacs
 )
 
-var editorNames = []string{"none", "neovim", "vim", "emacs"}
+var editorNames = enum.Names[Editor]{
+	Pkg: pkgName, Type: "Editor",
+	Tokens: []string{"none", "neovim", "vim", "emacs"},
+}
 
 // String is the editor's name, as the report and JSON print it.
-func (e Editor) String() string { return name(editorNames, e) }
+func (e Editor) String() string { return editorNames.String(e) }
 
 // MarshalText is the editor's name.
-func (e Editor) MarshalText() ([]byte, error) { return marshal(editorNames, "Editor", e) }
+func (e Editor) MarshalText() ([]byte, error) { return editorNames.Marshal(e) }
 
 // UnmarshalText reads a name MarshalText wrote.
-func (e *Editor) UnmarshalText(t []byte) error { return unmarshal(editorNames, "Editor", t, e) }
+func (e *Editor) UnmarshalText(t []byte) error { return editorNames.Unmarshal(t, e) }
 
 // Platform is a compatibility layer the program runs under.
 type Platform uint8
@@ -87,17 +94,20 @@ const (
 	PlatformWSL             // the Windows Subsystem for Linux
 )
 
-var platformNames = []string{"native", "msys", "wsl"}
+var platformNames = enum.Names[Platform]{
+	Pkg: pkgName, Type: "Platform",
+	Tokens: []string{"native", "msys", "wsl"},
+}
 
 // String is the platform's name, as the report and JSON print it.
-func (p Platform) String() string { return name(platformNames, p) }
+func (p Platform) String() string { return platformNames.String(p) }
 
 // MarshalText is the platform's name.
-func (p Platform) MarshalText() ([]byte, error) { return marshal(platformNames, "Platform", p) }
+func (p Platform) MarshalText() ([]byte, error) { return platformNames.Marshal(p) }
 
 // UnmarshalText reads a name MarshalText wrote.
 func (p *Platform) UnmarshalText(t []byte) error {
-	return unmarshal(platformNames, "Platform", t, p)
+	return platformNames.Unmarshal(t, p)
 }
 
 // Identity is what the environment says about the terminal.

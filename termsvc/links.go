@@ -7,7 +7,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/maccavelli/go-tui-lib/internal/enum"
 	"github.com/maccavelli/go-tui-lib/internal/sanitize"
+	"github.com/maccavelli/go-tui-lib/internal/teamsg"
 	"github.com/maccavelli/go-tui-lib/termcap"
 )
 
@@ -21,6 +23,20 @@ const (
 	// terminal can still detect, where OSC 8 links do not work.
 	LabelAndURL
 )
+
+var displayNames = enum.Names[Display]{
+	Pkg: pkgName, Type: "Display",
+	Tokens: []string{"label-only", "label-and-url"},
+}
+
+// String is the display's token.
+func (d Display) String() string { return displayNames.String(d) }
+
+// MarshalText is the display's token. A display with no token is an error.
+func (d Display) MarshalText() ([]byte, error) { return displayNames.Marshal(d) }
+
+// UnmarshalText reads a token MarshalText wrote, exactly, case included.
+func (d *Display) UnmarshalText(b []byte) error { return displayNames.Unmarshal(b, d) }
 
 // LinkDisplay is how links should be shown on c's terminal: the label only
 // where OSC 8 links work, and the label with its URL on Apple Terminal,
@@ -67,5 +83,5 @@ func (p LinkPolicy) Open(rawURL string) tea.Cmd {
 	if !p.Openable(rawURL) {
 		return nil
 	}
-	return func() tea.Msg { return OpenURLMsg{URL: rawURL} }
+	return teamsg.Cmd(OpenURLMsg{URL: rawURL})
 }

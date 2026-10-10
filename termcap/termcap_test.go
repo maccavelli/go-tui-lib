@@ -60,8 +60,8 @@ func TestEnumNames(t *testing.T) {
 	check("Support", []string{Unknown.String(), Unsupported.String(), Supported.String()}, "unknown,unsupported,supported")
 	check("Origin", []string{NotQueried.String(), Heuristic.String(), Environment.String(), Queried.String(), Override.String()}, "not-queried,heuristic,env,query,override")
 	check("Mux", []string{NoMux.String(), Tmux.String(), Screen.String(), Zellij.String()}, "none,tmux,screen,zellij")
-	if s := Support(9).String(); s != "9" {
-		t.Errorf("an unnamed Support prints %q, want its number", s)
+	if s := Support(9).String(); s != "Support(9)" {
+		t.Errorf("an unnamed Support prints %q, want \"Support(9)\"", s)
 	}
 	if _, err := Support(9).MarshalText(); err == nil {
 		t.Error("an unnamed Support marshalled")

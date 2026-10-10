@@ -14,6 +14,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/maccavelli/go-tui-lib/internal/sanitize"
+	"github.com/maccavelli/go-tui-lib/internal/teamsg"
 	"github.com/maccavelli/go-tui-lib/internal/termevent"
 )
 
@@ -538,13 +539,13 @@ func (p *Prober) deliver() tea.Cmd {
 	}
 	p.done = true
 	c := p.Caps()
-	return func() tea.Msg { return CapsMsg{Caps: c} }
+	return teamsg.Cmd(CapsMsg{Caps: c})
 }
 
 // schemeChanged reports a DSR 997 after the probe, and asks for the exact
 // background, so a theme that follows it gets the colour.
 func (p *Prober) schemeChanged(dark bool) tea.Cmd {
-	msg := func() tea.Msg { return ColorSchemeMsg{Dark: dark} }
+	msg := teamsg.Cmd(ColorSchemeMsg{Dark: dark})
 	if p.noBackground {
 		return msg
 	}

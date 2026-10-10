@@ -102,7 +102,7 @@ func TestTierText(t *testing.T) {
 	if TierUnicode != 0 {
 		t.Error("TierUnicode is not the zero Tier")
 	}
-	if got := Tier(9).String(); got != "9" {
+	if got := Tier(9).String(); got != "Tier(9)" {
 		t.Errorf("Tier(9).String() = %q", got)
 	}
 	if _, err := Tier(9).MarshalText(); err == nil || err.Error() != "glyph: Tier 9 has no name" {

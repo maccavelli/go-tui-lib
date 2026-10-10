@@ -161,7 +161,7 @@ func Check(e Expr, known Keys) []error {
 		case inNode:
 			kind(n.key)
 			if kd, ok := kind(n.list); ok && kd != KindList {
-				errs = append(errs, fmt.Errorf("when: key %q is a %s, not a list, after in", n.list, kindName(kd)))
+				errs = append(errs, fmt.Errorf("when: key %q is a %s, not a list, after in", n.list, kd))
 			}
 		case cmpNode:
 			errs = append(errs, checkCmp(n, kind)...)
@@ -181,7 +181,7 @@ func checkCmp(n cmpNode, kind func(string) (Kind, bool)) []error {
 	switch n.op {
 	case tLt, tLe, tGt, tGe:
 		if kd != KindNumber {
-			return []error{fmt.Errorf("when: key %q is a %s, compared as a number", n.key, kindName(kd))}
+			return []error{fmt.Errorf("when: key %q is a %s, compared as a number", n.key, kd)}
 		}
 		if n.lit.Kind() != KindNumber {
 			return []error{fmt.Errorf("when: key %q is compared with %s, which is not a number", n.key, literalText(n.lit))}

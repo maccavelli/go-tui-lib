@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/maccavelli/go-tui-lib/internal/enum"
 	"github.com/maccavelli/go-tui-lib/internal/sanitize"
 	"github.com/maccavelli/go-tui-lib/termcap"
 )
@@ -42,15 +43,19 @@ const (
 	ActivityDone
 )
 
-var activityNames = []string{"idle", "busy", "retry", "waiting", "error", "done"}
+var activityNames = enum.Names[ActivityState]{
+	Pkg: pkgName, Type: "ActivityState",
+	Tokens: []string{"idle", "busy", "retry", "waiting", "error", "done"},
+}
 
 // String is the state's name in the beacon.
-func (s ActivityState) String() string {
-	if int(s) < len(activityNames) {
-		return activityNames[s]
-	}
-	return strconv.Itoa(int(s))
-}
+func (s ActivityState) String() string { return activityNames.String(s) }
+
+// MarshalText is the state's token. A state with no token is an error.
+func (s ActivityState) MarshalText() ([]byte, error) { return activityNames.Marshal(s) }
+
+// UnmarshalText reads a token MarshalText wrote, exactly, case included.
+func (s *ActivityState) UnmarshalText(b []byte) error { return activityNames.Unmarshal(b, s) }
 
 // activityVersion is the beacon format's version.
 const activityVersion = "1"

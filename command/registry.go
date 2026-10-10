@@ -14,6 +14,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/maccavelli/go-tui-lib/internal/sanitize"
+	"github.com/maccavelli/go-tui-lib/internal/teamsg"
 	"github.com/maccavelli/go-tui-lib/when"
 )
 
@@ -481,7 +482,7 @@ func (r *Registry) WatchContext(ctx context.Context) tea.Cmd {
 		if len(next.conflicts) == 0 {
 			return changed
 		}
-		return tea.BatchMsg{msgCmd(changed), msgCmd(ConflictMsg{Conflicts: slices.Clone(next.conflicts)})}
+		return tea.BatchMsg{teamsg.Cmd(changed), teamsg.Cmd(ConflictMsg{Conflicts: slices.Clone(next.conflicts)})}
 	}
 }
 

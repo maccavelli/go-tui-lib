@@ -10,6 +10,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/maccavelli/go-tui-lib/internal/teamsg"
 )
 
 type doneMsg struct{}
@@ -20,7 +21,7 @@ func TestDispatchLoop(t *testing.T) {
 		c.When = "!off"
 		c.Handler = HandlerFunc(func(context.Context, *Invocation) (Result, error) {
 			ran.Store(true)
-			return Result{Value: 7, Text: "done", Cmd: msgCmd(doneMsg{})}, nil
+			return Result{Value: 7, Text: "done", Cmd: teamsg.Cmd(doneMsg{})}, nil
 		})
 	}))
 	c := r.Dispatch(t.Context(), Request{ID: "a", Origin: OriginKey})

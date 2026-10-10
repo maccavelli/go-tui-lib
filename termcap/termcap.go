@@ -16,6 +16,9 @@ package termcap
 
 import "github.com/maccavelli/go-tui-lib/internal/enum"
 
+// pkgName is the package's name, as its enums' errors give it.
+const pkgName = "termcap"
+
 // Support is what is known about one capability.
 type Support uint8
 
@@ -30,16 +33,19 @@ const (
 	Supported
 )
 
-var supportNames = []string{"unknown", "unsupported", "supported"}
+var supportNames = enum.Names[Support]{
+	Pkg: pkgName, Type: "Support",
+	Tokens: []string{"unknown", "unsupported", "supported"},
+}
 
 // String is the support's name, as the report and JSON print it.
-func (s Support) String() string { return name(supportNames, s) }
+func (s Support) String() string { return supportNames.String(s) }
 
 // MarshalText is the support's name.
-func (s Support) MarshalText() ([]byte, error) { return marshal(supportNames, "Support", s) }
+func (s Support) MarshalText() ([]byte, error) { return supportNames.Marshal(s) }
 
 // UnmarshalText reads a name MarshalText wrote.
-func (s *Support) UnmarshalText(b []byte) error { return unmarshal(supportNames, "Support", b, s) }
+func (s *Support) UnmarshalText(b []byte) error { return supportNames.Unmarshal(b, s) }
 
 // Origin is where a fact came from. The constants are in order of strength,
 // weakest first.
@@ -61,16 +67,19 @@ const (
 	Override
 )
 
-var originNames = []string{"not-queried", "heuristic", "env", "query", "override"} // stable text
+var originNames = enum.Names[Origin]{
+	Pkg: pkgName, Type: "Origin",
+	Tokens: []string{"not-queried", "heuristic", "env", "query", "override"}, // stable text
+}
 
 // String is the origin's name, as the report and JSON print it.
-func (o Origin) String() string { return name(originNames, o) }
+func (o Origin) String() string { return originNames.String(o) }
 
 // MarshalText is the origin's name.
-func (o Origin) MarshalText() ([]byte, error) { return marshal(originNames, "Origin", o) }
+func (o Origin) MarshalText() ([]byte, error) { return originNames.Marshal(o) }
 
 // UnmarshalText reads a name MarshalText wrote.
-func (o *Origin) UnmarshalText(b []byte) error { return unmarshal(originNames, "Origin", b, o) }
+func (o *Origin) UnmarshalText(b []byte) error { return originNames.Unmarshal(b, o) }
 
 // Fact is a value with its provenance, so a report can say why. Reason is
 // a reason token, one of the Reason constants, that says why a fact is
@@ -109,26 +118,16 @@ const (
 	Zellij
 )
 
-var muxNames = []string{"none", "tmux", "screen", "zellij"}
+var muxNames = enum.Names[Mux]{
+	Pkg: pkgName, Type: "Mux",
+	Tokens: []string{"none", "tmux", "screen", "zellij"},
+}
 
 // String is the multiplexer's name, as the report and JSON print it.
-func (m Mux) String() string { return name(muxNames, m) }
+func (m Mux) String() string { return muxNames.String(m) }
 
 // MarshalText is the multiplexer's name.
-func (m Mux) MarshalText() ([]byte, error) { return marshal(muxNames, "Mux", m) }
+func (m Mux) MarshalText() ([]byte, error) { return muxNames.Marshal(m) }
 
 // UnmarshalText reads a name MarshalText wrote.
-func (m *Mux) UnmarshalText(b []byte) error { return unmarshal(muxNames, "Mux", b, m) }
-
-// name is v's entry in names, or its number when names has none.
-func name[T ~uint8](names []string, v T) string { return enum.Name(names, v) }
-
-// marshal is v's entry in names; one it has none for is an error.
-func marshal[T ~uint8](names []string, kind string, v T) ([]byte, error) {
-	return enum.Marshal("termcap", kind, names, v)
-}
-
-// unmarshal reads a name marshal wrote.
-func unmarshal[T ~uint8](names []string, kind string, b []byte, v *T) error {
-	return enum.Unmarshal("termcap", kind, names, b, v)
-}
+func (m *Mux) UnmarshalText(b []byte) error { return muxNames.Unmarshal(b, m) }

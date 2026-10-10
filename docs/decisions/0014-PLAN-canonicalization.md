@@ -1,6 +1,6 @@
 ---
 status: in-progress
-date: 2026-10-09
+date: 2026-10-10
 associated-madr: "0014-MADR-native-integration-api.md"
 ---
 # Implement W4: renames with deprecation aliases, opaque options, one enum helper, JSON v2, structured errors, and the planned records' names; release `v0.9.0` and `v0.10.0`
@@ -306,6 +306,11 @@ each record's index row says "A<n> recorded".
   * `TestOutOfRangeText`.
 * **Mutation S6-1:** an enum skips `UnmarshalText`.
   `TestEveryEnumRoundTrips`.
+* **2026-10-10, D2:** `Names` carries a `Pkg` field as well, so the
+  errors keep their texts; the twelve enums with no text yet take the
+  tokens D2 lists; `Surface`'s helper is an `enum.Bits[T]` type beside
+  `Names`; and `teamsg.Cmd` replaces a sixth site,
+  `termcap/prober.go:547`.
 
 ### Step 7: JSON v2, errors, adapters, width, wording
 
@@ -714,3 +719,168 @@ No deviation.
   exit 0; `TestOptionsAreOpaque`, the deprecated-name tests and the
   conformance scan, 7 passed, 0 failed; `go-fuzz_test.sh`, "25 passed, 0 failed";
   `make fuzz FUZZTIME=3s`, "8 packages ran clean".
+
+### Step 6: `internal/enum` everywhere, and `internal/teamsg`
+
+#### Deviations
+
+* **D2 (2026-10-10): four details Step 6 left open.**
+  * **Found,** reading the step against `4aedfb2`:
+    * `internal/enum`'s errors name the package as well as the enum,
+      "termcap: unknown Mux", and its package comment promises a package
+      that moves onto it keeps its texts. `Names{Type, Tokens}` has no
+      package to name.
+    * Twelve enums have no text at all, so Step 6 chooses their tokens,
+      which become stable API: `command.Verdict` (the step says its ACP
+      kinds, but not its zero's), `termsvc`'s `Status`, `Route`,
+      `Display`, `Urgency`, `Protocol` and `Policy`, `layout`'s `Axis`,
+      `SizeKind` and `Span`, `workspace`'s `Chrome` and `AnchorKind`, and
+      `when.Kind`.
+    * The step does not say where `Surface`'s helper lives.
+    * A sixth one-message command: `termcap/prober.go:547`,
+      `schemeChanged`'s `ColorSchemeMsg`, inline since `45ead16`, before
+      this PLAN. The fact table names five sites.
+  * **The owner's choices:**
+    * `Names{Pkg, Type, Tokens}`: the errors keep their texts byte for
+      byte, and `String`'s out-of-range form names the type alone,
+      `Mux(9)`.
+    * These tokens:
+
+      | Enum | Tokens, from 0 |
+      | :--- | :--- |
+      | `command.Verdict` | `""`, as `ACPKind` gives and `SkipReason`'s zero prints; `allow_once`, `allow_always`, `reject_once`, `reject_always` |
+      | `termsvc.Status` | `unconfirmed`, `confirmed`, `failed` |
+      | `termsvc.Route` | `none`, `backend`, `tmux-buffer`, `osc52`, `osc52-tmux` |
+      | `termsvc.Display` | `label-only`, `label-and-url` |
+      | `termsvc.Urgency` | `normal`, `low`, `critical` |
+      | `termsvc.Protocol` | `auto`, `osc99`, `osc777`, `osc9`, `bell`, `off` |
+      | `termsvc.Policy` | `when-unfocused`, `always`, `never`, `unless-focused` |
+      | `layout.Axis` | `horizontal`, `vertical` |
+      | `layout.SizeKind` | `fill`, `fixed`, `percent`, `ratio` |
+      | `layout.Span` | `full-width`, `under-main` |
+      | `workspace.Chrome` | `borders`, `separators`, `none` |
+      | `workspace.AnchorKind` | `center`, `below-cursor`, `on-pane` |
+      | `when.Kind` | `nothing`, `boolean`, `number`, `string`, `list`: the words `when`'s errors already use |
+
+      Every other enum keeps the tokens its `String` prints today.
+    * `Surface`'s helper is an `enum.Bits[T]` type in `internal/enum`,
+      beside `Names`, rather than an unexported helper in `command`.
+    * `teamsg.Cmd` replaces all six sites.
+  * **Also found, needing no choice:** moving onto `Names` changes the
+    out-of-range text of every enum whose `String` printed the bare
+    number: `termcap`'s seven, `command.Format`, `glyph.Tier`,
+    `launch.Choice` and `Target`, `theme`'s two, and `termsvc`'s
+    `ActivityState` and `SkipReason`. Three tests pin the old text:
+    `termcap/termcap_test.go:63`, which the step names, and
+    `glyph/glyph_test.go:105` and `theme/text_test.go:35`, which it does
+    not; the agent found the third when the tests ran. Each changes to the
+    `Type(N)` form, and the release notes name the change.
+
+#### What was built
+
+* **`internal/enum`:**
+  * `Names[T]{Pkg, Type, Tokens}`, with `String`, `Marshal` and
+    `Unmarshal`. `String` gives `Type(N)` for a value with no token; the
+    errors are the package's existing texts.
+  * `Bits[T ~uint8]{Pkg, Type, Tokens, None}` (D2), for a bit set: the
+    tokens of the bits that are set, lowest first and joined with `|`,
+    `None` for the empty set, and bits with no token last, in hex, which
+    `Marshal` refuses. `Unmarshal` takes the tokens in any order, and
+    refuses an empty or unknown one.
+  * `Name`, `Marshal` and `Unmarshal` stay. `Marshal` and `Unmarshal`
+    wrap `Names`; `Name` keeps the bare number, since it has no type
+    name. No package calls them now.
+* **Every exported enum is on a table, 34 in all.**
+  * The 13 that were already on `internal/enum`, termcap's three helpers
+    removed with them.
+  * The 21 others: `command`'s `Kind`, `Danger`, `Mode`, `SourceKind`,
+    `Origin` and `Verdict` on `Names`, and `Surface` on `Bits`;
+    `termsvc`'s eight; `layout`'s three; `workspace`'s two; `when.Kind`.
+    Each has `String`, `MarshalText` and `UnmarshalText`, with D2's
+    tokens. `Verdict.ACPKind` is `String`, and `""` for a value with no
+    token, as before. `when`'s `kindName` is gone; its errors print the
+    `Kind`.
+  * Each package names itself once, in `const pkgName`, for its tables'
+    `Pkg` (`goconst`).
+* **`internal/teamsg.Cmd[M any](m M) tea.Cmd`** replaces `command`'s
+  `msgCmd`, `termsvc`'s `copied` and `result`, and the three inline forms
+  in `termcap/prober.go` (two) and `termsvc/links.go`. `command`'s own
+  test used `msgCmd` and uses `Cmd`.
+* **The pins,** D2's three tests: `Tier(9)`, `Support(9)` and
+  `Background(-1)` now expect the `Type(N)` form.
+* **`AGENTS.md`,** "API conventions" rule 5: the tokens come from one
+  table in `internal/enum`, `Names` or `Bits`; a value with no token
+  prints `Type(N)`; `internal/conformance` checks the round trip.
+* **`docs/architecture.md`:** the package graph gains the imports this
+  step adds (`internal/enum` in `layout`, `when`, `termsvc` and
+  `workspace`; `internal/teamsg` in `command`, `termcap` and `termsvc`),
+  with rows and a tree line for `internal/teamsg`. Step 8 still owns the
+  renames there.
+* **Tests:**
+  * `internal/conformance/enums_test.go` (new). The collision check's
+    scan now keeps each type's object, and the enums are what it finds:
+    every exported type of a public package with an integer underlying
+    type, aliases aside, with its constants read from the type checker.
+    A table of conversions builds their values; a scanned enum missing
+    from the table fails, and so does an entry the scan does not find.
+    * `TestEveryEnumRoundTrips`: each enum has `String` and
+      `MarshalText`, and `UnmarshalText` on its pointer; each constant
+      and the zero value has a lowercase token of its own, which
+      `String` prints, `MarshalText` writes and `UnmarshalText` reads
+      back into a variable that held another value.
+    * `TestOutOfRangeText`: one past the last constant, and for an `int`
+      enum one below the first, prints `Type(N)`, is refused by
+      `MarshalText` with the package's and the type's names, and is not
+      read back. For `Surface`, `SurfaceKey|0x80` prints `key|0x80`, and
+      `MarshalText` refuses `0x80`.
+  * `internal/enum`: `TestNames`, `TestBits` and `TestBitsEight`.
+  * `internal/teamsg`: `TestCmd`.
+
+#### Checks
+
+* **The probe:** the two conformance tests, on a scratch copy of
+  `4aedfb2`, the commit before this step: `TestEveryEnumRoundTrips`
+  failed 76 times (29 missing `MarshalText`, 26 `String`, 21
+  `UnmarshalText`), and `TestOutOfRangeText` 36 times (the bare number
+  from the 13 enums already on `internal/enum`, and the missing
+  methods). Both pass on the step's code, with no table entry stale and
+  none missing: the scan found the 34 enums.
+* **Mutations,** on scratch copies of the tree, each one building; all
+  eight killed by an assertion:
+  * **S6-1** (`termsvc.Status` skips `UnmarshalText`):
+    "termsvc.Status has no UnmarshalText method".
+  * **S6-2** (`layout.Axis`'s `UnmarshalText` does nothing):
+    `UnmarshalText("horizontal") = vertical`.
+  * **S6-3** (two `termsvc.Route` values share `osc52`): "3 and 4 share
+    the token".
+  * **S6-4** (`workspace.AnchorKind`'s table says `Anchor`):
+    `"Anchor(3)", want "AnchorKind(3)"`.
+  * **S6-5** (`Names.String` prints the bare number): `"5", want
+    "Danger(5)"`.
+  * **S6-6** (a `Danger` token in capitals): "want one lowercase token".
+  * **S6-7** (`Bits.Unmarshal` skips an empty token): `TestBits`,
+    `Unmarshal(""): <nil>`.
+  * **S6-8** (`Bits.Marshal` writes unknown bits): `TestOutOfRangeText`,
+    `command.Surface(0x81).MarshalText: <nil>`.
+* **`apidiff`:** `make apicheck`, "against v0.8.0, 14 incompatible
+  change(s)", Steps 4 and 5's, and "clean": the new methods are
+  compatible, and `scripts/apicheck.allow` gains nothing.
+* **Rule 2 on macOS,** go1.27.2:
+  * `make pre-add-check FILES=<the 35 Go files>`: "35 file(s) clean".
+  * `make lint`, the cross `go vet`, `-race`, `-shuffle=on -count=2`,
+    `LC_ALL=C`, workspace mode, `go mod tidy -diff`, `make vuln`, `make
+    examples`, `scripts/go-modules.sh --check` and `make release-check`
+    ("198 file(s) clean"): clean.
+  * CI's other checks: `shellcheck`, `markdownlint-cli2`, `actionlint`,
+    `go-precheck_test.sh` ("12 passed") and `go-fuzz_test.sh` ("25
+    passed"): clean.
+* **The Windows test host,** go1.27.2 windows/amd64, with the index synced
+  to the copied tree: `make pre-add-check`, `make lint`, `make vuln` and
+  `make examples`, each exit 0; `go test -count=2 -shuffle=on ./...`,
+  exit 0; the step's tests and the changed pins, 13 passed, 0 failed;
+  `go-fuzz_test.sh`, "25 passed, 0 failed"; `make fuzz FUZZTIME=3s`, "8
+  packages ran clean".
+* **For Step 8's notes,** the behaviour changes: the 21 enums' new
+  `MarshalText` turns their JSON from a number into the token, in a
+  program's own values and in `command.WriteResult`'s; and the
+  out-of-range text D2 lists.

@@ -32,7 +32,7 @@ func TestBackgroundText(t *testing.T) {
 			t.Errorf("Background(%d) has a token", v)
 		}
 	}
-	if Background(-1).String() != "-1" {
+	if Background(-1).String() != "Background(-1)" {
 		t.Errorf("Background(-1) = %q", Background(-1).String())
 	}
 	fs := flag.NewFlagSet("x", flag.ContinueOnError)

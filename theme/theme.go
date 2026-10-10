@@ -36,6 +36,9 @@ import (
 	"github.com/maccavelli/go-tui-lib/internal/enum"
 )
 
+// pkgName is the package's name, as its enums' errors give it.
+const pkgName = "theme"
+
 // Background is what the terminal's background is known to be.
 type Background int
 
@@ -48,15 +51,18 @@ const (
 	Light
 )
 
-var backgroundNames = []string{"unknown", "dark", "light"}
+var backgroundNames = enum.Names[Background]{
+	Pkg: pkgName, Type: "Background",
+	Tokens: []string{"unknown", "dark", "light"},
+}
 
 // String is the background's token: "unknown", "dark" or "light".
-func (b Background) String() string { return enum.Name(backgroundNames, b) }
+func (b Background) String() string { return backgroundNames.String(b) }
 
 // MarshalText is the background's token. A background with no token is an
 // error.
 func (b Background) MarshalText() ([]byte, error) {
-	return enum.Marshal("theme", "Background", backgroundNames, b)
+	return backgroundNames.Marshal(b)
 }
 
 // UnmarshalText reads a token MarshalText wrote, exactly, case included,
@@ -67,7 +73,7 @@ func (b *Background) UnmarshalText(t []byte) error {
 		*b = Unknown
 		return nil
 	}
-	return enum.Unmarshal("theme", "Background", backgroundNames, t, b)
+	return backgroundNames.Unmarshal(t, b)
 }
 
 // FromDark is the background a terminal reports as dark or light, as
@@ -217,21 +223,24 @@ const (
 	BorderDouble
 )
 
-var borderNames = []string{"light", "rounded", "heavy", "double"}
+var borderNames = enum.Names[BorderStyle]{
+	Pkg: pkgName, Type: "BorderStyle",
+	Tokens: []string{"light", "rounded", "heavy", "double"},
+}
 
 // String is the border style's token: "light", "rounded", "heavy" or
 // "double".
-func (s BorderStyle) String() string { return enum.Name(borderNames, s) }
+func (s BorderStyle) String() string { return borderNames.String(s) }
 
 // MarshalText is the border style's token. A style with no token is an
 // error.
 func (s BorderStyle) MarshalText() ([]byte, error) {
-	return enum.Marshal("theme", "BorderStyle", borderNames, s)
+	return borderNames.Marshal(s)
 }
 
 // UnmarshalText reads a token MarshalText wrote, exactly, case included.
 func (s *BorderStyle) UnmarshalText(t []byte) error {
-	return enum.Unmarshal("theme", "BorderStyle", borderNames, t, s)
+	return borderNames.Unmarshal(t, s)
 }
 
 // Theme is everything a package needs to render: the profile and background

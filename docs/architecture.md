@@ -26,21 +26,22 @@ below).
 ```text
  launch        start the TUI from a CLI   → command, glyph, termcap, internal/enum, internal/limits; bubbletea, colorprofile, x/term
  launch/launchtest  fake streams for tests → launch, termcap (tests)
- workspace     Bubble Tea pane host       → layout, theme, glyph, internal/cells, internal/limits, internal/sanitize, command, when; bubbletea, bubbles/key, bubbles/help, colorprofile, x/ansi
- command       the command registry       → when, internal/enum, internal/sanitize; bubbletea
- when          availability expressions   → standard library
+ workspace     Bubble Tea pane host       → layout, theme, glyph, internal/cells, internal/enum, internal/limits, internal/sanitize, command, when; bubbletea, bubbles/key, bubbles/help, colorprofile, x/ansi
+ command       the command registry       → when, internal/enum, internal/sanitize, internal/teamsg; bubbletea
+ when          availability expressions   → internal/enum
  internal/cells  the reused frame buffer  → layout; ultraviolet, x/ansi
- termsvc       terminal services          → termcap, internal/sanitize; bubbletea, x/ansi
- termcap       capabilities, the probe    → internal/termevent, internal/enum, internal/sanitize; bubbletea, x/ansi, colorprofile
+ termsvc       terminal services          → termcap, internal/enum, internal/sanitize, internal/teamsg; bubbletea, x/ansi
+ termcap       capabilities, the probe    → internal/termevent, internal/enum, internal/sanitize, internal/teamsg; bubbletea, x/ansi, colorprofile
  termcap/termcaptest  fake terminals      → termcap; bubbletea, x/ansi, colorprofile (tests)
  internal/termevent   pass-through events → ultraviolet
  internal/termevent/termeventtest  those events for tests → ultraviolet, bubbletea
  theme         palettes, roles, styles    → glyph, internal/enum; lipgloss, colorprofile
  glyph         Unicode and ASCII glyphs   → internal/enum
  internal/enum  enum names and text forms → standard library
+ internal/teamsg  the one-message command → bubbletea
  internal/sanitize  untrusted display text → x/ansi
  internal/limits  the window clamp        → standard library
- layout        geometry and state         → standard library
+ layout        geometry and state         → internal/enum
  tuitest       golden rendering           → glyph; x/ansi, colorprofile (tests and examples only)
 ```
 
@@ -51,7 +52,8 @@ below).
 | `glyph` | `Set` (4 border styles, separators with a cross and four tees, focus marker, ellipsis, scroll, bullet, badge brackets), `Unicode()`, `ASCII()`, `For(utf8)`; `Tier` (`TierUnicode`, `TierLegacy`, `TierASCII`) and `Tier.Set`; every glyph one cell |
 | `launch` | `Choice` and `Flags` (`--mode`, `--tui`, bound natively in each framework); `Streams`, `StreamSource`, `FromSource`; `Config`, `Decide` → `Decision` with `Target`s and a `Reason` token; `Run[M]` with `WithRegistry`, `WithRestorer`, `OnStart`, `WithProgramOptions`, `WithFilter`; `ErrNotStarted`, `ErrCrashed`; `Frame`; `ExitCode`, `ExitError`; `Restorer` |
 | `launch/launchtest` | `Terminal` (a fake terminal stream with a size and typed keys), `Pipe`, `Streams`, `Env` |
-| `internal/enum` | `Name`, `Marshal` and `Unmarshal` over a table of names, for an enum's `String`, `MarshalText` and `UnmarshalText`, on `uint8` or `int` |
+| `internal/enum` | `Names`, an enum's tokens, and `Bits`, a bit set's, for an enum's `String`, `MarshalText` and `UnmarshalText`, on `uint8` or `int`; `Name`, `Marshal` and `Unmarshal` over a bare table |
+| `internal/teamsg` | `Cmd`, the `tea.Cmd` that delivers one message |
 | `theme` | `Palette` for dark, light and unknown backgrounds; `LightDarkColor` and `ProfileColor`; `Styles`; `New(profile, background, glyphs)` with `WithPalette` and `WithPaletteFor`; `FromDark`; `Border(style)`; text forms for `Background` and `BorderStyle` |
 | `layout` | `Rect`, `Size` (fixed, percent, ratio, fill; min, max, shrink order), `Node` (`Pane`, `Split`, `Responsive`, or a custom node), `Solve` → `Plan`; `State` (JSON); the sidebar presets |
 | `workspace` | `Pane` and its optional interfaces, `PlainViewer` among them; `Workspace` (routing, focus, chrome, resize, zoom, hide, overlays, cursor, `View`, `RenderPlain`, `help.KeyMap` and `Help`, the width method, a following theme with `WithGlyphs`, `WithProfile`, `WithBackground` and `GlyphThemeBuilder`, `WithSize`, clamped to `MaxSide` and `MaxCells`, `SetBackground`, `Panes`, `PaneAs`, `WhenContext`); `Wrap`; `KeyMap`; `Commands` and the context keys, `FocusedPaneKey()` to `HeightKey()` |
@@ -177,13 +179,15 @@ termcap/termcaptest/        fake terminals for tests
 launch/                     start the TUI from a program's own CLI
 launch/launchtest/          fake streams for a program's tests
 internal/enum/              enum names and text forms
+internal/teamsg/            the one-message command
 internal/sanitize/          the one sanitizer for untrusted display text
 internal/limits/            the window clamp
 internal/cells/             the reused frame buffer, an ultraviolet importer
 internal/termevent/         pass-through events, the other ultraviolet importer
 internal/conformance/       the conformance scan: terminal ownership,
                             environment, exit and spawn, type names,
-                            stability lines (tests only)
+                            stability lines, opaque options, enum text
+                            (tests only)
 tuitest/internal/clash/     proves tuitest's -update flag does not clash (tests only)
 testdata/frameworks/        the framework examples: programs on flag, Cobra,
                             Kong and urfave/cli, built in a module of their

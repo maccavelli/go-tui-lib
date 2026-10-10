@@ -49,19 +49,22 @@ const (
 	TargetTTY
 )
 
-var targetNames = []string{"none", "stream", "err", "tty"}
+var targetNames = enum.Names[Target]{
+	Pkg: pkgName, Type: "Target",
+	Tokens: []string{"none", "stream", "err", "tty"},
+}
 
 // String is the target's token: "none", "stream", "err" or "tty".
-func (t Target) String() string { return enum.Name(targetNames, t) }
+func (t Target) String() string { return targetNames.String(t) }
 
 // MarshalText is the target's token. A target with no token is an error.
 func (t Target) MarshalText() ([]byte, error) {
-	return enum.Marshal("launch", "Target", targetNames, t)
+	return targetNames.Marshal(t)
 }
 
 // UnmarshalText reads a token MarshalText wrote, exactly, case included.
 func (t *Target) UnmarshalText(b []byte) error {
-	return enum.Unmarshal("launch", "Target", targetNames, b, t)
+	return targetNames.Unmarshal(b, t)
 }
 
 // Reason is why a decision fell as it did, as a stable token in termcap's

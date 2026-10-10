@@ -10,6 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/maccavelli/go-tui-lib/internal/teamsg"
 	"github.com/maccavelli/go-tui-lib/when"
 )
 
@@ -24,7 +25,7 @@ func (r *Registry) Dispatch(ctx context.Context, req Request) tea.Cmd {
 	e, inv, d, err := r.admit(ctx, req)
 	if err != nil {
 		r.audit(req, e, d, outcome{started: time.Now()}, err)
-		return msgCmd(ResultMsg{Request: req, Err: err})
+		return teamsg.Cmd(ResultMsg{Request: req, Err: err})
 	}
 	if inv.Command.Mode == Async {
 		return func() tea.Msg {
@@ -244,14 +245,12 @@ func forwardText(inv *Invocation) string {
 // effects is what a run sends to the program: its Result.Cmd, a
 // ResultMsg, and for a Prompt or Forward that succeeded a PromptMsg.
 func effects(req Request, inv *Invocation, o outcome) []tea.Cmd {
-	cmds := []tea.Cmd{o.res.Cmd, msgCmd(ResultMsg{Request: req, Result: o.res, Err: o.err, Duration: o.dur})}
+	cmds := []tea.Cmd{o.res.Cmd, teamsg.Cmd(ResultMsg{Request: req, Result: o.res, Err: o.err, Duration: o.dur})}
 	if o.err == nil && inv.Command.Kind != Action {
-		cmds = append(cmds, msgCmd(PromptMsg{Text: o.res.Text, Command: inv.Command, Request: req}))
+		cmds = append(cmds, teamsg.Cmd(PromptMsg{Text: o.res.Text, Command: inv.Command, Request: req}))
 	}
 	return cmds
 }
-
-func msgCmd(m tea.Msg) tea.Cmd { return func() tea.Msg { return m } }
 
 // audit records a request when there is an auditor, with the values its
 // command's schema marks secret masked. e is nil for an unknown command.

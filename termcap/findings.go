@@ -1,6 +1,10 @@
 package termcap
 
-import "reflect"
+import (
+	"reflect"
+
+	"github.com/maccavelli/go-tui-lib/internal/enum"
+)
 
 // Disposition is how a finding should be read.
 type Disposition uint8
@@ -12,19 +16,22 @@ const (
 	Issue
 )
 
-var dispositionNames = []string{"recommendation", "issue"}
+var dispositionNames = enum.Names[Disposition]{
+	Pkg: pkgName, Type: "Disposition",
+	Tokens: []string{"recommendation", "issue"},
+}
 
 // String is the disposition's name, as the report and JSON print it.
-func (d Disposition) String() string { return name(dispositionNames, d) }
+func (d Disposition) String() string { return dispositionNames.String(d) }
 
 // MarshalText is the disposition's name.
 func (d Disposition) MarshalText() ([]byte, error) {
-	return marshal(dispositionNames, "Disposition", d)
+	return dispositionNames.Marshal(d)
 }
 
 // UnmarshalText reads a name MarshalText wrote.
 func (d *Disposition) UnmarshalText(t []byte) error {
-	return unmarshal(dispositionNames, "Disposition", t, d)
+	return dispositionNames.Unmarshal(t, d)
 }
 
 // Finding is one thing the doctor tells the user: a reason token, what it

@@ -147,8 +147,11 @@ needs an exception says so.
    satisfy (0014-PLAN-canonicalization Step 5). An option type that is a
    function over an unexported struct is opaque already.
 5. **Enums.** An exported enum has `String`, `MarshalText` and
-   `UnmarshalText`, with stable lowercase tokens. 0014's W4 moves them
-   onto one `internal/enum` helper.
+   `UnmarshalText`, with stable lowercase tokens, from one table in
+   `internal/enum`: `Names`, or `Bits` for a bit set
+   (0014-PLAN-canonicalization Step 6). A value with no token prints
+   `Type(N)`. `internal/conformance` fails on an enum whose tokens do not
+   round-trip.
 6. **Errors.** Sentinels are `Err…` values. A typed error has `Unwrap` when
    it wraps another. An error that ends a CLI has `ExitCode() int`.
 7. **Hooks.** A hook is an interface, with a `…Func` adapter.

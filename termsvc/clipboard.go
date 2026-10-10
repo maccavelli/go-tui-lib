@@ -8,6 +8,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/maccavelli/go-tui-lib/internal/enum"
+	"github.com/maccavelli/go-tui-lib/internal/teamsg"
 	"github.com/maccavelli/go-tui-lib/termcap"
 )
 
@@ -31,6 +33,20 @@ const (
 	Failed
 )
 
+var statusNames = enum.Names[Status]{
+	Pkg: pkgName, Type: "Status",
+	Tokens: []string{"unconfirmed", "confirmed", "failed"},
+}
+
+// String is the status's token.
+func (s Status) String() string { return statusNames.String(s) }
+
+// MarshalText is the status's token. A status with no token is an error.
+func (s Status) MarshalText() ([]byte, error) { return statusNames.Marshal(s) }
+
+// UnmarshalText reads a token MarshalText wrote, exactly, case included.
+func (s *Status) UnmarshalText(b []byte) error { return statusNames.Unmarshal(b, s) }
+
 // Route is a way to the clipboard.
 type Route uint8
 
@@ -48,6 +64,20 @@ const (
 	// passthrough, for a tmux whose set-clipboard is off.
 	RouteOSC52Tmux
 )
+
+var routeNames = enum.Names[Route]{
+	Pkg: pkgName, Type: "Route",
+	Tokens: []string{"none", "backend", "tmux-buffer", "osc52", "osc52-tmux"},
+}
+
+// String is the route's token.
+func (r Route) String() string { return routeNames.String(r) }
+
+// MarshalText is the route's token. A route with no token is an error.
+func (r Route) MarshalText() ([]byte, error) { return routeNames.Marshal(r) }
+
+// UnmarshalText reads a token MarshalText wrote, exactly, case included.
+func (r *Route) UnmarshalText(b []byte) error { return routeNames.Unmarshal(b, r) }
 
 // CopiedMsg reports a copy.
 type CopiedMsg struct {
@@ -97,7 +127,7 @@ func CopyContext(ctx context.Context, c termcap.Caps, text string, o ...CopyOpti
 		f(&cfg)
 	}
 	if len(text) > MaxCopyBytes {
-		return copied(CopiedMsg{Status: Failed})
+		return teamsg.Cmd(CopiedMsg{Status: Failed})
 	}
 	if b := cfg.clipboard; b != nil {
 		d := cfg.timeout
@@ -113,12 +143,10 @@ func CopyContext(ctx context.Context, c termcap.Caps, text string, o ...CopyOpti
 	if c.Mux.Value == termcap.Tmux {
 		return tea.Sequence(
 			tea.Batch(tea.SetClipboard(text), tea.Raw(Wrap(c, ansi.SetSystemClipboard(text)))),
-			copied(CopiedMsg{Status: Unconfirmed, Route: RouteOSC52Tmux}))
+			teamsg.Cmd(CopiedMsg{Status: Unconfirmed, Route: RouteOSC52Tmux}))
 	}
-	return tea.Sequence(tea.SetClipboard(text), copied(CopiedMsg{Status: Unconfirmed, Route: RouteOSC52}))
+	return tea.Sequence(tea.SetClipboard(text), teamsg.Cmd(CopiedMsg{Status: Unconfirmed, Route: RouteOSC52}))
 }
-
-func copied(m CopiedMsg) tea.Cmd { return func() tea.Msg { return m } }
 
 // CopySequence is the bytes Copy has written for text without a clipboard:
 // OSC 52, and inside tmux the same again wrapped for passthrough, with its

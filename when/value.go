@@ -4,7 +4,12 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/maccavelli/go-tui-lib/internal/enum"
 )
+
+// pkgName is the package's name, as its enums' errors give it.
+const pkgName = "when"
 
 // Kind is what a Value holds.
 type Kind uint8
@@ -17,20 +22,19 @@ const (
 	KindList
 )
 
-// kindName names a kind in Check's errors.
-func kindName(k Kind) string {
-	switch k {
-	case KindBool:
-		return "boolean"
-	case KindNumber:
-		return "number"
-	case KindString:
-		return "string"
-	case KindList:
-		return "list"
-	}
-	return "nothing"
+var kindNames = enum.Names[Kind]{
+	Pkg: pkgName, Type: "Kind",
+	Tokens: []string{"nothing", "boolean", "number", "string", "list"},
 }
+
+// String is the kind's token, as Check's errors name it.
+func (k Kind) String() string { return kindNames.String(k) }
+
+// MarshalText is the kind's token. A kind with no token is an error.
+func (k Kind) MarshalText() ([]byte, error) { return kindNames.Marshal(k) }
+
+// UnmarshalText reads a token MarshalText wrote, exactly, case included.
+func (k *Kind) UnmarshalText(b []byte) error { return kindNames.Unmarshal(b, k) }
 
 // Value is a context key's value: a boolean, a number, a string or a list
 // of strings. Build one with BoolValue, NumberValue, StringValue or

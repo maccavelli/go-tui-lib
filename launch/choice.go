@@ -2,6 +2,9 @@ package launch
 
 import "github.com/maccavelli/go-tui-lib/internal/enum"
 
+// pkgName is the package's name, as its enums' errors give it.
+const pkgName = "launch"
+
 // Choice is the program's request, bound to its own flag: auto, tui or
 // plain. Its methods make it a flag value in each framework
 // docs/reports/0014-REPORT-api-assessment-and-integration-research.md §3.2
@@ -28,10 +31,13 @@ const (
 	ChoicePlain
 )
 
-var choiceNames = []string{"auto", "tui", "plain"}
+var choiceNames = enum.Names[Choice]{
+	Pkg: pkgName, Type: "Choice",
+	Tokens: []string{"auto", "tui", "plain"},
+}
 
 // String is the choice's token.
-func (c Choice) String() string { return enum.Name(choiceNames, c) }
+func (c Choice) String() string { return choiceNames.String(c) }
 
 // Set reads a token, for a flag.Value.
 func (c *Choice) Set(s string) error { return c.UnmarshalText([]byte(s)) }
@@ -44,12 +50,12 @@ func (c Choice) Get() any { return c }
 
 // MarshalText is the choice's token. A choice with no token is an error.
 func (c Choice) MarshalText() ([]byte, error) {
-	return enum.Marshal("launch", "Choice", choiceNames, c)
+	return choiceNames.Marshal(c)
 }
 
 // UnmarshalText reads a token MarshalText wrote, exactly, case included.
 func (c *Choice) UnmarshalText(b []byte) error {
-	return enum.Unmarshal("launch", "Choice", choiceNames, b, c)
+	return choiceNames.Unmarshal(b, c)
 }
 
 // MarshalFlag is the choice's token, for go-flags.

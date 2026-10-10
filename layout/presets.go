@@ -1,5 +1,7 @@
 package layout
 
+import "github.com/maccavelli/go-tui-lib/internal/enum"
+
 // Span is where a preset's bottom pane runs.
 type Span uint8
 
@@ -10,6 +12,20 @@ const (
 	// keeps the full height.
 	UnderMain
 )
+
+var spanNames = enum.Names[Span]{
+	Pkg: pkgName, Type: "Span",
+	Tokens: []string{"full-width", "under-main"},
+}
+
+// String is the span's token.
+func (s Span) String() string { return spanNames.String(s) }
+
+// MarshalText is the span's token. A span with no token is an error.
+func (s Span) MarshalText() ([]byte, error) { return spanNames.Marshal(s) }
+
+// UnmarshalText reads a token MarshalText wrote, exactly, case included.
+func (s *Span) UnmarshalText(b []byte) error { return spanNames.Unmarshal(b, s) }
 
 // The names of the presets' splits, and so of their separators in
 // State.Resize: "sidebar:0" is the boundary between the main pane and the
