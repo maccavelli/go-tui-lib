@@ -147,7 +147,7 @@ func (r *Registry) CancelAll() { r.running.cancelAll() }
 // set, the command is offered on the origin's surface, its When holds, its
 // arguments fit its schema (and gain its defaults), and the policy allows
 // it. The entry is nil when no command has the ID.
-func (r *Registry) admit(ctx context.Context, req Request) (*entry, *Invocation, Decision, error) {
+func (r *Registry) admit(ctx context.Context, req Request) (*entry, *Invocation, Verdict, error) {
 	s := r.snap.Load()
 	i, ok := s.byID[req.ID]
 	if !ok {
@@ -158,13 +158,16 @@ func (r *Registry) admit(ctx context.Context, req Request) (*entry, *Invocation,
 	if err := r.tooLarge(max(len(req.Args), len(req.Raw))); err != nil {
 		return e, nil, 0, err
 	}
-	c := req.Context
+	c := req.WhenContext
+	if c == nil {
+		c = req.Context // the deprecated field, through v0.9.x
+	}
 	if c == nil {
 		c = when.Map(nil)
 	}
 	inv := &Invocation{
 		Command: e.cmd, Args: req.Args, Raw: req.Raw,
-		Origin: req.Origin, Caller: req.Caller, Context: c,
+		Origin: req.Origin, Caller: req.Caller, WhenContext: c, Context: c,
 	}
 	if req.Origin == 0 || req.Origin > OriginProgram {
 		return e, nil, 0, fmt.Errorf("%w: %s: the request's origin is %s", ErrRefused, req.ID, req.Origin)
@@ -252,7 +255,7 @@ func msgCmd(m tea.Msg) tea.Cmd { return func() tea.Msg { return m } }
 
 // audit records a request when there is an auditor, with the values its
 // command's schema marks secret masked. e is nil for an unknown command.
-func (r *Registry) audit(req Request, e *entry, d Decision, o outcome, err error) {
+func (r *Registry) audit(req Request, e *entry, d Verdict, o outcome, err error) {
 	if r.auditor == nil {
 		return
 	}
@@ -265,7 +268,7 @@ func (r *Registry) audit(req Request, e *entry, d Decision, o outcome, err error
 	}
 	r.auditor.Audit(Record{
 		ID: req.ID, Origin: req.Origin, Caller: req.Caller, Args: args,
-		Decision: d, Started: o.started, Duration: o.dur, Err: err,
+		Verdict: d, Decision: d, Started: o.started, Duration: o.dur, Err: err,
 	})
 }
 

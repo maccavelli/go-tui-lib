@@ -127,7 +127,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     case tea.KeyPressMsg:
         if msg.String() == "f2" {
             return m, m.r.Dispatch(context.Background(), command.Request{
-                ID: "workspace.zoom", Origin: command.OriginKey, Context: m.ws.WhenContext(),
+                ID: "workspace.zoom", Origin: command.OriginKey, WhenContext: m.ws.WhenContext(),
             })
         }
     }

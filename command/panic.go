@@ -41,7 +41,7 @@ func runHandler(ctx context.Context, c *Command, inv *Invocation) (res Result, e
 }
 
 // askGate asks g about inv, and returns its panic as a *PanicError.
-func askGate(ctx context.Context, g Gate, inv *Invocation) (d Decision, err error) {
+func askGate(ctx context.Context, g Gate, inv *Invocation) (d Verdict, err error) {
 	defer func() {
 		if p := recover(); p != nil {
 			d, err = RejectOnce, &PanicError{ID: inv.Command.ID, Value: p, Stack: debug.Stack(), gate: true}

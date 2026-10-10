@@ -165,7 +165,7 @@ func TestAuditMasksSecrets(t *testing.T) {
 	for _, req := range []Request{
 		{Args: []byte(full), Origin: OriginKey},                                       // runs
 		{Args: []byte(full), Origin: OriginAgent},                                     // refused
-		{Args: []byte(full), Origin: OriginKey, Context: mapOf("off")},                // unavailable
+		{Args: []byte(full), Origin: OriginKey, WhenContext: mapOf("off")},            // unavailable
 		{Args: []byte(`{"user":"me","token":"s3cret","bogus":1}`), Origin: OriginKey}, // bad arguments
 		{Args: []byte(`{"token":"s3cret"`), Origin: OriginKey},                        // not JSON
 	} {

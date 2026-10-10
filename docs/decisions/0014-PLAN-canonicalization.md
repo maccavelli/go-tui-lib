@@ -481,3 +481,87 @@ each record's index row says "A<n> recorded".
   next amended, before they run.
 * **`docs/README.md`:** each record's row says its amendment is recorded,
   and this PLAN's row says `in-progress`.
+
+### Step 3: `command`'s renames
+
+#### Deviations
+
+No deviation.
+
+#### What was built
+
+* **`command/gate.go`:**
+  * `type Verdict uint8` holds `AllowOnce`, `AllowAlways`, `RejectOnce`
+    and `RejectAlways`, now typed `Verdict`, and `ACPKind`;
+  * `type Decision = Verdict`, marked `// Deprecated: use Verdict
+    (0014-MADR W4).`;
+  * `Gate.Decide` and `GateFunc` return `Verdict`; the alias keeps a gate
+    written against `Decision` satisfying `Gate`;
+  * the unexported `verdict` function is `settle`.
+* **`command/audit.go`:** `Record.Verdict` is added, and
+  `Record.Decision`, now of type `Verdict`, is deprecated. The registry
+  sets both. The slog key stays `"decision"`; `SlogAuditor` reads
+  `Verdict`, else `Decision`, so a `Record` a program builds with the old
+  field alone still logs its answer.
+* **`command/handler.go`:** `Request.WhenContext` and
+  `Invocation.WhenContext` are added beside the deprecated `Context`
+  fields.
+* **`command/dispatch.go`:** `admit` reads `WhenContext`, else the
+  deprecated `Context`, and builds the `Invocation` with both set to the
+  same value.
+* **`command/builtin.go`:** the list command reads `WhenContext`.
+* **Uses:** `command`'s and `workspace`'s tests, and the commands guide's
+  example, move to the new names. `docs/architecture.md` moves in
+  Step 8, with the other documents.
+* **`command/rename_test.go` (new),** in package `command`, so that
+  staticcheck does not report the deprecated names it uses on purpose:
+  * `TestOldDecisionStillWorks`: a `Gate` whose `Decide` returns
+    `Decision`, for each of the four answers; a `GateFunc` literal
+    returning `Decision`; and a function from `Decision` to `Verdict` that
+    compiles only while they are one type;
+  * `TestWhenContextFallsBack`: `Context` alone, `WhenContext` alone, both
+    (`WhenContext` wins, even empty), and neither; the handler sees both
+    fields, set;
+  * `TestRecordCarriesBoth`: a granted request's record has `AllowAlways`
+    in both fields, an unknown command's neither, and `SlogAuditor`
+    writes `decision=reject_once` for a `Record` with either field.
+
+#### Checks
+
+* **Mutations,** on scratch copies of the tree; every one was killed by a
+  failing test, none by a build failure:
+  * **S3-1** (the PLAN's: `admit` ignores the old field): "Context
+    alone, the old field: ran false … want ran true";
+  * **S3-2** (`admit` reads the old field first, added): "both:
+    WhenContext wins: ran false";
+  * **S3-3** (the `Invocation` leaves the old field unset, added): "the
+    Invocation's WhenContext map[on:true] and Context <nil>";
+  * **S3-4** (the audit sets `Verdict` only, added): "Verdict 2,
+    Decision 0";
+  * **S3-5** (`SlogAuditor` ignores the old field, added): the log line
+    for a `Record` with `Decision` alone holds no `reject_once`.
+* **`apidiff`:** `make apicheck`, "against v0.8.0, 0 incompatible
+  change(s)", so `scripts/apicheck.allow` gains nothing: `Decision`
+  turning into an alias of `Verdict` is compatible, as this PLAN's probe
+  found.
+* **Rule 2 on macOS,** go1.27.2:
+  * `make pre-add-check FILES=<the 15 Go files>`: "15 file(s) clean".
+  * `make lint`: clean. On the first run, staticcheck's ST1023 and
+    unconvert refused a typed `var` and a conversion in
+    `TestOldDecisionStillWorks`; the function from `Decision` to
+    `Verdict` replaced them.
+  * The cross `go vet` for `freebsd/amd64`, `openbsd/amd64` and
+    `linux/386`; `-race`, `-shuffle=on -count=2`, `LC_ALL=C` and workspace
+    mode; `go mod tidy -diff`, `make vuln`, `make examples`,
+    `scripts/go-modules.sh --check` and `make release-check`: clean.
+  * CI's other checks: `shellcheck`, `markdownlint-cli2`, `actionlint`
+    and `go-precheck_test.sh` ("12 passed"): clean.
+* **The Windows test host,** go1.27.2 windows/amd64:
+  * a first run, started before the lint fix, was stopped, and its files
+    were removed from the host;
+  * on the final tree: `make pre-add-check`, `make lint`, `make vuln` and
+    `make examples`, each exit 0; `go test -count=2 -shuffle=on ./...`,
+    exit 0; the step's tests, with `command`'s gate, audit and exit-code
+    tests (the same pattern selects those seven on macOS, the three new among
+    them), 7 passed, 0 failed; `go-fuzz_test.sh`, "25 passed, 0 failed"; `make fuzz
+    FUZZTIME=3s`, "8 packages ran clean".

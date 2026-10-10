@@ -57,7 +57,7 @@ func rig(t *testing.T, o ...workspace.CommandOption) (*workspace.Workspace, *com
 // into ws. It returns the ResultMsg's error.
 func dispatch(t *testing.T, ws *workspace.Workspace, r *command.Registry, id command.ID, args string) error {
 	t.Helper()
-	cmd := r.Dispatch(context.Background(), command.Request{ID: id, Args: []byte(args), Origin: command.OriginKey, Context: ws.WhenContext()})
+	cmd := r.Dispatch(context.Background(), command.Request{ID: id, Args: []byte(args), Origin: command.OriginKey, WhenContext: ws.WhenContext()})
 	var err error
 	var effects []tea.Cmd
 	for _, m := range flatten(cmd) {

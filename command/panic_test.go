@@ -74,7 +74,7 @@ func TestHandlerPanicIsAnError(t *testing.T) {
 
 func TestGatePanicRefuses(t *testing.T) {
 	ran := false
-	r := registryOf(t, []RegistryOption{WithGate(&gateFunc{next: func(*Invocation) (Decision, error) {
+	r := registryOf(t, []RegistryOption{WithGate(&gateFunc{next: func(*Invocation) (Verdict, error) {
 		panic(secret)
 	}})}, cmd("p", Destructive, func(c *Command) {
 		c.Handler = HandlerFunc(func(context.Context, *Invocation) (Result, error) {

@@ -6,22 +6,27 @@ import (
 	"sync"
 )
 
-// Decision is a gate's answer, with ACP's four permission option kinds.
-// Its zero value is "no decision", which refuses.
-type Decision uint8
+// Verdict is a gate's answer, with ACP's four permission option kinds.
+// Its zero value is "no verdict", which refuses.
+type Verdict uint8
 
-// The decisions.
+// Decision is the old name of Verdict, kept through v0.9.x.
+//
+// Deprecated: use Verdict (0014-MADR W4).
+type Decision = Verdict
+
+// The verdicts.
 const (
-	AllowOnce    Decision = iota + 1 // run this time
-	AllowAlways                      // run, and do not ask again for this command and caller
-	RejectOnce                       // refuse this time
-	RejectAlways                     // refuse, and do not ask again for this command and caller
+	AllowOnce    Verdict = iota + 1 // run this time
+	AllowAlways                     // run, and do not ask again for this command and caller
+	RejectOnce                      // refuse this time
+	RejectAlways                    // refuse, and do not ask again for this command and caller
 )
 
-// ACPKind is d as ACP's PermissionOptionKind: "allow_once", "allow_always",
-// "reject_once" or "reject_always"; "" for no decision.
-func (d Decision) ACPKind() string {
-	switch d {
+// ACPKind is v as ACP's PermissionOptionKind: "allow_once", "allow_always",
+// "reject_once" or "reject_always"; "" for no verdict.
+func (v Verdict) ACPKind() string {
+	switch v {
 	case AllowOnce:
 		return "allow_once"
 	case AllowAlways:
@@ -34,7 +39,7 @@ func (d Decision) ACPKind() string {
 	return ""
 }
 
-func (d Decision) allows() bool { return d == AllowOnce || d == AllowAlways }
+func (v Verdict) allows() bool { return v == AllowOnce || v == AllowAlways }
 
 // Gate is asked before a command runs when the policy says to ask:
 // typically a permission dialog. Dispatch asks it on the goroutine that
@@ -42,14 +47,14 @@ func (d Decision) allows() bool { return d == AllowOnce || d == AllowAlways }
 // reached through Run, from the agent's goroutine. A gate's panic refuses
 // the request, with an error that wraps ErrRefused and a *PanicError.
 type Gate interface {
-	Decide(ctx context.Context, inv *Invocation) (Decision, error)
+	Decide(ctx context.Context, inv *Invocation) (Verdict, error)
 }
 
 // GateFunc is a function used as a Gate.
-type GateFunc func(ctx context.Context, inv *Invocation) (Decision, error)
+type GateFunc func(ctx context.Context, inv *Invocation) (Verdict, error)
 
 // Decide calls f.
-func (f GateFunc) Decide(ctx context.Context, inv *Invocation) (Decision, error) {
+func (f GateFunc) Decide(ctx context.Context, inv *Invocation) (Verdict, error) {
 	return f(ctx, inv)
 }
 
@@ -57,7 +62,7 @@ func (f GateFunc) Decide(ctx context.Context, inv *Invocation) (Decision, error)
 // otherwise: a program's own command line passes its --yes flag, as
 // Request.Gate.
 func AllowIf(ok bool) Gate {
-	return GateFunc(func(context.Context, *Invocation) (Decision, error) {
+	return GateFunc(func(context.Context, *Invocation) (Verdict, error) {
 		if ok {
 			return AllowOnce, nil
 		}
@@ -88,27 +93,27 @@ type alwaysKey struct {
 type policy struct {
 	gate   Gate
 	mu     sync.Mutex
-	always map[alwaysKey]Decision
+	always map[alwaysKey]Verdict
 }
 
 // decide is the policy's answer for inv: AllowOnce when it does not ask;
 // else the request's own gate's, when it has one; else a remembered
 // answer, or the registry's gate's. A refusal is an error wrapping
 // ErrRefused; a gate's panic is a refusal that also wraps a *PanicError.
-func (p *policy) decide(ctx context.Context, inv *Invocation, own Gate) (Decision, error) {
+func (p *policy) decide(ctx context.Context, inv *Invocation, own Gate) (Verdict, error) {
 	if !asks(inv.Command.Danger, inv.Origin) {
 		return AllowOnce, nil
 	}
 	if own != nil {
 		d, err := askGate(ctx, own, inv)
-		return verdict(inv, d, err)
+		return settle(inv, d, err)
 	}
 	key := alwaysKey{inv.Command.ID, inv.Caller}
 	p.mu.Lock()
 	d, ok := p.always[key]
 	p.mu.Unlock()
 	if ok {
-		return verdict(inv, d, nil)
+		return settle(inv, d, nil)
 	}
 	if p.gate == nil {
 		return RejectOnce, fmt.Errorf("%w: %s %s from %s needs a gate, and there is none",
@@ -120,12 +125,12 @@ func (p *policy) decide(ctx context.Context, inv *Invocation, own Gate) (Decisio
 		p.always[key] = d
 		p.mu.Unlock()
 	}
-	return verdict(inv, d, err)
+	return settle(inv, d, err)
 }
 
-// verdict is a gate's answer, or its error, as the policy's: anything but
+// settle is a gate's answer, or its error, as the policy's: anything but
 // AllowOnce or AllowAlways refuses.
-func verdict(inv *Invocation, d Decision, err error) (Decision, error) {
+func settle(inv *Invocation, d Verdict, err error) (Verdict, error) {
 	if err != nil {
 		return RejectOnce, fmt.Errorf("%w: %s: the gate failed: %w", ErrRefused, inv.Command.ID, err)
 	}

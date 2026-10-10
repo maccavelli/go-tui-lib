@@ -94,7 +94,7 @@ func TestAllowIf(t *testing.T) {
 func TestGateFunc(t *testing.T) {
 	var saw *Invocation
 	fail := errors.New("no")
-	g := GateFunc(func(_ context.Context, inv *Invocation) (Decision, error) {
+	g := GateFunc(func(_ context.Context, inv *Invocation) (Verdict, error) {
 		saw = inv
 		return AllowAlways, fail
 	})

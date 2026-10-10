@@ -25,7 +25,7 @@ func (r *Registry) builtins() []Command {
 	list := MustNew(idList, "List commands", func(_ context.Context, inv *Invocation, _ NoArgs) (Result, error) {
 		var infos []ManifestCommand
 		var text strings.Builder
-		for c := range r.Available(inv.Context, inv.Origin.surface()) {
+		for c := range r.Available(inv.WhenContext, inv.Origin.surface()) {
 			infos = append(infos, manifestCommandOf(&c))
 			text.WriteString(string(c.ID) + "  " + c.Title + "\n")
 		}

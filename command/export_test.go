@@ -212,7 +212,7 @@ func TestCallMCPErrors(t *testing.T) {
 func TestCallMCPIsAgent(t *testing.T) {
 	var seen []Origin
 	var callers []string
-	g := &gateFunc{next: func(inv *Invocation) (Decision, error) {
+	g := &gateFunc{next: func(inv *Invocation) (Verdict, error) {
 		seen, callers = append(seen, inv.Origin), append(callers, inv.Caller)
 		return AllowOnce, nil
 	}}

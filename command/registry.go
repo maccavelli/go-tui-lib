@@ -150,7 +150,7 @@ func WithLoop(send func(tea.Msg)) RegistryOption {
 // commands: command.list, command.describe and app.quit.
 func NewRegistry(o ...RegistryOption) *Registry {
 	r := &Registry{maxArg: DefaultMaxArgBytes}
-	r.policy.always = map[alwaysKey]Decision{}
+	r.policy.always = map[alwaysKey]Verdict{}
 	r.running.runs = map[ID]map[uint64]context.CancelFunc{}
 	for _, f := range o {
 		f(r)

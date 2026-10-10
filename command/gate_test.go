@@ -24,16 +24,16 @@ func mapOf(keys ...string) when.Map {
 // gateFunc is a Gate that counts its calls and answers with next.
 type gateFunc struct {
 	calls int
-	next  func(inv *Invocation) (Decision, error)
+	next  func(inv *Invocation) (Verdict, error)
 }
 
-func (g *gateFunc) Decide(_ context.Context, inv *Invocation) (Decision, error) {
+func (g *gateFunc) Decide(_ context.Context, inv *Invocation) (Verdict, error) {
 	g.calls++
 	return g.next(inv)
 }
 
-func answer(d Decision, err error) *gateFunc {
-	return &gateFunc{next: func(*Invocation) (Decision, error) { return d, err }}
+func answer(d Verdict, err error) *gateFunc {
+	return &gateFunc{next: func(*Invocation) (Verdict, error) { return d, err }}
 }
 
 var (
@@ -117,8 +117,8 @@ func TestPolicy(t *testing.T) {
 }
 
 func TestAlways(t *testing.T) {
-	var queue []Decision
-	g := &gateFunc{next: func(inv *Invocation) (Decision, error) {
+	var queue []Verdict
+	g := &gateFunc{next: func(inv *Invocation) (Verdict, error) {
 		if len(queue) == 0 {
 			t.Errorf("the gate was asked about %s for %s, which it answered always", inv.Command.ID, inv.Caller)
 			return RejectOnce, nil
@@ -128,7 +128,7 @@ func TestAlways(t *testing.T) {
 		return d, nil
 	}}
 	r := dangerRegistry(t, WithGate(g))
-	run := func(id ID, caller string, d Decision) error {
+	run := func(id ID, caller string, d Verdict) error {
 		t.Helper()
 		if d != 0 {
 			queue = append(queue, d)
@@ -139,7 +139,7 @@ func TestAlways(t *testing.T) {
 	steps := []struct {
 		id      ID
 		caller  string
-		answer  Decision // queued for the gate; 0 when it must not be asked
+		answer  Verdict // queued for the gate; 0 when it must not be asked
 		calls   int
 		refused bool
 	}{
@@ -197,11 +197,11 @@ func TestRequestGate(t *testing.T) {
 }
 
 func TestDecisionACPKind(t *testing.T) {
-	for d, want := range map[Decision]string{
+	for d, want := range map[Verdict]string{
 		AllowOnce: "allow_once", AllowAlways: "allow_always", RejectOnce: "reject_once", RejectAlways: "reject_always", 0: "",
 	} {
 		if got := d.ACPKind(); got != want {
-			t.Errorf("Decision(%d).ACPKind() = %q, want %q", d, got, want)
+			t.Errorf("Verdict(%d).ACPKind() = %q, want %q", d, got, want)
 		}
 	}
 }

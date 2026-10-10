@@ -15,7 +15,7 @@ import (
 // wrapped, through launch.ExitCode and through errors.As. It is an
 // external test, since launch imports command.
 func TestExitCodes(t *testing.T) {
-	r := command.NewRegistry(command.WithGate(gate(func() (command.Decision, error) { panic("boom") })))
+	r := command.NewRegistry(command.WithGate(gate(func() (command.Verdict, error) { panic("boom") })))
 	panics, err := command.New("panics", "Panics", func(context.Context, *command.Invocation, command.NoArgs) (command.Result, error) {
 		panic("boom")
 	}, command.WithDanger(command.UI))
@@ -66,6 +66,6 @@ func TestExitCodes(t *testing.T) {
 }
 
 // gate is a function as a command.Gate.
-type gate func() (command.Decision, error)
+type gate func() (command.Verdict, error)
 
-func (g gate) Decide(context.Context, *command.Invocation) (command.Decision, error) { return g() }
+func (g gate) Decide(context.Context, *command.Invocation) (command.Verdict, error) { return g() }
