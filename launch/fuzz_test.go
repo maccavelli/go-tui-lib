@@ -1,6 +1,7 @@
 package launch
 
 import (
+	"math"
 	"strings"
 	"testing"
 
@@ -26,7 +27,7 @@ func FuzzDecideEnv(f *testing.F) {
 		{strings.Join(with("PROG_NO_TUI=1"), "\n"), 16 | 32, 100, 50},
 		{"TERM=dumb", 1 | 16, 100, 50},
 		{strings.Join(with("COLUMNS=99999999999"), "\n"), 2, 0, 0},
-		{strings.Join(base, "\n"), 1 | 16, 1 << 40, 1 << 40},
+		{strings.Join(base, "\n"), 1 | 16, math.MaxInt, math.MaxInt}, // fits either int size (D10)
 		{strings.Join(base, "\n"), 1 | 16, -5, -7},
 		{strings.Join(base, "\n"), 1 | 16 | 64, 80, 24},
 		{strings.Join(base, "\n"), 1 | 8 | 16, 80, 24},

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"math"
 	"math/rand/v2"
 	"reflect"
 	"slices"
@@ -618,28 +617,6 @@ func FuzzSolve(f *testing.F) {
 		}
 		check(t, "fuzz", p, area, false)
 	})
-}
-
-// TestMulDiv: exact past 64 bits, and 0, 0 where its callers' bounds do
-// not hold, never Div64's panic (docs/decisions/0014-PLAN-hardening.md
-// Step 7).
-func TestMulDiv(t *testing.T) {
-	for _, c := range []struct{ a, b, d, q, r int }{
-		{7, 3, 2, 10, 1},
-		{1 << 62, 1 << 40, 1 << 41, 1 << 61, 0},
-		{1 << 24, 1<<40 + 1, 1<<41 + 3, 8388607, 2199014866947},
-		{math.MaxInt, math.MaxInt, math.MaxInt, math.MaxInt, 0},
-		{-1, 1, 1, 0, 0},      // a below 0
-		{1, -1, 1, 0, 0},      // b below 0
-		{1, 1, 0, 0, 0},       // d of 0
-		{1, 1, -1, 0, 0},      // d below 0
-		{1 << 62, 4, 1, 0, 0}, // the quotient passes 64 bits
-		{1 << 62, 2, 1, 0, 0}, // the quotient passes an int
-	} {
-		if q, r := mulDiv(c.a, c.b, c.d); q != c.q || r != c.r {
-			t.Errorf("mulDiv(%d, %d, %d) = %d, %d; want %d, %d", c.a, c.b, c.d, q, r, c.q, c.r)
-		}
-	}
 }
 
 func abs(x int) int {

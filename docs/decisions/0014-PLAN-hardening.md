@@ -1513,10 +1513,28 @@ owner chose to fix each here: `make fuzz` would otherwise fail in CI.
 
 #### Deviations
 
-No deviation. The step's list of documents gained, dated 2026-10-09,
-what Steps 8 and 9 changed: `docs/architecture.md`'s `make fuzz` and CI
-lines, its package table's new names, and the workspace guide's "Text
-width".
+The step's list of documents gained, dated 2026-10-09, what Steps 8 and
+9 changed: `docs/architecture.md`'s `make fuzz` and CI lines, its package
+table's new names, and the workspace guide's "Text width".
+
+* **D10 (2026-10-09): test cases that need a 64-bit int.**
+  * **Found:** CI run `38005043629`, on `f6c9f9b`, failed its `cross go
+    vet` gate for `linux/386`, where `int` is 32 bits: test constants
+    overflow it. They are all of `layout/overflow_test.go` (cases from
+    2^40 to 2^62), `TestMulDiv` in `layout/layout_test.go`, both from
+    Step 7, and one seed of 2^40 in `launch/fuzz_test.go`, from Step 9.
+    The library itself builds for `386`, so a program using `v0.8.0` is
+    unaffected. The tag was already on `origin` at `f6c9f9b`, and tags
+    are never moved. The agent's gate script had not run CI's cross vet,
+    which is how it reached the push.
+  * **The owner's choice:** `TestLayoutOverflow` and `TestMulDiv` live in
+    a file built only where `int` is 64 bits (`!386 && !arm && !mips &&
+    !mipsle`), since their cases are 64-bit overflow; the `launch` seed
+    is `math.MaxInt`, which fits either size. The change is to tests
+    only, on `main`, with no `v0.8.1`. The gate script runs the cross vet
+    from now on.
+  * **The others:** rewrite the cases by int size, so they also run on a
+    32-bit build; or the same fix with a `v0.8.1` tag.
 
 #### The documents
 
@@ -1603,9 +1621,28 @@ incompatible change(s)"; apidiff lists 75 additions.
   `KeyZoomed`, `KeyHiddenPanes`, `KeyOverlay`, `KeyModal`, `KeyWidth` and
   `KeyHeight` (use the functions of the same names ending in `Key`).
 
+#### D10's fix and checks
+
+* **The fix, to tests only:**
+  * `TestMulDiv` moves from `layout/layout_test.go` to
+    `layout/overflow_test.go`, which builds only under `!386 && !arm &&
+    !mips && !mipsle`;
+  * `launch/fuzz_test.go`'s seed of 2^40 is `math.MaxInt`.
+* **Checks:**
+  * `go vet` for `linux/386`, `linux/arm`, `freebsd/amd64` and
+    `openbsd/amd64`: clean; it had failed on `f6c9f9b` with the errors
+    above. Under `linux/386`, `go list` gives the `layout` test files
+    without `overflow_test.go`.
+  * Every Rule 2 gate, with the cross vet the gate script now runs:
+    clean; `make release-check`: "193 file(s) clean".
+  * CI's steps the failed run skipped, run as CI runs them:
+    `shellcheck` 0.11.0 on `scripts/*.sh`, `markdownlint-cli2`,
+    `actionlint` 1.7.12 and `go-precheck_test.sh` ("12 passed, 0
+    failed"): clean.
+
 #### Still to do in this step
 
-* The owner commits; the agent runs the disclosure guard over the
-  outgoing commits; the owner pushes; with CI green, the owner tags
-  `v0.8.0` (annotated, `-m "v0.8.0"`).
+* `v0.8.0` was tagged at `f6c9f9b` and pushed with `main`; CI failed on
+  both, by D10. With D10 committed and pushed, CI must be green on
+  `main`.
 * The consumer smoke test against `v0.8.0`.
