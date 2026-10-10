@@ -104,7 +104,7 @@ func capsOf(t *testing.T, msgs []tea.Msg) Caps {
 // start returns a prober that has seen tea's colour profile, then env, as
 // a program does, and what it sent on env.
 func start(env Env, o ...Option) (*Prober, []tea.Msg) {
-	p := New(o...)
+	p := NewProber(o...)
 	run(p.Update(tea.ColorProfileMsg{Profile: colorprofile.TrueColor}))
 	return p, run(p.Update(tea.EnvMsg(env)))
 }
@@ -165,7 +165,7 @@ func TestBatchNeverAsksWhatTeaAsks(t *testing.T) {
 }
 
 func TestBatchGoesOutOnceOnTheFirstEnvironment(t *testing.T) {
-	p := New()
+	p := NewProber()
 	if msgs := feed(p, tea.WindowSizeMsg{Width: 80, Height: 24}, tea.ColorProfileMsg{}); raw(msgs) != "" {
 		t.Fatalf("sent %q before tea.EnvMsg", raw(msgs))
 	}
@@ -313,7 +313,7 @@ func TestTimeoutEndsTheProbe(t *testing.T) {
 			if d != 0 {
 				o, want = []Option{WithTimeout(d)}, d
 			}
-			p := New(o...)
+			p := NewProber(o...)
 			began := time.Now()
 			deadline := p.Init()
 			feed(p, tea.EnvMsg(local))
@@ -355,7 +355,7 @@ func TestCapsMsgIsDeliveredOnce(t *testing.T) {
 
 func TestAnotherProbersTimeoutIsIgnored(t *testing.T) {
 	p, _ := start(local)
-	if msgs := feed(p, timeoutMsg{New()}); len(msgs) != 0 {
+	if msgs := feed(p, timeoutMsg{NewProber()}); len(msgs) != 0 {
 		t.Fatalf("another prober's deadline ended this probe: %v", msgs)
 	}
 }
@@ -451,7 +451,7 @@ func TestQuitRestoresFirst(t *testing.T) {
 }
 
 func TestDisabledSendsNothing(t *testing.T) {
-	p := New(WithDisabled())
+	p := NewProber(WithDisabled())
 	if p.Init() != nil {
 		t.Fatal("Init returned a command")
 	}

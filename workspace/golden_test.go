@@ -29,7 +29,7 @@ func frame(c tuitest.Case, chrome Chrome, setup func(*Workspace)) string {
 	if chrome == Separators {
 		gap = 1
 	}
-	root := layout.SidebarRightBottom("main", "side", "logs", layout.Footer("footer", 1), layout.Gap(gap))
+	root := layout.SidebarRightBottom("main", "side", "logs", layout.WithFooter("footer", 1), layout.WithGap(gap))
 	w := New(root, panes, WithTheme(caseTheme(c)), WithChrome(chrome), WithPaneChrome("footer", None))
 	w.Update(tea.WindowSizeMsg{Width: c.Width, Height: 24})
 	if setup != nil {

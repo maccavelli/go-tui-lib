@@ -145,7 +145,7 @@ func session(root layout.Node, th theme.Theme, w, h int, opts ...workspace.Optio
 // agentRoot is the preset: sidebar on the left or right, and the bottom pane
 // across the width or under the session only.
 func agentRoot(left bool, span layout.Span) layout.Node {
-	opts := []layout.PresetOption{layout.Footer("footer", 1), layout.Gap(0), layout.BottomSpan(span)}
+	opts := []layout.PresetOption{layout.WithFooter("footer", 1), layout.WithGap(0), layout.WithBottomSpan(span)}
 	if left {
 		return layout.SidebarLeftBottom("session", "metrics", "logs", opts...)
 	}

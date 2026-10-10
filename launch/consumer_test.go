@@ -369,7 +369,7 @@ func TestRunRegistryDetached(t *testing.T) {
 }
 
 func TestRunRestorerAfterCrash(t *testing.T) {
-	p := termcap.New()
+	p := termcap.NewProber()
 	p.Update(tea.ColorProfileMsg{Profile: colorprofile.TrueColor})
 	p.Update(tea.EnvMsg{"TERM=xterm-kitty"})
 	p.Update(tea.ModeReportMsg{Mode: ansi.ModeLightDark, Value: ansi.ModeReset})

@@ -27,7 +27,7 @@ func TestEnvCapsMatchesDisabledProber(t *testing.T) {
 		env := termcap.Env(append(append([]string{}, pr.Env...), "LC_APP_THEME=dark"))
 		for _, goos := range []string{"linux", "darwin", "windows"} {
 			for name, opts := range optionSets {
-				p := termcap.New(append(append([]termcap.Option{}, opts...), termcap.WithDisabled(), termcap.WithGOOS(goos))...)
+				p := termcap.NewProber(append(append([]termcap.Option{}, opts...), termcap.WithDisabled(), termcap.WithGOOS(goos))...)
 				p.Update(tea.EnvMsg(env))
 				want := p.Caps()
 				got := termcap.EnvCaps(env, goos, opts...)

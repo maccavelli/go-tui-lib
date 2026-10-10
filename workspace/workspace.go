@@ -102,7 +102,7 @@ type Chrome uint8
 
 const (
 	// Borders draws a border with the title in its top edge around each
-	// pane. Use layout.Gap(0) with it, or the gaps stay blank.
+	// pane. Use layout.WithGap(0) with it, or the gaps stay blank.
 	Borders Chrome = iota
 	// Separators draws a title row at the top of each pane and separator
 	// lines in the layout's gaps.
@@ -311,8 +311,13 @@ func WithFocusRing(ids ...layout.PaneID) Option {
 // WithState restores a saved layout state.
 func WithState(s layout.State) Option { return func(w *Workspace) { w.state = s } }
 
-// WithMouse turns mouse handling on or off (default on; it does nothing until
-// the program sets a mouse mode).
+// WithoutMouse turns mouse handling off. It is on by default, and does
+// nothing until the program sets a mouse mode.
+func WithoutMouse() Option { return func(w *Workspace) { w.mouse = false } }
+
+// WithMouse turns mouse handling on or off.
+//
+// Deprecated: use WithoutMouse, since handling is on by default (0014-MADR W4).
 func WithMouse(on bool) Option { return func(w *Workspace) { w.mouse = on } }
 
 // WithWidthMethod fixes how the workspace measures text, and stops it

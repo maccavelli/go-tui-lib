@@ -42,7 +42,7 @@ func changers(t *testing.T) (*Workspace, map[string]*stable) {
 		ps[id] = &stable{fake: &fake{id: id}}
 		panes[layout.PaneID(id)] = ps[id]
 	}
-	w := New(layout.SidebarRightBottom("main", "side", "logs", layout.Gap(0)), panes, WithTheme(asciiTheme))
+	w := New(layout.SidebarRightBottom("main", "side", "logs", layout.WithGap(0)), panes, WithTheme(asciiTheme))
 	w.Init()
 	w.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	w.Render()
@@ -56,7 +56,7 @@ func TestEachDirtyCaseRedraws(t *testing.T) {
 		act    func(w *Workspace)
 	}{
 		{"size", nil, func(w *Workspace) { w.Update(tea.WindowSizeMsg{Width: 100, Height: 30}) }},
-		{"layout", nil, func(w *Workspace) { w.SetLayout(layout.SidebarLeftBottom("main", "side", "logs", layout.Gap(0))) }},
+		{"layout", nil, func(w *Workspace) { w.SetLayout(layout.SidebarLeftBottom("main", "side", "logs", layout.WithGap(0))) }},
 		{"state", nil, func(w *Workspace) { w.Toggle("logs") }},
 		{"focus", nil, func(w *Workspace) { w.FocusNext() }},
 		{"overlay push", nil, func(w *Workspace) {

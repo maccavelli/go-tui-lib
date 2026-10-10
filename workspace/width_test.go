@@ -32,7 +32,7 @@ func emojiPanes() map[layout.PaneID]Pane {
 }
 
 func emojiFrame(c tuitest.Case, m ansi.Method) string {
-	w := New(layout.SidebarRightBottom("main", "side", "logs", layout.Gap(0)), emojiPanes(),
+	w := New(layout.SidebarRightBottom("main", "side", "logs", layout.WithGap(0)), emojiPanes(),
 		WithTheme(caseTheme(c)), WithWidthMethod(m))
 	w.Update(tea.WindowSizeMsg{Width: c.Width, Height: 24})
 	return w.Render()
@@ -117,7 +117,7 @@ func TestMethodChangeRedrawsCachedViews(t *testing.T) {
 	for id, p := range emojiPanes() {
 		panes[id] = &stable{fake: p.(*fake)}
 	}
-	w := New(layout.SidebarRightBottom("main", "side", "logs", layout.Gap(0)), panes, WithTheme(caseTheme(tuitest.Case{Color: true, UTF8: true})))
+	w := New(layout.SidebarRightBottom("main", "side", "logs", layout.WithGap(0)), panes, WithTheme(caseTheme(tuitest.Case{Color: true, UTF8: true})))
 	w.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 	wholeLines(t, w.Render(), ansi.WcWidth, 80)
 	w.Update(tea.ModeReportMsg{Mode: ansi.ModeUnicodeCore, Value: ansi.ModeSet})

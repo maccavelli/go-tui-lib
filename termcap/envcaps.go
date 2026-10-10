@@ -16,7 +16,7 @@ package termcap
 func EnvCaps(env Env, goos string, opts ...Option) Caps {
 	o := make([]Option, 0, len(opts)+2)
 	o = append(append(o, opts...), WithDisabled(), WithGOOS(goos))
-	p := New(o...)
+	p := NewProber(o...)
 	p.start(env) // its command, the hooks and the CapsMsg, is not run
 	return p.Caps()
 }

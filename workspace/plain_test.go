@@ -42,7 +42,7 @@ func plainWorkspace(th theme.Theme, opts ...Option) *Workspace {
 		"logs":   Wrap(plainBubble{text: "INFO started"}),
 		"footer": &fake{id: "footer", noFocus: true, body: "model x | mode ask | ctx 12%"},
 	}
-	root := layout.SidebarRightBottom("main", "side", "logs", layout.Footer("footer", 1), layout.Gap(0))
+	root := layout.SidebarRightBottom("main", "side", "logs", layout.WithFooter("footer", 1), layout.WithGap(0))
 	w := New(root, panes, append([]Option{WithTheme(th), WithPaneChrome("footer", None)}, opts...)...)
 	w.Update(tea.WindowSizeMsg{Width: 100, Height: 24})
 	w.Push(Overlay{ID: "permission", Pane: &fake{id: "permission", body: "overlay text"}, Width: 30, Height: 5, Modal: true})

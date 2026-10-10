@@ -408,9 +408,9 @@ func presets() map[string]Node {
 		"sidebar-left":              SidebarLeft("main", "side"),
 		"sidebar-right-bottom":      SidebarRightBottom("main", "side", "logs"),
 		"sidebar-left-bottom":       SidebarLeftBottom("main", "side", "logs"),
-		"sidebar-right-bottom-main": SidebarRightBottom("main", "side", "logs", BottomSpan(UnderMain)),
-		"sidebar-left-bottom-main":  SidebarLeftBottom("main", "side", "logs", BottomSpan(UnderMain)),
-		"sidebar-right-footer":      SidebarRightBottom("main", "side", "logs", Footer("footer", 1)),
+		"sidebar-right-bottom-main": SidebarRightBottom("main", "side", "logs", WithBottomSpan(UnderMain)),
+		"sidebar-left-bottom-main":  SidebarLeftBottom("main", "side", "logs", WithBottomSpan(UnderMain)),
+		"sidebar-right-footer":      SidebarRightBottom("main", "side", "logs", WithFooter("footer", 1)),
 	}
 }
 

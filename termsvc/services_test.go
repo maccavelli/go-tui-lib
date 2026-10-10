@@ -211,7 +211,7 @@ func TestNotificationText(t *testing.T) {
 }
 
 func TestGate(t *testing.T) {
-	n := notifier(termcap.Caps{}, WithProtocol(Bell), WithGate(func(x Notification) bool { return x.Title == "done" }))
+	n := notifier(termcap.Caps{}, WithProtocol(Bell), WithNotifyFilter(func(x Notification) bool { return x.Title == "done" }))
 	if r := sent(t, n.Notify(Notification{Title: "working"})); r.Sent || r.Skipped != SkipGated {
 		t.Errorf("gated: %+v", r)
 	}

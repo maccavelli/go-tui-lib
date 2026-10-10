@@ -51,41 +51,84 @@ func defaults() preset {
 	}
 }
 
-// SidebarWidth sets the sidebar's claim on the width (default 30%, between
-// 24 and 56 cells).
-func SidebarWidth(s Size) PresetOption { return func(p *preset) { p.sidebar = s } }
+// WithSidebarWidth sets the sidebar's claim on the width (default 30%,
+// between 24 and 56 cells).
+func WithSidebarWidth(s Size) PresetOption { return func(p *preset) { p.sidebar = s } }
 
-// BottomHeight sets the bottom pane's claim on the height (default 30%,
+// WithBottomHeight sets the bottom pane's claim on the height (default 30%,
 // between 5 and 20 rows).
-func BottomHeight(s Size) PresetOption { return func(p *preset) { p.bottom = s } }
+func WithBottomHeight(s Size) PresetOption { return func(p *preset) { p.bottom = s } }
 
-// MainSize sets the main pane's claim (default Fill(1), at least 30 cells).
-func MainSize(s Size) PresetOption { return func(p *preset) { p.main = s } }
+// WithMainSize sets the main pane's claim (default Fill(1), at least 30
+// cells).
+func WithMainSize(s Size) PresetOption { return func(p *preset) { p.main = s } }
 
-// BottomSpan sets where the bottom pane runs (default FullWidth).
-func BottomSpan(s Span) PresetOption { return func(p *preset) { p.span = s } }
+// WithBottomSpan sets where the bottom pane runs (default FullWidth).
+func WithBottomSpan(s Span) PresetOption { return func(p *preset) { p.span = s } }
 
-// Footer adds a footer pane of rows rows under everything, such as a status
-// line. It is never resized and never folded.
-func Footer(id PaneID, rows int) PresetOption {
+// WithFooter adds a footer pane of rows rows under everything, such as a
+// status line. It is never resized and never folded.
+func WithFooter(id PaneID, rows int) PresetOption {
 	return func(p *preset) { p.footer, p.footerRows = id, rows }
 }
 
-// Gap sets the cells between neighbouring panes (default 1, for a
+// WithGap sets the cells between neighbouring panes (default 1, for a
 // separator). Use 0 when the panes draw their own borders.
-func Gap(n int) PresetOption { return func(p *preset) { p.gap = n } }
+func WithGap(n int) PresetOption { return func(p *preset) { p.gap = n } }
 
-// Breakpoints sets the responsive folds: below foldWidth columns the
+// WithBreakpoints sets the responsive folds: below foldWidth columns the
 // sidebar moves under the main pane; below hideWidth it is hidden; below
 // hideBottomHeight rows the bottom pane is hidden. Defaults: 100, 70, 16.
-// They measure the area above a Footer, which takes its rows first.
-func Breakpoints(foldWidth, hideWidth, hideBottomHeight int) PresetOption {
+// They measure the area above a WithFooter, which takes its rows first.
+func WithBreakpoints(foldWidth, hideWidth, hideBottomHeight int) PresetOption {
 	return func(p *preset) { p.foldBelow, p.hideBelow, p.bottomBelow = foldWidth, hideWidth, hideBottomHeight }
 }
 
-// NoResponsive keeps the full arrangement at every size; the solver still
-// shrinks and hides panes that do not fit, in shrink order.
-func NoResponsive() PresetOption { return func(p *preset) { p.responsive = false } }
+// WithoutResponsive keeps the full arrangement at every size; the solver
+// still shrinks and hides panes that do not fit, in shrink order.
+func WithoutResponsive() PresetOption { return func(p *preset) { p.responsive = false } }
+
+// SidebarWidth is WithSidebarWidth.
+//
+// Deprecated: use WithSidebarWidth (0014-MADR W4).
+func SidebarWidth(s Size) PresetOption { return WithSidebarWidth(s) }
+
+// BottomHeight is WithBottomHeight.
+//
+// Deprecated: use WithBottomHeight (0014-MADR W4).
+func BottomHeight(s Size) PresetOption { return WithBottomHeight(s) }
+
+// MainSize is WithMainSize.
+//
+// Deprecated: use WithMainSize (0014-MADR W4).
+func MainSize(s Size) PresetOption { return WithMainSize(s) }
+
+// BottomSpan is WithBottomSpan.
+//
+// Deprecated: use WithBottomSpan (0014-MADR W4).
+func BottomSpan(s Span) PresetOption { return WithBottomSpan(s) }
+
+// Footer is WithFooter.
+//
+// Deprecated: use WithFooter (0014-MADR W4).
+func Footer(id PaneID, rows int) PresetOption { return WithFooter(id, rows) }
+
+// Gap is WithGap.
+//
+// Deprecated: use WithGap (0014-MADR W4).
+func Gap(n int) PresetOption { return WithGap(n) }
+
+// Breakpoints is WithBreakpoints.
+//
+// Deprecated: use WithBreakpoints (0014-MADR W4).
+func Breakpoints(foldWidth, hideWidth, hideBottomHeight int) PresetOption {
+	return WithBreakpoints(foldWidth, hideWidth, hideBottomHeight)
+}
+
+// NoResponsive is WithoutResponsive.
+//
+// Deprecated: use WithoutResponsive (0014-MADR W4).
+func NoResponsive() PresetOption { return WithoutResponsive() }
 
 // SidebarRight is a main pane with a sidebar on its right.
 func SidebarRight(main, side PaneID, o ...PresetOption) Node {

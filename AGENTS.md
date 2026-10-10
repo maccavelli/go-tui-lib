@@ -140,9 +140,11 @@ needs an exception says so.
    against it. `internal/conformance` fails when two public packages
    export a type of the same name, unless the glossary and its
    `sharedNames` list both allow it.
-4. **Options.** Option functions are named `With…`, `Without…` or `On…`,
-   and new code uses opaque option types. The option types that still
-   expose their structs become opaque in 0014's W4.
+4. **Options.** Option functions are named `With…`, `Without…` or `On…`:
+   `On…` names a callback, `With…` sets a value or a provider, and
+   `Without…` turns off a default. New code uses opaque option types. The
+   option types that still expose their structs become opaque in 0014's
+   W4.
 5. **Enums.** An exported enum has `String`, `MarshalText` and
    `UnmarshalText`, with stable lowercase tokens. 0014's W4 moves them
    onto one `internal/enum` helper.

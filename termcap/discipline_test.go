@@ -181,7 +181,7 @@ func TestIsReplyFragment(t *testing.T) {
 		t.Error("a complete sequence is a fragment")
 	}
 	// Before the batch, and once everything is answered, nothing is awaited.
-	idle := New()
+	idle := NewProber()
 	if idle.IsReplyFragment(termeventtest.Unknown("\x1b[?62;")) {
 		t.Error("a fragment before the batch was sent")
 	}
@@ -235,7 +235,7 @@ func TestAlacrittyVersionFromDA2(t *testing.T) {
 // unordered with tea.EnvMsg, so CapsMsg waits for it; the deadline does
 // not (MADR A3, PLAN D10).
 func TestCapsMsgWaitsForTheColourProfile(t *testing.T) {
-	p := New()
+	p := NewProber()
 	feed(p, tea.EnvMsg(local))
 	if n := count[CapsMsg](feed(p, termeventtest.DeviceAttributes(62))); n != 0 {
 		t.Fatalf("%d CapsMsg before the colour profile", n)
@@ -245,13 +245,13 @@ func TestCapsMsgWaitsForTheColourProfile(t *testing.T) {
 		t.Errorf("Complete %v, Profile %v; want the sentinel's CapsMsg with the profile", c.Complete, c.Profile)
 	}
 
-	jb := New()
+	jb := NewProber()
 	feed(jb, tea.EnvMsg(Env{"TERMINAL_EMULATOR=JetBrains-JediTerm"}))
 	if c := capsOf(t, feed(jb, tea.ColorProfileMsg{Profile: colorprofile.TrueColor})); c.Profile != colorprofile.TrueColor {
 		t.Errorf("JetBrains: Profile %v", c.Profile)
 	}
 
-	late := New()
+	late := NewProber()
 	feed(late, tea.EnvMsg(local))
 	if c := capsOf(t, feed(late, timeoutMsg{late})); !c.TimedOut {
 		t.Error("the deadline waited for the colour profile")

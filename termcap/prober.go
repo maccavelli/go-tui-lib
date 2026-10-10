@@ -190,8 +190,8 @@ type consoleMsg struct {
 	classic, ok bool
 }
 
-// New returns a Prober.
-func New(o ...Option) *Prober {
+// NewProber returns a Prober.
+func NewProber(o ...Option) *Prober {
 	p := &Prober{timeout: DefaultTimeout, goos: runtime.GOOS}
 	for _, f := range o {
 		f(p)
@@ -201,6 +201,11 @@ func New(o ...Option) *Prober {
 	}
 	return p
 }
+
+// New returns a Prober.
+//
+// Deprecated: use NewProber (0014-MADR W4).
+func New(o ...Option) *Prober { return NewProber(o...) }
 
 // Init starts the deadline. The batch follows the first tea.EnvMsg.
 func (p *Prober) Init() tea.Cmd {

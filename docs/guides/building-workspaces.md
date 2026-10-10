@@ -65,20 +65,20 @@ Four presets build the common arrangements as ordinary `layout.Node` trees:
 
 Options change them:
 
-- **Sizes.** `SidebarWidth(layout.Percent(30).AtLeast(24).AtMost(56))`,
-  `BottomHeight(...)` and `MainSize(...)` take a claim with bounds.
-- **`BottomSpan(layout.UnderMain)`** runs the bottom pane under the main pane
+- **Sizes.** `WithSidebarWidth(layout.Percent(30).AtLeast(24).AtMost(56))`,
+  `WithBottomHeight(...)` and `WithMainSize(...)` take a claim with bounds.
+- **`WithBottomSpan(layout.UnderMain)`** runs the bottom pane under the main pane
   only, so the sidebar keeps its full height. The default, `FullWidth`, runs
   it under both.
-- **`Footer(id, rows)`** adds a status line under everything.
-- **`Gap(n)`** sets the cells between panes. Use `Gap(0)` with
+- **`WithFooter(id, rows)`** adds a status line under everything.
+- **`WithGap(n)`** sets the cells between panes. Use `WithGap(0)` with
   `workspace.Borders`, and the default 1 with `workspace.Separators`.
-- **`Breakpoints(fold, hide, hideBottom)`** sets the responsive folds:
+- **`WithBreakpoints(fold, hide, hideBottom)`** sets the responsive folds:
   - below `fold` columns (default 100) the sidebar moves under the main pane;
   - below `hide` (default 70) it is hidden;
   - below `hideBottom` rows (default 16) the bottom pane is hidden.
 
-  They measure the area above a footer. `NoResponsive()` turns them off.
+  They measure the area above a footer. `WithoutResponsive()` turns them off.
 
 For anything else, build the tree yourself:
 

@@ -6,7 +6,7 @@ import (
 )
 
 func TestPlanAllYieldsInOrderAndStops(t *testing.T) {
-	p, err := Solve(SidebarRightBottom("main", "side", "logs", Footer("footer", 1)), Rect{W: 120, H: 40}, State{})
+	p, err := Solve(SidebarRightBottom("main", "side", "logs", WithFooter("footer", 1)), Rect{W: 120, H: 40}, State{})
 	if err != nil {
 		t.Fatal(err)
 	}

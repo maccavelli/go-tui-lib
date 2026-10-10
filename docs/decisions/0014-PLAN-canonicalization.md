@@ -565,3 +565,86 @@ No deviation.
     tests (the same pattern selects those seven on macOS, the three new among
     them), 7 passed, 0 failed; `go-fuzz_test.sh`, "25 passed, 0 failed"; `make fuzz
     FUZZTIME=3s`, "8 packages ran clean".
+
+### Step 4: the other renames, and W3's deprecated variables
+
+#### Deviations
+
+No deviation. The removal of W3's variables is the PLAN as amended in
+Step 1.
+
+#### What was built
+
+* **`termcap`:** `NewProber`; `New` calls it, marked `// Deprecated: use
+  NewProber (0014-MADR W4).` `EnvCaps`, the tests, `launch`'s consumer
+  test and the terminal-capabilities guide call `NewProber`.
+* **`layout`:** `WithSidebarWidth`, `WithBottomHeight`, `WithMainSize`,
+  `WithBottomSpan`, `WithFooter`, `WithGap`, `WithBreakpoints` and
+  `WithoutResponsive`; the eight bare names are deprecated wrappers.
+  `layout`'s and `workspace`'s tests, `workspace.go`'s comment and the
+  building-workspaces guide use the new names.
+* **`workspace`:** `WithoutMouse()`; `WithMouse(on)` is deprecated, since
+  handling is on by default.
+* **`termsvc`:** `WithNotifyFilter`; `WithGate` is a deprecated wrapper,
+  since a gate is `command`'s permission concept.
+* **`AGENTS.md`,** "API conventions" rule 4: `On…` names a callback,
+  `With…` sets a value or a provider, and `Without…` turns off a default.
+* **W3's deprecated variables, removed** (0014-MADR-native-integration-api
+  A1.5): `termcaptest.RunTimeout`, so `runTimeout` is the terminal's
+  timeout, else `DefaultRunTimeout`, and `TestSetRunTimeout`'s table and
+  a test's deadline lose it; and the seven `workspace.Key…` variables,
+  with `workspace/contextkeys_test.go`, which reassigned them.
+  `TestKeyFunctions` stays.
+* **`scripts/apicheck.allow`** lists the eight removals, under a header
+  naming this PLAN and step.
+* **`TestDeprecatedOptionsStillWork`,** in `layout`, `termcap`,
+  `workspace` and `termsvc`, each in its package so that staticcheck does
+  not report the deprecated names it uses on purpose: each old name does
+  what its new one does. `layout`'s solves the preset with each old
+  option and its new one, at a width where the option changes the plan,
+  and fails if it does not.
+
+#### Checks
+
+* **Mutations,** on scratch copies of the tree; every one was killed by a
+  failing test, none by a build failure:
+  * **S4-1** (`Gap` drops its argument): "Gap: the old name solves to …";
+  * **S4-2** (`NoResponsive` does nothing): "NoResponsive: the old name
+    solves to …";
+  * **S4-3** (`termcap.New` ignores its options): "New with options:
+    timeout 2s";
+  * **S4-4** (`WithMouse` ignores `on`): "WithMouse(true) after
+    WithoutMouse: mouse false";
+  * **S4-5** (`WithoutMouse` does nothing): "WithoutMouse: mouse true";
+  * **S4-6** (`WithGate` sets no filter): "the filter is not set";
+  * **S4-7** (`runTimeout` ignores the terminal's): "Run with a 50ms
+    timeout took 10.001445292s".
+
+  `layout`'s test first failed on its own check for `NoResponsive` at
+  120 columns, where the default folds nothing; its case runs at 80.
+* **`apidiff`:** `make apicheck`, "against v0.8.0, 8 incompatible
+  change(s)", each the listed removal, and "clean". The new names are
+  additions.
+* **Rule 2 on macOS,** go1.27.2:
+  * `make pre-add-check FILES=<the 32 Go files>`: "32 file(s) clean".
+  * `make lint`, the cross `go vet`, `-race`, `-shuffle=on -count=2`,
+    `LC_ALL=C`, workspace mode, `go mod tidy -diff`, `make vuln`, `make
+    examples`, `scripts/go-modules.sh --check` and `make release-check`:
+    clean.
+  * CI's other checks: `shellcheck`, `markdownlint-cli2`, `actionlint`
+    and `go-precheck_test.sh` ("12 passed"): clean.
+* **The Windows test host,** go1.27.2 windows/amd64: `make pre-add-check`,
+  `make lint`, `make vuln` and `make examples`, each exit 0; `go test
+  -count=2 -shuffle=on ./...`, exit 0; the step's tests, with the context
+  keys', the presets' and the profiles' tests, 10 passed, 0 failed; `make fuzz
+  FUZZTIME=3s`, "8 packages ran clean".
+  * `go-fuzz_test.sh` exited 123 there, and passed on macOS. The agent's
+    Windows harness builds the index from the last commit, which still
+    holds `workspace/contextkeys_test.go`, while the copied tree does not:
+    case 6's `git ls-files` listed it, and `grep` failed on it ("No such
+    file or directory"). Run again with the index from the copied tree
+    (`git add -A`), it gave "25 passed, 0 failed". The harness syncs the
+    index from now on.
+  * **Noted, not changed:** case 6 aborts with no FAIL line when a
+    tracked test file is deleted and not yet staged. It is
+    0014-PLAN-hardening's code; the owner decides whether it is fixed.

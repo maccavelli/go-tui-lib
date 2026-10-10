@@ -7,3 +7,14 @@
 # removes its entries: once the next tag is the base, apidiff no longer
 # prints them, and scripts/go-apicheck.sh fails on them as stale
 # (docs/decisions/0014-PLAN-api-policy-gates.md Step 4).
+
+# docs/decisions/0014-PLAN-canonicalization.md Step 4: W3's deprecated
+# variables, removed in v0.9.0 (0014-MADR-native-integration-api A1.5).
+.	- ./termcap/termcaptest.RunTimeout: removed
+.	- ./workspace.KeyFocusedPane: removed
+.	- ./workspace.KeyHeight: removed
+.	- ./workspace.KeyHiddenPanes: removed
+.	- ./workspace.KeyModal: removed
+.	- ./workspace.KeyOverlay: removed
+.	- ./workspace.KeyWidth: removed
+.	- ./workspace.KeyZoomed: removed

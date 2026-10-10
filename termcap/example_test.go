@@ -53,7 +53,7 @@ func (pane) View(int, int) string                     { return "" }
 // A program keeps a Prober beside its workspace, and quits through it.
 // Split replies are dropped before they reach the program as keys.
 func ExampleProber() {
-	probe := termcap.New()
+	probe := termcap.NewProber()
 	ws := workspace.New(layout.Pane{ID: "main"}, map[layout.PaneID]workspace.Pane{"main": pane{}},
 		workspace.WithoutBackgroundQuery())
 	prog := tea.NewProgram(&program{probe: probe, ws: ws},

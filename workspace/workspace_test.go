@@ -95,7 +95,7 @@ var asciiTheme = theme.New(colorprofile.ASCII, theme.Unknown, glyph.ASCII())
 func newRig(t *testing.T, width, height int, opts ...Option) rig {
 	t.Helper()
 	r := rig{main: &fake{id: "main"}, side: &fake{id: "side"}, logs: &fake{id: "logs"}, footer: &fake{id: "footer", noFocus: true}}
-	root := layout.SidebarRightBottom("main", "side", "logs", layout.Footer("footer", 1), layout.Gap(0))
+	root := layout.SidebarRightBottom("main", "side", "logs", layout.WithFooter("footer", 1), layout.WithGap(0))
 	opts = append([]Option{WithTheme(asciiTheme)}, opts...)
 	r.w = New(root, map[layout.PaneID]Pane{"main": r.main, "side": r.side, "logs": r.logs, "footer": r.footer}, opts...)
 	r.w.Init()
@@ -267,11 +267,11 @@ func TestMouseRouting(t *testing.T) {
 	if r.w.Focused() != "main" {
 		t.Fatal("a click reached a pane under a modal overlay")
 	}
-	off := newRig(t, 120, 40, WithMouse(false))
+	off := newRig(t, 120, 40, WithoutMouse())
 	x, y = off.at("side", 2, 1)
 	off.w.Update(tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
 	if off.w.Focused() != "main" {
-		t.Fatal("WithMouse(false) still routed a click")
+		t.Fatal("WithoutMouse() still routed a click")
 	}
 }
 
@@ -510,7 +510,7 @@ func benchWorkspace(withChanger bool, th theme.Theme) *Workspace {
 			panes[layout.PaneID(id)] = f
 		}
 	}
-	w := New(layout.SidebarRightBottom("main", "side", "logs", layout.Footer("footer", 1), layout.Gap(0)), panes, WithTheme(th))
+	w := New(layout.SidebarRightBottom("main", "side", "logs", layout.WithFooter("footer", 1), layout.WithGap(0)), panes, WithTheme(th))
 	w.Update(tea.WindowSizeMsg{Width: 200, Height: 60})
 	return w
 }

@@ -61,7 +61,7 @@ func TestSequenceMatchesNotify(t *testing.T) {
 		{notifier(kitty, WithProtocol(Off)), Notification{Title: "t"}, SkipDisabled},
 		{notifier(kitty, WithPolicy(Never)), Notification{Title: "t"}, SkipDisabled},
 		{notifier(kitty), Notification{Title: "\x1b[m"}, SkipEmpty},
-		{notifier(kitty, WithGate(func(Notification) bool { return false })), Notification{Title: "t"}, SkipGated},
+		{notifier(kitty, WithNotifyFilter(func(Notification) bool { return false })), Notification{Title: "t"}, SkipGated},
 	} {
 		if got, skip := tc.n.Sequence(tc.x); got != "" || skip != tc.want {
 			t.Errorf("%+v: %q, %v; want nothing, %v", tc.x, got, skip, tc.want)

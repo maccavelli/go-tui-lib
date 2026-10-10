@@ -37,7 +37,7 @@ func (m model) View() tea.View {
 func ExampleWorkspace_program() {
 	th := theme.New(colorprofile.TrueColor, theme.Unknown, glyph.Unicode())
 	ws := workspace.New(
-		layout.SidebarRightBottom("session", "metrics", "logs", layout.Footer("footer", 1), layout.Gap(0)),
+		layout.SidebarRightBottom("session", "metrics", "logs", layout.WithFooter("footer", 1), layout.WithGap(0)),
 		map[layout.PaneID]workspace.Pane{
 			"session": &transcript{}, "metrics": &metrics{}, "logs": &logs{}, "footer": &footer{text: "ready"},
 		},

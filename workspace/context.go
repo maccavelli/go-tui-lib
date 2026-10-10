@@ -50,47 +50,6 @@ func WidthKey() when.Key[int] { return ctxWidth }
 // HeightKey is the key of the workspace's height in cells.
 func HeightKey() when.Key[int] { return ctxHeight }
 
-// The workspace's context keys as variables. Reassigning one changes
-// nothing the workspace publishes. They are removed in v0.9.0.
-var (
-	// KeyFocusedPane is the key of the focused pane's ID.
-	//
-	// Deprecated: use FocusedPaneKey.
-	KeyFocusedPane = ctxFocusedPane
-
-	// KeyZoomed is the key of whether a pane is zoomed.
-	//
-	// Deprecated: use ZoomedKey.
-	KeyZoomed = ctxZoomed
-
-	// KeyHiddenPanes is the key of every pane the layout knows and is not
-	// showing: hidden by the user, dropped by a responsive rule, or
-	// squeezed out.
-	//
-	// Deprecated: use HiddenPanesKey.
-	KeyHiddenPanes = ctxHiddenPanes
-
-	// KeyOverlay is the key of the top overlay's ID, or "" with none open.
-	//
-	// Deprecated: use OverlayKey.
-	KeyOverlay = ctxOverlay
-
-	// KeyModal is the key of whether the top overlay is modal.
-	//
-	// Deprecated: use ModalKey.
-	KeyModal = ctxModal
-
-	// KeyWidth is the key of the workspace's width in cells.
-	//
-	// Deprecated: use WidthKey.
-	KeyWidth = ctxWidth
-
-	// KeyHeight is the key of the workspace's height in cells.
-	//
-	// Deprecated: use HeightKey.
-	KeyHeight = ctxHeight
-)
-
 // ContextKeys is the workspace's keys and their kinds, for when.Check.
 func ContextKeys() when.Keys {
 	return when.Keys{

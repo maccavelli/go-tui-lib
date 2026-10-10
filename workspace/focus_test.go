@@ -52,7 +52,7 @@ func TestFocusReachesValuePanes(t *testing.T) {
 	for _, id := range []string{"a", "b", "c"} {
 		panes[layout.PaneID(id)] = valuePane{id: id, log: &log}
 	}
-	w := New(layout.SidebarRightBottom("a", "b", "c", layout.Gap(0)), panes, WithTheme(asciiTheme))
+	w := New(layout.SidebarRightBottom("a", "b", "c", layout.WithGap(0)), panes, WithTheme(asciiTheme))
 	w.Init()
 	w.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	w.FocusNext()

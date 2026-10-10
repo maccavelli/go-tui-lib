@@ -42,7 +42,7 @@ func TestReportGolden(t *testing.T) {
 		termcaptest.DA1Only(), termcaptest.Silent(), termcaptest.AppleTerminalSSH(), termcaptest.JetBrains(),
 	} {
 		// The identity is read for one OS, so the files match on every host.
-		c := termcaptest.Run(t, app{termcap.New(pin, termcap.WithGOOS("linux"), termcap.WithTimeout(100*time.Millisecond))}, p)
+		c := termcaptest.Run(t, app{termcap.NewProber(pin, termcap.WithGOOS("linux"), termcap.WithTimeout(100*time.Millisecond))}, p)
 		name := "report-" + strings.ReplaceAll(p.Name, " ", "-")
 		for _, w := range []int{80, 120} {
 			var b strings.Builder

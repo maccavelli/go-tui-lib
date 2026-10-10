@@ -273,12 +273,12 @@ func TestHooksAreNotCalledWhenNotSet(t *testing.T) {
 }
 
 func TestConsoleHost(t *testing.T) {
-	p := New(WithGOOS("windows"), WithConsoleHost(func() (bool, bool) { return false, true }))
+	p := NewProber(WithGOOS("windows"), WithConsoleHost(func() (bool, bool) { return false, true }))
 	feed(p, feed(p, tea.EnvMsg(Env{}))...)
 	if got := p.Caps().LegacyConsole; got != (Fact[bool]{Value: false, Origin: Queried}) {
 		t.Errorf("console host said ConPTY: %+v", got)
 	}
-	q := New(WithGOOS("linux"), WithConsoleHost(func() (bool, bool) { t.Error("console host asked off Windows"); return true, true }))
+	q := NewProber(WithGOOS("linux"), WithConsoleHost(func() (bool, bool) { t.Error("console host asked off Windows"); return true, true }))
 	feed(q, feed(q, tea.EnvMsg(Env{}))...)
 }
 

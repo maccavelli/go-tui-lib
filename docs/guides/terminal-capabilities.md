@@ -31,7 +31,7 @@ type model struct {
 
 func newModel() *model {
     return &model{
-        probe: termcap.New(),
+        probe: termcap.NewProber(),
         // The prober asks for the background; the workspace must not ask too.
         ws: workspace.New(root, panes, workspace.WithoutBackgroundQuery()),
     }

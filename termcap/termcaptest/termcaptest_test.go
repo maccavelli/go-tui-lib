@@ -28,7 +28,7 @@ type app struct {
 	quitting  bool // Quit was returned; it is returned once
 }
 
-func newApp(o ...termcap.Option) *app { return &app{p: termcap.New(o...)} }
+func newApp(o ...termcap.Option) *app { return &app{p: termcap.NewProber(o...)} }
 
 func (a *app) Init() tea.Cmd { return a.p.Init() }
 
@@ -141,7 +141,7 @@ func TestColorSchemeReportMidRun(t *testing.T) {
 	go func() {
 		// Wait for the subscription, which follows the probe, then switch
 		// to light.
-		for deadline := time.Now().Add(RunTimeout); !strings.Contains(term.Output(), ansi.SetModeLightDark); {
+		for deadline := time.Now().Add(DefaultRunTimeout); !strings.Contains(term.Output(), ansi.SetModeLightDark); {
 			if time.Now().After(deadline) {
 				return
 			}
@@ -338,7 +338,7 @@ func (f *fatalTB) Fatalf(format string, args ...any) {
 }
 
 // TestSetRunTimeout: a terminal's own timeout bounds its Run, and below 1
-// takes RunTimeout back, then DefaultRunTimeout
+// takes DefaultRunTimeout back
 // (docs/decisions/0014-PLAN-hardening.md Step 8, finding H11).
 func TestSetRunTimeout(t *testing.T) {
 	tb := &fatalTB{}
@@ -356,20 +356,15 @@ func TestSetRunTimeout(t *testing.T) {
 		t.Errorf("Run's failures: %q", tb.msgs)
 	}
 
-	saved := RunTimeout
-	t.Cleanup(func() { RunTimeout = saved })
 	for _, c := range []struct {
-		set, run, want time.Duration
+		set, want time.Duration
 	}{
-		{0, 3 * time.Second, 3 * time.Second},
-		{time.Second, 3 * time.Second, time.Second},
-		{-time.Second, 3 * time.Second, 3 * time.Second},
-		{0, 0, DefaultRunTimeout},
-		{0, -time.Second, DefaultRunTimeout},
+		{time.Second, time.Second},
+		{0, DefaultRunTimeout},
+		{-time.Second, DefaultRunTimeout},
 	} {
-		RunTimeout = c.run
 		if got := NewTerminal(Silent()).SetRunTimeout(c.set).runTimeout(); got != c.want {
-			t.Errorf("SetRunTimeout(%v) with RunTimeout %v: %v, want %v", c.set, c.run, got, c.want)
+			t.Errorf("SetRunTimeout(%v): %v, want %v", c.set, got, c.want)
 		}
 	}
 	if DefaultRunTimeout != 10*time.Second {

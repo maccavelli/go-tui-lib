@@ -169,12 +169,6 @@ type StopMsg struct{}
 // program to quit after StopMsg, unless SetRunTimeout sets another.
 const DefaultRunTimeout = 10 * time.Second
 
-// RunTimeout bounds each wait in Run, for a Terminal without a timeout of
-// its own. A value below 1 is DefaultRunTimeout. It is removed in v0.9.0.
-//
-// Deprecated: use (*Terminal).SetRunTimeout.
-var RunTimeout = DefaultRunTimeout
-
 // Terminal is a scripted fake terminal speaking a Profile.
 type Terminal struct {
 	profile Profile
@@ -202,21 +196,17 @@ func Run(tb testing.TB, model tea.Model, p Profile) termcap.Caps {
 
 // SetRunTimeout sets how long each wait in Run lasts, for this terminal
 // alone, and returns t (docs/decisions/0014-PLAN-hardening.md Step 8). A
-// value below 1 takes the default back: RunTimeout while it is kept, then
-// DefaultRunTimeout.
+// value below 1 takes DefaultRunTimeout back.
 func (t *Terminal) SetRunTimeout(d time.Duration) *Terminal {
 	t.timeout = max(d, 0)
 	return t
 }
 
-// runTimeout is each wait in Run: the terminal's own, else RunTimeout,
-// else DefaultRunTimeout.
+// runTimeout is each wait in Run: the terminal's own, else
+// DefaultRunTimeout.
 func (t *Terminal) runTimeout() time.Duration {
-	switch {
-	case t.timeout > 0:
+	if t.timeout > 0 {
 		return t.timeout
-	case RunTimeout > 0:
-		return RunTimeout
 	}
 	return DefaultRunTimeout
 }

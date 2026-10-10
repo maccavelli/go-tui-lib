@@ -87,7 +87,7 @@ func chromeFrame(c tuitest.Case) string {
 		"side":   &fake{id: "side", body: "tokens 1200\ncost $0.01"},
 		"footer": &fake{id: "footer", noFocus: true, body: "model x | ctx 12%"},
 	}
-	root := layout.SidebarRight("main", "side", layout.Footer("footer", 1), layout.NoResponsive())
+	root := layout.SidebarRight("main", "side", layout.WithFooter("footer", 1), layout.WithoutResponsive())
 	w := New(root, panes, WithTheme(caseTheme(c)), WithChrome(None), WithPaneChrome("main", Separators))
 	w.Update(tea.WindowSizeMsg{Width: c.Width, Height: 12})
 	return w.Render()
@@ -143,7 +143,7 @@ func TestSeparatorFollowsPaneChrome(t *testing.T) {
 	// With None everywhere, no separator is drawn; with Separators on main
 	// only, the one beside main is.
 	frame := func(opts ...Option) string {
-		w := New(layout.SidebarRight("main", "side", layout.NoResponsive()),
+		w := New(layout.SidebarRight("main", "side", layout.WithoutResponsive()),
 			map[layout.PaneID]Pane{"main": &fake{id: "main"}, "side": &fake{id: "side"}},
 			append([]Option{WithTheme(asciiTheme), WithChrome(None)}, opts...)...)
 		w.Update(tea.WindowSizeMsg{Width: 60, Height: 6})

@@ -129,9 +129,18 @@ func WithPolicy(p Policy) NotifyOption { return func(n *Notifier) { n.policy = p
 // WithBackend sends notifications through b instead of the terminal.
 func WithBackend(b Backend) NotifyOption { return func(n *Notifier) { n.backend = b } }
 
-// WithGate lets f decide, last, whether a notification is sent, such as
-// only for a completed turn. The policy for that belongs to the program.
-func WithGate(f func(Notification) bool) NotifyOption { return func(n *Notifier) { n.gate = f } }
+// WithNotifyFilter lets f decide, last, whether a notification is sent,
+// such as only for a completed turn. The policy for that belongs to the
+// program.
+func WithNotifyFilter(f func(Notification) bool) NotifyOption {
+	return func(n *Notifier) { n.gate = f }
+}
+
+// WithGate is WithNotifyFilter.
+//
+// Deprecated: use WithNotifyFilter; a gate is command's permission concept
+// (0014-MADR W4).
+func WithGate(f func(Notification) bool) NotifyOption { return WithNotifyFilter(f) }
 
 // defaultBackendTimeout bounds a backend's Notify and a clipboard's Copy.
 const defaultBackendTimeout = 5 * time.Second
