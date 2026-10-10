@@ -112,7 +112,7 @@ jobs:
         env:
           GOWORK: 'off'
         run: |
-          ./scripts/go-fuzz_test.sh
+          python3 scripts/go-fuzz_test.py
           make fuzz
       - name: fuzz corpus
         if: failure()
@@ -192,5 +192,8 @@ jobs:
           export PATH="$RUNNER_TEMP/shellcheck-${SHELLCHECK_VERSION}:$PATH"
           shellcheck --version
           shellcheck scripts/*.sh
+          # The Python scripts compile (docs/decisions/0017-MADR-python-repository-scripts.md).
+          python3 --version
+          python3 -m py_compile scripts/*.py
           npx --yes markdownlint-cli2@0.23.2
           go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12

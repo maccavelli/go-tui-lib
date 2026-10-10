@@ -19,7 +19,7 @@
 # whose name starts with "." or "_".
 #
 # GO names the go command (default go); the tests inject one through it, as
-# scripts/go-fuzz_test.sh does for go-fuzz.sh.
+# scripts/go-fuzz_test.py does for go-fuzz.py.
 #
 # Exit codes: 0 ok · 1 check failed · 2 usage or tool error.
 set -uo pipefail

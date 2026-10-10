@@ -365,6 +365,21 @@ applies them.
 Cross-target commands set `CGO_ENABLED=0` explicitly: a host `go env` may
 set `CGO_ENABLED=1`, and cgo cannot cross-compile to another OS here.
 
+## Scripts
+
+The scripts under `scripts/` are Python 3.12 or later, the standard
+library only (`docs/decisions/0017-MADR-python-repository-scripts.md`):
+no `pip`, no virtual environment. A script runs commands from argument
+lists, never with `shell=True`. A test harness reports every failure as a
+FAIL line naming its case, and goes on to the next; it never stops
+silently. `make` runs them through `PYTHON` (default `python3`).
+
+`go-fuzz` is ported. `go-modules`, `go-apicheck`, `go-examples` and
+`go-precheck` are still shell, until their phases of
+`docs/decisions/0017-PLAN-python-repository-scripts.md`; when
+`go-precheck` is ported, `scripts/go-precheck.sh` stays as a shim, since
+the machine-wide commit gate runs it by that name.
+
 ## Identifiers
 
 Nothing committed carries a hostname, account name, org-internal path, or a

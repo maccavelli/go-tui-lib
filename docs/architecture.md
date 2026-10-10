@@ -161,8 +161,8 @@ scripts/
   go-modules.sh             lists the modules; --check compares go.work
                             with the tracked go.mod files
   go-modules_test.sh        its offline test
-  go-fuzz.sh                fuzzes each fuzz target of a package in turn
-  go-fuzz_test.sh           its offline test
+  go-fuzz.py                fuzzes each fuzz target of a package in turn
+  go-fuzz_test.py           its offline test
   go-apicheck.sh            the API diff gate: incompatible changes since
                             each module's previous tag
   go-apicheck_test.sh       its test, on throwaway repositories
@@ -286,7 +286,7 @@ docs/
     operating systems cover the rest.
 - **`make fuzz`** fuzzes, in every module, each fuzz target of every
   package whose tests declare one, for `FUZZTIME` (default 20s):
-  `scripts/go-fuzz.sh -a` finds the packages, so a new target needs no
+  `scripts/go-fuzz.py -a` finds the packages, so a new target needs no
   list.
 - **`scripts/go-precheck.sh`** runs, for each module that owns a given
   file (every module when none is given), in the module's directory:

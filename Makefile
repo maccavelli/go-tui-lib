@@ -15,6 +15,9 @@ FLEET_LINT_CFG := .golangci.yml
 # temporary directory; it is never added to go.mod
 # (docs/decisions/0014-PLAN-api-policy-gates.md Step 4).
 APIDIFF_VERSION ?= v0.0.0-20261007180756-3d68b386da03
+# The scripts under scripts/ are Python, the standard library only
+# (docs/decisions/0017-MADR-python-repository-scripts.md).
+PYTHON ?= python3
 
 .PHONY: all help test test-sum fmt vet lint modernize tidy tidy-check vuln fuzz apicheck examples pre-add-check release-check
 
@@ -98,7 +101,7 @@ FUZZTIME ?= 20s
 # The packages are found, not listed: every package whose tests declare a
 # fuzz target, per module (docs/decisions/0014-PLAN-hardening.md Step 9).
 fuzz: ## Fuzzes every fuzz target, found in every package of every module, for FUZZTIME each (default 20s)
-	$(call each_module,$(CURDIR)/scripts/go-fuzz.sh -a -t $(FUZZTIME) -m 1 ./...)
+	$(call each_module,$(PYTHON) $(CURDIR)/scripts/go-fuzz.py -a -t $(FUZZTIME) -m 1 ./...)
 
 # The API diff gate: an incompatible change since the previous tag fails unless
 # scripts/apicheck.allow lists it (docs/decisions/0014-PLAN-api-policy-gates.md Step 4).

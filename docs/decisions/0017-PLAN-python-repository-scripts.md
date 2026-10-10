@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in-progress
 date: 2026-10-10
 associated-madr: "0017-MADR-python-repository-scripts.md"
 ---
@@ -28,7 +28,7 @@ stays as a shim for the machine-wide commit gate.
 | The machine-wide commit gate runs `./scripts/go-precheck.sh <files>` when it is executable, else `make pre-add-check` | outside the repository |
 | `AGENTS.md`, `docs/architecture.md` and `docs/guides/releasing.md` name the scripts | `git grep scripts/go-` |
 | `python3` is 3.14.7 on macOS and on the Windows test host; Ubuntu 24.04's is 3.12 | `python3 --version`; the runner image |
-| `.gitignore` ignores `*.py[cod]`, not `__pycache__/` | `.gitignore:18` |
+| `.gitignore` ignores `*.py[cod]`, not `__pycache__/` (2026-10-10, Phase 1: wrong; it ignores both, `.gitignore:17-18`) | `.gitignore:18` |
 | Case 6's fault: exit 1, "grep: …: No such file or directory", no FAIL line, while a tracked test file is deleted and not staged | [0014-PLAN-canonicalization.md](0014-PLAN-canonicalization.md) Step 9 |
 
 ### In scope
@@ -115,7 +115,8 @@ case 6's fault is fixed here. The owner approves.
 * **Callers:** `Makefile`'s `fuzz` target and CI's `fuzz` step run the
   Python files; a `PYTHON ?= python3` variable in the `Makefile`.
 * **CI:** `python3 -m py_compile scripts/*.py` in the lint step.
-* **`.gitignore`:** `__pycache__/`.
+* **`.gitignore`:** `__pycache__/`. (2026-10-10: already there; nothing
+  to add.)
 * **`AGENTS.md`:** scripts are Python, standard library only
   (0017-MADR); the shell scripts left are listed until their phase.
 * **Probe:** on a scratch copy with a tracked fuzz test deleted and not
@@ -208,4 +209,105 @@ phase. No tag is needed: the scripts are not part of the module's API.
 
 ## Execution Record
 
-Not started.
+### Phase 0: records
+
+* The owner chose the route on 2026-10-10, over porting `go-fuzz_test`
+  alone or patching case 6 in shell, and to run W4's Step 10 after
+  Phase 1.
+* The records were committed as `3e9d79c`, after W4's Step 9 as
+  `4cb8b72`; the owner approved this PLAN ("approved to proceed").
+
+### Phase 1: `go-fuzz`, with the case-6 fix
+
+#### Deviations
+
+No deviation. Three things found on the way, none changing the scope:
+
+* **The facts table was wrong about `.gitignore`:** it already ignores
+  `__pycache__/`. The agent's search for it matched only `*.py[cod]`.
+  Nothing was added.
+* **The recorder.** The shell test's case 1b put a bash script in `GO`.
+  A native Windows Python cannot run a shell script as a program, so the
+  Python test builds its recorder as a small Go program in its temporary
+  directory, which runs natively on every host. The case and its checks
+  are the same.
+* **Line endings.** On the Windows test host, the first run failed one
+  case, "its failure names the directory the input is in: want yes, got
+  no": Python on Windows writes `\r\n` to a pipe, so the path the test
+  read ended in `\r`. The harness reads the script's output with `\r\n`
+  as `\n`. The shell test had run under Git Bash, which writes `\n`.
+
+#### What was built
+
+* **`scripts/go-fuzz.py`,** executable, the standard library only. It
+  parses its arguments as `getopts ':t:z:m:al'` did, runs `go` from
+  argument lists (`GO` overrides it), and prints the same `go-fuzz:`
+  lines with the same exit codes. Its usage text names `go-fuzz.py`.
+* **`scripts/go-fuzz_test.py`:** the shell test's 25 cases, by name, and
+  a case 7 of two checks: a throwaway repository whose tracked test files
+  `b/b_test.go` (a fuzz target) and `a/plain_test.go` are deleted and not
+  staged, where the listing names only `example.com/gone/a`, and
+  discovery agrees. Case 6's listing is `fuzz_packages`: `git ls-files`,
+  the files that exist, and `^func Fuzz` found in Python. Each case runs
+  under `case()`, which turns an exception into a FAIL line naming the
+  case. `FUZZ` names the script under test, and a file not ending in
+  `.py` runs as a program, so the shell script can be tested too.
+* **Callers:** `Makefile`'s `PYTHON ?= python3`, and `make fuzz` runs
+  `$(PYTHON) scripts/go-fuzz.py`; CI's `fuzz` step runs `python3
+  scripts/go-fuzz_test.py`; CI's lint step prints `python3 --version` and
+  runs `python3 -m py_compile scripts/*.py`.
+* **Docs:** `AGENTS.md` gains "Scripts": Python 3.12 or later, the
+  standard library only, argument lists, the harness rule, `PYTHON`, and
+  which scripts are still shell. `docs/architecture.md`'s tree and `make
+  fuzz` line, and `scripts/go-modules.sh`'s comment, name the Python
+  files.
+* **Removed:** `scripts/go-fuzz.sh` and `scripts/go-fuzz_test.sh`.
+
+#### Checks
+
+* **The comparison (rule 3),** on the same tree:
+  * the shell test, "25 passed, 0 failed"; the Python test, "27 passed,
+    0 failed"; every shell case's name is in the Python test, which adds
+    case 7's two;
+  * the Python test against `go-fuzz.sh` (`FUZZ`): "27 passed, 0 failed";
+  * the two tools, run alike on eight inputs (the repository's
+    discovery list; one package's targets; too few targets; discovery
+    finding none; a failing target found by discovery; three usage
+    errors): the same exit codes and `go-fuzz:` lines on each, such as
+    "go-fuzz: FuzzBoom failed (exit 1); Go wrote the failing input under
+    …/boom/testdata/fuzz/FuzzBoom/"; and `-a -l ./...` byte for byte, 8
+    packages.
+* **The probe,** on a scratch clone with `when/when_test.go`, a tracked
+  test file with no fuzz target, deleted and not staged: `go-fuzz_test.sh`
+  exited 1 with no FAIL line ("grep: when/when_test.go: No such file or
+  directory"); `go-fuzz_test.py`, "27 passed, 0 failed".
+* **Mutations,** on scratch copies, each killed:
+  * **P1-1** (the listing keeps files that do not exist): "FAIL 7. a
+    deleted, unstaged test file: the case stopped: FileNotFoundError", "25
+    passed, 1 failed".
+  * **P1-2** (case 2 raises): "FAIL 2. too few targets: the case
+    stopped: RuntimeError: injected", and the run went on, "25 passed, 1
+    failed", exit 1.
+  * **P1-3** (`go-fuzz.py -a` drops one package): seven FAILs, among them
+    "the repository's packages with targets are all found", "20 passed, 7
+    failed".
+
+  They ran again after the line-ending change, with the same results.
+* **macOS:** `python3 -m py_compile scripts/*.py`; `go-fuzz_test.py`, "27
+  passed, 0 failed"; `make fuzz FUZZTIME=3s`, "go-fuzz: 8 packages ran
+  clean"; `make release-check`, "200 file(s) clean"; `make lint`;
+  `shellcheck scripts/*.sh`; `markdownlint-cli2`; `actionlint`;
+  `go-precheck_test.sh`, "12 passed"; `go-modules_test.sh`, "17 passed".
+  All clean.
+* **The Windows test host,** go1.27.2 windows/amd64, Python 3.14.7, with
+  the index synced: `make pre-add-check`, `make lint`, `make vuln` and
+  `make examples`, each exit 0; `go test -count=2 -shuffle=on ./...`,
+  exit 0; `py_compile`, exit 0; `go-fuzz_test.py`, "27 passed, 0 failed";
+  `make fuzz FUZZTIME=3s`, "8 packages ran clean". (The harness's "the
+  step's tests" count reads `go test` lines, and printed 0 for a phase
+  with no Go test.)
+  * Before that run, a rerun the agent started without first copying its
+    bundle was stopped; its remote process ran on, and a second run under
+    the same label failed at once on the busy directory. The agent
+    removed both runs' files on the host, and ran again under a new
+    label; the stopped run's directory was gone when it finished.
