@@ -1640,9 +1640,29 @@ incompatible change(s)"; apidiff lists 75 additions.
     `actionlint` 1.7.12 and `go-precheck_test.sh` ("12 passed, 0
     failed"): clean.
 
-#### Still to do in this step
+#### The tag, CI and the smoke test
 
-* `v0.8.0` was tagged at `f6c9f9b` and pushed with `main`; CI failed on
-  both, by D10. With D10 committed and pushed, CI must be green on
-  `main`.
-* The consumer smoke test against `v0.8.0`.
+* **The tag.** The owner tagged `v0.8.0` at `f6c9f9b` and pushed it with
+  `main`; CI failed on both, by D10. D10 landed as `66b30d0`, after the
+  disclosure guard passed over it, and CI run `38009381864` on `main`
+  passed. The tag stays where it is: the library code it holds builds
+  for every target, and D10 changed tests only.
+* **The consumer smoke test,** as the releasing guide gives it, in a
+  scratch module outside the repository, with `go env GOWORK` empty:
+  `go get github.com/maccavelli/go-tui-lib@v0.8.0`, `go mod tidy`, then
+  `go vet`, `go build` and `go run`, each clean. The program checks:
+  * `ParseArgs("greet", ["-n", "2", "world"])` gives
+    `{"count":2,"name":"world"}`, and `WriteResult` writes the handler's
+    text;
+  * with `WithMaxArgBytes(64)`, 100 bytes of words are an `*ArgError`
+    "over 64";
+  * `RenderPlain(1 << 30)` of a pane whose view holds an OSC title is
+    `"main\nbody text\n\n"`;
+  * `launch.Decide` on streams that are not terminals, with
+    `COLUMNS=999999`, is plain, `launch.input-not-terminal`, at width
+    4,096.
+
+  It printed "smoke: ok". A copy expecting a width of 999,999 failed
+  with "FAIL: Decide: …" and exit status 1.
+
+Step 10 is done.
