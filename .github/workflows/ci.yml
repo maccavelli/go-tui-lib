@@ -156,7 +156,7 @@ jobs:
       - name: apicheck
         shell: bash
         run: |
-          ./scripts/go-apicheck_test.sh
+          python3 scripts/go-apicheck_test.py
           make apicheck
       # The framework examples build in a temporary module, run as
       # testdata/frameworks/cases.txt says, and match the guides' excerpts

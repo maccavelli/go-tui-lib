@@ -158,6 +158,9 @@ case 6's fault is fixed here. The owner approves.
 * **`scripts/go-apicheck_test.py`** replaces its test.
 * **Callers:** `make apicheck`; `go-precheck.sh`.
 * **Mutation P3-1:** a stale entry is not reported; the test.
+* **2026-10-10, D3:** the module path comes from `go list -m`'s stdout
+  alone, as D2's list does; a case pins it, and mutation P3-2 reads
+  stderr into the path again.
 
 ### Phase 4: `go-examples`
 
@@ -450,3 +453,85 @@ Three other things found on the way, none changing the scope:
   * A run on the tree before D2 was stopped when D2 began, at the owner's
     word, as it would have to run again; its processes on the host were
     ended with `taskkill`, and its files removed, before this run.
+
+### Phase 3: `go-apicheck`
+
+#### Deviations
+
+* **D3 (2026-10-10): `go list -m`'s stderr was read into the module
+  path.**
+  * **Found,** reading `go-apicheck.sh` before the port: it runs
+    `mod="$(cd "$m" && GOWORK=off "$GO" list -m 2>&1)"` and passes `$mod`
+    to `apidiff` as the module path. On success, a line `go` wrote to
+    stderr, such as a warning, would join the path, the fault D2 fixed in
+    `go-modules`. Its other `2>&1` reads print their output only when the
+    command fails, and are kept.
+  * **The owner's choice:** fix it in this phase, as D2: the path is `go
+    list -m`'s stdout; on success, what `go` wrote to stderr passes
+    through; on failure, the message names `go`'s output as before.
+  * **The other:** port it faithfully, and leave it to a later record.
+
+#### What was built
+
+* **`scripts/go-apicheck.py`,** executable, the standard library only:
+  the base tag, `apidiff` at the `Makefile`'s pin or `APIDIFF`, the allow
+  file's entries, unlisted and stale lines, its messages and exit codes,
+  and its environment variables, as `go-apicheck.sh` had them. It reads
+  `git archive`'s output with `tarfile`, where the shell piped it to
+  `tar`, and lists the modules with `go-modules.py` through the Python
+  running it. By D3, the module path is `go list -m`'s stdout alone. Its
+  output's lines end in `\n` alone.
+* **`scripts/go-apicheck_test.py`:** the shell test's 19 cases, by name,
+  and case 11 (D3), three checks: through a `go` that writes a warning to
+  stderr and succeeds, an unchanged API passes, against `v0.1.0`, and the
+  warning reaches the output. Case 10's failing `apidiff`, a shell script
+  in the shell test, and case 11's `go` are small Go programs the test
+  builds, so they run natively on every host.
+* **Callers:** `make apicheck` runs `$(PYTHON) ./scripts/go-apicheck.py`;
+  `go-precheck.sh` runs it with `"${PYTHON:-python3}"`; CI's `apicheck`
+  step runs the test with `python3`.
+* **Docs:** `AGENTS.md`, `docs/architecture.md`, the comments of
+  `go-precheck.sh`, and `scripts/apicheck.allow`'s header name the Python
+  file. The header's one changed word is the file name: a close-out that
+  compares the emptied file with `v0.8.0`'s now compares with this
+  header.
+* **Removed:** `scripts/go-apicheck.sh` and `scripts/go-apicheck_test.sh`.
+
+#### Checks
+
+* **The comparison (rule 3),** on the same tree:
+  * the shell test, "19 passed, 0 failed"; the Python test has every shell
+    case by name, and adds case 11's three;
+  * the two scripts, on ten inputs, with stdout and stderr compared apart:
+    the repository, with `apidiff` installed at the pin ("clean"); a
+    module never tagged; an unchanged API; an unlisted removal; a listed
+    one; a stale entry; a failing `apidiff`; the skip variable; no allow
+    file; outside a repository. The same stdout, stderr and exit code on
+    each.
+* **The probe for D3:** the Python test against `go-apicheck.sh` fails
+  case 11: "an unchanged API passes with go warning: want 0, got 2", the
+  shell script reporting "exporting v0.1.0's API failed", since the
+  warning had joined the module path; "20 passed, 2 failed".
+* **The empty module cache:** "22 passed, 0 failed", on macOS and on the
+  Windows test host.
+* **Mutations,** on scratch copies, each killed:
+  * **P3-1** (a stale entry is not reported): "a stale entry fails: want
+    1, got 0" and "the stale entry is named", "20 passed, 2 failed".
+  * **P3-2** (the module path reads `go`'s stderr again): the probe's two
+    failures, "20 passed, 2 failed".
+* **macOS:** `py_compile`; `go-apicheck_test.py` ("22 passed"),
+  `go-modules_test.py` ("23 passed") and `go-fuzz_test.py` ("27
+  passed"); `go-precheck_test.sh` ("12 passed") and `go-examples_test.sh`
+  ("19 passed"); `make apicheck`, "against v0.10.0, 0 incompatible
+  change(s)", "clean"; `make release-check`, "200 file(s) clean", which
+  runs the Python script through `go-precheck.sh`; `shellcheck`,
+  `markdownlint-cli2` and `actionlint`. All clean.
+* **The Windows test host,** go1.27.2 windows/amd64, Python 3.14.7, with
+  the index synced: `make pre-add-check`, `make lint`, `make vuln`, `make
+  examples` and `make test`, each exit 0; `go test -count=2 -shuffle=on
+  ./...`, exit 0; `py_compile`, exit 0; `go-apicheck_test.py`, "22
+  passed, 0 failed", warm and with an empty module cache;
+  `go-modules_test.py`, "23 passed"; `make apicheck`, "clean";
+  `go-fuzz_test.py`, "27 passed"; `go-precheck_test.sh`, "12 passed";
+  `go-examples_test.sh`, "19 passed"; `make fuzz FUZZTIME=3s`, "8
+  packages ran clean".

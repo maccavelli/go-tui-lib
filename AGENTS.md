@@ -307,7 +307,7 @@ not yet staged is not checked
 It ends with `scripts/go-modules.py --check`. Then:
 
 - **With no file list** (`make release-check`, or `make pre-add-check`
-  without `FILES`), it runs the API diff gate, `scripts/go-apicheck.sh`.
+  without `FILES`), it runs the API diff gate, `scripts/go-apicheck.py`.
   `GO_PRECHECK_SKIP_APICHECK=1` skips it offline.
 - **With no file list, or one that names a file under
   `testdata/frameworks`,** it runs the examples gate,
@@ -374,7 +374,7 @@ lists, never with `shell=True`. A test harness reports every failure as a
 FAIL line naming its case, and goes on to the next; it never stops
 silently. `make` runs them through `PYTHON` (default `python3`).
 
-`go-fuzz` and `go-modules` are ported. `go-apicheck`, `go-examples` and
+`go-fuzz`, `go-modules` and `go-apicheck` are ported. `go-examples` and
 `go-precheck` are still shell, until their phases of
 `docs/decisions/0017-PLAN-python-repository-scripts.md`; when
 `go-precheck` is ported, `scripts/go-precheck.sh` stays as a shim, since

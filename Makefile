@@ -106,7 +106,7 @@ fuzz: ## Fuzzes every fuzz target, found in every package of every module, for F
 # The API diff gate: an incompatible change since the previous tag fails unless
 # scripts/apicheck.allow lists it (docs/decisions/0014-PLAN-api-policy-gates.md Step 4).
 apicheck: ## Fails on an incompatible API change since the previous tag, per module
-	@APIDIFF_VERSION=$(APIDIFF_VERSION) ./scripts/go-apicheck.sh
+	@APIDIFF_VERSION=$(APIDIFF_VERSION) $(PYTHON) ./scripts/go-apicheck.py
 
 # The framework examples under testdata/frameworks, built against the tree in
 # a temporary module of their own, run, and compared with the guides'

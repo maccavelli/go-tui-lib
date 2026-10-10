@@ -35,7 +35,7 @@
 #
 # Then, once: scripts/go-modules.py --check, which fails when go.work and the
 # tracked go.mod files disagree; and, when no file list is given (the
-# `make release-check` path), scripts/go-apicheck.sh, which fails on an
+# `make release-check` path), scripts/go-apicheck.py, which fails on an
 # incompatible API change since each module's previous tag that
 # scripts/apicheck.allow does not list
 # (docs/decisions/0014-PLAN-api-policy-gates.md Step 4). A file list skips
@@ -334,7 +334,7 @@ if [ "$#" -eq 0 ]; then
   if [ "${GO_PRECHECK_SKIP_APICHECK:-0}" = "1" ]; then
     echo "apicheck: skipped (GO_PRECHECK_SKIP_APICHECK=1)" >&2
   else
-    api_out="$("$REPO_ROOT/scripts/go-apicheck.sh" 2>&1)"
+    api_out="$("${PYTHON:-python3}" "$REPO_ROOT/scripts/go-apicheck.py" 2>&1)"
     api_rc=$?
     if [ "$api_rc" -ne 0 ]; then
       show "apicheck" "$api_out"

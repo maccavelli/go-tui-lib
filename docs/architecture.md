@@ -163,9 +163,9 @@ scripts/
   go-modules_test.py        its offline test
   go-fuzz.py                fuzzes each fuzz target of a package in turn
   go-fuzz_test.py           its offline test
-  go-apicheck.sh            the API diff gate: incompatible changes since
+  go-apicheck.py            the API diff gate: incompatible changes since
                             each module's previous tag
-  go-apicheck_test.sh       its test, on throwaway repositories
+  go-apicheck_test.py       its test, on throwaway repositories
   apicheck.allow            the incompatible changes a PLAN allows
   go-examples.sh            builds and runs the framework examples, and
                             checks the guides' excerpts of them
@@ -305,7 +305,7 @@ docs/
 
   `make pre-add-check` runs it, and so does the machine-wide agent gate
   before an agent `git commit` that stages Go files.
-- **`make apicheck`** runs `scripts/go-apicheck.sh`. For each module it
+- **`make apicheck`** runs `scripts/go-apicheck.py`. For each module it
   takes the newest release tag merged into `HEAD` that does not contain
   `HEAD`, so a tagged commit compares with the tag before it. It exports
   that tag's API and the tree's with apidiff, installed at the

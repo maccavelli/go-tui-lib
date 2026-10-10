@@ -5,5 +5,5 @@
 # The module directory is "." for the root. Each block starts with a comment
 # naming the PLAN and step that allow its changes. A release's close-out
 # removes its entries: once the next tag is the base, apidiff no longer
-# prints them, and scripts/go-apicheck.sh fails on them as stale
+# prints them, and scripts/go-apicheck.py fails on them as stale
 # (docs/decisions/0014-PLAN-api-policy-gates.md Step 4).
