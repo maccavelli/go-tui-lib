@@ -158,9 +158,9 @@ Makefile                    development targets (below)
   ci.yml                    CI
 scripts/
   go-precheck.sh            the pre-add check, per module
-  go-modules.sh             lists the modules; --check compares go.work
+  go-modules.py             lists the modules; --check compares go.work
                             with the tracked go.mod files
-  go-modules_test.sh        its offline test
+  go-modules_test.py        its offline test
   go-fuzz.py                fuzzes each fuzz target of a package in turn
   go-fuzz_test.py           its offline test
   go-apicheck.sh            the API diff gate: incompatible changes since
@@ -244,7 +244,7 @@ docs/
   `examples`, `pre-add-check`, `release-check`, `help`.
 - **Per module.** `test`, `vet`, `lint`, `modernize`, `tidy-check` and
   `vuln` run once in each module's directory with `GOWORK=off`, taking the
-  list from `scripts/go-modules.sh`; a failure to list the modules fails
+  list from `scripts/go-modules.py`; a failure to list the modules fails
   the target.
 - **`make lint`** runs `make modernize`, then `golangci-lint run -c
   <root>/.golangci.yml ./...` three times per module: `GOOS=linux`,
@@ -298,7 +298,7 @@ docs/
   own failure, on a file it cannot read or parse, fails the check, and
   with no file list the files are the tracked Go files the work tree has
   ([0015-MADR](decisions/0015-MADR-precheck-gofmt-errors.md)). It ends
-  with `scripts/go-modules.sh --check`, then:
+  with `scripts/go-modules.py --check`, then:
   - with no file list, the API diff gate;
   - with no file list, or one naming a file under `testdata/frameworks`,
     the examples gate.
@@ -336,8 +336,8 @@ docs/
   test binary that defines its own boolean `-update` may use it instead.
 - **CI** (`.github/workflows/ci.yml`) reads the Go version from `go.work`
   and caches on every module's `go.sum`. It has three jobs:
-  - **`modules`** (Linux): the test of `go-modules.sh`, then
-    `go-modules.sh --check`, then the module list as the matrix's input.
+  - **`modules`** (Linux): the test of `go-modules.py`, then
+    `go-modules.py --check`, then the module list as the matrix's input.
   - **`test (<module>, <os>)`** for each module on `ubuntu-24.04`,
     `macos-15` and `windows-2025`, in the module's directory with
     `GOWORK=off`:

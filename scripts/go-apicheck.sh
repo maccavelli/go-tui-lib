@@ -4,7 +4,7 @@
 # (docs/decisions/0014-MADR-native-integration-api.md W0.2;
 # docs/decisions/0014-PLAN-api-policy-gates.md Step 4).
 #
-# For each module scripts/go-modules.sh lists, with GOWORK=off:
+# For each module scripts/go-modules.py lists, with GOWORK=off:
 #   1. The base is the newest <prefix>vX.Y.Z tag merged into HEAD that does
 #      not contain HEAD, so a run on a tagged commit compares with the tag
 #      before it. The prefix is empty for the root and "<dir>/" for a nested
@@ -76,8 +76,8 @@ fi
 # The allow file's entries, without comments or blank lines, sorted.
 grep -v -e '^#' -e '^[[:space:]]*$' "$ALLOW" | tr -d '\r' | LC_ALL=C sort -u >"$WORK/allowed"
 
-if ! modules="$("$HERE/go-modules.sh")"; then
-  echo "apicheck: scripts/go-modules.sh failed." >&2
+if ! modules="$("${PYTHON:-python3}" "$HERE/go-modules.py")"; then
+  echo "apicheck: scripts/go-modules.py failed." >&2
   exit 2
 fi
 

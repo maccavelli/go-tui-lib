@@ -31,13 +31,13 @@ jobs:
         with:
           go-version-file: go.work
           cache-dependency-path: '**/go.sum'
-      - name: go-modules.sh, its tests, and --check
+      - name: go-modules.py, its tests, and --check
         id: list
         shell: bash
         run: |
-          ./scripts/go-modules_test.sh
-          ./scripts/go-modules.sh --check
-          list="$(./scripts/go-modules.sh | jq -R . | jq -cs .)"
+          python3 scripts/go-modules_test.py
+          python3 scripts/go-modules.py --check
+          list="$(python3 scripts/go-modules.py | jq -R . | jq -cs .)"
           echo "modules: $list"
           echo "list=$list" >>"$GITHUB_OUTPUT"
 
@@ -88,7 +88,7 @@ jobs:
         run: go test -count=1 ./...
 
   # The gates that loop over the modules themselves, through the Makefile
-  # and scripts/go-modules.sh, as `make pre-add-check` does.
+  # and scripts/go-modules.py, as `make pre-add-check` does.
   gates:
     needs: modules
     runs-on: ubuntu-24.04
@@ -127,7 +127,7 @@ jobs:
       - name: cross go vet
         shell: bash
         run: |
-          mods="$(./scripts/go-modules.sh)"
+          mods="$(python3 scripts/go-modules.py)"
           status=0
           for m in $mods; do
             for target in freebsd/amd64 openbsd/amd64 linux/386; do

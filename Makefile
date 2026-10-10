@@ -26,9 +26,9 @@ all: help
 # Every gate runs once per module, in the module's directory, with
 # GOWORK=off, so that a module builds from its own go.mod and published
 # versions only (docs/decisions/0010-MADR-nested-adapter-modules.md §4).
-# scripts/go-modules.sh lists the modules go.work names; a failure to list
+# scripts/go-modules.py lists the modules go.work names; a failure to list
 # them fails the target, rather than looping over nothing.
-MODULES_CMD := ./scripts/go-modules.sh
+MODULES_CMD = $(PYTHON) ./scripts/go-modules.py
 
 # each_module runs $(1) in every module's directory with GOWORK=off.
 define each_module

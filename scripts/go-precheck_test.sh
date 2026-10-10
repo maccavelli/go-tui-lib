@@ -65,7 +65,7 @@ g() { # git, as a throwaway identity
 repo() {
 	mkdir -p "$1/p" "$1/scripts"
 	cp "$PRECHECK" "$1/scripts/go-precheck.sh"
-	cp "$ROOT/scripts/go-modules.sh" "$1/scripts/go-modules.sh"
+	cp "$ROOT/scripts/go-modules.py" "$1/scripts/go-modules.py"
 	(
 		cd "$1"
 		git init -q

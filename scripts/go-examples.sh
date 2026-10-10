@@ -4,7 +4,7 @@
 # docs/decisions/0014-PLAN-api-policy-gates.md Step 5).
 #
 # The examples live under testdata/frameworks, which the go command,
-# scripts/go-modules.sh and golangci-lint all skip. They are programs built on
+# scripts/go-modules.py and golangci-lint all skip. They are programs built on
 # the standard flag package, Cobra, Kong and urfave/cli, and they build in a
 # temporary module outside the repository's modules:
 #   1. testdata/frameworks is copied into a temporary directory, with go.mod

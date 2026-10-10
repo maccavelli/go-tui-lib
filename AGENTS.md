@@ -76,7 +76,7 @@ The repository holds more than one Go module
 - **`go.work` lists every module** and is committed. It is for development
   only: it builds a root change and an adapter change together before
   either is tagged. A module is added to it with `go work use ./<dir>` in
-  the commit that adds the module. `scripts/go-modules.sh --check` fails
+  the commit that adds the module. `scripts/go-modules.py --check` fails
   when `go.work` and the tracked `go.mod` files disagree. `go.work.sum` is
   ignored, not committed: workspace-mode commands such as `go doc` on a
   dependency write it, and no gate reads it
@@ -304,7 +304,7 @@ are the tracked Go files the work tree has, so a tracked file deleted but
 not yet staged is not checked
 (`docs/decisions/0015-MADR-precheck-gofmt-errors.md`).
 
-It ends with `scripts/go-modules.sh --check`. Then:
+It ends with `scripts/go-modules.py --check`. Then:
 
 - **With no file list** (`make release-check`, or `make pre-add-check`
   without `FILES`), it runs the API diff gate, `scripts/go-apicheck.sh`.
@@ -374,7 +374,7 @@ lists, never with `shell=True`. A test harness reports every failure as a
 FAIL line naming its case, and goes on to the next; it never stops
 silently. `make` runs them through `PYTHON` (default `python3`).
 
-`go-fuzz` is ported. `go-modules`, `go-apicheck`, `go-examples` and
+`go-fuzz` and `go-modules` are ported. `go-apicheck`, `go-examples` and
 `go-precheck` are still shell, until their phases of
 `docs/decisions/0017-PLAN-python-repository-scripts.md`; when
 `go-precheck` is ported, `scripts/go-precheck.sh` stays as a shim, since

@@ -54,7 +54,7 @@ echo "refs/heads/main $(git rev-parse HEAD) refs/heads/main $(git rev-parse orig
 3. If it brings a dependency only it may import, add a depguard rule to
    `.golangci.yml` over `$all` less `!**/<dir>/**`, as the `glamour` rule
    does.
-4. Run `scripts/go-modules.sh --check` and `make release-check`. Both now
+4. Run `scripts/go-modules.py --check` and `make release-check`. Both now
    cover the new module. Commit `go.work` with the module.
 
 ## Release the root alone

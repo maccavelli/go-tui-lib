@@ -21,7 +21,7 @@
 # Every module is checked on its own, in its own directory
 # (docs/decisions/0010-MADR-nested-adapter-modules.md §4;
 # docs/decisions/0010-PLAN-nested-adapter-modules.md Phase 3). The modules are
-# the ones go.work lists (scripts/go-modules.sh). For each module:
+# the ones go.work lists (scripts/go-modules.py). For each module:
 #   1. gofmt on its files;
 #   2. with GOWORK=off, so a module builds from its own go.mod and published
 #      versions only: golangci-lint for linux, darwin and windows; go vet;
@@ -33,7 +33,7 @@
 # it exit non-zero with nothing on its output, and that is not "formatted"
 # (docs/decisions/0015-MADR-precheck-gofmt-errors.md).
 #
-# Then, once: scripts/go-modules.sh --check, which fails when go.work and the
+# Then, once: scripts/go-modules.py --check, which fails when go.work and the
 # tracked go.mod files disagree; and, when no file list is given (the
 # `make release-check` path), scripts/go-apicheck.sh, which fails on an
 # incompatible API change since each module's previous tag that
@@ -152,8 +152,8 @@ fi
 
 # The modules, longest directory first, so that a file belongs to the
 # deepest module containing it.
-if ! module_list="$("$REPO_ROOT/scripts/go-modules.sh")"; then
-  echo "go-precheck: could not list the modules (scripts/go-modules.sh)." >&2
+if ! module_list="$("${PYTHON:-python3}" "$REPO_ROOT/scripts/go-modules.py")"; then
+  echo "go-precheck: could not list the modules (scripts/go-modules.py)." >&2
   exit 1
 fi
 modules=()
@@ -323,7 +323,7 @@ while IFS= read -r m; do
 done < <(printf '%s\n' "$module_list")
 
 # Once: go.work lists exactly the tree's modules.
-if ! check_out="$("$REPO_ROOT/scripts/go-modules.sh" --check 2>&1)"; then
+if ! check_out="$("${PYTHON:-python3}" "$REPO_ROOT/scripts/go-modules.py" --check 2>&1)"; then
   show "go.work" "$check_out"
   fail 1
 fi
