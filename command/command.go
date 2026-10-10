@@ -23,7 +23,7 @@
 package command
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"iter"
@@ -79,7 +79,7 @@ func (id ID) Segments() iter.Seq[string] {
 }
 
 // Schema is a JSON Schema 2020-12 document.
-type Schema = json.RawMessage
+type Schema = jsontext.Value
 
 // Command is one action, as every surface sees it.
 type Command struct {

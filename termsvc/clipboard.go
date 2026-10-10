@@ -92,6 +92,12 @@ type Clipboard interface {
 	Copy(ctx context.Context, text string) error
 }
 
+// ClipboardFunc is a function used as a Clipboard.
+type ClipboardFunc func(ctx context.Context, text string) error
+
+// Copy calls f.
+func (f ClipboardFunc) Copy(ctx context.Context, text string) error { return f(ctx, text) }
+
 // CopyOption configures Copy.
 type CopyOption func(*copyConfig)
 

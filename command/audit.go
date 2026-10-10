@@ -2,7 +2,7 @@ package command
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"log/slog"
 	"time"
 )
@@ -12,6 +12,12 @@ type Auditor interface {
 	Audit(Record)
 }
 
+// AuditorFunc is a function used as an Auditor.
+type AuditorFunc func(Record)
+
+// Audit calls f.
+func (f AuditorFunc) Audit(r Record) { f(r) }
+
 // Record is one request's audit entry. Verdict is zero when the request
 // failed before the policy was asked. Duration is the handler's, and zero
 // when the handler did not run.
@@ -19,7 +25,7 @@ type Record struct {
 	ID      ID
 	Origin  Origin
 	Caller  string
-	Args    json.RawMessage
+	Args    jsontext.Value
 	Verdict Verdict
 	// Decision is Verdict, set to the same value through v0.9.x.
 	//

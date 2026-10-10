@@ -89,6 +89,18 @@ One planned pair is deliberate: `Renderer`, the interface in `stream`,
 and the type in `stream/glamourmd` that implements it. It is added to
 "Deliberate" and to `sharedNames` when the adapter is built.
 
+## Width: one rule
+
+Width is measured in cells, by one rule
+([0014-PLAN-canonicalization](decisions/0014-PLAN-canonicalization.md)
+Step 7; `AGENTS.md`, "TUI conventions" rule 5):
+
+| Who | Measures and cuts with |
+| :--- | :--- |
+| `workspace` | its width method: `ansi.WcWidth` until the terminal reports grapheme clustering (mode 2027), `ansi.GraphemeWidth` after, unless `WithWidthMethod` fixes it; it cuts with `internal/sanitize`'s `Truncate`, never wider than asked |
+| a test | `tuitest.Fits`, under the case's method |
+| `termsvc`, `termcap`'s report | grapheme clusters, with `ansi.Truncate` |
+
 ## The rule for a new name
 
 The record that introduces an exported type name checks it against this

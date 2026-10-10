@@ -2,7 +2,7 @@ package command
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -30,8 +30,8 @@ func (f HandlerFunc) Run(ctx context.Context, inv *Invocation) (Result, error) {
 // who asked.
 type Invocation struct {
 	Command Command
-	Args    json.RawMessage // the arguments, as JSON
-	Raw     string          // the slash tail, verbatim
+	Args    jsontext.Value // the arguments, as JSON
+	Raw     string         // the slash tail, verbatim
 	Origin  Origin
 	Caller  string // the agent's or MCP client's name, for example
 	// WhenContext is the context the command was enabled in; never nil.
@@ -52,7 +52,7 @@ type Result struct {
 // Request asks the registry to run a command.
 type Request struct {
 	ID     ID
-	Args   json.RawMessage
+	Args   jsontext.Value
 	Raw    string
 	Origin Origin
 	Caller string

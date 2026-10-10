@@ -23,9 +23,12 @@ type Value interface{ ~uint8 | ~int }
 
 // Names is an enum's tokens: Tokens[i] is the value i's. Pkg and Type
 // name the package and the enum in the errors, as "termcap" and "Mux".
+// Unmarshal's error wraps Unknown, the package's sentinel for a name it
+// does not know, when there is one.
 type Names[T Value] struct {
 	Pkg, Type string
 	Tokens    []string
+	Unknown   error
 }
 
 // String is v's token, or the stringer form "Type(N)" for a v with none.
@@ -52,11 +55,29 @@ func (n Names[T]) Marshal(v T) ([]byte, error) {
 func (n Names[T]) Unmarshal(b []byte, v *T) error {
 	i := slices.Index(n.Tokens, string(b))
 	if i < 0 {
-		return fmt.Errorf("%s: unknown %s %q", n.Pkg, n.Type, b)
+		return Errorf(n.Unknown, "%s: unknown %s %q", n.Pkg, n.Type, b)
 	}
 	*v = T(i)
 	return nil
 }
+
+// Errorf is an error with the formatted text that wraps sentinel, whose
+// own text it does not repeat, so that a package can add a sentinel to an
+// error without changing its text. A nil sentinel wraps nothing.
+func Errorf(sentinel error, format string, a ...any) error {
+	return &wrapError{msg: fmt.Sprintf(format, a...), err: sentinel}
+}
+
+// wrapError is Errorf's error.
+type wrapError struct {
+	msg string
+	err error
+}
+
+func (e *wrapError) Error() string { return e.msg }
+
+// Unwrap is the sentinel, or nil.
+func (e *wrapError) Unwrap() error { return e.err }
 
 // Bits is a bit set's tokens: Tokens[i] is the bit 1<<i's, and None is
 // the empty set's. A set's text is its bits' tokens, lowest first, joined
@@ -133,10 +154,10 @@ func Name[T Value](names []string, v T) string {
 
 // Marshal is Names{pkg, kind, names}.Marshal(v).
 func Marshal[T Value](pkg, kind string, names []string, v T) ([]byte, error) {
-	return Names[T]{pkg, kind, names}.Marshal(v)
+	return Names[T]{Pkg: pkg, Type: kind, Tokens: names}.Marshal(v)
 }
 
 // Unmarshal is Names{pkg, kind, names}.Unmarshal(b, v).
 func Unmarshal[T Value](pkg, kind string, names []string, b []byte, v *T) error {
-	return Names[T]{pkg, kind, names}.Unmarshal(b, v)
+	return Names[T]{Pkg: pkg, Type: kind, Tokens: names}.Unmarshal(b, v)
 }

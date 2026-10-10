@@ -1,0 +1,18 @@
+  1|{
+ 22|  "schema_version": 1,
+ 13|  "caps": {},
+ 15|  "findings": [
+  5|    {
+ 37|      "id": "keyboard.kitty-unknown",
+ 29|      "disposition": "issue",
+ 82|      "message": "The Kitty keyboard query had no answer before the probe ended.",
+ 75|      "fix": "Run again; if it persists, give the prober a longer timeout."
+  6|    },
+  5|    {
+ 31|      "id": "terminal.unknown",
+ 38|      "disposition": "recommendation",
+ 90|      "message": "Nothing names the terminal, so capabilities that depend on it are off.",
+ 64|      "fix": "Set TERM_PROGRAM, or let LC_TERMINAL through SSH."
+  5|    }
+  3|  ]
+  1|}

@@ -1,7 +1,8 @@
 package termcap
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 	"fmt"
 	"image/color"
 	"io"
@@ -69,7 +70,7 @@ func Report(w io.Writer, c Caps, o ...ReportOption) error {
 		if findings == nil {
 			findings = []Finding{}
 		}
-		out, err := json.MarshalIndent(reportJSON{SchemaVersion: ReportSchemaVersion, Caps: c, Findings: findings}, "", "  ")
+		out, err := json.Marshal(reportJSON{SchemaVersion: ReportSchemaVersion, Caps: c, Findings: findings}, jsontext.WithIndent("  "))
 		if err != nil {
 			return err
 		}

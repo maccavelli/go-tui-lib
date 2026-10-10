@@ -10,8 +10,9 @@ import (
 )
 
 // ParseSlash reads a slash line, "/resize sidebar 4", into the request
-// --args, the palette and an agent would send for it: Origin is
-// OriginSlash, Raw the text after the name, and Args the JSON.
+// the palette, the program's own command line (ParseArgs) and an agent
+// would send for it: Origin is OriginSlash, Raw the text after the name,
+// and Args the JSON.
 //
 // Positional values fill the properties marked positional (A1's arg tag),
 // in order; a positional array takes every value left. name=value fills

@@ -43,8 +43,9 @@ type scanner struct {
 	pos int
 }
 
+// errorf is a *SyntaxError at pos.
 func (s *scanner) errorf(pos int, format string, a ...any) error {
-	return fmt.Errorf("when: "+format+" at offset %d", append(a, pos)...)
+	return &SyntaxError{Offset: pos, Msg: fmt.Sprintf(format, a...)}
 }
 
 func (s *scanner) skipSpace() {

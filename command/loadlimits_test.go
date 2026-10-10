@@ -2,7 +2,7 @@ package command
 
 import (
 	"context"
-	"encoding/json"
+	json "encoding/json/v2"
 	"errors"
 	"io/fs"
 	"strconv"

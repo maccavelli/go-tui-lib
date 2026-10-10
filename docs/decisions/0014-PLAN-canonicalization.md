@@ -344,6 +344,11 @@ each record's index row says "A<n> recorded".
 
   The code is unchanged; only the documentation is unified.
 * **The `--args` wording** is fixed in `command/slash.go` and the guide.
+* **2026-10-10, D3:** v2 refuses invalid UTF-8 when writing as well, and
+  `ParseTmux` does not sanitize: `ParseTmux` cleans its fields, and
+  `termcap` writes its JSON allowing invalid UTF-8, as U+FFFD, while it
+  reads strictly. `ErrUnknownName` is also wrapped by `Caps`'s unknown
+  colour profile.
 
 ### Step 8: the release `v0.9.0`
 
@@ -884,3 +889,156 @@ No deviation.
   `MarshalText` turns their JSON from a number into the token, in a
   program's own values and in `command.WriteResult`'s; and the
   out-of-range text D2 lists.
+
+### Step 7: JSON v2, errors, adapters, width, wording
+
+#### Deviations
+
+* **D3 (2026-10-10): v2 writes no invalid UTF-8, and one more unknown
+  name.**
+  * **Found,** on a scratch copy with `termcap` on v2:
+    * v2 refuses invalid UTF-8 when it writes, not only when it reads.
+      `Caps{Terminal: "wez\xffterm"}` and a `Caps` holding
+      `ParseTmux("3.4\xff…")` make `Caps.MarshalJSON` fail ("invalid
+      UTF-8 within \"/tmux/version\""), and so `Report`'s JSON, where v1
+      wrote U+FFFD.
+    * The step's "W3 already sanitizes the strings" holds for the
+      environment and the terminal's replies, but not for `ParseTmux`
+      (`termcap/tmux.go:50-54`), whose input is the output of a tmux the
+      program runs; nor for a program's own `Caps` values and
+      `WithOverride`, which no sanitizer sees. The first is a gap in
+      0014-MADR C6, "one `internal/sanitize` for every untrusted
+      string".
+    * `Caps.UnmarshalJSON` reads one name besides the seven enums': the
+      colour profile, refused as "termcap: unknown colour profile"
+      (`termcap/caps.go:135`).
+  * **The owner's choices:**
+    * `ParseTmux` cleans each field with `sanitize.Line`, as every other
+      source does; and `Caps.MarshalJSON` and `Report` write with
+      `jsontext.AllowInvalidUTF8(true)`, so a report never fails on a
+      value's bytes and writes U+FFFD as v1 did. Reading stays strict.
+    * The colour profile's error wraps `ErrUnknownName` as well, its
+      text unchanged.
+  * The MADR's decisions stand, so it is not amended.
+
+#### What was built
+
+* **JSON.**
+  * `command`: `args.go`, `audit.go`, `command.go` and `handler.go`
+    import `encoding/json/jsontext` for `jsontext.Value`, in place of v1's
+    `json.RawMessage`. In Go 1.27 the v1 name is an alias of it, so no
+    signature changes, and `apidiff` reports none.
+  * `termcap`: `Caps.MarshalJSON` and `UnmarshalJSON` use v2, and
+    `Report` writes with `jsontext.WithIndent("  ")`. `Report` needs no
+    `AllowInvalidUTF8` of its own: its caps come through
+    `Caps.MarshalJSON`, and its findings are the package's own text, so
+    the option there could never take effect.
+  * The tests of both packages moved to v2 as well, so neither package
+    imports v1. `layout/state.go` keeps v1, outside this PLAN's scope.
+  * D3: `ParseTmux` cleans each field with `sanitize.Line`, and
+    `Caps.MarshalJSON` writes invalid UTF-8 as U+FFFD.
+* **`when.SyntaxError{Offset, Msg, Err}`** (`when/error.go`), with `Error`
+  and `Unwrap`. `scanner.errorf` builds it, so its 18 sites give it; the
+  regex site sets `Err` to `regexp`'s error, under `Msg` "a bad regex";
+  the two size limits give `Offset: -1`. Every text is the one before,
+  byte for byte. `Parse`'s comment says its error is a `*SyntaxError`.
+* **`termcap.ErrUnknownName`,** "termcap: unknown name". `enum.Names`
+  gains an `Unknown` sentinel, which `Unmarshal`'s error wraps, and
+  `enum.Errorf` makes an error with a text of its own that wraps a
+  sentinel, so no text changes. The seven enums' tables set it, and
+  `Caps`'s unknown colour profile uses `enum.Errorf` (D3).
+* **The adapters:** `command.AuditorFunc`, `termsvc.BackendFunc` and
+  `termsvc.ClipboardFunc`, each a function type whose method calls it,
+  as `HandlerFunc`. No exported type of these names existed, and the
+  glossary lists none.
+* **Width:** `AGENTS.md`'s "TUI conventions" rule 5, and a "Width: one
+  rule" section in `docs/glossary.md`, state the rule: the workspace's
+  method, `WcWidth` until mode 2027 and `GraphemeWidth` after, cutting
+  with `sanitize.Truncate`; `tuitest.Fits` under the case's method in
+  tests; grapheme clusters, with `ansi.Truncate`, in `termsvc` and
+  `termcap`'s report. The agent read each claim against the code
+  (`tuitest/case.go:28`, `termsvc/termsvc.go:104`,
+  `termcap/report.go:215-226`). No code changed.
+* **The `--args` wording:** `command/slash.go` and
+  `docs/guides/commands.md` name the program's own command line
+  (`ParseArgs`), which replaced `--args`.
+* **Tests:**
+  * `termcap/json_test.go` (new):
+    * `TestCapsJSONStable`, the report's JSON as two golden files,
+      `full()` with `<>&` in its terminal's name and the zero `Caps`,
+      written on v1 before the switch;
+    * `TestCapsJSONReadsStrictly`: a duplicate name and invalid UTF-8
+      are refused, and a name in another case is not read;
+    * `TestErrUnknownName`: the seven enums and two JSON inputs wrap it,
+      with their texts; a bad colour does not;
+    * `TestJSONWritesInvalidUTF8`: U+FFFD from `MarshalJSON` and
+      `Report`; `ParseTmux` drops escapes, invalid UTF-8, a bidi control
+      and BEL.
+  * `when`: `TestSyntaxErrorOffsets`, 22 sources over the 21 sites
+    (nesting both ways), each's offset, `Msg`, nil `Err` and text; and
+    the regex's wrapped `*syntax.Error`.
+  * `command`: `TestAuditorFunc`, through a registry. `termsvc`:
+    `TestBackendAndClipboardFuncs`, through `Notify` and `Copy`, the
+    clipboard's error reported as `Failed`.
+
+#### Checks
+
+* **The measured difference:** the golden written on v1 and the one on
+  v2 differ in one line, `full()`'s terminal: v1 wrote `"WezTerm
+  \u003c20240203\u003e \u0026 co"`, v2 `"WezTerm <20240203> & co"`.
+  The zero report is the same. No field `termcap` writes is a nil slice
+  without `omitzero`, so v2's `[]` for a nil slice changes nothing here.
+* **The probe,** on a scratch copy of `1d6b438`, the commit before this
+  step, with the new tests that compile there:
+  * `TestCapsJSONReadsStrictly`: 3 failures; v1 read the duplicate
+    (the last value won), turned `\xff` into U+FFFD, and read
+    `"Complete"` and `"MUX"`.
+  * `TestJSONWritesInvalidUTF8`: 1 failure, `ParseTmux` keeping `\xff`,
+    the escape, U+202E and BEL.
+  * `TestErrUnknownName`, `TestSyntaxErrorOffsets`, `TestAuditorFunc`
+    and `TestBackendAndClipboardFuncs` use names `1d6b438` lacks; the
+    mutations below show each failing.
+* **Mutations,** on scratch copies of the tree, each one building; all
+  ten killed by an assertion:
+  * **S7-1** (`Names.Unmarshal` wraps no sentinel) and **S7-2** (the
+    colour profile's neither): `TestErrUnknownName`, "want … wrapping
+    ErrUnknownName".
+  * **S7-3** (`errorf` gives offset 0): `"a & b" = 0 … want 2`.
+  * **S7-4** (the regex error flattened into `Msg`): "a bad regex:
+    &when.SyntaxError{… Err:error(nil)}".
+  * **S7-5** (the source limit gives offset 0): `= 0 … want -1`.
+  * **S7-6** (`MarshalJSON` refuses invalid UTF-8): "invalid UTF-8
+    within \"/terminal/value\"".
+  * **S7-7** (`ParseTmux` keeps the raw field): "ParseTmux kept
+    untrusted bytes".
+  * **S7-8** (`AuditorFunc.Audit` drops the record): "records []".
+  * **S7-9** (`BackendFunc.Notify` does not call the function): "the
+    backend was sent []".
+  * **S7-10** (`ClipboardFunc.Copy` hides the error): "Copy reported
+    [{Status:confirmed …}]".
+* **`apidiff`:** `make apicheck`, "against v0.8.0, 14 incompatible
+  change(s)", Steps 4 and 5's, and "clean": the new names are additions,
+  and `jsontext.Value` is the type `json.RawMessage` names.
+* **Rule 2 on macOS,** go1.27.2:
+  * `make pre-add-check FILES=<the 26 Go files>`: "26 file(s) clean".
+  * `make lint`, the cross `go vet`, `-race`, `-shuffle=on -count=2`,
+    `LC_ALL=C`, workspace mode, `go mod tidy -diff`, `make vuln`, `make
+    examples`, `scripts/go-modules.sh --check` and `make release-check`
+    ("201 file(s) clean"): clean.
+  * CI's other checks: `shellcheck`, `markdownlint-cli2`, `actionlint`,
+    `go-precheck_test.sh` ("12 passed") and `go-fuzz_test.sh` ("25
+    passed"): clean.
+* **The Windows test host,** go1.27.2 windows/amd64, with the index synced
+  to the copied tree: `make pre-add-check`, `make lint`, `make vuln` and
+  `make examples`, each exit 0; `go test -count=2 -shuffle=on ./...`,
+  exit 0; the step's tests, 12 passed, 0 failed; `go-fuzz_test.sh`, "25
+  passed, 0 failed"; `make fuzz FUZZTIME=3s`, "8 packages ran clean".
+* **For Step 8's notes:**
+  * `termcap`'s JSON no longer escapes `<>&`, and reads strictly:
+    duplicate names and invalid UTF-8 are errors, and names match in
+    their own case only; a program's own invalid UTF-8 is written as
+    U+FFFD.
+  * `ParseTmux` cleans its fields.
+  * `when.Parse`'s errors are `*SyntaxError`, with the same texts.
+  * `termcap`'s unknown-name errors wrap `ErrUnknownName`.
+  * The three `…Func` adapters are new.

@@ -17,7 +17,7 @@ const (
 )
 
 var dispositionNames = enum.Names[Disposition]{
-	Pkg: pkgName, Type: "Disposition",
+	Pkg: pkgName, Type: "Disposition", Unknown: ErrUnknownName,
 	Tokens: []string{"recommendation", "issue"},
 }
 

@@ -47,10 +47,10 @@ const (
 // Expr is a parsed expression. Its zero value is false.
 type Expr struct{ root node }
 
-// Parse compiles src.
+// Parse compiles src. Its error is a *SyntaxError.
 func Parse(src string) (Expr, error) {
 	if len(src) > MaxSource {
-		return Expr{}, fmt.Errorf("when: source of %d bytes, more than %d", len(src), MaxSource)
+		return Expr{}, &SyntaxError{Offset: -1, Msg: fmt.Sprintf("source of %d bytes, more than %d", len(src), MaxSource)}
 	}
 	p := parser{s: scanner{src: src}}
 	if err := p.advance(); err != nil {
@@ -66,7 +66,7 @@ func Parse(src string) (Expr, error) {
 	// The canonical form can be longer than the source, and must parse
 	// too (docs/decisions/0006-MADR-command-registry.md A3).
 	if n := len(root.str()); n > MaxSource {
-		return Expr{}, fmt.Errorf("when: canonical form of %d bytes, more than %d", n, MaxSource)
+		return Expr{}, &SyntaxError{Offset: -1, Msg: fmt.Sprintf("canonical form of %d bytes, more than %d", n, MaxSource)}
 	}
 	return Expr{root: root}, nil
 }

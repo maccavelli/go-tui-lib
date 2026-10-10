@@ -14,10 +14,19 @@
 // policy in AGENTS.md, "API conventions".
 package termcap
 
-import "github.com/maccavelli/go-tui-lib/internal/enum"
+import (
+	"errors"
+
+	"github.com/maccavelli/go-tui-lib/internal/enum"
+)
 
 // pkgName is the package's name, as its enums' errors give it.
 const pkgName = "termcap"
+
+// ErrUnknownName is wrapped by the error for a name termcap does not know:
+// from each enum's UnmarshalText, and from Caps.UnmarshalJSON for a colour
+// profile. The errors' texts name the type and the name.
+var ErrUnknownName = errors.New("termcap: unknown name")
 
 // Support is what is known about one capability.
 type Support uint8
@@ -34,7 +43,7 @@ const (
 )
 
 var supportNames = enum.Names[Support]{
-	Pkg: pkgName, Type: "Support",
+	Pkg: pkgName, Type: "Support", Unknown: ErrUnknownName,
 	Tokens: []string{"unknown", "unsupported", "supported"},
 }
 
@@ -68,7 +77,7 @@ const (
 )
 
 var originNames = enum.Names[Origin]{
-	Pkg: pkgName, Type: "Origin",
+	Pkg: pkgName, Type: "Origin", Unknown: ErrUnknownName,
 	Tokens: []string{"not-queried", "heuristic", "env", "query", "override"}, // stable text
 }
 
@@ -119,7 +128,7 @@ const (
 )
 
 var muxNames = enum.Names[Mux]{
-	Pkg: pkgName, Type: "Mux",
+	Pkg: pkgName, Type: "Mux", Unknown: ErrUnknownName,
 	Tokens: []string{"none", "tmux", "screen", "zellij"},
 }
 

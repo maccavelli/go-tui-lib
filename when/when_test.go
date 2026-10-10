@@ -1,7 +1,10 @@
 package when
 
 import (
+	"errors"
+	"regexp/syntax"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -144,6 +147,63 @@ func TestParseErrors(t *testing.T) {
 		if _, err := Parse(src); err == nil {
 			t.Errorf("Parse(%q) succeeded", src)
 		}
+	}
+}
+
+// TestSyntaxErrorOffsets: each of Parse's error sites gives a
+// *SyntaxError with its offset and its text, the regex's wrapping
+// regexp's error, and the two size limits offset -1
+// (docs/decisions/0014-PLAN-canonicalization.md Step 7).
+func TestSyntaxErrorOffsets(t *testing.T) {
+	for _, c := range []struct {
+		src    string
+		offset int
+		msg    string
+	}{
+		{"a & b", 2, `a single '&'`},
+		{"a | b", 2, `a single '|'`},
+		{"a = b", 2, `a single '='`},
+		{`a == 'x\`, 5, "an unterminated string"},
+		{"a == 'x", 5, "an unterminated string"},
+		{"a =~ x", 5, "a regex must start with '/'"},
+		{"a =~ /x/q", 8, "an unknown regex flag 'q'"},
+		{"a =~ /x", 5, "an unterminated regex"},
+		{strings.Repeat("!", MaxDepth+1) + "a", MaxDepth, "nesting deeper than 64"},
+		{strings.Repeat("(", MaxDepth+1) + "a", MaxDepth, "nesting deeper than 64"},
+		{"(a", 2, "a missing ')'"},
+		{"'s'", 0, "a string alone is not a condition"},
+		{"a &&", 4, "an expression that ends too soon"},
+		{"&& a", 0, "an unexpected operator"},
+		{"1a", 0, `"1a" is not a key`},
+		{"a not b", 6, "'not' without 'in'"},
+		{"a in 1", 5, "'in' needs a key"},
+		{"a ==", 4, "a comparison without a value"},
+		{"a == 1" + strings.Repeat("0", 400), 5, `a bad number "1` + strings.Repeat("0", 400) + `"`},
+		{"a b", 2, "an unexpected token"},
+		{strings.Repeat("a", MaxSource+1), -1, "source of 4097 bytes, more than 4096"},
+		{strings.Repeat("a&&", (MaxSource-1)/3) + "a", -1, "canonical form of 6826 bytes, more than 4096"},
+	} {
+		_, err := Parse(c.src)
+		se, ok := errors.AsType[*SyntaxError](err)
+		if !ok {
+			t.Errorf("Parse(%.20q): %v, not a *SyntaxError", c.src, err)
+			continue
+		}
+		want := "when: " + c.msg
+		if c.offset >= 0 {
+			want += " at offset " + strconv.Itoa(c.offset)
+		}
+		if se.Offset != c.offset || se.Msg != c.msg || se.Err != nil || err.Error() != want {
+			t.Errorf("Parse(%.20q) = %d, %q, %v; want %d, %q, %q", c.src, se.Offset, se.Msg, se.Err, c.offset, c.msg, want)
+		}
+	}
+
+	_, err := Parse("a =~ /(/")
+	se, ok := errors.AsType[*SyntaxError](err)
+	var re *syntax.Error
+	if !ok || se.Offset != 0 || se.Msg != "a bad regex" || !errors.As(err, &re) ||
+		err.Error() != "when: a bad regex: "+re.Error()+" at offset 0" {
+		t.Errorf("a bad regex: %#v, %v", se, err)
 	}
 }
 

@@ -1,0 +1,136 @@
+  1|{
+ 22|  "schema_version": 1,
+ 11|  "caps": {
+ 21|    "complete": true,
+ 22|    "timed_out": true,
+ 17|    "terminal": {
+ 41|      "value": "WezTerm <20240203> & co",
+ 23|      "origin": "query"
+  6|    },
+ 12|    "mux": {
+ 22|      "value": "tmux",
+ 21|      "origin": "env"
+  6|    },
+ 15|    "remote": {
+ 20|      "value": true,
+ 21|      "origin": "env"
+  6|    },
+ 19|    "attributes": [
+  9|      62,
+  8|      4,
+  8|      22
+  6|    ],
+ 23|    "kitty_keyboard": {
+ 27|      "value": "supported",
+ 23|      "origin": "query"
+  6|    },
+ 24|    "keyboard_flags": 1,
+ 20|    "sync_output": {
+ 27|      "value": "supported",
+ 23|      "origin": "query"
+  6|    },
+ 23|    "grapheme_width": {
+ 29|      "value": "unsupported",
+ 23|      "origin": "query"
+  6|    },
+ 29|    "color_scheme_reports": {
+ 27|      "value": "supported",
+ 23|      "origin": "query"
+  6|    },
+ 23|    "in_band_resize": {
+ 29|      "value": "unsupported",
+ 23|      "origin": "query"
+  6|    },
+ 21|    "focus_events": {
+ 27|      "value": "supported",
+ 23|      "origin": "query"
+  6|    },
+ 23|    "desktop_notify": {
+ 29|      "value": "unsupported",
+ 26|      "origin": "override"
+  6|    },
+ 23|    "kitty_graphics": {
+ 27|      "origin": "heuristic"
+  6|    },
+ 14|    "sixel": {
+ 27|      "value": "supported",
+ 23|      "origin": "query"
+  6|    },
+ 13|    "dark": {
+ 20|      "value": true,
+ 23|      "origin": "query"
+  6|    },
+ 14|    "brand": {
+ 25|      "value": "wezterm",
+ 23|      "origin": "query"
+  6|    },
+ 18|    "env_brand": {
+ 22|      "origin": "env",
+ 34|      "reason": "terminal.unknown"
+  6|    },
+ 15|    "editor": {
+ 24|      "value": "neovim",
+ 21|      "origin": "env"
+  6|    },
+ 17|    "platform": {
+ 21|      "value": "wsl",
+ 21|      "origin": "env"
+  6|    },
+ 23|    "legacy_console": {
+ 27|      "origin": "heuristic"
+  6|    },
+ 13|    "tmux": {
+ 20|      "known": true,
+ 23|      "version": "3.4",
+ 38|      "extended_keys_format": "csi-u",
+ 20|      "mouse": true,
+ 24|      "term_features": [
+ 13|        "RGB"
+  8|      ],
+ 23|      "client_flags": [
+ 15|        "focus"
+  7|      ]
+  6|    },
+ 26|    "palette_known": true,
+ 29|    "secondary_attributes": [
+  8|      1,
+  9|      95,
+  7|      0
+  6|    ],
+ 28|    "background": "#1e1f29",
+ 25|    "profile": "ANSI256",
+ 28|    "foreground": "#cdd6f4",
+ 16|    "palette": [
+ 16|      "#00ff00",
+ 16|      "#10ef01",
+ 16|      "#20df02",
+ 16|      "#30cf03",
+ 16|      "#40bf04",
+ 16|      "#50af05",
+ 16|      "#609f06",
+ 16|      "#708f07",
+ 16|      "#807f08",
+ 16|      "#906f09",
+ 16|      "#a05f0a",
+ 16|      "#b04f0b",
+ 16|      "#c03f0c",
+ 16|      "#d02f0d",
+ 16|      "#e01f0e",
+ 15|      "#f00f0f"
+  5|    ]
+  4|  },
+ 15|  "findings": [
+  5|    {
+ 31|      "id": "terminal.unknown",
+ 38|      "disposition": "recommendation",
+ 90|      "message": "Nothing names the terminal, so capabilities that depend on it are off.",
+ 64|      "fix": "Set TERM_PROGRAM, or let LC_TERMINAL through SSH."
+  6|    },
+  5|    {
+ 37|      "id": "keyboard.wsl-dead-keys",
+ 38|      "disposition": "recommendation",
+123|      "message": "Under WSL, keyboard enhancement breaks dead keys in VS Code, and is not trusted in an unnamed terminal.",
+ 82|      "fix": "None in this library; a later terminal-mode record can turn it off."
+  5|    }
+  3|  ]
+  1|}

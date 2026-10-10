@@ -160,7 +160,7 @@ func (p *parser) cmp() (node, error) {
 		}
 		re, err := regexp.Compile(flagPrefix(flags) + pattern)
 		if err != nil {
-			return nil, p.s.errorf(pos, "a bad regex: %v", err)
+			return nil, &SyntaxError{Offset: pos, Msg: "a bad regex", Err: err}
 		}
 		return regexNode{key: word, re: re, pattern: pattern, flags: flags}, p.advance()
 	case tWord:

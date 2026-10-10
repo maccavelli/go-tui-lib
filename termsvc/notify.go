@@ -167,6 +167,12 @@ type Backend interface {
 	Notify(ctx context.Context, x Notification) error
 }
 
+// BackendFunc is a function used as a Backend.
+type BackendFunc func(ctx context.Context, x Notification) error
+
+// Notify calls f.
+func (f BackendFunc) Notify(ctx context.Context, x Notification) error { return f(ctx, x) }
+
 // NotifyOption configures a Notifier. It is opaque: only this package's
 // functions make one.
 type NotifyOption interface{ apply(*Notifier) }

@@ -41,7 +41,7 @@ const (
 )
 
 var brandNames = enum.Names[Brand]{
-	Pkg: pkgName, Type: "Brand",
+	Pkg: pkgName, Type: "Brand", Unknown: ErrUnknownName,
 	Tokens: []string{
 		"unknown", "apple-terminal", "iterm2", "kitty", "ghostty", "wezterm", "alacritty", "foot",
 		"rio", "contour", "vte", "konsole", "terminator", "windows-terminal", "vscode", "cursor",
@@ -71,7 +71,7 @@ const (
 )
 
 var editorNames = enum.Names[Editor]{
-	Pkg: pkgName, Type: "Editor",
+	Pkg: pkgName, Type: "Editor", Unknown: ErrUnknownName,
 	Tokens: []string{"none", "neovim", "vim", "emacs"},
 }
 
@@ -95,7 +95,7 @@ const (
 )
 
 var platformNames = enum.Names[Platform]{
-	Pkg: pkgName, Type: "Platform",
+	Pkg: pkgName, Type: "Platform", Unknown: ErrUnknownName,
 	Tokens: []string{"native", "msys", "wsl"},
 }
 

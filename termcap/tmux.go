@@ -3,6 +3,8 @@ package termcap
 import (
 	"strconv"
 	"strings"
+
+	"github.com/maccavelli/go-tui-lib/internal/sanitize"
 )
 
 // TmuxFacts is what tmux says about itself, from one run of TmuxQuery.
@@ -37,13 +39,15 @@ const tmuxFormat = "#{version}\t#{extended-keys-format}\t#{mouse}\t#{client_term
 func TmuxQuery() []string { return []string{"tmux", "display-message", "-p", tmuxFormat} }
 
 // ParseTmux reads TmuxQuery's output. Known is false unless every field is
-// there; the fields it found are kept either way.
+// there; the fields it found are kept either way. Each field is cleaned as
+// a line of display text (internal/sanitize), since the output is
+// untrusted.
 func ParseTmux(out string) TmuxFacts {
 	fields := strings.Split(strings.TrimRight(out, "\r\n"), "\t")
 	var t TmuxFacts
 	field := func(i int) string {
 		if i < len(fields) {
-			return strings.TrimSpace(fields[i])
+			return strings.TrimSpace(sanitize.Line(fields[i]))
 		}
 		return ""
 	}

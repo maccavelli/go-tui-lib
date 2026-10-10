@@ -110,7 +110,16 @@ whose record grants an exception says so in that record.
    correct under `NO_COLOR`, an ASCII colour profile and an unknown
    background.
 5. **Width is the caller's, and is measured in cells.** Wrapping and
-   truncation use `x/ansi`, and nothing assumes a terminal size.
+   truncation use `x/ansi`, and nothing assumes a terminal size. One rule
+   says which width (0014-PLAN-canonicalization Step 7):
+   - the workspace measures with its width method, `ansi.WcWidth` until
+     the terminal reports grapheme clustering (mode 2027) and
+     `ansi.GraphemeWidth` after, unless `WithWidthMethod` fixes it; it
+     cuts with `internal/sanitize`'s `Truncate`, which never returns text
+     wider than asked;
+   - a test measures with `tuitest.Fits`, under its case's method;
+   - `termsvc` and `termcap`'s report cut by grapheme cluster, with
+     `ansi.Truncate`.
 6. **Rendering is tested across the matrix** {colour, no colour} × {UTF-8,
    ASCII} × at least two widths, with golden files under the package's
    `testdata/`. CI also runs the tests under `LC_ALL=C`.

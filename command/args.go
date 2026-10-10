@@ -2,7 +2,7 @@ package command
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	jsonv2 "encoding/json/v2"
 	"errors"
 	"fmt"
@@ -97,7 +97,7 @@ func MustNew[A any](id ID, title string, run func(ctx context.Context, inv *Invo
 // ArgsOf encodes a as a request's arguments: deterministic JSON, with a
 // time.Duration in the string form New's schema accepts ("1m30s"). It is
 // how a program's own command line builds Request.Args from its flags.
-func ArgsOf[A any](a A) (json.RawMessage, error) {
+func ArgsOf[A any](a A) (jsontext.Value, error) {
 	b, err := jsonv2.Marshal(a, jsonv2.Deterministic(true), jsonv2.WithMarshalers(durationMarshalers))
 	if err != nil {
 		return nil, fmt.Errorf("command: arguments: %w", err)

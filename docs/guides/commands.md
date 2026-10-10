@@ -187,9 +187,9 @@ mode =~ /^insert/i
 
 ## Slash commands
 
-`r.ParseSlash("/resize sidebar 4")` gives the `Request` the palette,
-`--args` and an agent would send for it: `OriginSlash`, the tail in `Raw`,
-and the arguments as JSON.
+`r.ParseSlash("/resize sidebar 4")` gives the `Request` the palette, the
+program's own command line (`ParseArgs`) and an agent would send for it:
+`OriginSlash`, the tail in `Raw`, and the arguments as JSON.
 
 - Positional values fill the `arg` properties in order; a positional array
   takes the rest. `name=value` sets any property, and repeats for an

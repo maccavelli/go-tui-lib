@@ -1,11 +1,14 @@
 package termcap
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 	"fmt"
 	"image/color"
 
 	"github.com/charmbracelet/colorprofile"
+
+	"github.com/maccavelli/go-tui-lib/internal/enum"
 )
 
 // Caps is what is known about the terminal. A field is added, never
@@ -69,7 +72,8 @@ type capsJSON struct {
 	Palette    []string `json:"palette,omitzero"` // 16 entries, "" where unknown
 }
 
-// MarshalJSON writes c with every zero field left out.
+// MarshalJSON writes c with every zero field left out. Invalid UTF-8 in a
+// value, which only a program's own values can hold, is written as U+FFFD.
 func (c Caps) MarshalJSON() ([]byte, error) {
 	j := capsJSON{caps: caps(c), Background: hex(c.Background), Foreground: hex(c.Foreground)}
 	if c.Profile != colorprofile.Unknown {
@@ -81,7 +85,7 @@ func (c Caps) MarshalJSON() ([]byte, error) {
 			j.Palette[i] = hex(p)
 		}
 	}
-	return json.Marshal(j)
+	return json.Marshal(j, jsontext.AllowInvalidUTF8(true))
 }
 
 // hex is c as #rrggbb, or "" when c is nil.
@@ -132,7 +136,7 @@ func (c *Caps) UnmarshalJSON(b []byte) error {
 	if j.Profile != "" {
 		p, ok := parseProfile(j.Profile)
 		if !ok {
-			return fmt.Errorf("termcap: unknown colour profile %q", j.Profile)
+			return enum.Errorf(ErrUnknownName, "termcap: unknown colour profile %q", j.Profile)
 		}
 		c.Profile = p
 	}
