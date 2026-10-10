@@ -1130,3 +1130,62 @@ listed in `scripts/apicheck.allow`, and 75 compatible ones.
   text methods.
 * **Unchanged for a program:** `command`'s `json.RawMessage` fields are
   spelled `jsontext.Value`, the same type in Go 1.27.
+
+#### The tag, CI and the smoke test
+
+* **The tag.** The owner committed the documents as `9a90b6d`, pushed
+  `main`, and tagged `v0.9.0` there (an annotated tag). The owner pushed
+  before the agent ran the disclosure guard, so the push's own pre-push
+  guard was the first over these commits; the agent then ran it over
+  `ae6e76c..9a90b6d`, which holds everything that push sent: exit 0. CI
+  passed on `main`, run `38065389258`, and on the tag, run
+  `38066341008`; and on `2c58073`, Step 7, run `38063219588`.
+* **The consumer smoke test,** as the releasing guide gives it, in a
+  scratch module outside the repository, with `go env GOWORK` empty: `go
+  get github.com/maccavelli/go-tui-lib@v0.9.0` from the proxy, `go mod
+  tidy`, then `go vet`, `go build` and `go run` of two programs.
+  * **The old names:** `command.Decision` from a `GateFunc`,
+    `Request.Context` and `Invocation.Context`, `Record.Decision`,
+    `termcap.New`, `layout.SidebarWidth`, `Gap` and `NoResponsive`,
+    `workspace.WithMouse(true)` and `termsvc.WithGate`. It builds and
+    prints "smoke old names: ok": a destructive command an agent runs is
+    asked of the gate and allowed, the handler sees the context, the
+    record holds `AllowOnce`, `RenderPlain` draws the pane, and the
+    filter skips with `SkipGated`. golangci-lint 2.14.0's staticcheck,
+    with every issue shown, reports SA1019 for each of the 11 uses, with
+    its `// Deprecated:` text. The standalone `staticcheck` on the host
+    is too old to read Go 1.27's export data; golangci-lint's is the one
+    the repository runs.
+  * **The new names:** the same on `Verdict`, `WhenContext`,
+    `Record.Verdict`, `AuditorFunc`, `NewProber`, the `With…` options,
+    `WithoutMouse` and `WithNotifyFilter`; and what `v0.9.0` changed:
+    `Danger`'s JSON is `"read-only"`, `Mux(9)` prints "Mux(9)",
+    `Surface` reads "cli|key" and prints "key|cli", `Mux`'s unknown name
+    wraps `ErrUnknownName` with its text, `Caps`'s JSON keeps
+    `"a<b>&c"`, `when.Parse("a & b")` is a `*SyntaxError` at offset 2,
+    and a `BackendFunc` and a `ClipboardFunc` receive `Notify`'s and
+    `Copy`'s text. It prints "smoke new names: ok", and staticcheck
+    reports nothing.
+  * **The break:** a third program assigning `func(*workspace.Workspace)
+    {}` to a `workspace.Option` fails to build: "does not implement
+    workspace.Option (missing method apply)".
+  * **The negative control:** a copy of the new-names program expecting
+    `Danger`'s JSON as the number 1 failed with "FAIL: Danger's JSON =
+    {\"D\":\"read-only\"}" and exit status 1.
+
+#### `scripts/apicheck.allow`, emptied
+
+* **Why now:** the API diff gate's base is the newest tag that HEAD does
+  not contain. While HEAD is the tag, that is `v0.8.0`; from the next
+  commit it is `v0.9.0`, where apidiff reports none of the 14 entries.
+* **The proof, on a scratch clone of `9a90b6d`:** an empty commit after
+  the tag, with the list as it was, fails: "against v0.9.0, 0
+  incompatible change(s)", and the 14 entries "stale". With the list
+  emptied, it passes: "against v0.9.0, 0 incompatible change(s)",
+  "clean".
+* **The change:** both of W4's blocks go; the file is the header alone,
+  byte for byte as at `v0.8.0`. In the working tree, while HEAD is still
+  the tag, `make apicheck` compares with `v0.8.0` and fails on the 14
+  changes now unlisted; the close-out commit makes the base `v0.9.0`.
+
+Step 8 is done.

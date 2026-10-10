@@ -7,23 +7,3 @@
 # removes its entries: once the next tag is the base, apidiff no longer
 # prints them, and scripts/go-apicheck.sh fails on them as stale
 # (docs/decisions/0014-PLAN-api-policy-gates.md Step 4).
-
-# docs/decisions/0014-PLAN-canonicalization.md Step 4: W3's deprecated
-# variables, removed in v0.9.0 (0014-MADR-native-integration-api A1.5).
-.	- ./termcap/termcaptest.RunTimeout: removed
-.	- ./workspace.KeyFocusedPane: removed
-.	- ./workspace.KeyHeight: removed
-.	- ./workspace.KeyHiddenPanes: removed
-.	- ./workspace.KeyModal: removed
-.	- ./workspace.KeyOverlay: removed
-.	- ./workspace.KeyWidth: removed
-.	- ./workspace.KeyZoomed: removed
-
-# docs/decisions/0014-PLAN-canonicalization.md Step 5: the six option
-# types become opaque interfaces (0014-MADR-native-integration-api W0.4).
-.	- ./command.Option: changed from func(*Command) to interface{apply(*Command)}
-.	- ./command.RegistryOption: changed from func(*Registry) to interface{apply(*Registry)}
-.	- ./termcap.Option: changed from func(*Prober) to interface{apply(*Prober)}
-.	- ./termsvc.NotifyOption: changed from func(*Notifier) to interface{apply(*Notifier)}
-.	- ./workspace.Option: changed from func(*Workspace) to interface{apply(*Workspace)}
-.	- ./workspace.WrapOption: changed from func(*Model[M]) to interface{apply(*Model[M])}
