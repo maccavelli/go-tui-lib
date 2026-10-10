@@ -18,7 +18,7 @@ pattern, used by every program that needs it.
 
 ## Status
 
-- **The current release is `v0.9.0`.** `v0` means the API may still
+- **The current release is `v0.10.0`.** `v0` means the API may still
   change, and a renamed name keeps working for one minor release:
   [the migration guide](docs/guides/migrating.md) lists them.
 - **Multi-pane workspaces, since `v0.1.0`.** `layout` arranges panes: a main
@@ -62,8 +62,8 @@ pattern, used by every program that needs it.
   view keeps only its styles and links. Command files, a request's
   arguments and the window have limits, and each package that parses
   input has a fuzz target.
-- **One name for each idea, since `v0.9.0`.** Renamed names, with the
-  old ones deprecated until `v0.10.0`; opaque option types; text forms for
+- **One name for each idea, since `v0.9.0`.** Renamed names, whose old
+  names `v0.10.0` removes; opaque option types; text forms for
   every enum; `when.SyntaxError`, `termcap.ErrUnknownName` and a `…Func`
   adapter for each hook; and `encoding/json/v2` in `command` and
   `termcap`.

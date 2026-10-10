@@ -1280,3 +1280,45 @@ No deviation.
     close-out records a `go-fuzz_test` that passes in every tree state.
   * **The others:** port `go-fuzz_test` alone, or patch case 6 in shell
     and port later; and run Step 10 first.
+
+### Step 10: the release `v0.10.0`, and close-out
+
+#### Deviations
+
+No deviation. D4 held: Step 10 started after
+[0017-PLAN-python-repository-scripts.md](0017-PLAN-python-repository-scripts.md)
+Phase 1 was committed as `d066d7c`.
+
+#### The documents
+
+* **`README.md`:** "The current release is `v0.10.0`"; the `v0.9.0`
+  bullet says `v0.10.0` removes the old names.
+* `docs/guides/migrating.md`'s "Migrating to `v0.10.0`" and the glossary
+  landed with Step 9.
+
+#### Release notes
+
+`v0.10.0` removes the names `v0.9.0` deprecated (0014-MADR W4). Go 1.27.2
+is required. Against `v0.9.0`, apidiff reports 15 incompatible changes,
+each a removal listed in `scripts/apicheck.allow`, and no other change.
+
+* **Removed:**
+  * `command.Decision` (use `Verdict`) and `Record.Decision` (use
+    `Record.Verdict`);
+  * `command.Request.Context` and `Invocation.Context` (use
+    `WhenContext`);
+  * `termcap.New` (use `NewProber`);
+  * `layout.SidebarWidth`, `BottomHeight`, `MainSize`, `BottomSpan`,
+    `Footer`, `Gap`, `Breakpoints` and `NoResponsive` (use
+    `WithSidebarWidth`, `WithBottomHeight`, `WithMainSize`,
+    `WithBottomSpan`, `WithFooter`, `WithGap`, `WithBreakpoints` and
+    `WithoutResponsive`);
+  * `workspace.WithMouse` (use `WithoutMouse`; the mouse is handled by
+    default);
+  * `termsvc.WithGate` (use `WithNotifyFilter`).
+* **Behaviour change:** `SlogAuditor` logs the verdict under the key
+  `verdict`, where it was `decision`.
+* **`Decision`** is now `launch`'s alone: the collision check no longer
+  allows it in two packages.
+* **The repository, not the module:** `scripts/go-fuzz` is Python
+  (0017-PLAN Phase 1), with `go-fuzz_test`'s case 6 fixed.
