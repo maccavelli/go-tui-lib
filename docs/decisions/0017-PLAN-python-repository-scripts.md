@@ -370,3 +370,83 @@ Three other things found on the way, none changing the scope:
     passes through to the script's stderr; on failure, the message and
     `go`'s output, indented, are as before.
   * **The other:** keep the port faithful, and leave it to a later record.
+
+#### What was built
+
+* **`scripts/go-modules.py`,** executable, the standard library only: the
+  list, `--check`, the messages and exit codes of `go-modules.sh`. Its
+  stdout and stderr write `\n` alone, on Windows too: its callers read
+  the list with `$(...)`, which would keep a `\r`. By D2, the list comes
+  from `go list`'s stdout alone; what `go` writes to stderr passes
+  through.
+* **`scripts/go-modules_test.py`:** the shell test's 17 cases, by name,
+  and two more:
+  * case 9, two checks: a listing's bytes hold no `\r`;
+  * case 10, four checks (D2): through a `go` that writes a warning to
+    stderr and succeeds, the listing is `.` and `sub` alone, the warning
+    reaches stderr, and `--check` passes.
+
+  Case 8's other spelling of the directories, a bash wrapper in the shell
+  test, is a small Go program the test builds, as Phase 1's recorder is;
+  case 10 uses it too.
+* **Callers:** `Makefile`'s `MODULES_CMD` is `$(PYTHON)
+  ./scripts/go-modules.py`; CI's `modules` step runs the test, `--check`
+  and the list with `python3`, and its `gates` step lists the modules so;
+  `go-apicheck.sh` and `go-precheck.sh` run `"${PYTHON:-python3}"` on
+  it; `go-precheck_test.sh` copies it into its throwaway repositories.
+* **Docs:** `AGENTS.md` (the modules section, the pre-add text, and the
+  scripts still in shell), `docs/architecture.md` and
+  `docs/guides/releasing.md` name the Python files; so do the shell
+  scripts' comments.
+* **Removed:** `scripts/go-modules.sh` and `scripts/go-modules_test.sh`.
+* **Committed in two parts:** the owner committed the port as `a2a6a17`
+  while its Windows run was going, and D2, with its deviation entry, as
+  `5832dc9`.
+
+#### Checks
+
+* **The comparison (rule 3),** before D2, on the same tree: the shell
+  test, "17 passed, 0 failed"; the Python test, every shell case by name,
+  against `go-modules.py` and against `go-modules.sh` (`MODULES`); and the
+  two scripts, on nine inputs (the repository's list and `--check`; a
+  module missing from `go.work`; a `go.work` entry with no `go.mod`; an
+  untracked `go.mod`; no `go.work`, listed and checked; an unknown
+  argument; outside a repository): the same stdout, stderr and exit code
+  on each, the usage line's own script name aside.
+* **After D2,** the same nine inputs give the same stdout, stderr and exit
+  code as `go-modules.sh` from `HEAD~1`: D2 changes only a successful run
+  in which `go` writes to stderr.
+* **The probe for D2:** the Python test against `go-modules.sh` from
+  `HEAD~1` fails case 10's three checks that read the list and stderr:
+  "the warning is not listed", "the warning reaches stderr" and
+  "--check with a warning passes", "20 passed, 3 failed".
+* **The empty module cache (rule 3, D1):** "23 passed, 0 failed", on
+  macOS and on the Windows test host.
+* **Mutations,** on scratch copies, each killed:
+  * **P2-1** (`--check` ignores a `go.mod` that `go.work` omits): "a
+    module missing from go.work fails --check: want 1, got 0", "21 passed,
+    2 failed".
+  * **P2-2** (the list reads `go`'s stderr again, appended to stdout):
+    the same three checks as the probe, "20 passed, 3 failed". A first
+    version of P2-2 left `r.stderr` empty and crashed the script; it was
+    replaced, since a crash is not the fault it stands for.
+* **macOS:** `py_compile`; `go-modules_test.py`, "23 passed, 0 failed";
+  `go-fuzz_test.py`, "27 passed"; the shell tests still in shell,
+  `go-precheck_test.sh` ("12 passed"), `go-apicheck_test.sh` ("19
+  passed") and `go-examples_test.sh` ("19 passed"), each running
+  `go-modules.py`; `make release-check`, "200 file(s) clean"; `make test`;
+  `make lint`, `make fuzz FUZZTIME=2s` ("8 packages ran clean"),
+  `shellcheck`, `markdownlint-cli2` and `actionlint`, before D2. All
+  clean.
+* **The Windows test host,** go1.27.2 windows/amd64, Python 3.14.7, with
+  D2 and the index synced: `go-modules.py`'s list, as bytes, is `.` and
+  `\n`; `make pre-add-check`, `make lint`, `make vuln`, `make examples`
+  and `make test`, each exit 0, through `MODULES_CMD`; `go test -count=2
+  -shuffle=on ./...`, exit 0; `py_compile`, exit 0;
+  `go-modules_test.py`, "23 passed, 0 failed", warm and with an empty
+  module cache; `go-fuzz_test.py`, "27 passed"; `go-precheck_test.sh`,
+  "12 passed"; `go-apicheck_test.sh`, "19 passed"; `go-examples_test.sh`,
+  "19 passed"; `make fuzz FUZZTIME=3s`, "8 packages ran clean".
+  * A run on the tree before D2 was stopped when D2 began, at the owner's
+    word, as it would have to run again; its processes on the host were
+    ended with `taskkill`, and its files removed, before this run.
