@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-10-10
 associated-madr: "0014-MADR-native-integration-api.md"
 ---
@@ -1331,3 +1331,73 @@ each a removal listed in `scripts/apicheck.allow`, and no other change.
   on CI's empty module cache. The fault and its fix are
   [0017-PLAN-python-repository-scripts.md](0017-PLAN-python-repository-scripts.md)
   D1. Nothing was tagged; `v0.10.0` waits for CI on the fix.
+
+#### The tag, CI and the smoke test
+
+* **The tag.** The fix landed as `32298fb`; the disclosure guard passed
+  over it; the owner pushed `main`, CI run `38080753334` passed, and the
+  owner tagged `v0.10.0` there. CI on the tag, run `38081634725`, passed.
+* **The consumer smoke test,** in a scratch module outside the
+  repository, `go env GOWORK` empty, `go get
+  github.com/maccavelli/go-tui-lib@v0.10.0` from the proxy and `go mod
+  tidy`:
+  * **The new names:** `v0.9.0`'s program, with one more check: a
+    `SlogAuditor` record holds `"verdict":"allow_once"` and no
+    `"decision"`. `go vet`, `go build` and `go run`: "smoke new names:
+    ok". golangci-lint 2.14.0's staticcheck: "0 issues".
+  * **The old names:** `v0.9.0`'s old-name program fails to compile. With
+    every error shown (`-gcflags=-e`), its 11 uses each fail once:
+    `command.Decision`, `Record.Decision` twice, `Request.Context`,
+    `Invocation.Context`, `termcap.New`, `layout.SidebarWidth`, `Gap` and
+    `NoResponsive`, `workspace.WithMouse` and `termsvc.WithGate`.
+  * **The break of `v0.9.0`** still holds: a program's own
+    `func(*workspace.Workspace)` is not a `workspace.Option`.
+  * **The negative control:** a copy of the new-names program expecting
+    the key `"decision"` failed, exit status 1.
+
+#### `scripts/apicheck.allow`, emptied
+
+* **The proof, on a scratch clone of `32298fb`:** an empty commit after
+  the tag, with the list as it was, fails: "against v0.10.0, 0
+  incompatible change(s)", and the 15 entries "stale". With the list
+  emptied, it passes: "against v0.10.0, 0 incompatible change(s)",
+  "clean"; and `make release-check` there, "200 file(s) clean".
+* **The change:** Step 9's block goes; the file is the header alone, byte
+  for byte as at `v0.8.0`. In the working tree, while HEAD is the tag,
+  `make apicheck` compares with `v0.9.0` and fails on the 15 removals now
+  unlisted; the close-out commit makes the base `v0.10.0`.
+
+#### Verification, item by item
+
+* **Every rename** has its new name in `v0.9.0` (Steps 3 and 4), its old
+  name working through `v0.9.x` (the deprecated-name tests, and
+  `v0.9.0`'s smoke test, 11 SA1019 reports), and gone in `v0.10.0`
+  (Step 9, and the smoke test above). Holds.
+* **The six option types are opaque,** and the break was listed (Step 5,
+  `TestOptionsAreOpaque`, S5-1 and S5-2; both smoke tests). Holds.
+* **Every exported enum round-trips its text,** and `Surface` has its own
+  helper, `enum.Bits` by D2 (Step 6, `TestEveryEnumRoundTrips`, S6-1 to
+  S6-8). Holds.
+* **`command` and `termcap` use JSON v2 only,** with the report's JSON
+  pinned (Step 7: no v1 import in either package, tests included;
+  `TestCapsJSONStable`). Holds.
+* **`when.SyntaxError`, `termcap.ErrUnknownName` and the `…Func`
+  adapters exist** (Step 7, S7-1 to S7-10). Holds.
+* **One width rule is documented** (Step 7: `AGENTS.md` and the
+  glossary). Holds.
+* **The glossary and 0007–0009 agree** (Step 2, D1), **and the collision
+  check passes with no temporary entry** (Step 9, S9-1 and S9-2). Holds.
+* **`v0.9.0` and `v0.10.0` are tagged, with smoke tests,** at `9a90b6d`
+  and `32298fb`; **`make apicheck` showed only the listed lines** at each
+  step, and is clean against `v0.10.0` with an empty list. Holds.
+* **Rule 2's checks are clean on macOS and the Windows test host:** each
+  step's record has its runs; after Step 10's documents, macOS
+  `make release-check` on the close-out state, above; the Windows test
+  host last ran every check at `d066d7c` (0017-PLAN Phase 1) and
+  `go-fuzz_test.py` again at `32298fb`'s change (0017-PLAN D1), warm and
+  with an empty module cache. Holds.
+* **Not checked here:** the rollout's "pi-go and gobble move to the new
+  names during `v0.9.x`" is in those repositories; the smoke tests model
+  it.
+
+This PLAN is complete.
