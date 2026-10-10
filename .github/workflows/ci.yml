@@ -164,7 +164,7 @@ jobs:
       - name: examples
         shell: bash
         run: |
-          ./scripts/go-examples_test.sh
+          python3 scripts/go-examples_test.py
           make examples
       # The pre-add check's gofmt step and its choice of files
       # (docs/decisions/0015-PLAN-precheck-gofmt-errors.md Step 2).

@@ -1,6 +1,6 @@
 // Command flag runs a registry command from a command line built with the
 // standard flag package: the program docs/guides/commands.md shows in "Run
-// commands from your own CLI". scripts/go-examples.sh builds and runs it.
+// commands from your own CLI". scripts/go-examples.py builds and runs it.
 package main
 
 import (

@@ -167,9 +167,9 @@ scripts/
                             each module's previous tag
   go-apicheck_test.py       its test, on throwaway repositories
   apicheck.allow            the incompatible changes a PLAN allows
-  go-examples.sh            builds and runs the framework examples, and
+  go-examples.py            builds and runs the framework examples, and
                             checks the guides' excerpts of them
-  go-examples_test.sh       its offline test
+  go-examples_test.py       its offline test
   go-precheck_test.sh       the pre-add check's gofmt step and its files,
                             on throwaway repositories
 glyph/ theme/ layout/ workspace/ tuitest/ termcap/ termsvc/
@@ -314,7 +314,7 @@ docs/
   `scripts/apicheck.allow`. An unlisted incompatible change fails, and so
   does a listed one apidiff no longer reports. A module with no tag is
   skipped.
-- **`make examples`** runs `scripts/go-examples.sh`:
+- **`make examples`** runs `scripts/go-examples.py`:
   - it copies `testdata/frameworks` into a temporary module, whose
     `go.mod` comes from `go.mod.tmpl` with a `replace` of the root;
   - it builds and vets the programs, and runs `cases.txt`;

@@ -1,4 +1,4 @@
-# The framework examples' cases, which scripts/go-examples.sh runs
+# The framework examples' cases, which scripts/go-examples.py runs
 # (docs/decisions/0014-PLAN-api-policy-gates.md Step 5, deviation D6):
 #
 #   <framework> <args…> => <exit> stdout|stderr <substring>

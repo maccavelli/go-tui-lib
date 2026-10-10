@@ -311,7 +311,7 @@ It ends with `scripts/go-modules.py --check`. Then:
   `GO_PRECHECK_SKIP_APICHECK=1` skips it offline.
 - **With no file list, or one that names a file under
   `testdata/frameworks`,** it runs the examples gate,
-  `scripts/go-examples.sh`. That gate builds the framework examples in a
+  `scripts/go-examples.py`. That gate builds the framework examples in a
   temporary module, runs their cases, and compares the commands guide's
   excerpts with them. `GO_PRECHECK_SKIP_EXAMPLES=1` skips it offline.
 
@@ -374,8 +374,8 @@ lists, never with `shell=True`. A test harness reports every failure as a
 FAIL line naming its case, and goes on to the next; it never stops
 silently. `make` runs them through `PYTHON` (default `python3`).
 
-`go-fuzz`, `go-modules` and `go-apicheck` are ported. `go-examples` and
-`go-precheck` are still shell, until their phases of
+`go-fuzz`, `go-modules`, `go-apicheck` and `go-examples` are ported.
+`go-precheck` is still shell, until its phase of
 `docs/decisions/0017-PLAN-python-repository-scripts.md`; when
 `go-precheck` is ported, `scripts/go-precheck.sh` stays as a shim, since
 the machine-wide commit gate runs it by that name.

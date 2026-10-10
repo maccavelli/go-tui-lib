@@ -535,3 +535,72 @@ Three other things found on the way, none changing the scope:
   `go-fuzz_test.py`, "27 passed"; `go-precheck_test.sh`, "12 passed";
   `go-examples_test.sh`, "19 passed"; `make fuzz FUZZTIME=3s`, "8
   packages ran clean".
+
+### Phase 4: `go-examples`
+
+#### Deviations
+
+No deviation. Its `2>&1` reads print `go`'s output only when a command
+fails, and `GOEXE` is read from stdout alone, so the fault D2 and D3 fixed
+is not here. A region's name is matched as a regular expression, as the
+shell's `awk` matched it; every name the guides use is a plain word, so
+the match is the same as a literal one.
+
+#### What was built
+
+* **`scripts/go-examples.py`,** executable, the standard library only:
+  the temporary module, the build, vet and cases, the guide check, and
+  `--check-guide` and `--update`, with the messages, environment
+  variables and exit codes of `go-examples.sh`. It copies the tree with
+  `shutil`, reads the guides and regions in Python where the shell used
+  `awk`, and prints a differing excerpt with `difflib`'s unified diff
+  where the shell used `diff -u`. Its usage line and its update hint name
+  `go-examples.py`, the one change to its messages. Its output's lines end
+  in `\n` alone.
+* **`scripts/go-examples_test.py`:** the shell test's 19 cases, by name.
+  Case 7's hint is checked against the name of the script under test.
+* **Callers:** `make examples` runs `$(PYTHON) ./scripts/go-examples.py`;
+  `go-precheck.sh` runs it with `"${PYTHON:-python3}"`; CI's `examples`
+  step runs the test with `python3`.
+* **Docs:** `AGENTS.md` (the pre-add text, and only `go-precheck` left in
+  shell), `docs/architecture.md`, the comments of `go-precheck.sh`,
+  `testdata/frameworks/cases.txt`, and the package comments of the four
+  framework examples, outside their guide regions, name the Python file.
+* **Removed:** `scripts/go-examples.sh` and `scripts/go-examples_test.sh`.
+
+#### Checks
+
+* **The comparison (rule 3),** on the same tree:
+  * the shell test, "19 passed, 0 failed"; the Python test has every shell
+    case by name, against `go-examples.py` and against `go-examples.sh`
+    (`EXAMPLES`), "19 passed, 0 failed";
+  * the two scripts, on fourteen inputs, with stdout and stderr compared
+    apart and the script's own name normalized: the repository, every step
+    and `--check-guide`; a passing tree; a wrong exit; the other stream;
+    a one-byte excerpt difference, its diff included; a missing region; a
+    from line with no block; a broken build, with `--check-guide` and
+    without; the skip switch; an unknown argument; no `go.mod.tmpl`; and
+    `--update`, on two copies of one tree, whose written `go.mod.tmpl` and
+    `go.sum` are equal. The same stdout, stderr and exit code on each.
+* **The empty module cache:** "19 passed, 0 failed", on macOS and on the
+  Windows test host.
+* **Mutation P4-1** (an excerpt that differs from its source passes),
+  killed: "a one-byte excerpt difference fails: want 1, got 0" and "the
+  difference is shown", "17 passed, 2 failed".
+* **macOS:** `py_compile`; `go-examples_test.py` ("19 passed"),
+  `go-apicheck_test.py` ("22 passed"), `go-modules_test.py` ("23 passed")
+  and `go-fuzz_test.py` ("27 passed"); `go-precheck_test.sh` ("12
+  passed"); `make examples`, "10 excerpt(s) checked", "clean"; `make
+  pre-add-check` on the four framework examples, "4 file(s) clean", with
+  the examples gate; `make release-check`, "200 file(s) clean"; `make
+  lint`, `shellcheck`, `markdownlint-cli2` and `actionlint`. All clean.
+* **The Windows test host,** go1.27.2 windows/amd64, Python 3.14.7, with
+  the index synced: `make pre-add-check`, `make lint`, `make vuln` and
+  `make examples`, each exit 0, `make examples` "clean"; `py_compile`,
+  exit 0; `go-examples_test.py`, "19 passed, 0 failed", warm and with an
+  empty module cache; `go-apicheck_test.py`, "22 passed";
+  `go-modules_test.py`, "23 passed"; `go-fuzz_test.py`, "27 passed";
+  `go-precheck_test.sh`, "12 passed"; `make fuzz FUZZTIME=3s`, "8
+  packages ran clean". The run left out `make test` and a second shuffled
+  `go test`, which `make pre-add-check` already covers, as the owner and
+  the agent agreed after Phase 3's run.

@@ -40,7 +40,7 @@
 # scripts/apicheck.allow does not list
 # (docs/decisions/0014-PLAN-api-policy-gates.md Step 4). A file list skips
 # it: the API belongs to the whole module, not to the files. And
-# scripts/go-examples.sh, which builds and runs the framework examples under
+# scripts/go-examples.py, which builds and runs the framework examples under
 # testdata/frameworks and checks the guides' excerpts of them, on the
 # release-check path and whenever a file list names a file under
 # testdata/frameworks (Step 5, deviation D5).
@@ -352,7 +352,7 @@ if [ "$examples_run" = 1 ]; then
   if [ "${GO_PRECHECK_SKIP_EXAMPLES:-0}" = "1" ]; then
     echo "examples: skipped (GO_PRECHECK_SKIP_EXAMPLES=1)" >&2
   else
-    ex_out="$("$REPO_ROOT/scripts/go-examples.sh" 2>&1)"
+    ex_out="$("${PYTHON:-python3}" "$REPO_ROOT/scripts/go-examples.py" 2>&1)"
     ex_rc=$?
     if [ "$ex_rc" -ne 0 ]; then
       show "examples" "$ex_out"

@@ -1,6 +1,6 @@
 // Command kong runs a registry command from a command line built with Kong:
 // the program docs/guides/commands.md shows in "Run commands from your own
-// CLI". scripts/go-examples.sh builds and runs it.
+// CLI". scripts/go-examples.py builds and runs it.
 package main
 
 import (

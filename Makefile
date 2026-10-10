@@ -112,7 +112,7 @@ apicheck: ## Fails on an incompatible API change since the previous tag, per mod
 # a temporary module of their own, run, and compared with the guides'
 # excerpts (docs/decisions/0014-PLAN-api-policy-gates.md Step 5).
 examples: ## Builds and runs the framework examples in a temporary module
-	@./scripts/go-examples.sh
+	@$(PYTHON) ./scripts/go-examples.py
 
 # The pre-add rule (AGENTS.md). scripts/go-precheck.sh is the one
 # implementation; the agent gate at `git commit` runs the same file.
