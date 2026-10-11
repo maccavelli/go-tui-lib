@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-10-10
 associated-madr: "0017-MADR-python-repository-scripts.md"
 ---
@@ -728,3 +728,52 @@ the match is the same as a literal one.
   * A stray command of the agent's copied the tree to the host under a
     label `x` and failed at its second copy, leaving `tree-x.tgz` in the
     home directory; the agent removed it.
+
+### Phase 6: close-out
+
+#### Deviations
+
+No deviation. The documents this phase names moved with each port, as rule
+2 has a phase's callers and docs move in its commit: `docs/architecture.md`
+(the tree, and the tooling text), `docs/guides/releasing.md`, and
+`AGENTS.md` (the pre-add text, and the scripts section, which lists no
+shell script left but the shim). A search of the documents, the
+`Makefile` and CI for a `.sh` file finds only the shim and the machine-wide
+gate's own file.
+
+#### CI and the pushes
+
+CI runs on a push, not on a commit: the owner pushed Phases 0 and 1, with
+D1, in the push CI run `38080753334` passed on `32298fb`; and Phases 2 to
+5, with D2 to D4, in one push of seven commits, `32298fb..a101f2d`, which
+CI run `38098398902` passed, every job: `modules`, the three `test` jobs
+and `gates`. The owner pushed the second before the agent ran the
+disclosure guard; the agent ran it after, over those seven commits: exit
+0.
+
+#### Verification, item by item
+
+* **Each phase's comparison (rule 3) holds, before its shell pair is
+  deleted:** Phase 1, eight inputs; Phase 2, nine; Phase 3, ten; Phase 4,
+  fourteen; Phase 5, ten; each the same stdout, stderr and exit code,
+  each phase's test passing every shell case by name, against the Python
+  script and against the shell one, and with an empty module cache from
+  Phase 2 (D1). Where D2, D3 and D4 changed behaviour, the change is
+  confined to a successful run in which `go` writes to stderr, and each
+  has a probe that fails on the shell script. Holds.
+* **The case-6 probe fails on the shell test and passes on the Python
+  one:** Phase 1, with a tracked test file deleted and not staged: exit 1
+  and no FAIL line, against "27 passed, 0 failed". Holds.
+* **Every mutation is killed:** P1-1 to P1-3, P2-1 and P2-2, P3-1 and
+  P3-2, P4-1, P5-1 and P5-2. Holds.
+* **`make release-check`, `make fuzz`, `make apicheck`, `make examples` and
+  the five tests pass on macOS and on the Windows test host, and CI is
+  green, after each phase:** each phase's record has its macOS and Windows
+  runs; CI ran per push, as above, and is green on both. Holds, with CI
+  per push rather than per phase.
+* **After Phase 5, `scripts/` holds no shell file but the shim, and the
+  machine-wide gate's run through it is recorded:** `scripts/go-precheck.sh`
+  is the one `.sh`; the gate's run, failing on an unformatted file and
+  passing on a formatted one, is in Phase 5's record. Holds.
+
+This PLAN is complete.
