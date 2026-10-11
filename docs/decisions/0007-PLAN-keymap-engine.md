@@ -1,6 +1,6 @@
 ---
 status: in-progress
-date: 2026-10-10
+date: 2026-10-11
 associated-madr: "0007-MADR-keymap-engine.md"
 ---
 # Implement the keymap engine
@@ -963,3 +963,150 @@ Where §6 leaves a detail open, the step reads it so, needing no choice:
   failed, `TestRealTimer` among them; `keymap` under `-shuffle=on
   -count=2`, exit 0; `go-fuzz_test.py`, "27 passed"; `make fuzz
   FUZZTIME=3s`, "8 packages ran clean".
+
+### Step 5: the VS Code loader, exporter and schema
+
+No deviation. With A3's and A4's names and types, in `keymap/vscode.go`,
+`keymap/jsonc.go` and `keymap/schema.go`:
+
+* `LoadVSCode(r io.Reader, file string, ids func(command.ID) bool)
+  ([]Binding, error)`, its errors each a `*LoadError`;
+* `ExportVSCode(w io.Writer, bindings iter.Seq[Binding]) error`;
+* `Schema(ids []command.ID, args func(command.ID) jsontext.Value) ([]byte,
+  error)`, where §8 wrote `json.RawMessage` (A4.6).
+
+#### Readings
+
+Where §8 leaves a detail open, the step reads it so, needing no choice:
+
+* **A loaded binding is the user layer.** Its `Location` is `UserLayer`,
+  the file, the element's pointer, and its line and column, so Step 3's
+  Reserved check applies to the user's file. A program that loads its
+  own defaults from a file sets the layer it wants.
+* **Members are walked, not decoded into a struct.** The loader reads
+  each binding's members with `jsontext.Decoder`, so each error has its
+  member's own place and pointer (`StackPointer`), and it refuses an
+  unknown member itself. A struct decode with unknown members rejected
+  stops at a binding's first error and gives no member's offset.
+* **A syntax error ends the file there,** as `jsontext`'s errors are
+  sticky; the bindings before it are returned. A member named twice is
+  not a syntax error: the file is read allowing duplicate names, and each
+  binding refuses its own, so one does not end the file. `args` is read
+  strictly, and a name twice inside it is an error at that name.
+* **A column counts bytes,** from 1, as `go/token`'s does.
+* **`args` is kept compact,** so blanked comments leave no space in it,
+  and an export reads back byte for byte.
+* **An empty file,** or one of only space and comments, holds no bindings
+  and no error. A leading byte order mark is blanked. `"when": ""` is no
+  `when`. `"context": ""` is an error, as `"global"` names the global
+  scope (A3).
+* **The exporter** writes VS Code's spelling, indented with tabs as VS
+  Code writes the file; it leaves out an empty `when` or `args` and a
+  global `context`, and writes `<leader>` as `<leader>` (A6.4).
+* **The schema** requires `command`, and `key` unless the command begins
+  with `-`, and refuses other members. It drops an args schema's own
+  `$schema`, which JSON Schema allows only at a document's root, lists a
+  repeated ID once, and refuses a malformed ID and an args schema that is
+  neither an object nor a boolean.
+* **The key pattern** is built from Step 2's tables, in the syntax Go's
+  `regexp` and ECMA-262 share. ECMA-262 has no flag for case inside a
+  pattern, so each letter is a class of both cases. A one-character key
+  is any character but space and the controls, so the pattern may be
+  looser than `ParseStroke`, never stricter.
+* **"The workspace defaults"** of the round-trip test are MADR §9's
+  table with A4.1's commands, written as bindings: `workspace`'s own
+  defaults arrive in Step 7.
+* **No panic.** The loader records an error it cannot meet as an error.
+
+#### What was built
+
+* **`keymap/jsonc.go` (new):** `blank`, the scanner. Comments and
+  trailing commas become spaces, line breaks stay, strings are copied,
+  and an unterminated block comment is an error where it begins.
+* **`keymap/vscode.go` (new):** `LoadError` (`File`, `Line`, `Col`,
+  `Pointer`, `Err`, with `Error` and `Unwrap`), `LoadVSCode` and
+  `ExportVSCode`.
+* **`keymap/schema.go` (new):** `Schema` and the key pattern.
+* **`keymap/vscode_test.go` (new):**
+  * `TestBlank`; `TestJSONC`;
+  * `TestErrorPlaces`, 18 cases, each place checked against a marker
+    placed by hand: among them a bad key after a block comment over two
+    lines, an unknown member after a line comment, a bad `when`, an
+    unknown command with `ids` set, a name twice in `args`, a column after
+    non-ASCII text, a missing comma, and an unterminated comment;
+  * `TestThreeErrors`; `TestLoadRemoval`, `-command` with and without
+    `key`, given to `New`; `TestLoadShapes`; `TestLoadErrorText`;
+  * `TestExportRoundTrip`, for the workspace defaults and a planted user
+    file with `<leader>`, upper case, a scan code, a release, nested
+    `args`, removals and contexts; `TestExportText`.
+* **`keymap/schema_test.go` (new):** `TestSchema` (draft 2020-12, the
+  command enum, the key rule, an args schema from `command.SchemaOf` with
+  its `$schema` dropped, and a boolean one); `TestSchemaErrors`;
+  `TestKeyPattern` (Step 2's 5000 random sequences in both spellings,
+  every key, alias, modifier and scan code in both cases, and twelve
+  strings that are not keys refused).
+* **`keymap/fuzz_test.go` (new):** `FuzzLoadVSCode`: no panic; each error
+  a `*LoadError` at a line and column inside the input; what loads,
+  exports and reads back unchanged; and the key pattern accepts any input
+  `ParseSequence` reads. `make fuzz` finds it.
+* **`keymap/testdata/fuzz/FuzzLoadVSCode/caeb09acd3ef6f1f` (new):** the
+  input the fuzzer found, kept as `command`'s and `when`'s are.
+
+#### Checks
+
+* **Fuzz.** A first 60-second run was clean, but ran no input for its
+  last 13 seconds. No input was shown to be slow, but reading the loader
+  for a cost found `position` counting lines from the start for each
+  error, quadratic in a file of many errors; it now searches a table of
+  line starts built once. A second run found,
+  in 7 seconds, that a name twice inside `args` passed the loader and
+  failed the exporter; the loader now reads `args` strictly (K5-7), the
+  input is kept, and a 90-second run is clean.
+* **Scale.** A 600 KB file of 200,001 bad elements loads in about 74 ms.
+* **Lint and `go fix`.** `make lint` found an unchecked
+  `AppendUnquote`, a `!=` on an error in a test, repeated strings and an
+  `append` to another slice; each is fixed in the code. `make
+  modernize`'s `go fix` turned two `errors.As` into `errors.AsType`.
+* **Mutations,** on scratch copies, each killed by the tests named:
+  * **K5-1** (the scanner deletes a line comment, not blanking it) and
+    **K5-2** (a block comment): `TestBlank`, `TestErrorPlaces`;
+  * **K5-3** (a `//` inside a string is a comment): `TestBlank`,
+    `TestJSONC`;
+  * **K5-4** (errors stop at the first): `TestThreeErrors`;
+  * **K5-5** (unknown members are accepted): `TestErrorPlaces`,
+    `TestThreeErrors`;
+  * **K5-6** (a trailing comma is kept): `TestBlank`, `TestJSONC`;
+  * **K5-7** (a name twice inside `args` passes): `TestErrorPlaces`,
+    "a member twice in args"; its first form left a variable unused and
+    did not compile, and was rewritten;
+  * **K5-8** (the args schema keeps its `$schema`): `TestSchema`;
+  * **K5-9** (the key pattern is case-sensitive): `TestKeyPattern`;
+  * **K5-10** (a loaded binding is not the user layer): `TestJSONC`;
+  * **K5-11** (a removal needs a key): `TestLoadRemoval`,
+    `TestExportRoundTrip`;
+  * **K5-12** (`"global"` is not the global scope): `TestLoadShapes`;
+  * **K5-13** (the exporter writes the canonical spelling):
+    `TestExportText`;
+  * **K5-14** (the line table is off by one at a line's start):
+    `TestErrorPlaces`.
+
+  K5-1 to K5-5 are the PLAN's four, its first split by the kind of
+  comment; K5-6 to K5-14 are added.
+* **macOS,** go1.27.2: `make pre-add-check FILES=<the 6 files>`, "6
+  file(s) clean"; `make lint`; the cross `go vet`; `-race`, `-shuffle=on
+  -count=2`, `LC_ALL=C` and workspace mode; `go mod tidy -diff` (no
+  requirement added); `make vuln`; `make apicheck`, "against v0.10.0, 0
+  incompatible change(s)"; `make examples`; `scripts/go-modules.py
+  --check`; `make release-check`, "208 file(s) clean", the
+  tracked files, which the new ones join when committed; `go-fuzz.py`
+  on a scratch copy, finding `FuzzLoadVSCode`; `shellcheck`,
+  `markdownlint-cli2`, `actionlint` and the five Python tests. All clean.
+  This PLAN, under the repository's markdownlint rules, raises only
+  MD004.
+* **The Windows test host,** go1.27.2 windows/amd64, with the index
+  synced: `make pre-add-check`, "214 file(s) clean", with the
+  new files; `make lint`, `make vuln` and `make examples`, each exit 0;
+  the step's tests, `FuzzLoadVSCode`'s seeds and the conformance checks,
+  17 passed, 0 failed; `keymap` under `-shuffle=on -count=2`,
+  exit 0; `go-fuzz_test.py`, "27 passed"; `make fuzz FUZZTIME=3s`, "9
+  packages ran clean".
