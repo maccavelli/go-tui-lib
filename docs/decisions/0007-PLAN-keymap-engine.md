@@ -875,3 +875,91 @@ additions are compatible.
   `go-fuzz_test.py`, "27 passed"; `make fuzz FUZZTIME=3s`, "8 packages
   ran clean". A first run, started before the benchmark's fix, was
   stopped, its processes ended and its files removed.
+
+### Step 4: the matcher
+
+No deviation. As A3 names them: `Dispatcher`, `NewDispatcher` and
+`Outcome`, in `keymap/matcher.go`.
+
+#### Readings
+
+Where §6 leaves a detail open, the step reads it so, needing no choice:
+
+* **A key that ends a sequence** without a match is taken afresh, after
+  the sequence's keys go to `Replay`: `g` then `ctrl+p` gives the palette
+  and replays `g`, and `g` then `ctrl+k` replays `g` and leaves `ctrl+k`
+  pending. §6's "returns its strokes" is the sequence's, not the key that
+  ended it.
+* **A `TimeoutMsg`** is always `Handled`, current or old: it is the
+  dispatcher's own message, which no pane wants.
+* **A path change, or `SetKeymap`,** drops the pending keys with no
+  `Replay`: the pane they were typed for no longer has the focus.
+* **A release that matches nothing** leaves a pending sequence as it is,
+  so the release of a chord's first key, under event types, does not end
+  the chord (§6: a program "does not see each key twice").
+* **A Prefix pair** kept in one scope (A6.3): the shorter fires at once,
+  with no timeout fallback, as Q3 answered.
+* **Matching** walks the deciding scope's bindings with `Stroke.Matches`,
+  as `Lookup` walks strokes, so the keypad, caps lock and shifted symbols
+  match here as Step 2's table says.
+* **`Settings`** gains `Timeout` (zero means one second) and `Tick` (nil
+  means `tea.Tick`); the keymap keeps its parsed leader, which the
+  dispatcher leaves out of `Replay`.
+
+#### What was built
+
+* **`keymap/matcher.go` (new):** `Outcome` (`Command`, `Args`, `Handled`,
+  `Replay`), `TimeoutMsg`, `Dispatcher` with `NewDispatcher`, `Update`,
+  `SetKeymap` and `Pending`; and the keymap's `decide`, the scope
+  deciding for keys.
+* **`keymap/keymap.go`:** `Settings.Timeout` and `Settings.Tick`, and the
+  keymap's leader.
+* **`keymap/matcher_test.go` (new),** with a recording `Tick`:
+  `TestSequencesComplete` (one stroke, a chord, a leader sequence, four
+  strokes, one timer per pending stroke); `TestPrefixTimeout` (the
+  timeout's `Replay`, the leader left out; `Settings.Timeout` and the
+  one-second default); `TestStaleTimeout`; `TestPathChange`;
+  `TestSetKeymap`; `TestRelease`; `TestUnmatched`;
+  `TestDispatchScopeDecides` (A6, and keypad Enter completing
+  `ctrl+k enter`); and `TestRealTimer`, which runs the default
+  `tea.Tick` inside `testing/synctest.Test` and sees its `TimeoutMsg`
+  after one second of the fake clock.
+
+#### Checks
+
+* **Mutations,** on scratch copies, each killed by the test named:
+  * **K4-1** (the generation not compared): `TestStaleTimeout`, the first
+    stroke's timer replaying `a b`;
+  * **K4-2** (a path change does not cancel): `TestPathChange`, `x` on
+    another path replaying `g`;
+  * **K4-3** (the leader replayed): `TestPrefixTimeout`, "replay
+    [ctrl+x]";
+  * **K4-4** (`Replay` drops the first stroke): `TestPrefixTimeout` and
+    `TestUnmatched`, `g` not replayed;
+  * **K4-5** (a press stroke matches a release): `TestRelease`, a press
+    of `space` firing `talk` and a release of `a` firing `cmd.a`;
+  * **K4-6** (a release that matches nothing ends the sequence):
+    `TestRelease`, `ctrl+x`'s release replaying it;
+  * **K4-7** (an extending stroke starts no timer):
+    `TestSequencesComplete`, "a b c d, stroke 1";
+  * **K4-8** (the dispatcher walks the path outermost first):
+    `TestDispatchScopeDecides`, global `g` firing under `pane:a`.
+
+  K4-5 to K4-8 are added to the four this step names.
+* **macOS,** go1.27.2: `make pre-add-check FILES=<the 3 files>`, "3
+  file(s) clean"; `make lint`; the cross `go vet`; `-race`, `-shuffle=on
+  -count=2`, `LC_ALL=C` and workspace mode; `go mod tidy -diff` (no
+  requirement added); `make vuln`; `make apicheck`, "against v0.10.0, 0
+  incompatible change(s)"; `make examples`; `scripts/go-modules.py
+  --check`; `make release-check`, "206 file(s) clean", the
+  tracked files, which the two new ones join when committed;
+  `shellcheck`, `markdownlint-cli2`, `actionlint` and the five Python
+  tests. All clean. This PLAN, under the repository's markdownlint
+  rules, raises only MD004.
+* **The Windows test host,** go1.27.2 windows/amd64, with the index synced:
+  `make pre-add-check`, "208 file(s) clean", with the new
+  files; `make lint`, `make vuln` and `make examples`, each exit 0; the
+  step's tests and the conformance checks, 13 tests passed, 0
+  failed, `TestRealTimer` among them; `keymap` under `-shuffle=on
+  -count=2`, exit 0; `go-fuzz_test.py`, "27 passed"; `make fuzz
+  FUZZTIME=3s`, "8 packages ran clean".

@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"iter"
 	"slices"
+	"time"
+
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/maccavelli/go-tui-lib/command"
 	"github.com/maccavelli/go-tui-lib/internal/enum"
@@ -132,9 +135,13 @@ type Default struct {
 
 // Settings configure a keymap.
 type Settings struct {
-	Leader   string   // the sequence <leader> stands for; "" means none
-	Features Features // what the terminal reports; empty until it says
-	Reserved []string // sequences only the program may bind, such as "ctrl+c"
+	Leader   string        // the sequence <leader> stands for; "" means none
+	Timeout  time.Duration // how long a pending chord or leader waits; 0 means one second
+	Features Features      // what the terminal reports; empty until it says
+	Reserved []string      // sequences only the program may bind, such as "ctrl+c"
+	// Tick starts the pending sequence's timer; nil means tea.Tick. It is
+	// a clock for tests, not a hook (amendment A4, item 5).
+	Tick func(time.Duration, func(time.Time) tea.Msg) tea.Cmd
 }
 
 // Resolved is the binding a sequence resolves to.
@@ -154,6 +161,7 @@ type Keymap struct {
 	scopes    map[command.Scope][]*entry            // each scope's, in resolution order
 	index     map[command.Scope]map[Stroke][]*entry // the same, by first stroke
 	conflicts []BindingConflict                     // the warnings
+	leader    Sequence                              // Settings.Leader, parsed
 }
 
 // entry is a binding in effect: its keys expanded, a default's keys
@@ -235,7 +243,7 @@ func (k *Keymap) build() error {
 		case slices.ContainsFunc(q, func(s Stroke) bool { return s.Code == keyLeader }):
 			b.errs = append(b.errs, fmt.Errorf("%w %q: Settings.Leader names %s", ErrNotation, k.settings.Leader, leaderName))
 		default:
-			b.leader = q
+			b.leader, k.leader = q, q
 		}
 	}
 	for _, r := range k.settings.Reserved {
