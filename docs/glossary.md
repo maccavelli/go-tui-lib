@@ -83,6 +83,13 @@ planned one: `keymap.Context`, `Origin`, `Conflict`, `Rule`, `Result`,
 `palette.Query`, `Scope` and `Palette`; `safetext.Policy` and `Filter`;
 and `frame.Policy`, `Plan` and `Msg`.
 
+0008's amendment of 2026-10-11 (A3 items 6 and 7) renamed two more: the
+command provider `Commands(reg)` is `FromRegistry(reg)`, so that
+`Commands` keeps meaning a package's own command list, as
+`workspace.Commands` does; and the completion option `AsCompletion()` is
+`WithoutInput()`. No `palette` type is `RegistryOption`, which `command`
+exports.
+
 One planned pair is deliberate: `Renderer`, the interface in `stream`,
 and the type in `stream/glamourmd` that implements it. It is added to
 "Deliberate" and to `sharedNames` when the adapter is built.

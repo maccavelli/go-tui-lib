@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-07
+date: 2026-10-11
 decision-makers: owner
 consulted: 0003-REPORT-agent-tui-ecosystem-research.md (§3, §4, §7); Textual's command palette; crush, toad and codex sources; fzf's and sahilm/fuzzy's scoring; Charm v2 APIs (bubbles v2.2.1, lipgloss v2.0.6, x/ansi v0.11.8)
 informed: pi-go
@@ -617,7 +617,8 @@ names when it is next amended, before it runs.
 
 ### A3 (2026-10-11): the palette on the built keymap, registry and API conventions
 
-*Status: proposed (2026-10-11).* Written before execution, at the owner's
+*Status: accepted (2026-10-11),* the owner's answers to Q5–Q7, each the
+recommendation. Written before execution, at the owner's
 request of 2026-10-11 to "evaluate, research, and determine the data for
 ammending 0008 and preparing the plan". Since this record was accepted:
 
@@ -849,6 +850,10 @@ owner's, and each item they decide gives the recommendation.
 
 #### Owner questions (A3)
 
+*Answered 2026-10-11:* "Q5 follow recommendation. Q6 follow
+recommendation. Q7 follow recommendation." Every answer is the
+recommendation, so items 1 to 3 stand as written.
+
 * **Q5. How a picker takes its keys.** Recommended: item 1, the workspace
   offering a matched command to the component that consumes it. The
   alternatives are item 1's "Not chosen".
@@ -858,8 +863,7 @@ owner's, and each item they decide gives the recommendation.
   alternative is that the program closes it on `SelectedMsg`.
 
 [0008-PLAN-command-palette.md](0008-PLAN-command-palette.md), revised on
-2026-10-11, is written against these recommendations. A different answer
-changes its Steps 2, 6 and 7.
+2026-10-11, is written against these answers.
 
 ## More Information
 

@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in-progress
 date: 2026-10-11
 associated-madr: "0008-MADR-command-palette.md"
 ---
@@ -26,7 +26,9 @@ The steps are rewritten against the tree at `a0537d3`, after 0006 and
 * Step 2's generic-method probe ran on 2026-10-11 (A3, facts), so the old
   Step 2's probe and fallback are gone.
 * If the owner answers Q5, Q6 or Q7 otherwise, Steps 2, 6 and 7 are
-  amended before Step 2 starts.
+  amended before Step 2 starts. *Later on 2026-10-11:* the owner answered
+  each with the recommendation, and approved execution ("committed,
+  proceed").
 
 ## Goal
 
@@ -488,4 +490,26 @@ and this repository's `workspace`, `command`, `when`, `keymap`, `theme`,
 
 ## Execution Record
 
-None yet.
+### Step 1: records
+
+*2026-10-11.* The owner committed the revised records as `d297371`,
+answered Q5–Q7 ("Q5 follow recommendation. Q6 follow recommendation. Q7
+follow recommendation.") and approved execution ("committed, proceed").
+
+* **MADR A3** is `accepted`, with the answers under its owner questions;
+  the MADR's date is 2026-10-11.
+* **This PLAN** is `in-progress`.
+* **[0007-MADR-keymap-engine.md](0007-MADR-keymap-engine.md)** gains A12, a
+  pointer to A3 item 1, which extends its A11 item 1.
+* **`docs/glossary.md`:** "Names the planned records must not take"
+  records A3's two renames and `command`'s `RegistryOption`. The types
+  Steps 2 to 8 build are entered by those steps.
+* **`docs/README.md`:** 0007-MADR's row reads A4–A12 accepted; 0008-MADR's
+  A3 accepted; this PLAN's row `in-progress`.
+* **Records only:** no source, test, CI or configuration file changes in
+  this step.
+* **Prerequisites for Step 2,** checked: `scripts/apicheck.allow` is its
+  header alone. **Not met:** `a0537d3`, 0007's close-out, is not on
+  `origin/main` (`04182bf` after a fetch), so until it is pushed `make
+  apicheck` compares with `v0.11.0`. Step 2 waits for the owner's push of
+  `a0537d3`, `d297371` and this step.

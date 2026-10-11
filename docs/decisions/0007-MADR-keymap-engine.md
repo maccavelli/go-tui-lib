@@ -1304,6 +1304,18 @@ recommendation, found as Step 7 of
      `tea.KeyboardEnhancementsMsg`, whose errors the program would never
      see, and which has no way in for facts.
 
+### A12 (2026-10-11): extended by 0008-MADR A3
+
+*Status: accepted (2026-10-11).* A pointer; nothing here changes. A11
+item 1 has the workspace run its own commands without a registry, and
+send any other matched command to the program as `RequestMsg`.
+[0008-MADR-command-palette.md](0008-MADR-command-palette.md) A3 item 1
+adds a step between the two: a matched command the workspace does not own
+is first offered to the component that has the keyboard, through
+`workspace.CommandConsumer`, and only with no taker becomes a
+`RequestMsg`. It found that `RequestMsg`s can reach the program out of
+order, and left that for a record of its own.
+
 ## More Information
 
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md):
