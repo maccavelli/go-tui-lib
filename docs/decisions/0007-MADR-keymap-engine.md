@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-07
+date: 2026-10-10
 decision-makers: owner
 consulted: 0003-REPORT-agent-tui-ecosystem-research.md (§3, §4, §6, §7; §8, §9 and §11 for amendment A1); Charm v2 APIs (bubbletea v2.0.10, bubbles v2.2.1, the ultraviolet revision in go.sum); VS Code keybindings and when-clause documentation; codex, gemini-cli and opencode keymap sources
 informed: pi-go; go-core-lib
@@ -511,7 +511,8 @@ func Schema(ids []command.ID, args func(command.ID) json.RawMessage) ([]byte, er
   * While a modal overlay is open, the path is global and then that
     overlay only, so the layout's bindings do not reach through it.
 * **`KeyMap` is removed in this release** (owner question Q4, answered
-  "remove now").
+  "remove now"). *A4 item 2: superseded; deprecated in `v0.11.0` and
+  removed in `v0.12.0`.*
   * `KeyMap`, `DefaultKeyMap` and `WithKeyMap` are deleted, not
     deprecated. There is one code path, and no struct-to-rules converter.
   * **This breaks** any program that names `workspace.KeyMap`, calls
@@ -900,7 +901,7 @@ long as `termcap` stays a leaf package that performs no I/O at import.
 
 *Status: accepted (2026-10-07)* for the corrections. The default bindings
 for focus by index and directional resize are owner question Q8, open
-until this record is executed. Found by the documentation audit of
+until this record is executed. *Answered 2026-10-10: A, in A4 item 1.* Found by the documentation audit of
 [0011-MADR-docs-accuracy-after-v0-5-0.md](0011-MADR-docs-accuracy-after-v0-5-0.md),
 carried out by [0011-PLAN-docs-accuracy-after-v0-5-0.md](0011-PLAN-docs-accuracy-after-v0-5-0.md), finding F31. Each fact was re-checked against the tree
 on 2026-10-07.
@@ -1004,6 +1005,67 @@ new one.
 
 [0007-PLAN-keymap-engine.md](0007-PLAN-keymap-engine.md) takes these names
 when it is next amended, before it runs.
+
+### A4 (2026-10-10): the API conventions, and Q8
+
+*Status: accepted (2026-10-10)* for items 1 to 5, which the owner chose,
+and for item 6, which AGENTS.md's "API conventions" require. Item 7 is
+*proposed*, for the owner's approval with the PLAN.
+
+The record predates [0014-MADR-native-integration-api.md](0014-MADR-native-integration-api.md)'s
+W0 to W4, which wrote the conventions every exported name now follows
+(`AGENTS.md`, "API conventions") and shipped them in `v0.8.0` to
+`v0.10.0`. The design stands; these change its names and shapes. Where
+this record says the old form, read the new one. A3's names still apply.
+
+1. **Q8, answered A.** `workspace` gains two commands, so every default key
+   binds to a command ID:
+   * `workspace.focus.index`, with `{"index": n}`, 1 to 9: focus the n-th
+     pane of the focus ring, as `alt+n` does today;
+   * `workspace.resize.direction`, with `{"direction": "left|right|up|down"}`:
+     move the separator nearest the focused pane by one cell, as
+     `alt+shift+arrows` do today.
+
+   §9's table binds `alt+1` … `alt+9` and the four `alt+shift` arrows to
+   them, and today's key behaviour carries over unchanged.
+2. **Q4 is superseded by rule 1.** `workspace.KeyMap`, `DefaultKeyMap` and
+   `WithKeyMap` are not removed with this record's release: they stay in
+   `v0.11.0`, marked `// Deprecated:`, and `WithKeyMap` is converted into
+   rules for the `workspace` context; `v0.12.0` removes them. This is the
+   deprecation every replacement since W4 has had (rule 1), and the
+   owner's choice over Q4's "remove now".
+3. **`keymap.New`.** `Build(o Options, layers ...[]Rule)` is
+   `New(s Settings, layers ...[]Binding) (*Keymap, error)`: the constructor
+   of the type named after its package (rule 8, and the glossary's `New`
+   row). `Rebuild` stays a method.
+4. **`Describer` is an interface,** with an adapter (rule 7): `type
+   Describer interface{ Describe(id command.ID) (title string, ok bool)
+   }`, `DescriberFunc`, and `FromRegistry` returning one.
+5. **`Settings.Tick` stays a function field,** defaulting to `tea.Tick`:
+   it is a clock seam for tests, not a hook a program supplies, and the
+   record names it as rule 7's exception.
+6. **The rules every package follows,** applied:
+   * **enums (rule 5):** `Layer`, `Event` (`Press`, `Release`, `Repeat`)
+     and `ConflictKind` have `String`, `MarshalText` and `UnmarshalText`
+     through `internal/enum`'s `Names`, with lowercase tokens; `Features`
+     is a bit set, through `enum.Bits`. `internal/conformance`'s enum
+     table lists each, and `Features` among the bit sets;
+   * **errors (rule 6):** a `BindingConflict` is an error; `LoadVSCode`'s
+     errors are a typed `*LoadError` with the file, line, column and JSON
+     Pointer, and `Unwrap` when it wraps a parse error; `New` joins them
+     with `errors.Join`, as §4 says;
+   * **JSON:** the loader, exporter and schema use `encoding/json/v2` and
+     `jsontext`, as `command` does since W4; `Binding.Args` is a
+     `jsontext.Value`, where §3 wrote `json.RawMessage`;
+   * **options (rule 4):** `workspace.WithBindings` is a `workspace.Option`,
+     opaque; `keymap` itself takes a `Settings` struct, not options;
+   * **the stability line (rule 10)** ends `keymap`'s package comment;
+   * **the API diff gate:** `workspace`'s additions are compatible, and the
+     `v0.12.0` removals are listed in `scripts/apicheck.allow`.
+7. **Proposed: the `Layer` constants are `DefaultLayer`, `ProgramLayer`
+   and `UserLayer`.** §3 names them `Default`, `Program` and `User`, and
+   A1's `type Default struct` would declare `Default` twice in one
+   package. The type keeps its name; the constants take the suffix.
 
 ## More Information
 

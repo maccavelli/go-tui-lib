@@ -1,6 +1,6 @@
 ---
 status: proposed
-date: 2026-10-07
+date: 2026-10-10
 associated-madr: "0007-MADR-keymap-engine.md"
 ---
 # Implement the keymap engine
@@ -35,6 +35,30 @@ Associated MADR: [0007-MADR-keymap-engine.md](0007-MADR-keymap-engine.md)
 * **Step 9:** `glyph.Set` gains the modifier and arrow glyphs, each one
   cell wide with an ASCII twin, before the labels that draw them.
 
+*Revised 2026-10-10, for MADR amendments A3 and A4, and the facts re-read
+below.* A3 renames the types; A4 brings the API to AGENTS.md's "API
+conventions", answers Q8, and supersedes Q4. Where a step below names an
+old form, read the new one:
+
+| Was | Is | Record |
+| :--- | :--- | :--- |
+| `Context`, `Global`, `Path []Context` | `command.Scope`, `command.Global`, `Path []command.Scope` | A3 |
+| `Rule`, `Rule.Context` | `Binding`, `Binding.Scope` | A3 |
+| `Origin` | `Location` | A3 |
+| `Conflict`, `Conflict.Context` | `BindingConflict`, `BindingConflict.Scope` | A3 |
+| `ConflictKind` `Unsupported` | `NotSupported` | A3 |
+| `Result` | `Outcome` | A3 |
+| `Options` | `Settings` | A3 |
+| `Match` | `Resolved` | A3 |
+| `Matcher`, `NewMatcher` | `Dispatcher`, `NewDispatcher` | A3 |
+| `Build(o, layers...)` | `New(s, layers...)` | A4.3 |
+| `Describer` (a function type) | an interface, with `DescriberFunc` | A4.4 |
+| `Layer` constants `Default`, `Program`, `User` | `DefaultLayer`, `ProgramLayer`, `UserLayer` | A4.7, proposed |
+| `Rule.Args json.RawMessage` | `Binding.Args jsontext.Value` | A4.6 |
+| `KeyMap`, `DefaultKeyMap`, `WithKeyMap` removed in Step 7 | deprecated in Step 7 (`v0.11.0`), removed in Step 12 (`v0.12.0`) | A4.2 |
+
+The order of the steps is 1, 2 to 6, 9 to 11, 7, 8 and 12.
+
 ## Goal
 
 Ship `keymap`, and move `workspace`'s own bindings onto it, so that:
@@ -54,6 +78,28 @@ Done means every item under Verification holds, CI is green on the pushed
 tree, and the owner can tag the release.
 
 ## Scope
+
+### Facts re-read before execution (2026-10-10)
+
+The agent read each fact this PLAN rests on again on `8f68556`, after
+0014's W0 to W4 (`v0.8.0` to `v0.10.0`) and
+[0017-PLAN-python-repository-scripts.md](0017-PLAN-python-repository-scripts.md).
+
+| Fact | Today |
+| :--- | :--- |
+| The prerequisites are complete: 0002's hardening, 0004, 0005 and 0006; and 0014's W0 to W4 | `docs/README.md` |
+| `workspace.KeyMap` (focus next and prev, `FocusPane[9]`, zoom, the four resizes, close), `DefaultKeyMap` and `WithKeyMap` hold, with 0002's keys: `alt+.`, `alt+,`, `alt+1` to `alt+9`, `alt+z`, `alt+shift` arrows, `esc` | `workspace/keys.go:28-37`; `workspace/workspace.go:311` |
+| `workspace.Commands` registers the IDs A2 lists, and none takes an index or a direction | `workspace/commands.go` |
+| `KeyMapper` is read by the workspace's help, and W2 added `Workspace.Help` | `go doc ./workspace` |
+| `glyph.Set` has no modifier or arrow glyph; W2 added `glyph.Tier` | `go doc ./glyph Set` |
+| `termcap` gives the keyboard as `Caps.Keyboard()`, a `KeyboardCaps` of `Kitty`, `Enhancements`, `Accepted` and `Releases`, and `KeyboardFlags(Caps)` | `go doc ./termcap KeyboardCaps` |
+| A request carries its `when` values in `Request.WhenContext` (W4), and a key's origin is `command.OriginKey` | `command/handler.go` |
+| Bubble Tea is `v2.0.10`, bubbles `v2.2.1`; `tea.Key` has `Text`, `Mod`, `Code`, `ShiftedCode`, `BaseCode` | `go list -m`; `go doc charm.land/bubbletea/v2 Key` |
+| No type name A3 and A4 give is exported by another package: `Binding`, `Location`, `Settings`, `Dispatcher`, `Outcome`, `Resolved`, `BindingConflict`, `ConflictKind`, `Layer`, `Path`, `Stroke`, `Sequence`, `Event`, `Features`, `Default`, `KeyFacts`, `Alternative`, `Explanation`, `ActiveKey`, `Describer`, `Keymap` | a search of every package's types |
+| **Changed:** AGENTS.md's "API conventions" bind every new exported name: enums through `internal/enum`, which the conformance test checks; typed errors; hooks as interfaces with adapters; `NewX` constructors; opaque option types; a stability line; deprecation for one minor release | `AGENTS.md`; MADR A4 |
+| **Changed:** `command` and `termcap` use `encoding/json/v2`, and a raw value is a `jsontext.Value` | 0014-PLAN-canonicalization Step 7 |
+| **Changed:** `make fuzz` finds every fuzz target itself, so `FuzzLoadVSCode` joins it with no list to edit | `scripts/go-fuzz.py -a` |
+| **Changed:** the repository's scripts are Python; the release is `v0.11.0`, after `v0.10.0` | 0017-PLAN; `git tag` |
 
 ### In scope
 
@@ -117,6 +163,17 @@ finished engine.
 
 ## Rules for every step
 
+*2026-10-10:* rule 3's checks are now the Go checks of
+[0014-PLAN-component-native-forms.md](0014-PLAN-component-native-forms.md)
+Rule 2, as W4 runs them: `make pre-add-check`, `make lint`, the cross `go
+vet` for `freebsd/amd64`, `openbsd/amd64` and `linux/386`, `-race`,
+`-shuffle=on -count=2`, `LC_ALL=C`, workspace mode, `go mod tidy -diff`,
+`make vuln`, `make apicheck`, `make examples` and `make release-check`; CI's
+other checks (`shellcheck`, `markdownlint-cli2`, `actionlint`, the Python
+scripts' tests); and the Windows test host, with its index synced to the
+tree. `make apicheck` may show only the lines this PLAN lists in
+`scripts/apicheck.allow`, under a header naming it and the step.
+
 1. **Order.** Each step's package compiles, passes its tests and passes the
    pre-add gate before the next step starts.
 2. **Mutation proofs.** Each step names mutations of its key invariants.
@@ -160,6 +217,10 @@ are amended to match. Still to do:
 
 ### Step 2: notation
 
+*2026-10-10:* `Event` (`Press`, `Release`, `Repeat`) has its text forms
+through `internal/enum`, and joins `internal/conformance`'s enum table
+(A4.6). The package comment ends with the stability line.
+
 * `Stroke`, `Sequence`, `MaxStrokes`, `Event`, `ParseStroke`,
   `ParseSequence`, `String`, `VSCode`, `Matches` and `BubblesKeys`, as
   MADR §2 gives them.
@@ -189,6 +250,13 @@ are amended to match. Still to do:
 
 ### Step 3: rules, layers, contexts and conflicts
 
+*2026-10-10:* with A3's and A4's names: `Binding`, `Location`, `Settings`,
+`New` and `Rebuild`, `Resolved`, `BindingConflict` (an error) and
+`ConflictKind` (`Duplicate`, `Prefix`, `Reserved`, `NotSupported`,
+`Shadow`). `Layer` (`DefaultLayer`, `ProgramLayer`, `UserLayer`) and
+`ConflictKind` take `enum.Names`, and `Features` `enum.Bits`, each in the
+conformance table, `Features` as a bit set. A scope is a `command.Scope`.
+
 * `Context`, `Global`, `Path`, `Layer`, `Rule`, `Origin`, `Options`,
   `Features`, `FeaturesFrom`, `Default`, `Build`, `Rebuild`, `Lookup`,
   `Bindings`, `Conflicts`, `Rules` and `Conflict`, as MADR §3–§5 give them.
@@ -215,6 +283,9 @@ are amended to match. Still to do:
 
 ### Step 4: the matcher
 
+*2026-10-10:* `Dispatcher`, `NewDispatcher` and `Outcome` (A3).
+`Settings.Tick` stays a function field (A4.5).
+
 * `Matcher`, `NewMatcher`, `Update`, `SetKeymap`, `Pending`, `Result` and
   `TimeoutMsg`, as MADR §6 gives them.
 * **Tests, all with a recording `Options.Tick`:**
@@ -238,6 +309,12 @@ are amended to match. Still to do:
   * `Replay` drops the first stroke.
 
 ### Step 5: the VS Code loader, exporter and schema
+
+*2026-10-10:* `LoadVSCode` returns `[]Binding`, and its errors are
+`*LoadError`s, with the file, line, column and JSON Pointer, and `Unwrap`
+(A4.6). The loader, exporter and schema use `encoding/json/v2` and
+`jsontext`. `make fuzz` discovers `FuzzLoadVSCode`; there is no list to
+edit.
 
 * `LoadVSCode`, `ExportVSCode` and `Schema`, with the JSONC scanner, as
   MADR §8 gives them.
@@ -268,6 +345,9 @@ are amended to match. Still to do:
 
 ### Step 6: bubbles adapters and help
 
+*2026-10-10:* `Describer` is an interface with `DescriberFunc`, and
+`FromRegistry` returns one (A4.4). A test plants a `DescriberFunc`.
+
 * `Describer`, `FromRegistry`, `Binding` and `Help`, as MADR §7 gives
   them.
 * **Tests:**
@@ -285,6 +365,24 @@ are amended to match. Still to do:
   * `Help` groups contexts outermost first.
 
 ### Step 7: move `workspace` onto the engine
+
+*2026-10-10, A4 items 1 and 2:*
+
+* **The two commands of Q8,** in `workspace/commands.go`, before the
+  defaults: `workspace.focus.index` (`{"index": n}`, 1 to 9) and
+  `workspace.resize.direction` (`{"direction": "left|right|up|down"}`),
+  each doing what today's key does, with tests that the command and the
+  key give the same layout state. `DefaultRules` binds `alt+1` … `alt+9`
+  and the four `alt+shift` arrows to them.
+* **`KeyMap`, `DefaultKeyMap` and `WithKeyMap` are deprecated,** not
+  deleted: each marked `// Deprecated: use … (0007-MADR A4)`, and
+  `WithKeyMap` converted into rules for the `workspace` context. A test
+  in the package shows that a program's `WithKeyMap` still works through
+  `v0.11.x`. The `go doc` test below moves to Step 12, and the mutation
+  "an exported `KeyMap` type is left in place" with it.
+* A matched key is dispatched with `Origin: command.OriginKey` and the
+  path's `when` values in `Request.WhenContext`. `Workspace.Help` (W2)
+  reads the engine.
 
 * The command IDs, `DefaultRules`, `WithBindings`, `KeyPath` and
   `KeyContexter`, as MADR §9 gives them.
@@ -325,6 +423,13 @@ are amended to match. Still to do:
 
 ### Step 8: documentation and close-out
 
+*2026-10-10:* the release is `v0.11.0`, released as W4's Step 8 did: the
+documents, `docs/guides/migrating.md`'s "Migrating to `v0.11.0`" (the
+deprecated `KeyMap` and its rules), the disclosure guard, the owner's push
+and tag, the consumer smoke test (the deprecated names warn under
+SA1019 and compile; the new ones build), and the notes. The guide's "moving
+from `workspace.KeyMap`" section describes a deprecation, not a removal.
+
 * **`docs/guides/keymaps.md`:**
   * binding a command;
   * contexts and the focus path;
@@ -350,6 +455,10 @@ are amended to match. Still to do:
   tree. The owner tags.
 
 ### Step 9 (A1): normalisation, labels and aliases
+
+*2026-10-10:* `glyph.Set` gains the modifier and arrow glyphs first, each
+one cell wide with an ASCII twin, and every `glyph.Tier` gives them; the
+additions are compatible.
 
 * `Normalize`, `Stroke.Label`, `Sequence.Label`, `ParseAliases`,
   `DisplayAliases`, `CopyStrokes` and `Options.GOOS`, as MADR amendment A1
@@ -377,6 +486,9 @@ are amended to match. Still to do:
   * `Label` ignores the glyph table's ASCII twin.
 
 ### Step 10 (A1): terminal facts, alternatives, reachability and hints
+
+*2026-10-10:* `FactsFrom(termcap.Caps)` reads `Caps.Keyboard()`: `Kitty`,
+`Enhancements`, `Accepted` and `Releases`.
 
 * `KeyFacts`, `Alternative`, `Default.Alternatives`, `Options.Facts`,
   `Rebuild` with facts, the release rule, `Keymap.Reachable`,
@@ -429,6 +541,22 @@ are amended to match. Still to do:
   * `ActiveKeys` omits continuing strokes;
   * `Explain` lists the shadowed rule as the winner.
 
+### Step 12: the removals (`v0.12.0`)
+
+*Added 2026-10-10, A4 item 2.*
+
+* `workspace.KeyMap`, `DefaultKeyMap`, `WithKeyMap` and `KeyMap.Bindings`
+  are removed, with their deprecation test.
+* `scripts/apicheck.allow` lists each removal under this step.
+* **Tests:** `go doc ./workspace`, checked by a test, names no `KeyMap`,
+  `DefaultKeyMap` or `WithKeyMap` (moved from Step 7).
+* **Mutation:** an exported `KeyMap` type is left in place; the `go doc`
+  test.
+* **The release `v0.12.0`:** "Migrating to `v0.12.0`" in the migration
+  guide, the disclosure guard, the owner's push and tag, the smoke test
+  (the old names fail to compile), the notes, and the close-out that
+  empties `scripts/apicheck.allow` and marks this PLAN `complete`.
+
 ## Verification
 
 * Every step's mutations are killed.
@@ -444,6 +572,10 @@ are amended to match. Still to do:
 * No default binding in `keymap` or `workspace` is `ctrl+c`, and
   `CopyStrokes` is never bound by `keymap` itself.
 * `go doc ./workspace` lists no `KeyMap`, `DefaultKeyMap` or `WithKeyMap`.
+  *2026-10-10:* after Step 12; in `v0.11.x` they are deprecated (A4.2).
+* *2026-10-10:* every `keymap` enum round-trips its text, by
+  `internal/conformance`'s `TestEveryEnumRoundTrips`; `make apicheck` shows
+  only the lines this PLAN lists.
 * For Steps 9–11:
   * labels pass the 0001-MADR §6 matrix in UTF-8 and ASCII;
   * `keymap` needs no cgo, which `CGO_ENABLED=0` builds for all three
