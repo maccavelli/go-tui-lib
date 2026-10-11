@@ -1941,7 +1941,42 @@ incompatible change, and 10 compatible ones.
 
 #### The tag, CI and the smoke test
 
-Not done yet: they follow the owner's commit of these documents. The
-owner pushes, after the disclosure guard, and tags `v0.11.0` with CI
-green; the consumer smoke test then builds a program on the deprecated
-names, which warns under SA1019 and compiles, and one on the new ones.
+* **The tag.** The owner committed the documents as `2bf3da5`, pushed
+  `main` (`b6b23c6..2bf3da5`: Step 7's `8510e4e` and the documents), and
+  tagged `v0.11.0` there, an annotated tag. The owner pushed before the
+  agent ran the disclosure guard, so the push's own pre-push guard was the
+  first over these commits; the agent then ran it over
+  `b6b23c6..2bf3da5`: exit 0. CI passed on `main` at `2bf3da5`, run
+  `38163689050`, and on the tag, run `38164582704`.
+* **The consumer smoke test,** as the releasing guide gives it, in a
+  scratch module outside the repository, with `go env GOWORK` empty: `go
+  get github.com/maccavelli/go-tui-lib@v0.11.0` from the proxy, `go mod
+  tidy`, then `go vet`, `go build` and `go run` of two programs.
+  * **The deprecated names:** `workspace.KeyMap`, `DefaultKeyMap` with
+    `Zoom` moved to `ctrl+g`, and `WithKeyMap`. `alt+.` moves focus,
+    `alt+z` no longer zooms and `ctrl+g` does; it prints "smoke old
+    names: ok". golangci-lint 2.14.0's staticcheck, with every issue shown
+    and more than one on a line, reports SA1019 for each of the three
+    names, with its `// Deprecated:` text, and two style findings on the
+    program's own explicit `workspace.KeyMap` type.
+  * **A first run of it failed its own check:** it pressed `alt+.` after
+    zooming, when the zoomed pane is alone on screen and the ring has
+    nowhere to go, as in `v0.10.0`. The check moved before the zoom.
+  * **The new names:** a user file in VS Code's format, with comments
+    and a trailing comma, read by `LoadVSCode`; `keymap.New` with
+    `DefaultRules` and a reserved `ctrl+c`; `WithBindings`. The user's
+    `ctrl+g` zooms; the user's `ctrl+x ctrl+s` comes back as a
+    `RequestMsg` for `app.save`, from a key; `Shortcut` gives `⌃g` on
+    `darwin`; `Schema` lists `-app.save`; `FactsFrom` on VS Code gives
+    `alt-enter|host-takes-ctrl-q|host-takes-ctrl-i`; `Normalize` reads
+    `ctrl+5` as `ctrl+]`; and `Rebuild` and `SetBindings` take the new
+    keymap. It prints "smoke new names: ok", and staticcheck reports
+    nothing.
+  * **The negative control:** a copy of the new-names program expecting
+    the shortcut `⌃z` failed with `FAIL: the zoom shortcut is "⌃g"` and
+    exit status 1.
+* **`scripts/apicheck.allow`** holds no entry of this PLAN's: `v0.11.0`
+  made no incompatible change, so nothing is emptied. The API diff gate's
+  base is now `v0.11.0`.
+
+Step 8 is done. The PLAN stays `in-progress` until Step 12.
