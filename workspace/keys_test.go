@@ -12,8 +12,9 @@ import (
 var introducers = []string{"[", "]", "O", "P", "_", "^", "X", `\`, "shift+o", "shift+p", "shift+x"}
 
 func TestDefaultKeysAvoidSequenceIntroducers(t *testing.T) {
-	for _, b := range DefaultKeyMap().Bindings() {
-		for _, k := range b.Keys() {
+	for _, d := range DefaultRules() {
+		for _, s := range d.Keys {
+			k := s.String()
 			rest, ok := strings.CutPrefix(k, "alt+")
 			if !ok {
 				continue

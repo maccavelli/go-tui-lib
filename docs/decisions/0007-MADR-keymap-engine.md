@@ -1264,6 +1264,46 @@ A1's §6 items are read with these, under A3's names.
      whose zero value draws nothing; and no `Label`, which leaves each
      which-key panel to write it.
 
+### A11 (2026-10-11): the workspace on the engine
+
+*Status: accepted (2026-10-11)*, the owner's choices, each the
+recommendation, found as Step 7 of
+[0007-PLAN-keymap-engine.md](0007-PLAN-keymap-engine.md) began (its D1).
+§1, §5, §7 and §9 are read with these.
+
+1. **Who runs a matched command.** The workspace runs the commands
+   `Commands(w)` gives it, through their handlers, with
+   `Origin: command.OriginKey` and the workspace's `WhenContext`, as its
+   keys do today: no registry is needed for its own keys. An error from
+   one comes back as a `command.ResultMsg`, as `Dispatch` reports one. Any
+   other matched command comes back as `workspace.RequestMsg{Request
+   command.Request}`, with the same origin and context, which the program
+   passes to its registry's `Dispatch` (§1).
+   * *Not chosen:* a `WithRegistry` option, through which every matched
+     command runs, which a program that forgets `Commands(w)` loses its
+     keys to; and a dispatch hook, an interface and an adapter for what a
+     message carries.
+2. **The help keeps its four columns,** the pane's keys, focus, layout
+   and overlays, with today's descriptions, and reads each of the
+   workspace's bindings from the engine with `KeyBinding`, so a rebind or
+   a removal shows. §7's "delegates" is read as "reads the engine": §9
+   keeps every test that sets no key option unchanged, and one pins those
+   columns.
+   * *Not chosen:* `keymap.Help`'s column per scope, which breaks that
+     test.
+3. **`KeyPath` has `overlay`** while any overlay is open, before the open
+   overlays' `overlay:<id>`, modal or not, so §9's `esc` default in
+   `overlay` reaches every overlay, and a program can still bind for one
+   by its ID.
+   * *Not chosen:* an `esc` binding added per overlay as it opens, which
+     changes the keymap as overlays open and close.
+4. **`(*Workspace).SetBindings(*keymap.Keymap)`** swaps in a keymap the
+   program rebuilt (§5), and cancels anything pending. The workspace
+   never rebuilds one itself.
+   * *Not chosen:* the workspace rebuilding on
+     `tea.KeyboardEnhancementsMsg`, whose errors the program would never
+     see, and which has no way in for facts.
+
 ## More Information
 
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md):

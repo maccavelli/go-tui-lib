@@ -1,0 +1,17 @@
+ 57|workspace  alt+.            workspace.focus.next        -
+ 57|workspace  alt+,            workspace.focus.prev        -
+ 67|workspace  alt+9            workspace.focus.index       {"index":9}
+ 67|workspace  alt+8            workspace.focus.index       {"index":8}
+ 67|workspace  alt+7            workspace.focus.index       {"index":7}
+ 67|workspace  alt+6            workspace.focus.index       {"index":6}
+ 67|workspace  alt+5            workspace.focus.index       {"index":5}
+ 67|workspace  alt+4            workspace.focus.index       {"index":4}
+ 67|workspace  alt+3            workspace.focus.index       {"index":3}
+ 67|workspace  alt+2            workspace.focus.index       {"index":2}
+ 67|workspace  alt+1            workspace.focus.index       {"index":1}
+ 57|workspace  alt+z            workspace.zoom              -
+ 76|workspace  alt+shift+down   workspace.resize.direction  {"direction":"down"}
+ 74|workspace  alt+shift+up     workspace.resize.direction  {"direction":"up"}
+ 77|workspace  alt+shift+right  workspace.resize.direction  {"direction":"right"}
+ 76|workspace  alt+shift+left   workspace.resize.direction  {"direction":"left"}
+ 57|overlay    esc              workspace.overlay.close     -

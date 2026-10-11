@@ -10,7 +10,12 @@ import (
 // SetKeys, or removed with Unbind or SetEnabled(false). None is ctrl+c: the
 // program owns it (docs/decisions/0001-MADR-scaffold-charm-tui-library.md
 // §6, rule 2). The defaults use alt so that tab, the arrows and alt+arrows
-// stay with the focused pane, such as an editor.
+// stay with the focused pane, such as an editor. WithKeyMap binds each
+// field to its command.
+//
+// Deprecated: use DefaultRules and WithBindings
+// (docs/decisions/0007-MADR-keymap-engine.md A4, item 2). KeyMap is
+// removed in v0.12.0.
 type KeyMap struct {
 	// FocusNext and FocusPrev move focus around the ring.
 	FocusNext, FocusPrev key.Binding
@@ -34,6 +39,10 @@ type KeyMap struct {
 // control sequence starts (CSI, OSC, SS3, DCS, APC, PM, SOS and ST), so the
 // key cannot be told reliably from the sequence. No default uses alt with
 // one of them, and a rebinding should not either.
+//
+// Deprecated: use DefaultRules, which holds the same keys
+// (docs/decisions/0007-MADR-keymap-engine.md A4, item 2). DefaultKeyMap is
+// removed in v0.12.0.
 func DefaultKeyMap() KeyMap {
 	k := KeyMap{
 		FocusNext:   key.NewBinding(key.WithKeys("alt+."), key.WithHelp("alt+.", "next pane")),

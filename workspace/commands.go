@@ -31,8 +31,9 @@ func WithLayouts(layouts map[string]layout.Node) CommandOption {
 
 // Commands returns the workspace's own commands, closed over w, for a
 // command.Registry (docs/decisions/0006-MADR-command-registry.md §9, A2,
-// A8): focus and its cycle, zoom, toggle, resize, layouts, the layout
-// state, the panes, the top overlay and the theme's background. Each runs
+// A8): focus, its cycle and by index, zoom, toggle, resize and by
+// direction, layouts, the layout state, the panes, the top overlay and the
+// theme's background (docs/decisions/0007-MADR-keymap-engine.md A4). Each runs
 // on the event loop (command.Loop), on every surface but the shell, and
 // changes only presentation (command.UI) unless it only reads
 // (command.ReadOnly). A pane or split the workspace does not have is a
@@ -45,7 +46,7 @@ func Commands(w *Workspace, o ...CommandOption) []command.Command {
 	}
 	b := builder{w: w}
 	cmds := []command.Command{
-		b.focus(), b.next(), b.prev(), b.zoom(), b.toggle(), b.resize(),
+		b.focus(), b.next(), b.prev(), b.focusIndex(), b.zoom(), b.toggle(), b.resize(), b.resizeDirection(),
 		b.reset(), b.stateGet(), b.stateSet(), b.panes(), b.closeOverlay(), b.themeSet(),
 	}
 	if len(cfg.layouts) > 0 {
@@ -103,6 +104,14 @@ type resizeArg struct {
 	Delta int    `json:"delta" arg:"" help:"cells to give the pane before it; negative takes" schema:"min=-200,max=200"`
 }
 
+type indexArg struct {
+	Index int `json:"index" arg:"" help:"the pane's place in the focus ring, from 1" schema:"min=1,max=9"`
+}
+
+type directionArg struct {
+	Direction string `json:"direction" arg:"" enum:"left,right,up,down" help:"the way the separator moves"`
+}
+
 type layoutArg struct {
 	Name string `json:"name" arg:"" help:"the layout's name" placeholder:"NAME"`
 }
@@ -142,6 +151,34 @@ func (b *builder) next() command.Command {
 func (b *builder) prev() command.Command {
 	return newCommand(b, "workspace.focus.prev", "Focus the previous pane", cmdResult(b.w.FocusPrev),
 		b.opts("prev", command.UI, "Moves focus to the previous pane of the focus ring."))
+}
+
+func (b *builder) focusIndex() command.Command {
+	return newCommand(b, "workspace.focus.index", "Focus a pane by its place", func(a indexArg) (command.Result, error) {
+		r := b.w.focusRing()
+		if a.Index < 1 || a.Index > len(r) {
+			return command.Result{Text: "No pane " + strconv.Itoa(a.Index) + " in the focus ring."}, nil
+		}
+		return command.Result{Cmd: b.w.Focus(r[a.Index-1])}, nil
+	}, b.opts("", command.UI, "Moves focus to the n-th pane of the focus ring, as alt+n does.", command.WithArgHint("index")))
+}
+
+// directions are workspace.resize.direction's arguments, each an axis and
+// the way its separator moves.
+var directions = map[string]struct {
+	axis  layout.Axis
+	delta int
+}{"left": {layout.Horizontal, -1}, "right": {layout.Horizontal, 1}, "up": {layout.Vertical, -1}, "down": {layout.Vertical, 1}}
+
+func (b *builder) resizeDirection() command.Command {
+	return newCommand(b, cmdResizeDirection, "Move the nearest split", func(a directionArg) (command.Result, error) {
+		d, ok := directions[a.Direction]
+		if !ok {
+			return command.Result{}, &command.ArgError{Path: "/direction", Reason: "is not left, right, up or down"}
+		}
+		return command.Result{Cmd: b.w.resizeFocused(d.axis, d.delta)}, nil
+	}, b.opts("", command.UI, "Moves the separator nearest the focused pane by one cell, as alt+shift and an arrow do.",
+		command.WithArgHint("left|right|up|down")))
 }
 
 func (b *builder) zoom() command.Command {
@@ -315,7 +352,7 @@ func (w *Workspace) paneInfos() []paneInfo {
 }
 
 func (b *builder) closeOverlay() command.Command {
-	return newCommand(b, "workspace.overlay.close", "Close the overlay", func(command.NoArgs) (command.Result, error) {
+	return newCommand(b, cmdOverlayClose, "Close the overlay", func(command.NoArgs) (command.Result, error) {
 		if len(b.w.overlays) == 0 {
 			return command.Result{Text: "No overlay is open."}, nil
 		}

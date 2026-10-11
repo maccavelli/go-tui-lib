@@ -4,6 +4,7 @@ import (
 	"context"
 	json "encoding/json/v2"
 	"errors"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -402,6 +403,42 @@ func TestKeysStillWork(t *testing.T) {
 	drain(ws, ws.Update(tea.KeyPressMsg{Code: 'z', Mod: tea.ModAlt}))
 	if ws.State().Zoom != ws.Focused() {
 		t.Errorf("alt+z did not zoom %s: %+v", ws.Focused(), ws.State())
+	}
+}
+
+// TestKeysAndCommandsAgree: Q8's commands give the layout state their
+// default keys give (docs/decisions/0007-MADR-keymap-engine.md A4), and an
+// index past the ring changes nothing.
+func TestKeysAndCommandsAgree(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		key  tea.KeyPressMsg
+		id   command.ID
+		args string
+	}{
+		{"alt+2", tea.KeyPressMsg{Code: '2', Mod: tea.ModAlt}, "workspace.focus.index", `{"index":2}`},
+		{"alt+shift+right", tea.KeyPressMsg{Code: tea.KeyRight, Mod: tea.ModAlt | tea.ModShift}, "workspace.resize.direction", `{"direction":"right"}`},
+		{"alt+shift+left", tea.KeyPressMsg{Code: tea.KeyLeft, Mod: tea.ModAlt | tea.ModShift}, "workspace.resize.direction", `{"direction":"left"}`},
+	} {
+		byKey, _ := rig(t)
+		byCmd, r := rig(t)
+		was, wasState := byKey.Focused(), byKey.State()
+		drain(byKey, byKey.Update(c.key))
+		if err := dispatch(t, byCmd, r, c.id, c.args); err != nil {
+			t.Fatalf("%s: %v", c.id, err)
+		}
+		if byKey.Focused() != byCmd.Focused() || !reflect.DeepEqual(byKey.State(), byCmd.State()) {
+			t.Errorf("%s: focus %s, state %+v by key; %s, %+v by command", c.name,
+				byKey.Focused(), byKey.State(), byCmd.Focused(), byCmd.State())
+		}
+		if byKey.Focused() == was && reflect.DeepEqual(byKey.State(), wasState) {
+			t.Errorf("%s changed nothing, so the comparison shows nothing", c.name)
+		}
+	}
+	ws, r := rig(t)
+	was := ws.Focused()
+	if err := dispatch(t, ws, r, "workspace.focus.index", `{"index":9}`); err != nil || ws.Focused() != was {
+		t.Errorf("an index past the ring: %v, focus %s", err, ws.Focused())
 	}
 }
 

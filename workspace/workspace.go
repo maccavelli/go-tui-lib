@@ -31,10 +31,12 @@ import (
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/maccavelli/go-tui-lib/command"
 	"github.com/maccavelli/go-tui-lib/glyph"
 	"github.com/maccavelli/go-tui-lib/internal/cells"
 	"github.com/maccavelli/go-tui-lib/internal/enum"
 	"github.com/maccavelli/go-tui-lib/internal/limits"
+	"github.com/maccavelli/go-tui-lib/keymap"
 	"github.com/maccavelli/go-tui-lib/layout"
 	"github.com/maccavelli/go-tui-lib/theme"
 )
@@ -144,7 +146,12 @@ type Workspace struct {
 	panes    map[layout.PaneID]Pane
 	state    layout.State
 	theme    theme.Theme
-	keys     KeyMap
+	km       *keymap.Keymap     // the keys' bindings: WithBindings', or DefaultRules'
+	disp     *keymap.Dispatcher // matches keys against km along KeyPath
+	legacy   *KeyMap            // WithKeyMap's bindings, deprecated
+	modes    []mode             // PushMode's scopes, in order
+	modeSeq  uint64             // the last mode's number, so a pop removes its own
+	commands map[command.ID]command.Command
 	chrome   Chrome
 	chromes  map[layout.PaneID]Chrome
 	border   theme.BorderStyle
@@ -308,8 +315,12 @@ func clampSize(w, h int) (int, int) { return limits.Clamp(w, h) }
 // dark.
 func WithoutBackgroundQuery() Option { return optionFunc(func(w *Workspace) { w.noQuery = true }) }
 
-// WithKeyMap replaces the workspace's bindings.
-func WithKeyMap(k KeyMap) Option { return optionFunc(func(w *Workspace) { w.keys = k }) }
+// WithKeyMap replaces the workspace's bindings with k's, each field bound
+// to its command (docs/decisions/0007-MADR-keymap-engine.md A4, item 2).
+//
+// Deprecated: use WithBindings, with DefaultRules and a program's own
+// bindings (0007-MADR A4). WithBindings wins over it.
+func WithKeyMap(k KeyMap) Option { return optionFunc(func(w *Workspace) { w.legacy = &k }) }
 
 // WithChrome sets what is drawn around panes (default Borders).
 func WithChrome(c Chrome) Option { return optionFunc(func(w *Workspace) { w.chrome = c }) }
@@ -360,7 +371,6 @@ func New(root layout.Node, panes map[layout.PaneID]Pane, opts ...Option) *Worksp
 	w := &Workspace{
 		root:   root,
 		panes:  make(map[layout.PaneID]Pane, len(panes)),
-		keys:   DefaultKeyMap(),
 		border: theme.BorderRounded,
 		mouse:  true,
 		width:  fallbackWidth,
@@ -381,6 +391,10 @@ func New(root layout.Node, panes map[layout.PaneID]Pane, opts ...Option) *Worksp
 	for _, o := range opts {
 		o.apply(w)
 	}
+	if w.km == nil {
+		w.km = builtinKeymap(w.legacy)
+	}
+	w.disp = keymap.NewDispatcher(w.km)
 	// The first theme is built once every option has applied
 	// (docs/decisions/0014-PLAN-component-native-forms.md Step 6).
 	if w.themed {
@@ -528,8 +542,13 @@ func (w *Workspace) Update(msg tea.Msg) tea.Cmd {
 		return w.resolve()
 	case targeted:
 		return w.Send(m.id, m.msg)
-	case tea.KeyPressMsg:
-		return w.key(m)
+	case tea.KeyPressMsg, keymap.TimeoutMsg:
+		cmd, _ := w.key(m)
+		return cmd
+	case tea.KeyReleaseMsg:
+		if cmd, ok := w.key(m); ok {
+			return cmd
+		}
 	case tea.PasteMsg, tea.PasteStartMsg, tea.PasteEndMsg:
 		if o := w.modal(); o != nil {
 			return w.updateOverlay(len(w.overlays)-1, msg)
@@ -599,46 +618,6 @@ func (w *Workspace) Broadcast(msg tea.Msg) tea.Cmd {
 		cmds = append(cmds, w.updateOverlay(i, msg))
 	}
 	return tea.Batch(cmds...)
-}
-
-func (w *Workspace) key(m tea.KeyPressMsg) tea.Cmd {
-	if n := len(w.overlays); n > 0 {
-		top := w.overlays[n-1]
-		if key.Matches(m, w.keys.Close) {
-			if c, ok := top.Pane.(EscConsumer); !ok || !c.ConsumesEsc() {
-				return w.Pop()
-			}
-			return w.updateOverlay(n-1, m)
-		}
-		if top.Modal {
-			return w.updateOverlay(n-1, m)
-		}
-	}
-	switch {
-	case key.Matches(m, w.keys.FocusNext):
-		return w.cycle(1)
-	case key.Matches(m, w.keys.FocusPrev):
-		return w.cycle(-1)
-	case key.Matches(m, w.keys.Zoom):
-		return w.Zoom(w.focus)
-	case key.Matches(m, w.keys.ResizeLeft):
-		return w.resizeFocused(layout.Horizontal, -1)
-	case key.Matches(m, w.keys.ResizeRight):
-		return w.resizeFocused(layout.Horizontal, 1)
-	case key.Matches(m, w.keys.ResizeUp):
-		return w.resizeFocused(layout.Vertical, -1)
-	case key.Matches(m, w.keys.ResizeDown):
-		return w.resizeFocused(layout.Vertical, 1)
-	}
-	for i := range w.keys.FocusPane {
-		if key.Matches(m, w.keys.FocusPane[i]) {
-			if r := w.focusRing(); i < len(r) {
-				return w.Focus(r[i])
-			}
-			return nil
-		}
-	}
-	return w.Send(w.focus, m)
 }
 
 // Focus moves focus to pane id, if it is visible and focusable. The pane

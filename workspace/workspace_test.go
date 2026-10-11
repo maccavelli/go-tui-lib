@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/maccavelli/go-tui-lib/glyph"
+	"github.com/maccavelli/go-tui-lib/keymap"
 	"github.com/maccavelli/go-tui-lib/layout"
 	"github.com/maccavelli/go-tui-lib/theme"
 )
@@ -182,9 +183,9 @@ func TestKeysReachOnlyTheFocusedPane(t *testing.T) {
 }
 
 func TestCtrlCIsNeverConsumed(t *testing.T) {
-	for _, b := range DefaultKeyMap().Bindings() {
-		if slices.Contains(b.Keys(), "ctrl+c") {
-			t.Fatalf("a default binding uses ctrl+c: %v", b.Keys())
+	for _, d := range DefaultRules() {
+		if slices.ContainsFunc(d.Keys, func(s keymap.Stroke) bool { return s.String() == "ctrl+c" }) {
+			t.Fatalf("a default binding uses ctrl+c: %v", d.Keys)
 		}
 	}
 	r := newRig(t, 120, 40)

@@ -386,6 +386,13 @@ func())` joins this step, with Step 10's test (`PushMode` adds the scope at
 the end of `KeyPath`; `pop` removes it; a second `pop` does nothing) and
 its mutation (`pop` removes the wrong mode when two are pushed).
 
+*2026-10-11 (D1, MADR A11):* the workspace runs its own matched commands
+and returns any other as `RequestMsg`; its help keeps four columns, read
+with `KeyBinding`; `KeyPath` has `overlay` while an overlay is open; and
+`SetBindings` swaps in a rebuilt keymap. With A3's names: `Dispatcher` for
+`Matcher`, `Binding` for rule, and `command.Scope` for `keymap.Context` in
+`KeyContexter`.
+
 *2026-10-10, A4 items 1 and 2:*
 
 * **The two commands of Q8,** in `workspace/commands.go`, before the
@@ -1672,3 +1679,153 @@ choice:
   12 passed, 0 failed; `keymap` under `-shuffle=on -count=2`,
   exit 0; `go-fuzz_test.py`, "27 passed"; `make fuzz FUZZTIME=3s`, "9
   packages ran clean".
+
+### Step 7: move `workspace` onto the engine
+
+#### Deviations
+
+* **D1 (2026-10-11): four points §1, §5, §7 and §9 leave open or
+  contradict.**
+  * **Found,** reading them against `workspace` (`workspace.go`'s key
+    handling, `help.go`, and `chrome_test.go`'s help test), before any of
+    this step's code was written:
+    * §1 has the program dispatch a matched command, §9 keeps a program
+      that sets no key option working as before, with no registry, and
+      `WithBindings` is "the only way in";
+    * §7 delegates the help to `keymap.Help`, a column per scope, and
+      `TestHelpListsWhoeverHasTheKeyboardFirst`, which §9 keeps
+      unchanged, pins four columns;
+    * §9's table binds esc in `overlay`, and its `KeyPath` names only
+      `overlay:<id>`, so esc's default is on no path;
+    * §5 has the program rebuild the keymap, and `WithBindings` is an
+      option, applied once.
+  * **The owner's choices,** each the recommendation, recorded as MADR
+    A11: the workspace runs its own commands and returns any other as
+    `RequestMsg`; the help keeps four columns, read with `KeyBinding`;
+    `KeyPath` has `overlay` while an overlay is open; and `SetBindings`.
+  * **The others:** a `WithRegistry` option, or a dispatch hook;
+    delegating the help; an esc binding per overlay; the workspace
+    rebuilding the keymap itself.
+  * **Files:** none added to the step's scope beyond its own.
+
+#### Readings
+
+Where §9 and A11 leave a detail open, the step reads it so, needing no
+choice:
+
+* **The workspace's own commands** are `Commands(w)`'s, built on first
+  use; a command it does not hold, `workspace.layout.use` among them
+  (which needs `WithLayouts`), comes back as a `RequestMsg` like any
+  other.
+* **`DefaultRules`** lists each command's keys last first, so that the
+  first, `alt+1` and `alt+shift+left`, is the primary a help shows;
+  `Bindings` puts the later binding first.
+* **The help** lists the overlays' key with none open, as today, by
+  putting `overlay` on the help's path; the descriptions are today's.
+  `alt+1` to `alt+9`, one command now, are one entry, "pane", where the
+  full help listed nine, and the four resize keys likewise. Under a modal
+  overlay the focus and zoom keys, which do not reach through it, are no
+  longer listed.
+* **Under a modal overlay** global bindings still apply (§9), and the
+  overlay's own `KeyContexter` scopes follow it; a non-modal overlay's
+  are not on the path, as keys go to the focused pane.
+* **Releases and timeouts** go through the dispatcher. A release no
+  binding takes is broadcast to every pane, as before; `TimeoutMsg`
+  reaches the dispatcher through `Update`.
+* **`WithBindings` wins over `WithKeyMap`.** A `KeyMap` converts field by
+  field, `Close` into `overlay`; a disabled field, and a key that does not
+  parse, are left out. `DefaultRules` build clean, and an error from them
+  panics, as `Commands`' fixed definitions do.
+* **`workspace.focus.index`** past the ring changes nothing, as the key
+  did, and says so in `Result.Text`, with no error.
+* **The scope names** stay unexported: a program writes `"pane:<id>"`
+  and the others as strings.
+* **The guides** still name `DefaultKeyMap`
+  (`docs/guides/building-workspaces.md`); Step 8 updates them.
+
+#### What was built
+
+* **`workspace/bindings.go` (new):** `DefaultRules`, `WithBindings`,
+  `SetBindings`, `KeyPath`, `KeyContexter`, `PushMode` and `RequestMsg`;
+  the dispatching of keys; and a `KeyMap`'s conversion into rules.
+* **`workspace/workspace.go`:** the keymap and dispatcher in place of
+  `KeyMap`; presses, releases and timeouts through the dispatcher;
+  `WithKeyMap` deprecated.
+* **`workspace/keys.go`:** `KeyMap` and `DefaultKeyMap` deprecated.
+* **`workspace/help.go`:** the four columns, read with `KeyBinding`.
+* **`workspace/commands.go`:** `workspace.focus.index` and
+  `workspace.resize.direction`.
+* **Tests:** `workspace/bindings_test.go` (new): `TestDefaultRulesGolden`
+  with `workspace/testdata/golden/default-rules.golden`, the 17 defaults
+  of §9 with A4's commands; `TestKeyPath`; `TestPushMode` (Step 10's,
+  moved here); `TestRebind`; `TestChord` (a prefix replayed to the pane on
+  the timeout, and a program's chord as a `RequestMsg` from a key with the
+  focused pane in its `when` values); `TestSetBindings`;
+  `TestOwnCommandError`; `TestEscConsumerThroughTheEngine`;
+  `TestReleaseStillBroadcast`; `TestWithKeyMapStillWorks`.
+  `workspace/commands_test.go`: `TestKeysAndCommandsAgree`. The two tests
+  that read `DefaultKeyMap`, for sequence introducers and `ctrl+c`, read
+  `DefaultRules`. Every other workspace test, golden frames and the help
+  test included, passes unchanged.
+
+#### Checks
+
+* **A mutation that showed what a test cannot see.** K7-16 first
+  survived `TestKeysAndCommandsAgree`: the key and the command now run
+  the same handler, so they agree when both move the wrong way. The
+  resize tests, which pin the direction, kill it.
+* **Lint.** An unchecked `keymap.New` error, two repeated command IDs, a
+  576-byte array copied in a range, a parameter that shadowed `key`, and
+  `defaultKeymap` beside `DefaultKeyMap`; each fixed in the code.
+* **Mutations,** on scratch copies, each killed by the tests named:
+  * **K7-1** (`KeyPath` keeps the layout's scopes under a modal overlay):
+    `TestKeyPath`, `TestModalOverlayTrapsKeys`;
+  * **K7-2** (`Replay` strokes are dropped): `TestChord`;
+  * **K7-3** (a default is set back to `alt+]`): `TestDefaultRulesGolden`,
+    `TestDefaultKeysAvoidSequenceIntroducers`;
+  * **K7-4** (`pop` removes the wrong mode when two are pushed):
+    `TestPushMode`;
+  * **K7-5** (an `EscConsumer` does not get esc):
+    `TestEscConsumerThroughTheEngine`;
+  * **K7-6** (the workspace's own commands go out as `RequestMsg`):
+    `TestRebind`, `TestFocusCycles`, `TestKeysStillWork`;
+  * **K7-7** (a matched command's origin is not a key): `TestChord`,
+    `TestOwnCommandError`;
+  * **K7-8** (`WithKeyMap` is ignored) and **K7-9** (it wins over
+    `WithBindings`): `TestWithKeyMapStillWorks`;
+  * **K7-10** (`SetBindings` leaves the dispatcher on the old keymap):
+    `TestSetBindings`;
+  * **K7-11** (the help reads `DefaultRules`, not the keymap):
+    `TestRebind`;
+  * **K7-12** (`KeyPath` leaves `overlay` out under a non-modal
+    overlay): `TestKeyPath`, `TestEscConsumerThroughTheEngine`;
+  * **K7-13** (a release no binding takes is not broadcast):
+    `TestReleaseStillBroadcast`;
+  * **K7-14** (an own command's error is dropped): `TestOwnCommandError`;
+  * **K7-15** (`focus.index` is off by one): `TestFocusCycles`;
+  * **K7-16** (`resize.direction`'s right moves left):
+    `TestHeldResizeKeyHasNoDeadZone`, `TestResizeAtAWindowLimit`,
+    `TestKeyboardResizeSkipsAnUnnamedSeparator`;
+  * **K7-17** (the help leaves the overlays' key out with none open):
+    `TestHelpListsWhoeverHasTheKeyboardFirst`.
+
+  K7-1 to K7-4 are the PLAN's: its three that stay in this step, and
+  Step 10's `pop`; the `go doc` mutation moved to Step 12. K7-5 to K7-17
+  are added.
+* **macOS,** go1.27.2: `make pre-add-check FILES=<the 9 files>`, "9
+  file(s) clean"; `make lint`; the cross `go vet`; `-race`, `-shuffle=on
+  -count=2`, `LC_ALL=C` and workspace mode; `go mod tidy -diff` (no
+  requirement added); `make vuln`; `make apicheck`, "against v0.10.0, 0
+  incompatible change(s)", the deprecations and additions compatible;
+  `make examples`; `scripts/go-modules.py --check`; `make
+  release-check`, "224 file(s) clean"; `shellcheck`,
+  `markdownlint-cli2`, `actionlint` and the five Python tests. All clean.
+  This PLAN and the MADR, under the repository's markdownlint rules,
+  raise only MD004.
+* **The Windows test host,** go1.27.2 windows/amd64, with the index
+  synced: `make pre-add-check`, "226 file(s) clean", with the
+  new files; `make lint`, `make vuln` and `make examples`, each exit 0;
+  the step's tests and the conformance checks, 19 passed, 0
+  failed; `workspace` under `-shuffle=on -count=2`, exit 0;
+  `go-fuzz_test.py`, "27 passed"; `make fuzz FUZZTIME=3s`, "9 packages
+  ran clean".
