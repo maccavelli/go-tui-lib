@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in-progress
 date: 2026-10-10
 associated-madr: "0007-MADR-keymap-engine.md"
 ---
@@ -53,7 +53,7 @@ old form, read the new one:
 | `Matcher`, `NewMatcher` | `Dispatcher`, `NewDispatcher` | A3 |
 | `Build(o, layers...)` | `New(s, layers...)` | A4.3 |
 | `Describer` (a function type) | an interface, with `DescriberFunc` | A4.4 |
-| `Layer` constants `Default`, `Program`, `User` | `DefaultLayer`, `ProgramLayer`, `UserLayer` | A4.7, proposed |
+| `Layer` constants `Default`, `Program`, `User` | `DefaultLayer`, `ProgramLayer`, `UserLayer` | A4.7 |
 | `Rule.Args json.RawMessage` | `Binding.Args jsontext.Value` | A4.6 |
 | `KeyMap`, `DefaultKeyMap`, `WithKeyMap` removed in Step 7 | deprecated in Step 7 (`v0.11.0`), removed in Step 12 (`v0.12.0`) | A4.2 |
 
@@ -598,4 +598,14 @@ additions are compatible.
 
 ## Execution Record
 
-None yet.
+### Step 1: records
+
+* **The amendments:** MADR A4 and this PLAN's revision of 2026-10-10,
+  with the facts re-read on `8f68556`, were committed as `68d9b14`. The
+  owner chose Q8's A, the deprecation of `KeyMap` over Q4, `keymap.New`,
+  and a `Describer` interface with `Settings.Tick` kept, each the
+  recommendation.
+* **The approval:** the owner wrote "approved to proceed" on 2026-10-10,
+  approving this PLAN and A4's item 7, the `Layer` constants'
+  names, which is now accepted.
+* **Set:** this PLAN `in-progress`; `docs/README.md`'s rows.

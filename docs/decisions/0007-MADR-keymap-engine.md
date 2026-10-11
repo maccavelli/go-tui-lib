@@ -1009,8 +1009,9 @@ when it is next amended, before it runs.
 ### A4 (2026-10-10): the API conventions, and Q8
 
 *Status: accepted (2026-10-10)* for items 1 to 5, which the owner chose,
-and for item 6, which AGENTS.md's "API conventions" require. Item 7 is
-*proposed*, for the owner's approval with the PLAN.
+and for item 6, which AGENTS.md's "API conventions" require. Item 7 was
+*proposed*, for the owner's approval with the PLAN; the owner approved it
+on 2026-10-10 ("approved to proceed"), and it is accepted.
 
 The record predates [0014-MADR-native-integration-api.md](0014-MADR-native-integration-api.md)'s
 W0 to W4, which wrote the conventions every exported name now follows
