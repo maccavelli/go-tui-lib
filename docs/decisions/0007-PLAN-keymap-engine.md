@@ -609,3 +609,119 @@ additions are compatible.
   approving this PLAN and A4's item 7, the `Layer` constants'
   names, which is now accepted.
 * **Set:** this PLAN `in-progress`; `docs/README.md`'s rows.
+
+### Step 2: notation
+
+#### Deviations
+
+* **D1 (2026-10-10): three points §2 leaves open.**
+  * **Found,** reading §2 against Bubble Tea `v2.0.10` and ultraviolet's
+    decoder:
+    * a `Stroke` has an `Event`, but §2 gives no written form for it, so
+      `String()`, the VS Code spelling and this step's round-trip test
+      could not be lossless for a release or repeat stroke;
+    * ultraviolet gives the keypad its own codes and the main keys' names
+      (`key.go`'s `keyTypeString`: `KeyKpEnter` is `enter`, `KeyKp1` is
+      `1`), so §2's equal-`Code` rule would not let keypad Enter fire an
+      `enter` binding, where bubbles' name-based `key.Matches` does;
+    * §2's "an upper-case letter `A` becomes `shift+a`" and "input is
+      case-insensitive" disagree on `Ctrl+A`.
+  * **The owner's choices,** each the recommendation, recorded as MADR A5:
+    a `:release` or `:repeat` suffix; a named key matches by name; an
+    upper-case letter means shift, with or without other modifiers.
+  * **The others:** an `event` member on the binding, as opencode; equal
+    codes only; a bare letter only.
+  * **Also found, needing no choice:**
+    * **Caps lock on the Windows console.** ultraviolet reports a letter
+      typed with caps lock on in upper case, with `ModCapsLock`
+      (`decoder.go`'s `parseWin32InputKeyEvent` and `ensureKeyCase`). §2's
+      "matching ignores lock modifiers" is read to undo the lock's case
+      too: with `ModCapsLock`, a letter compares in lower case, and shift
+      still counts.
+    * **The interop test's limit.** Under caps lock, a key's `String()`
+      is its upper-case `Text` (Kitty's `parseKittyKeyboard` and the
+      Windows path set it), which bubbles cannot tell from shift and a
+      letter. So `key.Matches` and `Stroke.Matches` agree on every case
+      without a lock modifier, and differ on a caps-lock letter, where the
+      stroke is right; a test pins that difference rather than leaving
+      the rows out.
+    * **Scan strokes,** found by the interop test: bubbles compares a
+      key's typed text, so on an AZERTY `a` at the US `q` it matches
+      `[KeyA]` where `Matches` rightly matches `[KeyQ]`. The table pins
+      this too, and `BubblesKeys`' comment names all three limits: a
+      caps-lock letter, a shifted symbol written as shift and its key,
+      and a scan stroke.
+
+#### What was built
+
+* **`keymap/notation.go` (new),** the package's first file, with its
+  comment and stability line:
+  * `Event` (`Press`, `Release`, `Repeat`), with its text forms through
+    `enum.Names`;
+  * `Stroke`, `Sequence`, `MaxStrokes`, `ParseStroke`, `ParseSequence`,
+    `String`, `VSCode`, `Matches` and `BubblesKeys`, as §2 and A5 give
+    them; `ErrNotation`, which every parse error wraps, naming the input
+    and its bad part;
+  * the key names: a list of Bubble Tea's key constants, the main keys
+    before the keypad's, each named by Bubble Tea's own `Keystroke()`, so
+    no name is copied; VS Code's `escape`, `pageup` and `pagedown`, and the
+    aliases `option`, `cmd` and `win`; the scan codes `[KeyA]` to
+    `[KeyZ]`, `[Digit0]` to `[Digit9]` and the US punctuation;
+  * `Matches` ignores the lock modifiers and a letter caps lock made
+    upper case (D1); a `Repeat` stroke matches only a repeated key; a
+    release is the message's type, which `Matches` does not see, and
+    Step 4's dispatcher checks it.
+* **`keymap/notation_test.go` (new):**
+  * `TestRoundTrips`: 5,000 random canonical strokes (any modifier set,
+    named and F keys, printable runes, scan codes, any event) and
+    sequences of up to four read back from both spellings;
+  * `TestNames`: every listed key has a name of Bubble Tea's, and a name
+    reads as the main key;
+  * `TestNormalization`: A5's spellings as one stroke, and the refusals
+    (a lock modifier, an empty stroke, no key, a modifier twice, an
+    unknown key or scan code, five strokes, `<leader>` with no leader),
+    each wrapping `ErrNotation` and naming its part;
+  * `TestMatches` and `TestBubblesInterop`, over sixteen keys built as
+    ultraviolet `v0.0.0-20260811164956-006e29f97886` decodes them, each
+    citing its `decoder.go` lines: legacy upper case, a shifted symbol,
+    `alt+a` and `esc`; Kitty `shift+a`, `shift+/`, `ctrl+a`, an AZERTY key
+    with `BaseCode`, keypad Enter and 1, repeated and not, and caps lock;
+    the Windows console under caps lock, shift and caps lock, and num
+    lock. The agent read each cited range against the source;
+  * `TestEventText`.
+* **`internal/conformance/enums_test.go`:** `keymap.Event` joins the enum
+  table, so `TestEveryEnumRoundTrips` and `TestOutOfRangeText` cover it.
+
+#### Checks
+
+* **Mutations,** on scratch copies, each killed by the test the PLAN
+  names:
+  * **K2-1** (lock modifiers not masked): the caps-lock rows of
+    `TestMatches`;
+  * **K2-2** (the `Text` comparison dropped): "Kitty shift+/ typing ?:
+    \"?\".Matches = false";
+  * **K2-3** (`VSCode` writes `super` as `meta`): `TestRoundTrips`, a
+    stroke read back as `meta`;
+  * **K2-4** (`BubblesKeys` drops the text): "legacy upper-case A:
+    key.Matches(\"A\", [\"shift+a\"]) = false".
+
+  They ran again after the lint fixes below, with the same results.
+* **Lint fixes, found by the first gate run:** `goconst` on the modifier
+  names, spelled in the table and the parse map, now built from the
+  table; and `modernize`'s `strings.SplitSeq`.
+* **macOS,** go1.27.2: `make pre-add-check FILES=<the 3 files>`, "3 file(s)
+  clean"; `make lint`; the cross `go vet`; `-race`, `-shuffle=on
+  -count=2`, `LC_ALL=C` and workspace mode; `go mod tidy -diff` (no
+  requirement added); `make vuln`; `make apicheck`, "against v0.10.0, 0
+  incompatible change(s)"; `make examples`; `scripts/go-modules.py
+  --check`; `make release-check`, "200 file(s) clean", the tracked files,
+  which the new ones join when committed; `shellcheck`,
+  `markdownlint-cli2`, `actionlint` and the five Python tests. All clean.
+* **The Windows test host,** go1.27.2 windows/amd64, with the index synced:
+  `make pre-add-check`, "202 file(s) clean", with the new files; `make
+  lint`, `make vuln` and `make examples`, each exit 0; the step's tests
+  and the conformance checks, 10 tests passed, 0 failed; `keymap` under
+  `-shuffle=on -count=2`, exit 0;
+  `go-fuzz_test.py`, "27 passed"; `make fuzz FUZZTIME=3s`, "8 packages ran
+  clean". A first run on the code before the lint fixes was stopped, its
+  processes ended and its files removed.

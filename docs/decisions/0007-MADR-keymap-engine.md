@@ -1068,6 +1068,29 @@ this record says the old form, read the new one. A3's names still apply.
    A1's `type Default struct` would declare `Default` twice in one
    package. The type keeps its name; the constants take the suffix.
 
+### A5 (2026-10-10): the notation's open points
+
+*Status: accepted (2026-10-10)*, the owner's choices, found as Step 2 of
+[0007-PLAN-keymap-engine.md](0007-PLAN-keymap-engine.md) began (its D1).
+§2 is read with these.
+
+1. **An event is a suffix.** A press is written bare; a release or repeat
+   stroke ends in `:release` or `:repeat`, as `ctrl+a:release`, in the
+   canonical and the VS Code spelling alike: an extension VS Code lacks,
+   as `<leader>` and `hyper` are. Every `Sequence` round-trips, events
+   included.
+2. **A named key matches by name.** Bubble Tea gives the keypad its own
+   codes with the main keys' names (`KeyKpEnter` prints `enter`, `KeyKp1`
+   prints `1`). A stroke matches a message whose key Bubble Tea prints
+   with the stroke's name, so the keypad fires the same bindings, as
+   bubbles' `key.Matches` does. The names come from Bubble Tea's own
+   `Keystroke()`; parsing a name gives the first code that prints it, the
+   main key's.
+3. **An upper-case letter means shift,** with or without other
+   modifiers: `A` is `shift+a`, and `Ctrl+A` is `ctrl+shift+a`. Modifier
+   and key names are otherwise case-insensitive. The canonical and VS Code
+   spellings write lower case, so a round trip is unaffected.
+
 ## More Information
 
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md):

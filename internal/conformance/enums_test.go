@@ -12,6 +12,7 @@ import (
 
 	"github.com/maccavelli/go-tui-lib/command"
 	"github.com/maccavelli/go-tui-lib/glyph"
+	"github.com/maccavelli/go-tui-lib/keymap"
 	"github.com/maccavelli/go-tui-lib/launch"
 	"github.com/maccavelli/go-tui-lib/layout"
 	"github.com/maccavelli/go-tui-lib/termcap"
@@ -39,6 +40,7 @@ var enums = map[string]func(int64) any{
 	"command.Surface":       as[command.Surface],
 	"command.Verdict":       as[command.Verdict],
 	"glyph.Tier":            as[glyph.Tier],
+	"keymap.Event":          as[keymap.Event],
 	"launch.Choice":         as[launch.Choice],
 	"launch.Target":         as[launch.Target],
 	"layout.Axis":           as[layout.Axis],
