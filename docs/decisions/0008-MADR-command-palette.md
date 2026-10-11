@@ -615,6 +615,252 @@ new one.
 [0008-PLAN-command-palette.md](0008-PLAN-command-palette.md) takes these
 names when it is next amended, before it runs.
 
+### A3 (2026-10-11): the palette on the built keymap, registry and API conventions
+
+*Status: proposed (2026-10-11).* Written before execution, at the owner's
+request of 2026-10-11 to "evaluate, research, and determine the data for
+ammending 0008 and preparing the plan". Since this record was accepted:
+
+* 0006 and 0007 shipped: `keymap` in `v0.11.0`, and the workspace's keys
+  wholly on it in `v0.12.0`
+  ([0007-PLAN-keymap-engine.md](0007-PLAN-keymap-engine.md));
+* AGENTS.md gained its API conventions
+  ([0014-MADR-native-integration-api.md](0014-MADR-native-integration-api.md)
+  W0, `v0.8.0` to `v0.10.0`);
+* the toolchain moved to Go 1.27.2
+  ([0016-MADR-go-1-27-2-for-go-2026-6604.md](0016-MADR-go-1-27-2-for-go-2026-6604.md)).
+
+The design stands: `fuzzy` and `palette`, asynchronous scoped providers,
+grapheme-safe highlights, no new module. What changes is how a picker takes
+its keys, runs what it selects, closes, and themes itself, and the names
+and shapes the conventions require. Items 1 to 3 add to `workspace`, and
+item 8 to `glyph`; every addition is compatible. Q5 to Q7 below are the
+owner's, and each item they decide gives the recommendation.
+
+#### Facts re-read (2026-10-11, on `a0537d3`)
+
+| Fact | Where |
+| :--- | :--- |
+| Go 1.27.2 compiles a generic method on a concrete type, such as `(*Matcher).Rank[T]`; `go vet` and golangci-lint 2.14.0 under `.golangci.yml` accept it, and apidiff reports a change to one | a scratch probe outside the repository |
+| The workspace matches every key first, along `KeyPath`. It runs the commands `Commands(w)` gives itself; any other matched command goes back as `RequestMsg` | `workspace/bindings.go:194-249` |
+| Under a modal overlay, `KeyPath` is global, `overlay`, `overlay:<id>`, that overlay's `KeyContexts`, then the modes. A non-modal overlay adds `overlay` and `overlay:<id>`, never its `KeyContexts` | `workspace/bindings.go:132-154` |
+| An unmatched key goes to the modal overlay, or else the focused pane | `workspace/bindings.go:218-225` |
+| `esc` in the `overlay` scope closes the top overlay, unless that overlay is an `EscConsumer` that consumes it | `workspace/bindings.go:231-236` |
+| Bubble Tea runs each returned command in a goroutine of its own, so their messages can arrive in any order | bubbletea v2.0.10 `tea.go:708-747` |
+| **Measured:** 2000 key presses arriving together, each returning a command whose message carries its number, as the workspace returns a `RequestMsg`: 94 to 169 messages reached `Update` after a later one, in five runs | a scratch program on the macOS host |
+| A pane can read `(*Workspace).WidthMethod()`. It cannot read the theme, which the workspace rebuilds on `tea.ColorProfileMsg` and `tea.BackgroundColorMsg`, or the keymap, which `SetBindings` replaces | `go doc ./workspace`; `workspace/workspace.go:418-436` |
+| An overlay cannot close itself: `updateOverlay(i)` writes `w.overlays[i]` after the pane's `Update` returns, so a `Pop` inside it removes the slot being written | `workspace/overlay.go:155-162` |
+| `Registry.Dispatch` runs from the program's `Update`, on the calling goroutine, and runs a `Loop` command at once. A `Prompt` or `Forward` command also sends `PromptMsg` | `go doc ./command Registry.Dispatch` |
+| `command.Params(c)` gives a command's top-level arguments: `Type`, `Enum`, `Required`, `HasDefault` and `Default`, `Description`, `Placeholder`, `Hidden`, `Secret`, `Min` and `Max`, `Positional` and `Rest` | `go doc ./command Param` |
+| `keymap.Binding` has `When`. `Keymap` has `Shortcut(id, path, goos, glyphs)`, `KeyBinding`, `Help` and `Reachable` | `go doc ./keymap` |
+| bubbles `textinput.Model` has pointer `Focus` and `Blur`, value `Update`, `Cursor() *tea.Cursor`, and draws `Prompt` (`"> "`) and `EchoCharacter` (`'*'`) by default | bubbles v2.2.1 |
+| `glyph.Set` has `Focus`, `Ellipsis`, the scroll glyphs, `Bullet`, `BadgeOpen`, `BadgeClose` and `Keys`; no prompt or mask glyph | `go doc ./glyph Set` |
+| `theme.Styles` has `Title`, `Body`, `Muted`, `Accent`, `Success`, `Warning`, `Error`, `Badge` and the border and title roles | `go doc ./theme Styles` |
+| `internal/sanitize` has `Line`, `Styled` and `Truncate`; the workspace passes pane titles and badges through them | `workspace/render.go:174-299` |
+| `internal/conformance` checks the enums' text, the shared type names, opaque options, the stability line, and that nothing reads the environment, exits or starts a process | AGENTS.md, "Pre-add checks" |
+| `make fuzz` finds every fuzz target itself | `scripts/go-fuzz.py -a` |
+| `runtime/pprof`'s `goroutineleak` profile reports only goroutines blocked on a primitive nothing else can reach. `testing/synctest.Test` waits for every goroutine of its bubble, and fails when those left are durably blocked | Go 1.27.2 documentation |
+| `command` exports `RegistryOption`; none of the other names below is exported by another public package, `Option` aside, which `sharedNames` allows everywhere | a scan of every public package's types |
+
+#### What changes
+
+1. **A picker's own keys run in the picker, in the order they were
+   pressed** (§1 "No direct key handling", §7 "Keys"; Q5).
+   * **Found.** §1 and §7 give the palette a `DefaultKeyMap()` and a
+     `palette` context. 0007 removed that style in `v0.12.0`, and A11 has
+     the workspace match first. A key bound to a command the workspace does
+     not own reaches the program as `RequestMsg`, through a command, and
+     the measurement above shows such messages reordering: with the
+     palette's moves as `RequestMsg`, a "down" and an "enter" read together
+     could run the row that was selected before the move.
+   * **Decided.**
+     * `workspace.CommandConsumer`, beside `EscConsumer`:
+       `interface{ ConsumesCommand(id command.ID) bool }`.
+     * `workspace.CommandMsg{Request command.Request}`.
+     * When a matched command is not the workspace's own, the workspace
+       offers it before making a `RequestMsg`: to the modal overlay alone
+       when one is open; otherwise to the open overlays, top first, then
+       the focused pane. The first whose `ConsumesCommand(id)` is true is
+       sent `CommandMsg` at once, in `Update`, as an unmatched key is. The
+       request is the one `RequestMsg` would carry: `Origin:
+       command.OriginKey` and the workspace's `WhenContext`. With no taker,
+       `RequestMsg` as today. This extends 0007 A11 item 1, where the
+       workspace runs its own commands without a registry, to the
+       components it hosts.
+     * A `Picker` is a `KeyContexter` naming `kind:picker`, and consumes
+       its navigation commands: `palette.select.next`,
+       `palette.select.prev`, `palette.page.next`, `palette.page.prev`,
+       `palette.accept` and `palette.complete`.
+     * `palette.DefaultRules() []keymap.Default`:
+       * global: `ctrl+p` to `palette.open`, `when: "!workspace.modal"`
+         (Q3);
+       * `kind:picker`: `up` and `ctrl+p` to `palette.select.prev`, `down`
+         and `ctrl+n` to `palette.select.next`, `pgup` and `pgdown` to the
+         pages, `enter` to `palette.accept`, `tab` to `palette.complete`;
+       * `overlay:completion` (item 6): `up` and `ctrl+p`, `down` and
+         `ctrl+n`, and `tab` and `enter` to `palette.accept`.
+       * `esc` stays the workspace's: the `Picker` is an `EscConsumer` while
+         its query is not empty (§7).
+     * The program builds one keymap with `workspace.DefaultRules()` and
+       `palette.DefaultRules()` among its defaults, so one user file rebinds
+       both. Without the palette's rules, its keys reach the input as
+       text, and nothing moves the selection; the guide says so, and a test
+       pins it.
+     * `(*Picker).OpenCommand(id command.ID, title string, opts
+       ...command.Option) command.Command` gives a `Loop`, `UI` command that
+       opens that picker. The program registers it; `palette.open` is the
+       ID `DefaultRules` binds. Since no picker is open to consume it, its
+       key comes as `RequestMsg`, and the program's `Dispatch` runs it.
+   * **Not chosen:**
+     * the navigation as registry commands, through `RequestMsg`: it
+       reorders, as above, and every picker would need a registry;
+     * a keymap of the picker's own, resolving the raw keys it is given: a
+       program's global binding of `ctrl+n` would reach past it, and the
+       user's file would need a second build to reach it;
+     * `workspace.WithRegistry`, which A11 refused.
+   * **Found, not decided here.** Any program command bound to a key
+     reaches the program as `RequestMsg`, and can reorder the same way.
+     That is 0007's routing, and needs a record of its own.
+2. **Theme, width and keymap are read from the workspace** (§4, §7; Q6).
+   * **Found.** The workspace rebuilds its theme when the terminal reports
+     its profile or background, and replaces its keymap through
+     `SetBindings`. A `WithTheme` or `WithBindings` option on the palette
+     would go stale at either.
+   * **Decided.** `(*Workspace).Theme() theme.Theme` and
+     `(*Workspace).Bindings() *keymap.Keymap`, beside `WidthMethod()`.
+     `palette.NewPicker(w *workspace.Workspace, opts ...Option)` keeps `w`,
+     and its `View` reads the theme, the width method and the keymap there.
+     §4's `WithTheme`, `WithGlyphs` and `WithKeyMap` are dropped.
+   * **Not chosen:** a message the workspace broadcasts on each change,
+     which every pane would receive.
+3. **An overlay closes itself with `workspace.Close(id string) tea.Msg`**
+   (Q7), beside `To`. `Update` closes overlay `id` if it is open, with
+   `Pop`'s focus messages, and does nothing otherwise. A `Picker` that
+   accepts a hit returns a command that sends it, and takes no more input
+   while it waits.
+   * **Not chosen:** `SelectedMsg`, with the program popping the overlay,
+     which every program would repeat.
+4. **A hit runs on the event loop** (§4 `Hit.Run`, A1 item 2).
+   * **Found.** A1 has a command hit dispatch with `OriginPalette`.
+     `Dispatch` must run from `Update`, and §4's `Run tea.Cmd` runs on
+     another goroutine.
+   * **Decided.** `Hit.Run` is `func(args jsontext.Value) tea.Cmd`. The
+     `Picker` calls it in its `Update` on accept, with the arguments item 5
+     collects, or `nil`. `FromRegistry`'s calls `reg.Dispatch` with
+     `Origin: command.OriginPalette` and the `WhenContext` captured at
+     open; the registry's gate, `PromptMsg` (A1 item 5) and `ResultMsg`
+     follow from it. A `Run` that blocks blocks the UI, and its
+     documentation says so.
+5. **Arguments come from `command.Params`** (§6, A1 item 4).
+   * `Hit.Args json.RawMessage` becomes `Hit.Params []command.Param`.
+     `FromRegistry` fills it from `command.Params`.
+   * The argument stage prompts, in order, for a `string`, `integer`,
+     `number` or `boolean` parameter, and for any with `Enum`, through the
+     same fuzzy list. It applies `Required`, `Default`, `Min` and `Max`,
+     shows `Description` and `Placeholder`, skips `Hidden`, and masks
+     `Secret` with the `Mask` glyph.
+   * Any other parameter, or an error from `Params`, falls through: the
+     `Picker` sends `SelectedMsg` with no arguments, and runs nothing.
+   * The collected values are one JSON object, encoded with
+     `encoding/json/v2`. The recents store keeps hit IDs only, so no value
+     is ever kept, secret or not.
+6. **Completion mode is an option, `WithoutInput()`** (§5).
+   * `AsCompletion()` is not a `With…`, `Without…` or `On…` name.
+     `WithoutInput()` turns off the input row; such a picker opens
+     non-modal, with the overlay ID `completion` unless `WithID` gives
+     another.
+   * A non-modal overlay's `KeyContexts` are not on the path (0007 A11
+     item 3), so its bindings are in `overlay:completion`, by ID. A program
+     that picks another ID binds its own.
+   * The editor sends `palette.SetQuery(q string) tea.Msg` to it with
+     `SendOverlay` or `To`. On accept the `Picker` sends `SelectedMsg` and
+     closes with item 3.
+7. **The API conventions** (AGENTS.md; A2's names apply first).
+   * **Options** are opaque:
+     * `fuzzy.Option`: `WithCase(CaseMode)`, `WithNormalizer(Normalizer)`,
+       `WithDelimiters(string)`, `WithExtended()`, `WithMaxAlign(int)`;
+     * `fuzzy.IndexOption`: `WithMinOverlap(float64)`,
+       `WithMaxCandidates(int)`;
+     * `palette.Option`: `WithGOOS(string)`, `WithRecents(*Frecency)`,
+       `WithLimit(int)`, `WithGrouping(Grouping)`, `WithPlaceholder(string)`,
+       `WithLogger(slog.Handler)`, `WithoutInput()`;
+     * `palette.OverlayOption`: `WithID(string)`,
+       `WithAnchor(workspace.Anchor)`, `WithSize(width, height int)`;
+     * `palette.FrecencyOption`: `WithHalfLife(time.Duration)`,
+       `WithMaxEntries(int)`;
+     * `palette.FileOption`: `WithIndexAbove(int)` (default 5000) and
+       `WithMaxFiles(int)`; the `PathFilter` goes to `FSWalker`, as §5
+       has it.
+   * **Enums** through `internal/enum`, in the conformance table:
+     `fuzzy.Grade` (`exact`, `prefix`, `boundary`, `subsequence`),
+     `fuzzy.CaseMode` (`smart`, `insensitive`, `sensitive`) and
+     `palette.Grouping` (`score`, `provider`).
+   * **Hooks:** §2's `Normalize(func(rune) rune)` becomes `Normalizer`,
+     `interface{ Normalize(r rune) rune }`, with `NormalizerFunc`.
+     `Walker` and `PathFilter` take their adapters (A2).
+   * **Errors:** `palette.ErrRecentsVersion`, wrapped with the version, as
+     `layout.ErrStateVersion` is.
+   * **No clock option.** §6's injectable clock is dropped: `Frecency`
+     reads `time.Now`, and its tests run inside `testing/synctest`, whose
+     clock is fake.
+   * **Names:** §5's `Commands(reg)` provider is `FromRegistry(reg)`, so
+     `Commands` keeps meaning a package's own command list, as
+     `workspace.Commands` does; and no type is `RegistryOption`, which
+     `command` exports. `Hit` gains `Command command.ID`, empty for a hit
+     that is not a command.
+   * **Each package** ends its documentation with its stability line,
+     reads no environment, and has no mutable package variable.
+8. **Glyphs.** `glyph.Set` gains `Prompt` (`❯`, ASCII `>`) and `Mask` (`•`,
+   ASCII `*`), each one cell in both width methods, in every tier. The
+   `Picker` sets `textinput`'s `Prompt` and `EchoCharacter` from them, so
+   no default bubbles glyph is drawn (AGENTS.md, TUI rule 3).
+9. **Text from outside is sanitised.** A hit's `Text`, `Group`, `Help`,
+   `Hint` and `Disabled`, and a provider's name, go through
+   `sanitize.Line` before they are matched for drawing, measured or styled,
+   so a file name or an MCP title with a control sequence or a newline
+   draws as one row of its visible text. A failing provider's row names it;
+   its error goes to the `slog.Handler` only.
+10. **Limits.**
+    * A query is matched on its first 256 graphemes; the input takes no
+      more.
+    * The `Picker` keeps the best `WithLimit` hits (default 200) across
+      providers.
+    * `Files` stops its walk at `WithMaxFiles` (default 200 000) and shows
+      one muted row saying so.
+    * `Frecency.ReadFrom` reads at most 1 MiB, and refuses an ID longer
+      than 1024 bytes.
+11. **Hints come from the keymap.** For each drawn row whose `Hit.Command`
+    is set and whose `Hint` is empty, the `Picker` asks
+    `Bindings().Shortcut(id, path, goos, glyphs)`, with the key path
+    captured when it opened, so the hint is the key that works where the
+    user was.
+12. **The input is held directly.** The `Picker` holds a
+    `textinput.Model`, not a `workspace.Model[M]`: it is one part of a
+    pane that also draws results. It focuses and blurs the input on
+    `PaneFocusMsg` and `PaneBlurMsg`, and is a `Cursorer` that offsets the
+    input's cursor into the overlay.
+13. **The leak check** (Confirmation). A cancelled search, and a closed
+    picker, leave no goroutine: `testing/synctest.Test` fails otherwise,
+    and the `goroutineleak` profile, taken at the bubble's end, reports
+    none.
+14. **Release.** `fuzzy`, `palette`, and the `workspace` and `glyph`
+    additions ship together as `v0.13.0`. Every change is an addition, so
+    `scripts/apicheck.allow` stays empty.
+
+#### Owner questions (A3)
+
+* **Q5. How a picker takes its keys.** Recommended: item 1, the workspace
+  offering a matched command to the component that consumes it. The
+  alternatives are item 1's "Not chosen".
+* **Q6. How a picker gets the theme, width and keymap.** Recommended: item
+  2, accessors on the workspace. The alternative is a broadcast message.
+* **Q7. How a picker closes.** Recommended: item 3, `workspace.Close`. The
+  alternative is that the program closes it on `SelectedMsg`.
+
+[0008-PLAN-command-palette.md](0008-PLAN-command-palette.md), revised on
+2026-10-11, is written against these recommendations. A different answer
+changes its Steps 2, 6 and 7.
+
 ## More Information
 
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md):
@@ -635,3 +881,9 @@ names when it is next amended, before it runs.
   codex `codex-rs/tui/src/file_search.rs`; fzf `src/algo/algo.go`; bubbles
   v2.2.1 `list/list.go` and `list/defaultitem.go`; lipgloss v2.0.6
   `ranges.go` and `runes.go`.
+* For amendment A3: `workspace/bindings.go`, `workspace/overlay.go` and
+  `workspace/workspace.go` at `a0537d3`; bubbletea v2.0.10 `tea.go`
+  (`handleCommands`); bubbles v2.2.1 `textinput`; the `keymap` and
+  `command` documentation; and
+  [0007-MADR-keymap-engine.md](0007-MADR-keymap-engine.md) A11, which A3
+  item 1 extends.

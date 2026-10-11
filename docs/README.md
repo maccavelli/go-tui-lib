@@ -24,7 +24,7 @@ it was when they were written
 | 0006 | PLAN | [Implement the command registry (`when`, `command`, `command/cli`, and the Cobra and Kong front ends)](decisions/0006-PLAN-command-registry.md) | complete |
 | 0007 | MADR | [Bind keys to command IDs through a context-aware keymap engine, with chords, a leader key and VS Code-format user keymaps](decisions/0007-MADR-keymap-engine.md) | accepted; A1, A2 accepted; A3 recorded; A4–A11 accepted; Q8 answered (A4) |
 | 0007 | PLAN | [Implement the keymap engine](decisions/0007-PLAN-keymap-engine.md) | complete |
-| 0008 | MADR | [Find and run anything from one command palette, built on an in-repository fuzzy matcher and asynchronous, scoped providers](decisions/0008-MADR-command-palette.md) | accepted; A1 accepted; A2 recorded |
+| 0008 | MADR | [Find and run anything from one command palette, built on an in-repository fuzzy matcher and asynchronous, scoped providers](decisions/0008-MADR-command-palette.md) | accepted; A1 accepted; A2 recorded; A3 proposed |
 | 0008 | PLAN | [Implement the command palette and the fuzzy matcher](decisions/0008-PLAN-command-palette.md) | proposed |
 | 0009 | MADR | [Stream agent output through a stable-prefix Markdown engine, a frame scheduler, an input filter and a safe-text sanitizer](decisions/0009-MADR-streaming-content-engine.md) | accepted; A1–A3 accepted; A4 recorded; Q9 open |
 | 0009 | PLAN | [Implement the streaming content engine](decisions/0009-PLAN-streaming-content-engine.md) | proposed |
