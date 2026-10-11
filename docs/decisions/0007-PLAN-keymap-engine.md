@@ -1980,3 +1980,127 @@ incompatible change, and 10 compatible ones.
   base is now `v0.11.0`.
 
 Step 8 is done. The PLAN stays `in-progress` until Step 12.
+
+### Step 12: the removals (`v0.12.0`)
+
+#### Deviations
+
+No deviation. Where the step left a choice, the agent chose:
+
+* **`workspace/keys.go` is deleted,** as it held only the three removed
+  names; `TestDefaultKeysAvoidSequenceIntroducers`, in `keys_test.go`,
+  reads `DefaultRules` since Step 7, and stays.
+* **The `go doc` test** reads `go doc -all .` from the package's
+  directory and fails on `KeyMap`, `DefaultKeyMap` or `WithKeyMap` as a
+  word of its own, in a declaration or a comment; `help.KeyMap`, bubbles'
+  interface the workspace implements, and `KeyMapper` are not removed
+  names. It fails, too, when `go doc` prints no `DefaultRules`, so that it
+  cannot pass by reading nothing.
+* **`KeyMap.Bindings`** goes with its type: apidiff reports the type's
+  removal alone, so `scripts/apicheck.allow` lists three lines, and its
+  comment says so.
+
+#### What was removed and built
+
+* **`workspace/keys.go` (deleted):** `KeyMap`, `DefaultKeyMap` and
+  `KeyMap.Bindings`.
+* **`workspace/workspace.go`:** `WithKeyMap` and its field.
+* **`workspace/bindings.go`:** a `KeyMap`'s conversion into rules; the
+  built-in keymap is `DefaultRules`', and an error building it panics.
+* **`workspace/bindings_test.go`:** `TestWithKeyMapStillWorks`, the
+  deprecation test.
+* **`workspace/godoc_test.go` (new):** `TestDocNamesNoKeyMap`.
+* **`scripts/apicheck.allow`:** the three removals, under a comment
+  naming this PLAN and step.
+* **The documents:** "Migrating to `v0.12.0`" in the migration guide; the
+  keymaps guide's "Moving from `workspace.KeyMap`" and the workspace
+  guide's keys section say the names are removed; `docs/architecture.md`'s
+  `workspace` row lists them no longer; `README.md`: "The current release
+  is `v0.12.0`".
+
+#### Release notes
+
+`v0.12.0` removes the names `v0.11.0` deprecated (0007-MADR A4, item 2).
+Go 1.27.2 is required. Against `v0.11.0`, apidiff reports 3 incompatible
+changes, each listed in `scripts/apicheck.allow`.
+
+* **Breaking changes:** MADR §10's, a release later, as A4 has it:
+  * **removed:** `workspace.KeyMap` and its `Bindings`,
+    `workspace.DefaultKeyMap` and `workspace.WithKeyMap`;
+  * **their replacements:** a keymap, `keymap.New` with
+    `workspace.DefaultRules()` as its defaults, passed with
+    `workspace.WithBindings`, and swapped with `SetBindings` when rebuilt;
+  * **the field-to-command mapping:** `FocusNext` and `FocusPrev` are
+    `workspace.focus.next` and `.prev`; `FocusPane[i]` is
+    `workspace.focus.index` with `{"index": i+1}`; `Zoom` is
+    `workspace.zoom`; the four `Resize…` fields are
+    `workspace.resize.direction` with `{"direction": "left"}` and the
+    rest; `Close` is `workspace.overlay.close`, in the `overlay` scope;
+  * **one rebinding as a rule:** `ctrl+g` for zoom is a program-layer
+    removal of `workspace.zoom` in the `workspace` scope and a binding of
+    `ctrl+g` to it, in a keymap built over `DefaultRules()`, as the
+    keymaps guide writes it.
+* **A program that built on `v0.11.x` with no SA1019 report** needs no
+  change.
+
+#### Checks
+
+* **A script stopped halfway.** The first removal script deleted
+  `workspace/keys.go`, the step's intended change, before checking its
+  assumption about `bindings.go`, which was wrong: the block it removes
+  holds one method, not none. It changed nothing else. A second script,
+  checking every assumption before writing any file, did the rest.
+* **The `go doc` test against `v0.11.0`'s names,** on scratch copies,
+  each killed by `TestDocNamesNoKeyMap`, naming the line:
+  * **K12-1** (an exported `KeyMap` type is left in place): "type KeyMap
+    struct{}";
+  * **K12-2** (`DefaultKeyMap` is left in place): "func DefaultKeyMap()
+    []keymap.Default";
+  * **K12-3** (a doc comment still names `WithKeyMap`): `WithBindings`'
+    comment.
+
+  K12-1 is the PLAN's, moved from Step 7; K12-2 and K12-3 are added.
+* **The API diff gate** before the allow list: "against v0.11.0, 3
+  incompatible change(s)", each removal unlisted, and exit 1; with the
+  list, "clean".
+* **The documents:** `markdownlint-cli2`, 0 issues; the docs' 62 links
+  with a fragment each name a heading; every mention left of a removed
+  name is in a migration section.
+* **macOS,** go1.27.2: `make pre-add-check FILES=<the 4 files>`, "4
+  file(s) clean"; `make lint`; the cross `go vet`; `-race`, `-shuffle=on
+  -count=2`, `LC_ALL=C` and workspace mode; `go mod tidy -diff`; `make
+  vuln`; `make apicheck`, "against v0.11.0, 3 incompatible change(s)",
+  each listed; `make examples`; `scripts/go-modules.py --check`; `make
+  release-check`, "225 file(s) clean"; `shellcheck`,
+  `markdownlint-cli2`, `actionlint` and the five Python tests. All clean
+  but `-race`. This PLAN, under the repository's markdownlint rules,
+  raises only MD004.
+* **`-race` timed out on macOS,** and passed on a second host.
+  * On macOS, `internal/conformance` reached its ten-minute timeout in
+    `TestOutOfRangeText`, waiting on a `go list` it runs, while another
+    process on the host, not this step's, ran some 60 mutation-test
+    processes at a load average between 30 and 67. A plain `go test
+    ./...` before it had waited ten minutes on the same package, and
+    passed. This step does not touch `internal/conformance`, and its
+    tests passed on the Windows host in under a minute.
+  * On an idle Linux host the owner named, go1.27.2 linux/amd64, with the
+    tree copied as the Windows host's is: `-race -count=1 ./...`, exit 0,
+    21 packages ok, `internal/conformance` in
+    141.665s; `-shuffle=on -count=2`, `LC_ALL=C` and workspace
+    mode, each exit 0.
+* **The Windows test host,** go1.27.2 windows/amd64, with the index
+  synced: `make pre-add-check`, "226 file(s) clean", with the
+  new file and without the deleted one; `make lint`, `make vuln` and
+  `make examples`, each exit 0; the step's tests and the conformance
+  checks, 11 passed, 0 failed, `TestDocNamesNoKeyMap` among
+  them; `workspace` under `-shuffle=on -count=2`, exit 0;
+  `go-fuzz_test.py`, "27 passed"; `make fuzz FUZZTIME=3s`, "9 packages
+  ran clean".
+
+#### The tag, CI, the smoke test and the close-out
+
+Not done yet: they follow the owner's commit of this step. The owner
+pushes, after the disclosure guard, and tags `v0.12.0` with CI green. The
+smoke test then shows the removed names failing to compile and the new
+ones building; and the close-out empties `scripts/apicheck.allow` and
+marks this PLAN `complete`.

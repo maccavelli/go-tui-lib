@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"slices"
 
-	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/maccavelli/go-tui-lib/command"
@@ -95,7 +94,7 @@ func DefaultRules() []keymap.Default {
 // WithBindings sets the keymap the workspace's keys go through, in place of
 // one built from DefaultRules. A program builds it with DefaultRules as
 // its defaults, its own bindings, and the user's file
-// (docs/decisions/0007-MADR-keymap-engine.md §9). It wins over WithKeyMap.
+// (docs/decisions/0007-MADR-keymap-engine.md §9).
 func WithBindings(k *keymap.Keymap) Option {
 	return optionFunc(func(w *Workspace) { w.km = k })
 }
@@ -106,64 +105,20 @@ func WithBindings(k *keymap.Keymap) Option {
 // again.
 func (w *Workspace) SetBindings(k *keymap.Keymap) {
 	if k == nil {
-		k = builtinKeymap(nil)
+		k = builtinKeymap()
 	}
 	w.km = k
 	w.disp.SetKeymap(k)
 }
 
-// builtinKeymap is the keymap of DefaultRules, or of a deprecated KeyMap's
-// bindings when legacy is set. DefaultRules are fixed, and build clean: an
-// error is a bug. A KeyMap that binds one key in two fields still gives a
-// usable keymap, as keymap.New returns one with its errors (0007-MADR A6),
-// and WithKeyMap took such a KeyMap before.
-func builtinKeymap(legacy *KeyMap) *keymap.Keymap {
-	defaults := DefaultRules()
-	if legacy != nil {
-		defaults = legacy.defaults()
-	}
-	k, err := keymap.New(keymap.Settings{}, defaults)
-	if err != nil && legacy == nil {
+// builtinKeymap is the keymap of DefaultRules. They are fixed, and build
+// clean: an error is a bug.
+func builtinKeymap() *keymap.Keymap {
+	k, err := keymap.New(keymap.Settings{}, DefaultRules())
+	if err != nil {
 		panic(err)
 	}
 	return k
-}
-
-// defaults is a deprecated KeyMap as default bindings: each field's keys
-// bound to its command, and a disabled field, or a key that does not
-// parse, left out.
-func (k KeyMap) defaults() []keymap.Default {
-	type field struct {
-		b     key.Binding
-		scope command.Scope
-		id    command.ID
-		args  string
-	}
-	fields := []field{
-		{k.FocusNext, scopeWorkspace, "workspace.focus.next", ""},
-		{k.FocusPrev, scopeWorkspace, "workspace.focus.prev", ""},
-		{k.Zoom, scopeWorkspace, "workspace.zoom", ""},
-		{k.ResizeLeft, scopeWorkspace, cmdResizeDirection, `{"direction":"left"}`},
-		{k.ResizeRight, scopeWorkspace, cmdResizeDirection, `{"direction":"right"}`},
-		{k.ResizeUp, scopeWorkspace, cmdResizeDirection, `{"direction":"up"}`},
-		{k.ResizeDown, scopeWorkspace, cmdResizeDirection, `{"direction":"down"}`},
-		{k.Close, scopeOverlay, cmdOverlayClose, ""},
-	}
-	for i := range k.FocusPane {
-		fields = append(fields, field{k.FocusPane[i], scopeWorkspace, "workspace.focus.index", fmt.Sprintf(`{"index":%d}`, i+1)})
-	}
-	var out []keymap.Default
-	for _, f := range fields {
-		if !f.b.Enabled() {
-			continue
-		}
-		for _, s := range f.b.Keys() {
-			if q, err := keymap.ParseSequence(s, nil); err == nil {
-				out = append(out, def(f.scope, q, f.id, f.args))
-			}
-		}
-	}
-	return out
 }
 
 // KeyPath is the scopes a key is resolved in, outermost first

@@ -282,39 +282,3 @@ func TestReleaseStillBroadcast(t *testing.T) {
 		}
 	}
 }
-
-// TestWithKeyMapStillWorks: the deprecated WithKeyMap binds each field to
-// its command through v0.11.x, DefaultKeyMap holds DefaultRules' keys, and
-// WithBindings wins over it.
-func TestWithKeyMapStillWorks(t *testing.T) {
-	rules := func(k *keymap.Keymap) []string {
-		var out []string
-		for b := range k.Rules() {
-			out = append(out, fmt.Sprint(b.Scope, " ", b.Keys, " ", b.Command, " ", string(b.Args)))
-		}
-		slices.Sort(out)
-		return out
-	}
-	if got, want := rules(builtinKeymap(new(DefaultKeyMap()))), rules(builtinKeymap(nil)); !slices.Equal(got, want) {
-		t.Errorf("DefaultKeyMap's bindings:\n%q\nwant DefaultRules':\n%q", got, want)
-	}
-	k := DefaultKeyMap()
-	k.FocusNext.SetKeys("ctrl+n")
-	k.Zoom.SetEnabled(false)
-	r := newRig(t, 120, 40, WithKeyMap(k))
-	r.w.Update(ctrl('n'))
-	if r.w.Focused() == "main" {
-		t.Error("ctrl+n, WithKeyMap's FocusNext, did not move focus")
-	}
-	was := r.w.Focused()
-	r.w.Update(press("alt+."))
-	r.w.Update(press("alt+z"))
-	if r.w.Focused() != was || r.w.State().Zoom != "" {
-		t.Errorf("alt+. and alt+z still bound: focus %s, zoom %q", r.w.Focused(), r.w.State().Zoom)
-	}
-	r = newRig(t, 120, 40, WithKeyMap(k), WithBindings(mustKeymap(t, keymap.Settings{})))
-	r.w.Update(press("alt+z"))
-	if r.w.State().Zoom != "main" {
-		t.Errorf("WithBindings did not win over WithKeyMap: zoom %q", r.w.State().Zoom)
-	}
-}

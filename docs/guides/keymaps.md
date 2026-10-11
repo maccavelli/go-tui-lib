@@ -184,9 +184,9 @@ default.
 
 ## Moving from `workspace.KeyMap`
 
-`workspace.KeyMap`, `DefaultKeyMap` and `WithKeyMap` are deprecated in
-`v0.11.0`: they still work through `v0.11.x`, and `v0.12.0` removes them.
-`WithKeyMap` binds each field to its command:
+`workspace.KeyMap`, `DefaultKeyMap` and `WithKeyMap` were deprecated in
+`v0.11.0`, and `v0.12.0` removed them. In `v0.11.x`, `WithKeyMap` bound
+each field to its command:
 
 | Field | Command | Args | Scope |
 | :--- | :--- | :--- | :--- |

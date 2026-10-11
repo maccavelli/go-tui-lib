@@ -273,8 +273,8 @@ n}`, `workspace.resize.direction` with `{"direction": "left"}`, and the
 rest. The workspace runs its own; any other command a key matches comes
 back to your `Update` as a `RequestMsg`, for your registry. A key no
 binding takes goes to the focused pane, or the top modal overlay, and an
-overlay that is an `EscConsumer` gets esc first. `WithKeyMap` still works
-through `v0.11.x`, and is deprecated: see
+overlay that is an `EscConsumer` gets esc first. `WithKeyMap`, deprecated
+in `v0.11.0`, is gone in `v0.12.0`: see
 [moving from `workspace.KeyMap`](keymaps.md#moving-from-workspacekeymap).
 
 The same actions are also commands, `workspace.Commands(ws)`, for a

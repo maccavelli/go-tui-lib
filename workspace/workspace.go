@@ -148,7 +148,6 @@ type Workspace struct {
 	theme    theme.Theme
 	km       *keymap.Keymap     // the keys' bindings: WithBindings', or DefaultRules'
 	disp     *keymap.Dispatcher // matches keys against km along KeyPath
-	legacy   *KeyMap            // WithKeyMap's bindings, deprecated
 	modes    []mode             // PushMode's scopes, in order
 	modeSeq  uint64             // the last mode's number, so a pop removes its own
 	commands map[command.ID]command.Command
@@ -315,13 +314,6 @@ func clampSize(w, h int) (int, int) { return limits.Clamp(w, h) }
 // dark.
 func WithoutBackgroundQuery() Option { return optionFunc(func(w *Workspace) { w.noQuery = true }) }
 
-// WithKeyMap replaces the workspace's bindings with k's, each field bound
-// to its command (docs/decisions/0007-MADR-keymap-engine.md A4, item 2).
-//
-// Deprecated: use WithBindings, with DefaultRules and a program's own
-// bindings (0007-MADR A4). WithBindings wins over it.
-func WithKeyMap(k KeyMap) Option { return optionFunc(func(w *Workspace) { w.legacy = &k }) }
-
 // WithChrome sets what is drawn around panes (default Borders).
 func WithChrome(c Chrome) Option { return optionFunc(func(w *Workspace) { w.chrome = c }) }
 
@@ -392,7 +384,7 @@ func New(root layout.Node, panes map[layout.PaneID]Pane, opts ...Option) *Worksp
 		o.apply(w)
 	}
 	if w.km == nil {
-		w.km = builtinKeymap(w.legacy)
+		w.km = builtinKeymap()
 	}
 	w.disp = keymap.NewDispatcher(w.km)
 	// The first theme is built once every option has applied

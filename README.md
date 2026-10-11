@@ -18,7 +18,7 @@ pattern, used by every program that needs it.
 
 ## Status
 
-- **The current release is `v0.11.0`.** `v0` means the API may still
+- **The current release is `v0.12.0`.** `v0` means the API may still
   change, and a renamed name keeps working for one minor release:
   [the migration guide](docs/guides/migrating.md) lists them.
 - **Multi-pane workspaces, since `v0.1.0`.** `layout` arranges panes: a main

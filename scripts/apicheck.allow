@@ -7,3 +7,9 @@
 # removes its entries: once the next tag is the base, apidiff no longer
 # prints them, and scripts/go-apicheck.py fails on them as stale
 # (docs/decisions/0014-PLAN-api-policy-gates.md Step 4).
+
+# docs/decisions/0007-PLAN-keymap-engine.md Step 12: the removals of v0.12.0
+# (0007-MADR A4, item 2). KeyMap's method Bindings goes with its type.
+.	- ./workspace.DefaultKeyMap: removed
+.	- ./workspace.KeyMap: removed
+.	- ./workspace.WithKeyMap: removed

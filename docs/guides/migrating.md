@@ -6,6 +6,24 @@ wrapper, alias or field, and is removed in the next
 `staticcheck` reports each use of one as SA1019, so a program can find
 them all before the removal.
 
+## Migrating to `v0.12.0`
+
+`v0.12.0` removes the names `v0.11.0` deprecated
+([0007-PLAN-keymap-engine](../decisions/0007-PLAN-keymap-engine.md) Step
+12). A program that builds on `v0.11.x` with no SA1019 report needs no
+change.
+
+### Removed
+
+| Removed | Use |
+| :--- | :--- |
+| `workspace.KeyMap` and its `Bindings` | a keymap: `keymap.New` with `workspace.DefaultRules()` as its defaults, and its `Bindings` or `KeyBinding` |
+| `workspace.DefaultKeyMap` | `workspace.DefaultRules()`, the same keys |
+| `workspace.WithKeyMap` | `workspace.WithBindings`, and `SetBindings` for a rebuilt keymap |
+
+[The keymaps guide](keymaps.md#moving-from-workspacekeymap) maps each
+field to its command, and writes one rebinding both ways.
+
 ## Migrating to `v0.11.0`
 
 `v0.11.0` adds `keymap`, and moves the workspace's keys onto it
