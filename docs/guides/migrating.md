@@ -6,6 +6,54 @@ wrapper, alias or field, and is removed in the next
 `staticcheck` reports each use of one as SA1019, so a program can find
 them all before the removal.
 
+## Migrating to `v0.11.0`
+
+`v0.11.0` adds `keymap`, and moves the workspace's keys onto it
+([0007-MADR](../decisions/0007-MADR-keymap-engine.md)). A program that
+sets no key option needs no change: the default keys are the same.
+
+### Deprecated
+
+These still work in `v0.11.x`, and are removed in `v0.12.0`.
+
+| Deprecated | Use |
+| :--- | :--- |
+| `workspace.KeyMap` | a keymap: `keymap.New` with `workspace.DefaultRules()` as its defaults |
+| `workspace.DefaultKeyMap` | `workspace.DefaultRules()`, the same keys |
+| `workspace.WithKeyMap` | `workspace.WithBindings`, and `SetBindings` for a rebuilt keymap |
+
+Each field is now a command: `FocusNext` and `FocusPrev` are
+`workspace.focus.next` and `.prev`, `FocusPane[i]` is
+`workspace.focus.index` with `{"index": i+1}`, `Zoom` is `workspace.zoom`,
+the four `Resize…` fields are `workspace.resize.direction` with
+`{"direction": "left"}` and the rest, and `Close` is
+`workspace.overlay.close` in the `overlay` scope.
+[The keymaps guide](keymaps.md#moving-from-workspacekeymap) writes one
+rebinding both ways.
+
+### Changed
+
+- **The workspace's help lists a command once.** `alt+1` to `alt+9` are
+  one entry, `alt+1 pane`, where the full help listed nine, and the four
+  resize keys are one, `alt+shift+left resize`. Under a modal overlay,
+  the focus and zoom keys, which never reached through it, are no longer
+  listed.
+- **A global binding reaches a modal overlay.** A modal overlay still
+  takes every key no binding on its path takes, and the layout's keys
+  still do not reach through it.
+- **`glyph.Set` has `Keys`,** a `KeyGlyphs` of the macOS modifier and
+  arrow labels. Their ASCII twins are words, such as `opt+`: the one
+  exception to a glyph's single cell.
+
+### Added
+
+- **`keymap`:** notation, layered keymaps with conflicts, chords and a
+  leader, VS Code-format user files with a JSON Schema, terminal-aware
+  defaults, labels, help, which-key data and a key explanation.
+- **`workspace`:** `DefaultRules`, `WithBindings`, `SetBindings`,
+  `KeyPath`, `KeyContexter`, `PushMode` and `RequestMsg`; and two
+  commands, `workspace.focus.index` and `workspace.resize.direction`.
+
 ## Migrating to `v0.10.0`
 
 `v0.10.0` removes the names `v0.9.0` deprecated

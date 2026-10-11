@@ -26,7 +26,8 @@ below).
 ```text
  launch        start the TUI from a CLI   → command, glyph, termcap, internal/enum, internal/limits; bubbletea, colorprofile, x/term
  launch/launchtest  fake streams for tests → launch, termcap (tests)
- workspace     Bubble Tea pane host       → layout, theme, glyph, internal/cells, internal/enum, internal/limits, internal/sanitize, command, when; bubbletea, bubbles/key, bubbles/help, colorprofile, x/ansi
+ workspace     Bubble Tea pane host       → layout, theme, glyph, keymap, internal/cells, internal/enum, internal/limits, internal/sanitize, command, when; bubbletea, bubbles/key, bubbles/help, colorprofile, x/ansi
+ keymap        keys to command IDs        → command, when, glyph, termcap, internal/enum; bubbletea, bubbles/key, bubbles/help, x/ansi
  command       the command registry       → when, internal/enum, internal/sanitize, internal/teamsg; bubbletea
  when          availability expressions   → internal/enum
  internal/cells  the reused frame buffer  → layout; ultraviolet, x/ansi
@@ -52,11 +53,12 @@ below).
 | `glyph` | `Set` (4 border styles, separators with a cross and four tees, focus marker, ellipsis, scroll, bullet, badge brackets, and `Keys`, a `KeyGlyphs` of the macOS modifier and arrow labels), `Unicode()`, `ASCII()`, `For(utf8)`; `Tier` (`TierUnicode`, `TierLegacy`, `TierASCII`) and `Tier.Set`; every glyph one cell, except `Keys`' ASCII twins, which are words such as `opt+` and `up` |
 | `launch` | `Choice` and `Flags` (`--mode`, `--tui`, bound natively in each framework); `Streams`, `StreamSource`, `FromSource`; `Config`, `Decide` → `Decision` with `Target`s and a `Reason` token; `Run[M]` with `WithRegistry`, `WithRestorer`, `OnStart`, `WithProgramOptions`, `WithFilter`; `ErrNotStarted`, `ErrCrashed`; `Frame`; `ExitCode`, `ExitError`; `Restorer` |
 | `launch/launchtest` | `Terminal` (a fake terminal stream with a size and typed keys), `Pipe`, `Streams`, `Env` |
-| `internal/enum` | `Names`, an enum's tokens, and `Bits`, a bit set's, for an enum's `String`, `MarshalText` and `UnmarshalText`, on `uint8` or `int`; `Name`, `Marshal` and `Unmarshal` over a bare table |
+| `internal/enum` | `Names`, an enum's tokens, on `uint8` or `int`, and `Bits`, a bit set's, on `uint8` or `uint16`, for an enum's `String`, `MarshalText` and `UnmarshalText`; `Name`, `Marshal` and `Unmarshal` over a bare table |
 | `internal/teamsg` | `Cmd`, the `tea.Cmd` that delivers one message |
 | `theme` | `Palette` for dark, light and unknown backgrounds; `LightDarkColor` and `ProfileColor`; `Styles`; `New(profile, background, glyphs)` with `WithPalette` and `WithPaletteFor`; `FromDark`; `Border(style)`; text forms for `Background` and `BorderStyle` |
 | `layout` | `Rect`, `Size` (fixed, percent, ratio, fill; min, max, shrink order), `Node` (`Pane`, `Split`, `Responsive`, or a custom node), `Solve` → `Plan`; `State` (JSON); the sidebar presets and their `With…` options |
-| `workspace` | `Pane` and its optional interfaces, `PlainViewer` among them; `Workspace` (routing, focus, chrome, resize, zoom, hide, overlays, cursor, `View`, `RenderPlain`, `help.KeyMap` and `Help`, the width method, a following theme with `WithGlyphs`, `WithProfile`, `WithBackground` and `GlyphThemeBuilder`, `WithSize`, clamped to `MaxSide` and `MaxCells`, `SetBackground`, `Panes`, `PaneAs`, `WhenContext`); `Wrap`; `KeyMap`; `Commands` and the context keys, `FocusedPaneKey()` to `HeightKey()` |
+| `workspace` | `Pane` and its optional interfaces, `PlainViewer` among them; `Workspace` (routing, focus, chrome, resize, zoom, hide, overlays, cursor, `View`, `RenderPlain`, `help.KeyMap` and `Help`, the width method, a following theme with `WithGlyphs`, `WithProfile`, `WithBackground` and `GlyphThemeBuilder`, `WithSize`, clamped to `MaxSide` and `MaxCells`, `SetBackground`, `Panes`, `PaneAs`, `WhenContext`); `Wrap`; its keys through a keymap: `DefaultRules`, `WithBindings`, `SetBindings`, `KeyPath`, `KeyContexter`, `PushMode` and `RequestMsg`, and `KeyMap`, `DefaultKeyMap` and `WithKeyMap`, deprecated; `Commands` and the context keys, `FocusedPaneKey()` to `HeightKey()` |
+| `keymap` | the notation: `Stroke`, `Sequence`, `ParseStroke`, `ParseSequence`, `Event`, `Normalize`, `Label`, `ParseAliases`, `DisplayAliases` and `CopyStrokes`; `Keymap`, from `New(Settings, defaults, layers…)`, with `Rebuild`, `Lookup`, `Bindings`, `Reachable`, `Shortcut`, `Conflicts` and `Rules`; `Binding`, `Default` and `Alternative`, `Layer`, `Location`, `Path`; `BindingConflict` and `ConflictKind`; `Features`, `FeaturesFrom`, `KeyFacts` and `FactsFrom`; `Dispatcher` (`Update`, `SetKeymap`, `Pending`, `ActiveKeys`, `Explain`) with `Outcome` and `TimeoutMsg`; `LoadVSCode`, `LoadError`, `ExportVSCode` and `Schema`; `KeyBinding`, `Help`, `Describer`, `DescriberFunc` and `FromRegistry` |
 | `internal/cells` | `Frame`: a reused cell buffer that draws strings into rectangles with a chosen width method |
 | `internal/sanitize` | `Line` for one line of plain text and `Styled` for a pane's view, which keeps SGR and OSC 8 only; `Truncate`, never wider than asked; `Token`; `HasControl` |
 | `internal/limits` | `MaxSide`, `MaxCells` and `Clamp`, the window clamp `workspace` and `launch` share |
@@ -73,7 +75,9 @@ below).
   and Bubble Tea, for `tea.Cmd` and `tea.Msg` only. `workspace` imports
   both to publish its commands and context keys; `command` never imports
   `workspace` ([0006-MADR](decisions/0006-MADR-command-registry.md)
-  §1).
+  §1). `keymap` imports `command`, `when`, `glyph` and `termcap`'s facts;
+  `workspace` imports `keymap`, which never imports `workspace` or
+  `layout` ([0007-MADR](decisions/0007-MADR-keymap-engine.md) §1).
 - **The registry reads lock-free.** Each write publishes a new immutable
   snapshot behind an `atomic.Pointer`; `Lookup`, `Available` and the
   exports read one, from any goroutine. A `Loop` command runs on the
@@ -368,11 +372,10 @@ docs/
   Markdown), **overlay widgets** (dialog, picker, palette, toast), a
   help-footer pane beyond `workspace`'s `help.KeyMap`, and **`updatetea`.**
   Each is its own record.
-- **The keymap engine and the command palette**
-  ([0007-MADR](decisions/0007-MADR-keymap-engine.md),
-  [0008-MADR](decisions/0008-MADR-command-palette.md)), which bind keys to
-  command IDs and list the registry's commands. The workspace's own key
-  bindings stay until the keymap moves them onto these IDs.
+- **The command palette**
+  ([0008-MADR](decisions/0008-MADR-command-palette.md)), which lists the
+  registry's commands, and a which-key panel over `keymap`'s
+  `ActiveKeys`.
 - **Terminal modes and inline scrollback** (`termmode`, `inline`): mode
   plans, teardown, restore bytes and the Windows console helpers, and the
   per-terminal scrollback strategy. Each is a later record; until then tea

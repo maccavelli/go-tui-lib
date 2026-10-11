@@ -18,7 +18,7 @@ pattern, used by every program that needs it.
 
 ## Status
 
-- **The current release is `v0.10.0`.** `v0` means the API may still
+- **The current release is `v0.11.0`.** `v0` means the API may still
   change, and a renamed name keeps working for one minor release:
   [the migration guide](docs/guides/migrating.md) lists them.
 - **Multi-pane workspaces, since `v0.1.0`.** `layout` arranges panes: a main
@@ -67,6 +67,14 @@ pattern, used by every program that needs it.
   every enum; `when.SyntaxError`, `termcap.ErrUnknownName` and a `…Func`
   adapter for each hook; and `encoding/json/v2` in `command` and
   `termcap`.
+- **Keymaps, since `v0.11.0`.** `keymap` binds keys to command IDs in
+  scopes along a focus path, with chords, a leader, conflicts reported
+  where they come from, and the user's own `keybindings.json` in VS
+  Code's format, with a JSON Schema for their editor. It reads keys as a
+  legacy or an enhanced terminal sends them, and picks defaults the
+  terminal can deliver. The workspace's keys go through it, so a user
+  rebinds them in the same file
+  ([the keymaps guide](docs/guides/keymaps.md)).
 - **The stack is Charm v2:** `charm.land/bubbletea/v2`,
   `charm.land/lipgloss/v2` and `charm.land/bubbles/v2`, with
   `github.com/charmbracelet/colorprofile` and

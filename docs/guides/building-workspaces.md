@@ -250,8 +250,9 @@ cursor, as above.
 
 ## Keys and the mouse
 
-`workspace.DefaultKeyMap()` uses alt, so tab, the arrows and alt+arrows stay
-with your panes:
+The workspace's keys go through a keymap
+([the keymaps guide](keymaps.md)). `workspace.DefaultRules()` uses alt, so
+tab, the arrows and alt+arrows stay with your panes:
 
 - `alt+.` and `alt+,` move focus, and `alt+1` to `alt+9` focus a pane;
 - `alt+z` zooms the focused pane, and restores it;
@@ -264,8 +265,17 @@ control sequence, so those keys cannot be told reliably from one. No
 default uses alt with them; avoid them when you rebind. (`v0.1.0` used
 `alt+]` and `alt+[`.)
 
-Rebind any of them with `SetKeys`, remove one with `Unbind`, and pass the
-result with `WithKeyMap`.
+To rebind, build a keymap with `DefaultRules()` as its defaults and your
+own bindings, or the user's file, as layers, and pass it with
+`WithBindings`; `SetBindings` swaps in a rebuilt one. Each key runs a
+command: `workspace.focus.next`, `workspace.focus.index` with `{"index":
+n}`, `workspace.resize.direction` with `{"direction": "left"}`, and the
+rest. The workspace runs its own; any other command a key matches comes
+back to your `Update` as a `RequestMsg`, for your registry. A key no
+binding takes goes to the focused pane, or the top modal overlay, and an
+overlay that is an `EscConsumer` gets esc first. `WithKeyMap` still works
+through `v0.11.x`, and is deprecated: see
+[moving from `workspace.KeyMap`](keymaps.md#moving-from-workspacekeymap).
 
 The same actions are also commands, `workspace.Commands(ws)`, for a
 palette, slash lines and agents: see
@@ -284,7 +294,9 @@ where `help.New()` draws `•` and `…`. Call `SetWidth` on it, as on any
 help model. The short help lists the bindings of whoever has the keyboard, the top
 modal overlay's pane or else the focused pane, from its `KeyMapper`, then
 focus-next and zoom. The full help has four columns: those bindings, focus,
-layout and overlays. Disabled bindings are left out.
+layout and overlays. Each of the workspace's keys is read from the keymap,
+so a rebound key shows as it is, and one that is unbound, or does not
+reach through a modal overlay, is left out with the disabled bindings.
 
 With a mouse mode set:
 

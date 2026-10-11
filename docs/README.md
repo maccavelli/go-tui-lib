@@ -22,7 +22,7 @@ it was when they were written
 | 0005 | PLAN | [Implement terminal capabilities and services (`termcap`, `termsvc`)](decisions/0005-PLAN-terminal-capabilities-and-services.md) | complete |
 | 0006 | MADR | [Make one command registry the source of every action, for keys, palette, slash commands, the shell and agents, on open standards](decisions/0006-MADR-command-registry.md) | accepted; A1–A13 accepted; §10, A1's front ends and A10–A12 superseded by 0012 |
 | 0006 | PLAN | [Implement the command registry (`when`, `command`, `command/cli`, and the Cobra and Kong front ends)](decisions/0006-PLAN-command-registry.md) | complete |
-| 0007 | MADR | [Bind keys to command IDs through a context-aware keymap engine, with chords, a leader key and VS Code-format user keymaps](decisions/0007-MADR-keymap-engine.md) | accepted; A1, A2 accepted; A3 recorded; A4 accepted; Q8 answered (A4) |
+| 0007 | MADR | [Bind keys to command IDs through a context-aware keymap engine, with chords, a leader key and VS Code-format user keymaps](decisions/0007-MADR-keymap-engine.md) | accepted; A1, A2 accepted; A3 recorded; A4–A11 accepted; Q8 answered (A4) |
 | 0007 | PLAN | [Implement the keymap engine](decisions/0007-PLAN-keymap-engine.md) | in-progress |
 | 0008 | MADR | [Find and run anything from one command palette, built on an in-repository fuzzy matcher and asynchronous, scoped providers](decisions/0008-MADR-command-palette.md) | accepted; A1 accepted; A2 recorded |
 | 0008 | PLAN | [Implement the command palette and the fuzzy matcher](decisions/0008-PLAN-command-palette.md) | proposed |
@@ -97,7 +97,13 @@ it was when they were written
 | see how the API will grow to fit any Go CLI framework natively, and the hardening and renames planned before `v1` | [0014-MADR](decisions/0014-MADR-native-integration-api.md) |
 | see how flag, Cobra, Kong, urfave/cli and agent tools such as Codex, Grok and Pi integrate a TUI, and what the API assessment found | [0014-REPORT](reports/0014-REPORT-api-assessment-and-integration-research.md) |
 | know why the command registry is built this way | [0006-MADR](decisions/0006-MADR-command-registry.md) |
-| see the planned keymap and `keybindings.json` format | [0007-MADR](decisions/0007-MADR-keymap-engine.md) |
+| bind a key to a command, in a pane, an overlay or a mode | [guides/keymaps.md](guides/keymaps.md#bind-a-command) |
+| let users rebind keys in a `keybindings.json`, with a schema for their editor | [guides/keymaps.md](guides/keymaps.md#the-users-file) |
+| add chords or a leader key, or a which-key panel | [guides/keymaps.md](guides/keymaps.md#chords-and-the-leader) |
+| use shift+enter on terminals that send it, and something else on those that do not | [guides/keymaps.md](guides/keymaps.md#what-changes-on-an-enhanced-terminal) |
+| show a command's key in a footer or a hint, and drop it when unbound | [guides/keymaps.md](guides/keymaps.md#help-and-hints) |
+| move off `workspace.KeyMap` | [guides/keymaps.md](guides/keymaps.md#moving-from-workspacekeymap) |
+| know why the keymap is built this way | [0007-MADR](decisions/0007-MADR-keymap-engine.md) |
 | see the planned command palette and fuzzy matcher | [0008-MADR](decisions/0008-MADR-command-palette.md) |
 | see how streamed Markdown, frames and untrusted text will be handled | [0009-MADR](decisions/0009-MADR-streaming-content-engine.md) |
 | know why terminal capabilities are detected this way | [0005-MADR](decisions/0005-MADR-terminal-capabilities-and-services.md) |

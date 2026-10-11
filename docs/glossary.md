@@ -67,13 +67,15 @@ of its own.
 | `Filter` | a message filter, as `launch.WithFilter` takes | a message filter only |
 | `Renderer` | the streaming interface that turns Markdown into styled text | `stream`; an adapter's own `Renderer` implements it |
 | `New` | a constructor of the type named after its package; any other constructor is `NewX` | every package |
+| `Binding`, `Keymap`, `Path`, `Sequence`, `Stroke` | keys bound to a command in a scope, the built set of bindings, the scopes a key is resolved in, a key sequence, one key | `keymap` |
+| `Dispatcher`, `Outcome`, `Resolved` | the key matcher, what it made of a message, what a sequence resolves to | `keymap` |
 
 ## Names the planned records must not take
 
-[0007-MADR](decisions/0007-MADR-keymap-engine.md),
 [0008-MADR](decisions/0008-MADR-command-palette.md) and
 [0009-MADR](decisions/0009-MADR-streaming-content-engine.md) are accepted
-but unbuilt. Their amendments of 2026-10-09 (0007 A3, 0008 A2, 0009 A4,
+but unbuilt, and [0007-MADR](decisions/0007-MADR-keymap-engine.md) is
+built, in `v0.11.0`. Their amendments of 2026-10-09 (0007 A3, 0008 A2, 0009 A4,
 from [0014-PLAN-canonicalization.md](decisions/0014-PLAN-canonicalization.md)
 Step 2) renamed every type that collided with one above, or with another
 planned one: `keymap.Context`, `Origin`, `Conflict`, `Rule`, `Result`,

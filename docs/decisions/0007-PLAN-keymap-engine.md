@@ -1829,3 +1829,119 @@ choice:
   failed; `workspace` under `-shuffle=on -count=2`, exit 0;
   `go-fuzz_test.py`, "27 passed"; `make fuzz FUZZTIME=3s`, "9 packages
   ran clean".
+
+### Step 8: documentation and close-out
+
+#### Deviations
+
+No deviation. Where the step left a choice, the agent chose:
+
+* **The release notes have no breaking changes.** MADR §10 listed the
+  removal of `KeyMap`, `DefaultKeyMap` and `WithKeyMap` under that
+  heading; A4 item 2 made it a deprecation in `v0.11.0`, and Step 12's
+  `v0.12.0` removes them. The notes list them as deprecated, and apidiff
+  reports no incompatible change.
+* **The guide adds "Help and hints"** to the seven sections the step
+  names: the workspace's help, `KeyBinding`, `Help`, `Shortcut` and
+  `Explain`, which Steps 6, 10 and 11 built.
+* **The PLAN stays `in-progress`** after CI is green on the pushed tree:
+  Step 12, the removals in `v0.12.0`, is still to come, and the PLAN is
+  `complete` only after it.
+* **The commands guide** still binds `f2` by hand in its `Update`
+  example; it is the commands guide's example of `Dispatch`, which `make
+  examples` checks against the framework examples, and is left as it is.
+
+#### The documents
+
+* **`docs/guides/keymaps.md` (new):** binding a command; scopes and the
+  focus path; chords and the leader; the user's file and its schema;
+  reserved keys; what changes on an enhanced terminal; help and hints;
+  and moving from `workspace.KeyMap`, with the field-to-command table and
+  one rebinding written both ways, as a deprecation.
+* **`docs/guides/building-workspaces.md`:** "Keys and the mouse" names
+  `DefaultRules`, `WithBindings`, `SetBindings` and `RequestMsg`, and
+  says the help reads the keymap.
+* **`docs/guides/migrating.md`:** "Migrating to `v0.11.0`": what is
+  deprecated and what to use, the fields as commands, what changed, and
+  what was added.
+* **`docs/architecture.md`:** `keymap`'s line in the package diagram and
+  its row; `workspace`'s line and row; `internal/enum`'s `uint16`; the
+  import rule; and the keymap gone from "What is not here".
+* **`docs/glossary.md`:** 0007 is built, in `v0.11.0`; `keymap`'s
+  `Binding`, `Keymap`, `Path`, `Sequence`, `Stroke`, `Dispatcher`,
+  `Outcome` and `Resolved` in "One meaning each".
+* **`docs/README.md`:** 0007-MADR's status names A4 to A11; six "I want
+  to…" rows for the guide, and the MADR's row as why the keymap is built
+  this way.
+* **`README.md`:** "The current release is `v0.11.0`", and a bullet,
+  "Keymaps, since `v0.11.0`".
+
+#### Release notes
+
+`v0.11.0` adds `keymap`, and moves the workspace's keys onto it
+(0007-MADR). Go 1.27.2 is required. Against `v0.10.0`, apidiff reports no
+incompatible change, and 10 compatible ones.
+
+* **Breaking changes:** none. A program that sets no key option needs no
+  change: `workspace.DefaultRules()` holds the keys `v0.1.4` set.
+* **Deprecated,** working through `v0.11.x` and removed in `v0.12.0`:
+  * `workspace.KeyMap` (use a keymap, `keymap.New` with
+    `workspace.DefaultRules()` as its defaults);
+  * `workspace.DefaultKeyMap` (use `workspace.DefaultRules()`);
+  * `workspace.WithKeyMap` (use `workspace.WithBindings`, and
+    `SetBindings` for a rebuilt keymap).
+* **The field-to-command mapping:** `FocusNext` and `FocusPrev` are
+  `workspace.focus.next` and `.prev`; `FocusPane[i]` is
+  `workspace.focus.index` with `{"index": i+1}`; `Zoom` is
+  `workspace.zoom`; `ResizeLeft`, `ResizeRight`, `ResizeUp` and
+  `ResizeDown` are `workspace.resize.direction` with `{"direction":
+  "left"}` and the rest; `Close` is `workspace.overlay.close`, in the
+  `overlay` scope. Each in the `workspace` scope otherwise.
+* **One rebinding as a rule:** where a program wrote
+  `k := workspace.DefaultKeyMap(); k.Zoom.SetKeys("ctrl+g")` and passed
+  `WithKeyMap(k)`, it builds `keymap.New(keymap.Settings{},
+  workspace.DefaultRules(), rebind)`, where `rebind` removes
+  `workspace.zoom` in the `workspace` scope and binds `ctrl+g` to it, both
+  in the program layer, and passes `WithBindings(km)`.
+* **Behaviour changes:**
+  * the workspace's help lists a command once: `alt+1` to `alt+9` are one
+    entry, as are the four resize keys; under a modal overlay, the focus
+    and zoom keys, which never reached through it, are not listed;
+  * a global binding reaches a modal overlay; the layout's keys still do
+    not;
+  * a key a program binds that is not the workspace's own comes back as
+    a `workspace.RequestMsg`, for the program's registry;
+  * `glyph.Set` has `Keys`, whose ASCII twins are words.
+* **Additions:** the `keymap` package (notation, layered keymaps and
+  their conflicts, the dispatcher with chords and a leader, VS
+  Code-format user files with a JSON Schema, normalisation, labels,
+  terminal facts and alternatives, the bubbles adapters, which-key data
+  and the key explanation); `workspace`'s `DefaultRules`, `WithBindings`,
+  `SetBindings`, `KeyPath`, `KeyContexter`, `PushMode` and `RequestMsg`,
+  and the commands `workspace.focus.index` and
+  `workspace.resize.direction`; and `glyph.KeyGlyphs`.
+
+#### Checks
+
+* **The guide's code,** in a scratch module outside the repository that
+  requires the working tree through a `replace`: the guide's JSONC,
+  extracted from the guide byte for byte, loads as four bindings, two of
+  them unknown commands when a registry's IDs are given, and its rebinding
+  of zoom works; "Bind a command" and its `RequestMsg` reach a registry's
+  `Dispatch`; the `Rebuild` snippet compiles and swaps the keymap in, and
+  `Shortcut` gives `⌃s` on `darwin` and `ctrl+s` on `linux`; and both
+  ways of the rebinding zoom on `ctrl+g` and not `alt+z`. Four tests,
+  each passing.
+* **Links.** A script checked that each of the docs' 61 links to another
+  file's `#fragment` names a heading there, as GitHub writes anchors; on a
+  planted link to a heading that does not exist it failed, naming it.
+* **`markdownlint-cli2`** over the docs: 0 issues. **apidiff** at the
+  Makefile's version, over a scratch export of `v0.10.0`: the 10
+  compatible changes above, none incompatible.
+
+#### The tag, CI and the smoke test
+
+Not done yet: they follow the owner's commit of these documents. The
+owner pushes, after the disclosure guard, and tags `v0.11.0` with CI
+green; the consumer smoke test then builds a program on the deprecated
+names, which warns under SA1019 and compiles, and one on the new ones.
