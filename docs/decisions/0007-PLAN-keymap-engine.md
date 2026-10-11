@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-10-11
 associated-madr: "0007-MADR-keymap-engine.md"
 ---
@@ -2099,8 +2099,39 @@ changes, each listed in `scripts/apicheck.allow`.
 
 #### The tag, CI, the smoke test and the close-out
 
-Not done yet: they follow the owner's commit of this step. The owner
-pushes, after the disclosure guard, and tags `v0.12.0` with CI green. The
-smoke test then shows the removed names failing to compile and the new
-ones building; and the close-out empties `scripts/apicheck.allow` and
-marks this PLAN `complete`.
+* **The tag.** The owner committed this step as `04182bf`. The agent ran
+  the disclosure guard over the outgoing `a15790f..04182bf`, Step 8's
+  record and this step, before the push: exit 0. The owner pushed `main`
+  and tagged `v0.12.0` there, an annotated tag. CI passed on `main` at
+  `04182bf`, run `38171006895`, and on the tag, run `38172153403`.
+* **The consumer smoke test,** in a scratch module outside the
+  repository, with `go env GOWORK` empty: `go get
+  github.com/maccavelli/go-tui-lib@v0.12.0` from the proxy and `go mod
+  tidy`, with Step 8's two programs unchanged.
+  * **The removed names** fail to build, naming each:
+    `undefined: workspace.KeyMap`, `undefined: workspace.DefaultKeyMap`
+    and `undefined: workspace.WithKeyMap`. A first build wrote its output
+    over the program's own directory and failed for that; built to
+    `/dev/null`, it fails as above.
+  * **The new names** vet, build and run: "smoke new names: ok", and
+    golangci-lint 2.14.0's staticcheck, every issue shown, reports
+    nothing.
+  * **The negative control:** a copy expecting the shortcut `⌃z` failed
+    with `FAIL: the zoom shortcut is "⌃g"` and exit status 1.
+* **`scripts/apicheck.allow`, emptied.**
+  * **Why now:** the API diff gate's base is the newest tag HEAD does not
+    contain. While HEAD is the tag, that is `v0.11.0`; from the next
+    commit it is `v0.12.0`, where apidiff reports none of the three
+    entries.
+  * **The proof, on a scratch clone of `04182bf`** with an empty commit
+    after the tag: with the list as it was, the gate fails, "against
+    v0.12.0, 0 incompatible change(s)", and the three entries "stale";
+    with Step 12's block removed, it passes, "clean".
+  * **The change:** the block goes, and the file is its header alone,
+    byte for byte as at `a15790f`. In the working tree, while HEAD is
+    still the tag, `make apicheck` compares with `v0.11.0` and fails on
+    the three removals now unlisted; the close-out commit makes the base
+    `v0.12.0`.
+* **This PLAN is `complete`,** and its row in `docs/README.md` says so.
+
+Step 12 is done, and with it the PLAN.
