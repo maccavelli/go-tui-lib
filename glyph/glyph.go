@@ -2,9 +2,12 @@
 //
 // Each glyph has a Unicode form and an ASCII twin, and each form is exactly
 // one terminal cell wide, so a view laid out for one set fits the other
-// (docs/decisions/0001-MADR-scaffold-charm-tui-library.md §6, rule 3). A
-// package never writes a glyph literal of its own: it reads the Set it was
-// given, which is Unicode() on a UTF-8 terminal and ASCII() elsewhere.
+// (docs/decisions/0001-MADR-scaffold-charm-tui-library.md §6, rule 3). The
+// one exception is Set.Keys, the key labels: their Unicode forms are one
+// cell, and their ASCII twins are words, such as "opt+" and "up"
+// (docs/decisions/0007-MADR-keymap-engine.md A8), so a view measures them.
+// A package never writes a glyph literal of its own: it reads the Set it
+// was given, which is Unicode() on a UTF-8 terminal and ASCII() elsewhere.
 //
 // Stability: stable. Exported names change only through the deprecation
 // policy in AGENTS.md, "API conventions".
@@ -50,6 +53,19 @@ type Set struct {
 	// BadgeOpen and BadgeClose enclose a pane's badge, such as an unread
 	// count.
 	BadgeOpen, BadgeClose string
+	// Keys are the modifier and arrow labels a key binding is shown with.
+	Keys KeyGlyphs
+}
+
+// KeyGlyphs are the labels of the macOS modifier keys and of the arrow
+// keys. Each Unicode form is one cell; each ASCII twin is a word, which
+// may be wider. A modifier's ASCII twin ends in "+", so a label is its
+// modifiers and its key written together, in either set.
+type KeyGlyphs struct {
+	// Option, Command, Control and Shift are the macOS modifiers.
+	Option, Command, Control, Shift string
+	// Up, Down, Left and Right are the arrow keys.
+	Up, Down, Left, Right string
 }
 
 // Unicode returns the set for a UTF-8 terminal.
@@ -82,6 +98,10 @@ func Unicode() Set {
 		ScrollUp: "▲", ScrollDown: "▼", ScrollThumb: "┃", ScrollTrack: "│",
 		Bullet:    "•",
 		BadgeOpen: "[", BadgeClose: "]",
+		Keys: KeyGlyphs{
+			Option: "⌥", Command: "⌘", Control: "⌃", Shift: "⇧",
+			Up: "↑", Down: "↓", Left: "←", Right: "→",
+		},
 	}
 }
 
@@ -105,6 +125,10 @@ func ASCII() Set {
 		ScrollUp: "^", ScrollDown: "v", ScrollThumb: "#", ScrollTrack: "|",
 		Bullet:    "*",
 		BadgeOpen: "[", BadgeClose: "]",
+		Keys: KeyGlyphs{
+			Option: "opt+", Command: "cmd+", Control: "ctrl+", Shift: "shift+",
+			Up: "up", Down: "down", Left: "left", Right: "right",
+		},
 	}
 }
 

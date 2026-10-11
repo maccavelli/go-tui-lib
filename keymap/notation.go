@@ -28,6 +28,13 @@ import (
 // pkgName is the package's name, as its enums' errors give it.
 const pkgName = "keymap"
 
+// nameSuper and namePgDown are canonical names that several of the
+// spelling tables give: the modifiers', VS Code's, and the aliases'.
+const (
+	nameSuper  = "super"
+	namePgDown = "pgdown"
+)
+
 // Event is when a stroke fires: when its key is pressed, released, or
 // repeated while it is held.
 type Event uint8
@@ -85,18 +92,18 @@ var modifiers = []struct {
 	{tea.ModShift, "shift", ""},
 	{tea.ModMeta, "meta", ""},
 	{tea.ModHyper, "hyper", ""},
-	{tea.ModSuper, "super", "cmd"},
+	{tea.ModSuper, nameSuper, "cmd"},
 }
 
 // modifierNames are the names a modifier is read from, lower case: each
-// canonical and VS Code name, and the aliases "option" and "win".
+// canonical name, and each of modAliases, VS Code's "cmd" among them.
 var modifierNames = func() map[string]tea.KeyMod {
-	names := map[string]tea.KeyMod{"option": tea.ModAlt, "win": tea.ModSuper}
+	names := map[string]tea.KeyMod{}
 	for _, m := range modifiers {
 		names[m.canon] = m.mod
-		if m.vscode != "" {
-			names[m.vscode] = m.mod
-		}
+	}
+	for alias, canon := range modAliases {
+		names[alias] = names[canon]
 	}
 	return names
 }()
@@ -149,9 +156,9 @@ func keyNames() (map[rune]string, map[string]rune) {
 	return names, codes
 }
 
-// vscodeNames are the key names VS Code spells another way; the reverse
-// are read as aliases.
-var vscodeNames = map[string]string{"esc": "escape", "pgup": "pageup", "pgdown": "pagedown"}
+// vscodeNames are the key names VS Code spells another way. ParseStroke
+// reads VS Code's names among keyAliases.
+var vscodeNames = map[string]string{"esc": "escape", "pgup": "pageup", namePgDown: "pagedown"}
 
 // scanCodes are VS Code's scan codes, each the US-layout key it names.
 var scanCodes = scanTable()
@@ -254,10 +261,8 @@ func ParseStroke(s string) (Stroke, error) {
 		st.Code = r
 	default:
 		name := strings.ToLower(rest)
-		for canon, vs := range vscodeNames {
-			if name == vs {
-				name = canon
-			}
+		if canon, ok := keyAliases[name]; ok {
+			name = canon
 		}
 		c, ok := nameCodes[name]
 		if !ok {

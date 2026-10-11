@@ -1,0 +1,29 @@
+ 43|ctrl+k                               ctrl+k
+ 42|alt+k                                alt+k
+ 44|shift+k                              shift+k
+ 43|meta+k                               meta+k
+ 44|hyper+k                              hyper+k
+ 44|super+k                              super+k
+ 59|ctrl+alt+shift+super+k               ctrl+alt+shift+super+k
+ 70|ctrl+alt+shift+meta+hyper+super+k    ctrl+alt+shift+meta+hyper+super+k
+ 38|up                                   ↑
+ 38|down                                 ↓
+ 38|left                                 ←
+ 38|right                                →
+ 44|shift+up                             shift+↑
+ 47|ctrl+alt+left                        ctrl+alt+←
+ 44|super+right                          super+→
+ 41|pgup                                 pgup
+ 41|pgdown                               pgdn
+ 40|delete                               del
+ 45|ctrl+delete                          ctrl+del
+ 40|esc                                  esc
+ 42|enter                                enter
+ 42|space                                space
+ 40|tab                                  tab
+ 39|f5                                   f5
+ 38|?                                    ?
+ 50|ctrl+x ctrl+s                        ctrl+x ctrl+s
+ 47|<leader> f                           <leader> f
+ 46|a:release                            a:release
+ 48|ctrl+[KeyA]                          ctrl+[KeyA]

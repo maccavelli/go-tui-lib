@@ -2,6 +2,7 @@ package keymap
 
 import (
 	"encoding/json/jsontext"
+	"runtime"
 	"slices"
 	"time"
 
@@ -20,8 +21,8 @@ type Outcome struct {
 	// that is not handled goes to the focused pane.
 	Handled bool
 	// Replay is the keys of a sequence that ended without a match, the
-	// leader left out: they go to the focused pane, before the message
-	// when it is not handled.
+	// leader left out, as they arrived: they go to the focused pane,
+	// before the message when it is not handled.
 	Replay []tea.KeyPressMsg
 }
 
@@ -42,10 +43,24 @@ type Dispatcher struct {
 	gen     uint64     // bumped by each stroke that pends and each cancel
 }
 
-// keyEvent is a key, pressed or released.
+// keyEvent is a key, pressed or released: as it arrived, and as Normalize
+// reads it.
 type keyEvent struct {
-	key     tea.Key
+	key     tea.Key // normalised, for matching
+	raw     tea.Key // as it arrived, for Replay
 	release bool
+	text    bool // AltGr text, which no binding matches
+}
+
+// event is k as the dispatcher matches it.
+func (d *Dispatcher) event(k tea.Key, release bool) keyEvent {
+	var f Features
+	goos := runtime.GOOS
+	if d.k != nil {
+		f, goos = d.k.settings.Features, d.k.goos()
+	}
+	n, _ := Normalize(k, f, goos)
+	return keyEvent{key: n, raw: k, release: release, text: isAltGr(k, goos)}
 }
 
 // NewDispatcher is a dispatcher over k. A nil k matches nothing.
@@ -67,7 +82,10 @@ func (d *Dispatcher) cancel() {
 	d.gen++
 }
 
-// Update takes a message, the focus path and the when values:
+// Update takes a message, the focus path and the when values. A key is
+// read through Normalize, with the keymap's features and Settings.GOOS,
+// and AltGr text on Windows matches no binding, so it reaches the pane.
+// Then:
 //   - a key that completes a binding gives its command;
 //   - a key that starts or extends a longer binding is Handled, and gives a
 //     timer command, whose TimeoutMsg ends the sequence;
@@ -90,9 +108,9 @@ func (d *Dispatcher) Update(msg tea.Msg, p Path, ctx when.Context) (Outcome, tea
 		d.cancel()
 		return Outcome{Handled: true, Replay: replay}, nil
 	case tea.KeyPressMsg:
-		ev = keyEvent{key: m.Key()}
+		ev = d.event(m.Key(), false)
 	case tea.KeyReleaseMsg:
-		ev = keyEvent{key: m.Key(), release: true}
+		ev = d.event(m.Key(), true)
 	default:
 		return Outcome{}, nil
 	}
@@ -160,7 +178,7 @@ func (d *Dispatcher) replay() []tea.KeyPressMsg {
 	var out []tea.KeyPressMsg
 	for _, ev := range d.keys[skip:] {
 		if !ev.release {
-			out = append(out, tea.KeyPressMsg(ev.key))
+			out = append(out, tea.KeyPressMsg(ev.raw))
 		}
 	}
 	return out
@@ -196,10 +214,10 @@ func (k *Keymap) decide(p Path, ctx when.Context, keys []keyEvent) (full, longer
 }
 
 // matchAll reports whether each key matches its stroke: a release only a
-// Release stroke, and a press any other.
+// Release stroke, a press any other, and AltGr text none.
 func matchAll(q Sequence, keys []keyEvent) bool {
 	for i, s := range q {
-		if keys[i].release != (s.Event == Release) || !s.Matches(keys[i].key) {
+		if keys[i].text || keys[i].release != (s.Event == Release) || !s.Matches(keys[i].key) {
 			return false
 		}
 	}

@@ -475,6 +475,13 @@ from `workspace.KeyMap`" section describes a deprecation, not a removal.
 one cell wide with an ASCII twin, and every `glyph.Tier` gives them; the
 additions are compatible.
 
+*2026-10-11 (D1, MADR A8):* the modifier and arrow glyphs are
+`glyph.Set.Keys`, a `KeyGlyphs`. Its Unicode forms are one cell, and its
+ASCII twins are A1's words, so "each one cell wide" above holds for the
+Unicode forms only. `glyph`'s tests check `Keys` apart, and
+`docs/architecture.md`'s `glyph` row, which says every glyph is one cell,
+joins the step. With A3's names: `Settings.GOOS` and `Dispatcher.Update`.
+
 * `Normalize`, `Stroke.Label`, `Sequence.Label`, `ParseAliases`,
   `DisplayAliases`, `CopyStrokes` and `Options.GOOS`, as MADR amendment A1
   gives them. `Matcher.Update` normalises before matching.
@@ -1246,3 +1253,152 @@ choice:
   failed, `TestHelpGolden` among them; `keymap` under `-shuffle=on
   -count=2`, exit 0; `go-fuzz_test.py`, "27 passed"; `make fuzz
   FUZZTIME=3s`, "9 packages ran clean".
+
+### Step 9 (A1): normalisation, labels and aliases
+
+#### Deviations
+
+* **D1 (2026-10-11): the key glyphs.**
+  * **Found,** reading `glyph` against A1 and A2, before any of this
+    step's code was written:
+    * `glyph`'s package comment, and `TestEveryGlyphIsOneCell` and
+      `TestTierWidths`, which walk every field of `Set`, hold each glyph
+      and its ASCII twin to one cell; A1's ASCII twins are words (`opt+`,
+      `cmd+`, `up`), and the step's 2026-10-10 note asked for both;
+    * the type name of the option chosen, `Keys`, is `when.Keys`'s, and
+      `internal/conformance` fails on a type name two public packages
+      export.
+  * **The owner's choices,** each the recommendation, recorded as MADR
+    A8: `glyph.Set` gains `Keys`, a `KeyGlyphs`, with A1's words as its
+    ASCII twins, and `glyph`'s tests check `Keys` apart; the type is
+    `KeyGlyphs`.
+  * **The others:** one-cell ASCII twins, such as `^` for `⌃`; a separate
+    `KeyLabels` type; sharing the name `Keys` with `when`.
+  * **Files added to the step's scope:** `docs/architecture.md`, whose
+    `glyph` row said every glyph is one cell.
+
+#### Readings
+
+Where A1 leaves a detail open, the step reads it so, needing no choice:
+
+* **Ultraviolet normalises most of it already.** It reads a C0 byte as
+  ctrl and a letter, NUL as ctrl+space, BS as ctrl+h and DEL as
+  backspace (`decoder.go`'s `parseControl`, :1128-1165), and Kitty's C0
+  codes alike (:1318-1330). `Normalize`'s C0 and BS rules act on a key
+  from another source, and the test shows both: ultraviolet's form
+  unchanged, the raw code changed.
+* **BS.** Ultraviolet's ctrl+h for the byte 0x08 cannot be told from
+  ctrl+h, so `Normalize` leaves ctrl+h; "a raw BS" is a key whose code is
+  0x08.
+* **NUL** is ctrl+space, as ultraviolet reads it by default. A Windows
+  console key with no code and its rune in `BaseCode` (:1856-1860) is not
+  NUL.
+* **An upper-case letter with ctrl and no shift** comes from
+  ultraviolet's C1 path (:290-295) and from modifyOtherKeys (:1190-1196).
+  A C1 byte is read as ctrl+alt and an upper-case letter, so 0x81 becomes
+  ctrl+alt+shift+a, as A1's rule says, though an 8-bit terminal sends the
+  same byte for ctrl+alt+a.
+* **ctrl+5 and ctrl+4** keep any other modifier: ctrl+alt+5 is
+  ctrl+alt+], as a legacy terminal sends it.
+* **AltGr.** `Normalize` gives the text with no modifier, a lock and
+  `BaseCode` kept. The dispatcher matches no binding with it, so it goes
+  to the pane, and it ends a pending sequence as any unmatched key does.
+  In ultraviolet only AltGr gives ctrl and alt with text
+  (`parseWin32InputKeyEvent`, :2025-2045).
+* **super** drops meta and hyper from the key, so a stroke naming super
+  with meta or hyper does not match.
+* **The dispatcher** reads each key through `Normalize` with the keymap's
+  features, so the legacy rules apply until a `KeyboardEnhancementsMsg`
+  and `Rebuild` give `Disambiguate`; `Replay` keeps the keys as they
+  arrived.
+* **Labels.** A1's macOS order, ⌃ ⌥ ⇧ ⌘, is the canonical order; meta
+  and hyper, with no glyph, are words; letters stay lower case, as A8's
+  example `⌃⇧k`; an event and a scan code keep their canonical text; and
+  the placeholder is `<leader>`, while a keymap's bindings are expanded.
+* **`DisplayAliases`** holds `pgdn` and `del`: Bubble Tea's own `pgup`
+  is short already.
+* **The tables** `ParseAliases`, `DisplayAliases` and `CopyStrokes` are
+  functions returning a new map or slice, read-only as A1 asks.
+* **The schema's key pattern** reads the parse aliases, so it accepts
+  `return` and `del`.
+
+#### What was built
+
+* **`glyph/glyph.go`:** `KeyGlyphs`, `Set.Keys`, both tables, and the
+  package comment's exception.
+* **`keymap/normalize.go` (new):** `Normalize`.
+* **`keymap/label.go` (new):** `ParseAliases`, `DisplayAliases`,
+  `CopyStrokes`, `Stroke.Label` and `Sequence.Label`.
+* **`keymap/notation.go`:** `ParseStroke` reads the parse aliases, and
+  two names the tables share are constants.
+* **`keymap/keymap.go`:** `Settings.GOOS`.
+* **`keymap/matcher.go`:** the dispatcher normalises, matches no AltGr
+  text, and replays keys as they arrived.
+* **`keymap/schema.go`:** the key pattern with the aliases.
+* **`docs/architecture.md`:** the `glyph` row.
+* **Tests:**
+  * `glyph/glyph_test.go`: the one-cell walks leave out `Keys`, and
+    `TestKeyGlyphs` checks it in every tier;
+  * `keymap/normalize_test.go` (new): `TestNormalize`, 31 keys each with
+    its source and decoder lines, on a legacy terminal and with
+    `Disambiguate`; `TestDispatchNormalizes`; `TestAltGr`;
+  * `keymap/label_test.go` (new): `TestLabelGolden`, 29 sequences on
+    `darwin`, `linux` and `windows` in UTF-8 and ASCII; `TestLabelASCII`;
+    `TestLeaderLabel`; `TestAliases`; `TestCopyStrokes`.
+* **`keymap/testdata/golden/` (6 new files):** the labels, written with
+  `-tuitest.update` and each read: macOS draws `⌃⌥⇧⌘` in UTF-8 and
+  `ctrl+opt+shift+cmd+` in ASCII, the others the canonical words, and
+  every system `↑` or `up`.
+
+#### Checks
+
+* **A gap the mutations found.** K9-5 survived at first: no case had a C0
+  code with a modifier. "a raw 0x01 with alt" was added, and K9-5 is
+  killed.
+* **A wrong comment.** `ParseAliases` first said no spelling writes an
+  alias; `VSCode` writes VS Code's own, and the comment says so.
+* **Lint.** `goconst` found `super` and `pgdown` three times each; they
+  are constants the tables share.
+* **Mutations,** on scratch copies, each killed by the tests named:
+  * **K9-1** (ESC is mapped to ctrl+[): `TestNormalize`;
+  * **K9-2** (normalisation runs with `Disambiguate` set):
+    `TestNormalize`;
+  * **K9-3** (AltGr text is matched as a binding): `TestAltGr`;
+  * **K9-4** (`Label` ignores the glyph table's ASCII twin):
+    `TestLabelGolden`, `TestLabelASCII`;
+  * **K9-5** (a C0 code with a modifier is changed): `TestNormalize`;
+  * **K9-6** (an upper-case letter with ctrl and shift is changed):
+    `TestNormalize`;
+  * **K9-7** (super keeps stray meta and hyper): `TestNormalize`;
+  * **K9-8** (AltGr on every system): `TestNormalize`, `TestAltGr`;
+  * **K9-9** (`Replay` gives the normalised key):
+    `TestDispatchNormalizes`;
+  * **K9-10** (the dispatcher matches the raw key):
+    `TestDispatchNormalizes`;
+  * **K9-11** (a parse alias is not read): `TestAliases`;
+  * **K9-12** (`Label` writes the canonical name for a display alias):
+    `TestLabelGolden`;
+  * **K9-13** (darwin's glyphs on every system): `TestLabelGolden`;
+  * **K9-14** (an ASCII key glyph is not ASCII): `TestASCIISetIsASCII`,
+    `TestKeyGlyphs`;
+  * **K9-15** (a Unicode key glyph is a word): `TestKeyGlyphs`.
+
+  K9-1 to K9-4 are the PLAN's four; K9-5 to K9-15 are added.
+* **macOS,** go1.27.2: `make pre-add-check FILES=<the 10 files>`, "10
+  file(s) clean"; `make lint`; the cross `go vet`; `-race`, `-shuffle=on
+  -count=2`, `LC_ALL=C` and workspace mode; `go mod tidy -diff` (no
+  requirement added); `make vuln`; `make apicheck`, "against v0.10.0, 0
+  incompatible change(s)", `Set.Keys` a compatible addition; `make
+  examples`; `scripts/go-modules.py --check`; `make release-check`,
+  "216 file(s) clean", the tracked files, which the new ones
+  join when committed; `shellcheck`, `markdownlint-cli2`, `actionlint`
+  and the five Python tests. All clean. This PLAN and the MADR, under
+  the repository's markdownlint rules, raise only MD004.
+* **The Windows test host,** go1.27.2 windows/amd64, with the index
+  synced: `make pre-add-check`, "220 file(s) clean", with the
+  new files; `make lint`, `make vuln` and `make examples`, each exit 0;
+  the step's tests in `keymap` and `glyph` and the conformance checks,
+  16 passed, 0 failed; `keymap` under `-shuffle=on -count=2`,
+  exit 0, where `Settings.GOOS` left empty is `windows`;
+  `go-fuzz_test.py`, "27 passed"; `make fuzz FUZZTIME=3s`, "9 packages
+  ran clean".

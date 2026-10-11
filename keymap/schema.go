@@ -37,9 +37,7 @@ var keyPattern = func() string {
 		return "(?:" + strings.Join(names, "|") + ")"
 	}
 	keys := slices.Collect(maps.Keys(nameCodes))
-	for _, vs := range vscodeNames {
-		keys = append(keys, vs)
-	}
+	keys = slices.AppendSeq(keys, maps.Keys(keyAliases))
 	key := "(?:" + alt(keys) + `|\[` + alt(slices.Collect(maps.Keys(scanCodes))) + `\]|[^\x00-\x20\x7f])`
 	stroke := "(?:" + alt(slices.Collect(maps.Keys(modifierNames))) + `\+)*` + key +
 		"(?::" + alt([]string{Release.String(), Repeat.String()}) + ")?"

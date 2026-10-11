@@ -2,6 +2,7 @@ package glyph
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 	"unicode/utf8"
 
@@ -23,10 +24,21 @@ func fields(v reflect.Value, path string, visit func(path, s string)) {
 	}
 }
 
+// glyphs walks a Set's glyphs, Keys left out: its ASCII twins are words
+// (docs/decisions/0007-MADR-keymap-engine.md A8), which TestKeyGlyphs
+// checks.
+func glyphs(set Set, path string, visit func(path, s string)) {
+	fields(reflect.ValueOf(set), path, func(p, s string) {
+		if !strings.HasPrefix(p, path+".Keys.") {
+			visit(p, s)
+		}
+	})
+}
+
 func TestEveryGlyphIsOneCell(t *testing.T) {
 	for name, set := range map[string]Set{"Unicode": Unicode(), "ASCII": ASCII()} {
 		n := 0
-		fields(reflect.ValueOf(set), name, func(path, s string) {
+		glyphs(set, name, func(path, s string) {
 			n++
 			if s == "" {
 				t.Errorf("%s is empty", path)
@@ -61,7 +73,7 @@ func TestASCIISetIsASCII(t *testing.T) {
 func TestTierWidths(t *testing.T) {
 	for _, tier := range []Tier{TierUnicode, TierLegacy, TierASCII} {
 		n := 0
-		fields(reflect.ValueOf(tier.Set()), tier.String(), func(path, s string) {
+		glyphs(tier.Set(), tier.String(), func(path, s string) {
 			n++
 			if w := ansi.StringWidth(s); w != 1 || utf8.RuneCountInString(s) != 1 {
 				t.Errorf("%s = %q is %d cells and %d runes, want 1 and 1", path, s, w, utf8.RuneCountInString(s))
@@ -114,6 +126,42 @@ func TestTierText(t *testing.T) {
 	v := TierASCII
 	if err := v.UnmarshalText([]byte("Unicode")); err == nil || err.Error() != `glyph: unknown Tier "Unicode"` || v != TierASCII {
 		t.Errorf("UnmarshalText(\"Unicode\"): %v, left %s", err, v)
+	}
+}
+
+// TestKeyGlyphs: every tier gives each key label; a Unicode form is one
+// rune and one cell, an ASCII twin printable ASCII, a modifier's ending in
+// "+"; and the two sets differ in each.
+func TestKeyGlyphs(t *testing.T) {
+	modifiers := map[string]bool{"Option": true, "Command": true, "Control": true, "Shift": true}
+	for _, tier := range []Tier{TierUnicode, TierLegacy, TierASCII} {
+		n := 0
+		fields(reflect.ValueOf(tier.Set().Keys), tier.String()+".Keys", func(path, s string) {
+			n++
+			name := path[strings.LastIndex(path, ".")+1:]
+			switch {
+			case s == "":
+				t.Errorf("%s is empty", path)
+			case tier == TierUnicode && (ansi.StringWidth(s) != 1 || utf8.RuneCountInString(s) != 1):
+				t.Errorf("%s = %q is %d cells and %d runes, want 1 and 1", path, s, ansi.StringWidth(s), utf8.RuneCountInString(s))
+			case tier != TierUnicode && modifiers[name] != strings.HasSuffix(s, "+"):
+				t.Errorf("%s = %q: a modifier's word ends in +, and only a modifier's", path, s)
+			}
+			for _, r := range s {
+				if tier != TierUnicode && (r > 0x7e || r < 0x20) {
+					t.Errorf("%s = %q holds %U, which is not printable ASCII", path, s, r)
+				}
+			}
+		})
+		if n != 8 {
+			t.Errorf("%s: walked %d key glyphs, want 8", tier, n)
+		}
+	}
+	u, a := reflect.ValueOf(Unicode().Keys), reflect.ValueOf(ASCII().Keys)
+	for i := range u.NumField() {
+		if u.Field(i).String() == a.Field(i).String() {
+			t.Errorf("Keys.%s is %q in both sets", u.Type().Field(i).Name, u.Field(i).String())
+		}
 	}
 }
 

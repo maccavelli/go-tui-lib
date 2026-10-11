@@ -1174,6 +1174,34 @@ read `KeyBinding`.
      whatever the IDs, which shows another pane's and the program's
      commands in a component's help.
 
+### A8 (2026-10-11): the key glyphs
+
+*Status: accepted (2026-10-11)*, the owner's choices, each the
+recommendation, found as Step 9 of
+[0007-PLAN-keymap-engine.md](0007-PLAN-keymap-engine.md) began (its D1).
+A1's labels and A2's item 2 are read with these.
+
+1. **`glyph.Set` gains `Keys`,** a `KeyGlyphs` with `Option`, `Command`,
+   `Control`, `Shift`, `Up`, `Down`, `Left` and `Right`. The Unicode forms
+   are `⌥ ⌘ ⌃ ⇧ ↑ ↓ ← →`, each one cell. The ASCII twins are A1's words:
+   `opt+`, `cmd+`, `ctrl+`, `shift+`, `up`, `down`, `left` and `right`.
+   * `glyph`'s rule, that every glyph and its twin are one cell, gains
+     this one exception. Its tests check `Keys` apart: each Unicode form
+     one cell, each ASCII form printable ASCII.
+   * This narrows the "every glyph is one cell" of
+     [0002-MADR-multi-pane-workspace-layouts.md](0002-MADR-multi-pane-workspace-layouts.md)
+     for `Keys`' ASCII twins only.
+   * `Label` takes a `glyph.Set`, as A2 says.
+   * *Not chosen:* one-cell ASCII twins, such as `^` for `⌃`, which
+     contradict A1's `opt+` and `up`, and have no readable form for `⌥`,
+     `⌘` and `⇧`; and a separate `KeyLabels` type, which changes A2's
+     signatures and gives each caller two tables.
+2. **The type is `KeyGlyphs`, not `Keys`,** which `when.Keys` already
+   names: `internal/conformance` fails on a type name two public packages
+   export.
+   * *Not chosen:* sharing `Keys` with `when`, listed in the glossary,
+     which gives one name two meanings.
+
 ## More Information
 
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md):

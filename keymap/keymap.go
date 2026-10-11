@@ -1,10 +1,12 @@
 package keymap
 
 import (
+	"cmp"
 	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"iter"
+	"runtime"
 	"slices"
 	"time"
 
@@ -139,6 +141,10 @@ type Settings struct {
 	Timeout  time.Duration // how long a pending chord or leader waits; 0 means one second
 	Features Features      // what the terminal reports; empty until it says
 	Reserved []string      // sequences only the program may bind, such as "ctrl+c"
+	// GOOS is the system the keys come from, as runtime.GOOS names it, for
+	// Normalize's AltGr; "" means runtime.GOOS. A program serving a remote
+	// client sets the client's.
+	GOOS string
 	// Tick starts the pending sequence's timer; nil means tea.Tick. It is
 	// a clock for tests, not a hook (amendment A4, item 5).
 	Tick func(time.Duration, func(time.Time) tea.Msg) tea.Cmd
@@ -173,6 +179,9 @@ type entry struct {
 	hasWhen       bool
 	own, fallback Sequence // a default's own keys and its fallback, expanded
 }
+
+// goos is Settings.GOOS, or runtime.GOOS when it is empty.
+func (k *Keymap) goos() string { return cmp.Or(k.settings.GOOS, runtime.GOOS) }
 
 // holds reports whether the entry's when holds in ctx.
 func (e *entry) holds(ctx when.Context) bool {
