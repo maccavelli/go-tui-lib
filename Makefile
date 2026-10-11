@@ -114,16 +114,17 @@ apicheck: ## Fails on an incompatible API change since the previous tag, per mod
 examples: ## Builds and runs the framework examples in a temporary module
 	@$(PYTHON) ./scripts/go-examples.py
 
-# The pre-add rule (AGENTS.md). scripts/go-precheck.sh is the one
-# implementation; the agent gate at `git commit` runs the same file.
+# The pre-add rule (AGENTS.md). scripts/go-precheck.py is the one
+# implementation; the agent gate at `git commit` runs it through
+# scripts/go-precheck.sh, a shim kept for that gate.
 # Pass FILES=... to check specific files instead of every tracked Go file.
 FILES ?=
 pre-add-check: ## Runs the pre-add checks (gofmt, golangci-lint, vet, test, tidy, govulncheck), per module
-	@./scripts/go-precheck.sh $(FILES)
+	@$(PYTHON) ./scripts/go-precheck.py $(FILES)
 
 # Before a tag: the pre-add checks over every module, with no file list.
 release-check: ## Runs the pre-add checks over every module and file
-	@./scripts/go-precheck.sh
+	@$(PYTHON) ./scripts/go-precheck.py
 
 help: ## Displays this help message
 	@echo "Usage: make [target]"

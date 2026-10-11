@@ -192,6 +192,9 @@ case 6's fault is fixed here. The owner approves.
   gate runs the check through the shim and reports a gofmt failure that
   the scratch file carries.
 * **Mutation P5-1:** the shim drops its arguments; the test.
+* **2026-10-10, D4:** a nested module's `go.mod` text comes from `go mod
+  edit -print`'s stdout alone, as D2's list and D3's path do; a case pins
+  it, and mutation P5-2 reads stderr in again.
 
 ### Phase 6: close-out
 
@@ -604,3 +607,124 @@ the match is the same as a literal one.
   packages ran clean". The run left out `make test` and a second shuffled
   `go test`, which `make pre-add-check` already covers, as the owner and
   the agent agreed after Phase 3's run.
+
+### Phase 5: `go-precheck`, and the shim
+
+#### Deviations
+
+* **D4 (2026-10-10): `go mod edit -print`'s stderr was read into the
+  `go.mod` text.**
+  * **Found,** reading `go-precheck.sh` before the port: its requirements
+    step, for a module other than the root, runs `printed="$(GOWORK=off go
+    mod edit -print 2>&1)"` and searches `printed` for `replace` and
+    `require` lines. On success, a line `go` wrote to stderr joins the
+    text: the fault D2 and D3 fixed, with less reach, since a warning
+    misleads the check only if it begins with the word `replace` or
+    `require` and a space. Its
+    other `2>&1` reads are printed only when the command fails, or, for
+    `govulncheck`, need stderr to tell a network failure, and are kept.
+  * **The owner's choice:** fix it in this phase, as D2 and D3: the text
+    is the command's stdout; on success, what `go` wrote to stderr passes
+    through; on failure, the step shows `go`'s output as before.
+  * **The other:** port it faithfully, and leave it to a later record.
+
+#### What was built
+
+* **`scripts/go-precheck.py`,** executable, the standard library only:
+  the files, the modules and their owners, `gofmt` and its own failures,
+  the three `golangci-lint` runs, `go vet`, `go test`, `go mod tidy
+  -diff`, `govulncheck` and its network rule, workspace-mode tests, a
+  nested module's requirements, `go-modules.py --check`, and the API diff
+  gate and the examples, with the skip variables, messages and exit codes
+  of `go-precheck.sh`. It finds `golangci-lint` as Git Bash's `-x` test
+  did, with `.exe` on Windows. By D4, a nested module's `go.mod` text is
+  `go mod edit -print`'s stdout alone. Its output's lines end in `\n`
+  alone.
+* **`scripts/go-precheck.sh`** is the shim: one `exec` of `python3` (or
+  `PYTHON`) on `go-precheck.py` beside it, with `"$@"`. It holds no logic;
+  `shellcheck` passes it.
+* **`scripts/go-precheck_test.py`:** the shell test's twelve checks, by
+  name, each run through the shim, as the machine-wide gate runs it; and:
+  * case 7, three checks: through the shim and run directly, the same
+    exit status and output, the file list reaching the check;
+  * case 8 (D4), two checks: a nested module, through a `go` that writes
+    `replace example.com/x => ./x` to stderr and succeeds, passes, and no
+    replace directive is reported.
+
+  Its `golangci-lint` stub and case 8's `go` are small Go programs it
+  builds. It runs the shim without `BASH_ENV` and `ENV`: on the agent's
+  host, `BASH_ENV` names a start-up file that puts the real `go`'s
+  directory first on `PATH`, so case 8's `go` was never run, and the
+  first probe against the shell script passed. With them removed, the
+  probe fails as below.
+* **Callers:** `make pre-add-check` and `make release-check` run
+  `$(PYTHON) ./scripts/go-precheck.py`; CI's precheck step runs the test
+  with `python3`; the machine-wide gate runs the shim, unchanged.
+* **Docs:** `AGENTS.md` (the pre-add text, and the scripts section: every
+  script is Python, and the shim is the one shell file),
+  `docs/architecture.md` (the tree, with the shim, and the pre-add text),
+  `docs/guides/releasing.md` and the `Makefile`'s comment name the Python
+  file.
+* **Removed:** `scripts/go-precheck_test.sh`. `scripts/` holds no other
+  shell file than the shim.
+
+#### Checks
+
+* **The comparison (rule 3),** on the same tree, the shell pair from a
+  scratch clone of `67597d4`:
+  * the shell test there, "12 passed, 0 failed"; the Python test has every
+    shell check by name, and adds cases 7 and 8;
+  * the two scripts, on ten inputs, run as the gate runs them, with stdout
+    and stderr compared apart: the repository with two files listed, and
+    with none (every gate, the API diff gate and the examples among them,
+    200 files); a clean tree; an unformatted file; a testdata file that
+    does not parse; a tracked file deleted; a list with no Go file;
+    `golangci-lint` missing (exit 2); a nested module with a replace
+    directive; and one requiring the root at a pseudo-version. The same
+    stdout, stderr and exit code on each.
+* **The probe for D4:** the Python test against `go-precheck.sh` fails
+  case 8: "a nested module passes through a go that warns: want 0, got
+  1", the shell reporting "go.mod (sub): a replace directive …" with the
+  warning's line; "12 passed, 2 failed" (case 7 does not apply to it).
+* **The machine-wide gate,** `~/.agents/hooks/lib/precommit-checks.sh`,
+  on a scratch copy of the tree: with `when/error.go` staged unformatted,
+  exit 1, "Go pre-commit check failed (scripts/go-precheck.sh)", "gofmt:
+  these files are not formatted", naming the file; with a formatted change
+  to it staged, exit 0.
+* **The empty module cache:** "17 passed, 0 failed", on macOS and on the
+  Windows test host.
+* **Mutations,** on scratch copies, each killed:
+  * **P5-1** (the shim drops its arguments): case 3's three checks and
+    "the shim's output is the Python file's", "13 passed, 4 failed".
+  * **P5-2** (the `go.mod` text reads `go`'s stderr again): the probe's
+    two failures, "15 passed, 2 failed".
+* **macOS:** `py_compile`; the five tests, `go-precheck_test.py` ("17
+  passed"), `go-examples_test.py` ("19"), `go-apicheck_test.py` ("22"),
+  `go-modules_test.py` ("23") and `go-fuzz_test.py` ("27"); `make
+  pre-add-check FILES=when/error.go`, "1 file(s) clean"; `make
+  release-check`, "200 file(s) clean"; `make lint`, `shellcheck` (the
+  shim), `markdownlint-cli2` and `actionlint`. All clean.
+* **The Windows test host,** go1.27.2 windows/amd64, Python 3.14.7, with
+  the index synced, trimmed as in Phase 4: `make pre-add-check`, `make
+  lint`, `make vuln` and `make examples`, each exit 0;
+  `py_compile`, exit 0; `go-precheck_test.py`, "17 passed, 0 failed",
+  warm and with an empty module cache, through the shim under Git Bash
+  (after the fix below);
+  `go-examples_test.py`, "19 passed"; `go-apicheck_test.py`, "22
+  passed"; `go-modules_test.py`, "23 passed"; `go-fuzz_test.py`, "27
+  passed"; the shim on one file, exit 0, "1 file(s) clean"; `make fuzz
+  FUZZTIME=3s`, "8 packages ran clean".
+  * **The first run failed `go-precheck_test.py`,** "2 passed, 15
+    failed": every run through the shim gave exit 2, "go-precheck: gofmt
+    not found in PATH", while the Python file run directly passed. The
+    test ran `bash` from a native Windows Python, which found WSL's
+    `bash.exe` before Git's: the shim ran in WSL's Linux, whose `python3`
+    has no `gofmt` (its `PATH` read `/mnt/c/...`). The machine-wide gate is
+    a Git Bash script, and runs the shim with Git's bash. The test now
+    finds Git's `bash.exe` above `git --exec-path` on Windows, and `bash`
+    elsewhere; on the rerun, "17 passed, 0 failed", warm and with an empty
+    module cache. The mutations ran again after the change, with the same
+    results.
+  * A stray command of the agent's copied the tree to the host under a
+    label `x` and failed at its second copy, leaving `tree-x.tgz` in the
+    home directory; the agent removed it.

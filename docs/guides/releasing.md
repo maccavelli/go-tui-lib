@@ -29,7 +29,7 @@ echo "refs/heads/main $(git rev-parse HEAD) refs/heads/main $(git rev-parse orig
   database may already hold it. A mistake is fixed by a later version.
 - **An adapter requires a published root version.** Its `go.mod` names a
   `vX.Y.Z` tag of the root, never a pseudo-version, and has no `replace`.
-  `scripts/go-precheck.sh` fails otherwise.
+  `scripts/go-precheck.py` fails otherwise.
 - **`go.work` is for development,** and is committed; `go.work.sum` is
   ignored, since only ad-hoc workspace-mode commands write it. It lets a
   root change and an adapter change be built and tested together

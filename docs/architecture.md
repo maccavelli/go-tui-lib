@@ -157,7 +157,8 @@ Makefile                    development targets (below)
 .github/workflows/
   ci.yml                    CI
 scripts/
-  go-precheck.sh            the pre-add check, per module
+  go-precheck.py            the pre-add check, per module
+  go-precheck.sh            a shim that runs it, for the machine-wide gate
   go-modules.py             lists the modules; --check compares go.work
                             with the tracked go.mod files
   go-modules_test.py        its offline test
@@ -170,8 +171,8 @@ scripts/
   go-examples.py            builds and runs the framework examples, and
                             checks the guides' excerpts of them
   go-examples_test.py       its offline test
-  go-precheck_test.sh       the pre-add check's gofmt step and its files,
-                            on throwaway repositories
+  go-precheck_test.py       the pre-add check's gofmt step and its files,
+                            and the shim, on throwaway repositories
 glyph/ theme/ layout/ workspace/ tuitest/ termcap/ termsvc/
 when/ command/              the packages; goldens under testdata/golden/
                             where a package renders
@@ -288,7 +289,7 @@ docs/
   package whose tests declare one, for `FUZZTIME` (default 20s):
   `scripts/go-fuzz.py -a` finds the packages, so a new target needs no
   list.
-- **`scripts/go-precheck.sh`** runs, for each module that owns a given
+- **`scripts/go-precheck.py`** runs, for each module that owns a given
   file (every module when none is given), in the module's directory:
   `gofmt` on its files; with `GOWORK=off`, the same three golangci-lint
   runs, `go vet` and `go test` on their packages, `go mod tidy -diff` and

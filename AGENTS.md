@@ -282,7 +282,7 @@ make pre-add-check                 # every tracked Go file
 make pre-add-check FILES="a.go b.go"
 ```
 
-It runs `scripts/go-precheck.sh` once for each module that owns a file
+It runs `scripts/go-precheck.py` once for each module that owns a file
 given, or for every module when none is, in the module's directory:
 
 - `gofmt` on the files;
@@ -374,11 +374,10 @@ lists, never with `shell=True`. A test harness reports every failure as a
 FAIL line naming its case, and goes on to the next; it never stops
 silently. `make` runs them through `PYTHON` (default `python3`).
 
-`go-fuzz`, `go-modules`, `go-apicheck` and `go-examples` are ported.
-`go-precheck` is still shell, until its phase of
-`docs/decisions/0017-PLAN-python-repository-scripts.md`; when
-`go-precheck` is ported, `scripts/go-precheck.sh` stays as a shim, since
-the machine-wide commit gate runs it by that name.
+Every script is Python. The one shell file left,
+`scripts/go-precheck.sh`, is a shim that runs `go-precheck.py` with the
+same arguments and exit status, because the machine-wide commit gate runs
+it by that name; it holds no logic, and `shellcheck` checks it.
 
 ## Identifiers
 

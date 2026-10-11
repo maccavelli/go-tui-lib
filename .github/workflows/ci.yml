@@ -170,7 +170,7 @@ jobs:
       # (docs/decisions/0015-PLAN-precheck-gofmt-errors.md Step 2).
       - name: precheck test
         shell: bash
-        run: ./scripts/go-precheck_test.sh
+        run: python3 scripts/go-precheck_test.py
       # Scripts, Markdown and workflows are checked as the pre-add gate and
       # the records require (go-selfupdate-lib docs/decisions/0003-MADR-remediate-debugging-pass-findings.md D9).
       # shellcheck is pinned to the release the pre-add hosts use (the
