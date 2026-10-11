@@ -2,6 +2,7 @@ package enum
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -147,6 +148,31 @@ func TestBits(t *testing.T) {
 		if v != 0x40 {
 			t.Errorf("Unmarshal(%q) changed v to %#x", in, v)
 		}
+	}
+}
+
+// wide is a bit set over uint16, as keymap.KeyFacts is.
+type wide uint16
+
+// TestBitsWide: a uint16 set names bits past the eighth, and writes an
+// unnamed one past the eighth in hex.
+func TestBitsWide(t *testing.T) {
+	tokens := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"}
+	w := Bits[wide]{Pkg: "p", Type: "W", None: "none", Tokens: tokens}
+	b, err := w.Marshal(0x301)
+	back := wide(0x8000)
+	if err != nil || string(b) != "a|i|j" || w.Unmarshal(b, &back) != nil || back != 0x301 {
+		t.Errorf("Marshal(0x301) = %q, %v, back %#x", b, err, back)
+	}
+	if got := w.String(0x8401); got != "a|0x8400" {
+		t.Errorf("String(0x8401) = %q", got)
+	}
+	if _, err := w.Marshal(0x8401); err == nil || err.Error() != "p: W 0x8400 has no name" {
+		t.Errorf("Marshal(0x8401): %v", err)
+	}
+	all := Bits[wide]{Pkg: "p", Type: "W", None: "none", Tokens: append(tokens, "k", "l", "m", "n", "o", "p")}
+	if b, err := all.Marshal(0xffff); err != nil || strings.Count(string(b), "|") != 15 {
+		t.Errorf("Marshal(0xffff) with sixteen tokens = %q, %v", b, err)
 	}
 }
 

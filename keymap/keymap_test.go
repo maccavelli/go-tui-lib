@@ -181,7 +181,7 @@ func TestRemoval(t *testing.T) {
 		bind(t, DefaultLayer, ws, "c", "cmd.c"),
 		bind(t, DefaultLayer, ws, "d", "cmd.c"),
 	)
-	ds = append(ds, Default{Binding: bind(t, DefaultLayer, ws, "shift+enter", "newline"), Fallback: seq(t, "ctrl+j")})
+	ds = append(ds, Default{Binding: bind(t, DefaultLayer, ws, "shift+enter", "newline"), Alternatives: []Alternative{{Keys: seq(t, "ctrl+j")}}})
 	whens := []Binding{bind(t, ProgramLayer, ws, "q", "cmd.q"), bind(t, ProgramLayer, ws, "q", "cmd.q")}
 	whens[1].When = "x"
 	k, err := New(Settings{Features: Disambiguate}, ds, whens, []Binding{
@@ -222,13 +222,14 @@ func TestRemoval(t *testing.T) {
 	}
 }
 
-// TestFeatures: a default whose needs are missing binds its fallback, and
-// its own keys after Rebuild; one with no fallback binds nothing and
-// reports nothing; a binding the terminal cannot deliver is NotSupported,
-// kept, and binds after Rebuild (MADR §5, amendment A6).
+// TestFeatures: a default whose keys need missing features binds its one
+// alternative, and its own keys after Rebuild; one with no alternative
+// binds nothing and reports nothing; a binding the terminal cannot
+// deliver is NotSupported, kept, and binds after Rebuild (MADR §5,
+// amendments A1 and A6).
 func TestFeatures(t *testing.T) {
 	ds := []Default{
-		{Binding: bind(t, DefaultLayer, command.Global, "alt+n", "newline"), Needs: Disambiguate, Fallback: seq(t, "ctrl+j")},
+		{Binding: bind(t, DefaultLayer, command.Global, "ctrl+m", "newline"), Alternatives: []Alternative{{Keys: seq(t, "ctrl+j")}}},
 		{Binding: bind(t, DefaultLayer, command.Global, "shift+enter", "submit")},
 	}
 	user := []Binding{bind(t, UserLayer, command.Global, "ctrl+i", "indent")}
@@ -244,11 +245,11 @@ func TestFeatures(t *testing.T) {
 			t.Errorf("with no features, Bindings(%s) = %s, want %s", id, got, want)
 		}
 	}
-	k2, err := k.Rebuild(Disambiguate)
+	k2, err := k.Rebuild(Disambiguate, 0)
 	if err != nil {
 		t.Fatalf("Rebuild(disambiguate): %v", err)
 	}
-	for id, want := range map[command.ID]string{"newline": "alt+n", "submit": "shift+enter", "indent": "ctrl+i"} {
+	for id, want := range map[command.ID]string{"newline": "ctrl+m", "submit": "shift+enter", "indent": "ctrl+i"} {
 		if got := k2.Bindings(id, p); len(got) != 1 || got[0].String() != want {
 			t.Errorf("after Rebuild, Bindings(%s) = %v, want %s", id, got, want)
 		}
@@ -396,7 +397,7 @@ func TestImmutable(t *testing.T) {
 	if got := lookup(t, k, p, nil, "x"); got != "cut" {
 		t.Errorf("after the caller's changes, Lookup(x) = %q, want cut", got)
 	}
-	k2, _ := k.Rebuild(0)
+	k2, _ := k.Rebuild(0, 0)
 	if got := lookup(t, k2, p, nil, "x"); got != "cut" {
 		t.Errorf("Rebuild took the caller's changes: Lookup(x) = %q, want cut", got)
 	}

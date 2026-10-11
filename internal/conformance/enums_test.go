@@ -23,7 +23,7 @@ import (
 )
 
 // as is n as the enum T.
-func as[T ~uint8 | ~int](n int64) any { return T(n) }
+func as[T ~uint8 | ~uint16 | ~int](n int64) any { return T(n) }
 
 // enums builds a value of each enum the scan finds, keyed by package and
 // type name. The scan decides what an enum is: an exported type of a
@@ -43,6 +43,7 @@ var enums = map[string]func(int64) any{
 	"keymap.ConflictKind":   as[keymap.ConflictKind],
 	"keymap.Event":          as[keymap.Event],
 	"keymap.Features":       as[keymap.Features],
+	"keymap.KeyFacts":       as[keymap.KeyFacts],
 	"keymap.Layer":          as[keymap.Layer],
 	"launch.Choice":         as[launch.Choice],
 	"launch.Target":         as[launch.Target],
@@ -73,7 +74,7 @@ var enums = map[string]func(int64) any{
 
 // bitSets are the enums whose values are sets of bits, with
 // internal/enum's Bits text.
-var bitSets = map[string]bool{"command.Surface": true, "keymap.Features": true}
+var bitSets = map[string]bool{"command.Surface": true, "keymap.Features": true, "keymap.KeyFacts": true}
 
 // enumType is one enum the scan found: its key in enums, its package's
 // name and its own, its type, and the values of its constants with the

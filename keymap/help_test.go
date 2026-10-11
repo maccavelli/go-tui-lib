@@ -32,7 +32,7 @@ func TestKeyBindingMatches(t *testing.T) {
 	for _, c := range keyCases {
 		msg := tea.KeyPressMsg(c.key)
 		for text, want := range c.strokes {
-			k := mustNew(t, Settings{Features: allFeatures}, nil, []Binding{bind(t, ProgramLayer, command.Global, text, "cmd.x")})
+			k := mustNew(t, Settings{Features: allFeatures, Facts: Releases}, nil, []Binding{bind(t, ProgramLayer, command.Global, text, "cmd.x")})
 			kb := k.KeyBinding("cmd.x", global, nil)
 			if got := fires(k, global, msg, "cmd.x"); got != want[0] {
 				t.Errorf("%s: the dispatcher runs %q: %v, want %v", c.name, text, got, want[0])
@@ -77,7 +77,7 @@ func TestKeyBindingScopeDecides(t *testing.T) {
 // listed as their full text, which help shows and key.Matches never
 // matches; the help key is the primary sequence.
 func TestKeyBindingChord(t *testing.T) {
-	k := mustNew(t, Settings{Features: allFeatures}, nil, []Binding{
+	k := mustNew(t, Settings{Features: allFeatures, Facts: Releases}, nil, []Binding{
 		bind(t, ProgramLayer, command.Global, "ctrl+s", "cmd.save"),
 		bind(t, ProgramLayer, command.Global, "ctrl+x s", "cmd.save"),
 		bind(t, ProgramLayer, command.Global, "ctrl+x n", "cmd.new"),

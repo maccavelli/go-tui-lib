@@ -1202,6 +1202,44 @@ A1's labels and A2's item 2 are read with these.
    * *Not chosen:* sharing `Keys` with `when`, listed in the glossary,
      which gives one name two meanings.
 
+### A9 (2026-10-11): where the key facts come from
+
+*Status: accepted (2026-10-11)*, the owner's choices, each the recommendation,
+found as Step 10 of [0007-PLAN-keymap-engine.md](0007-PLAN-keymap-engine.md)
+began (its D1). A1's §5 and Q7 are read with this.
+
+`FactsFrom(termcap.Caps) KeyFacts` reads `Caps.Keyboard()` and
+`Caps.Brand`:
+
+* `Releases` is `Keyboard().Releases`;
+* `ShiftEnter` and `CtrlEnter` hold when the flags the terminal accepted
+  include Kitty's disambiguation, so that it reports those keys apart from
+  enter; `CtrlEnter` never holds on Apple Terminal;
+* `AltEnter` holds unless the brand is Apple Terminal or iTerm2, whose
+  Option key types characters until the user sets it to send Alt
+  (iTerm2's Option key defaults to Normal; Terminal.app needs "Use Option
+  as Meta key"). Elsewhere a legacy terminal sends alt+enter as ESC and
+  CR, Ghostty sends Option as Alt on a US layout, and over SSH, where the
+  brand is lost (0003-REPORT §9), the fact holds. A user who set Option
+  to Alt on those two is offered the next alternative, a key that works;
+* `HostTakesCtrlQ` and `HostTakesCtrlI` hold when the brand is VS Code,
+  Cursor, Windsurf or Zed, whose host takes those keys before the
+  terminal sees them.
+
+A1's per-terminal list (VTE before 8200, the xterm.js family, tmux before
+3.3) is met by what each terminal reports accepting, not by its name and
+version: `Caps` does not keep a terminal's version (`termcap`'s
+`Identity.Version` is not carried into it), and a terminal that delivers
+shift+enter apart from enter reports the flag that says so.
+
+* *Not chosen:* `Keyboard()` only, which never sets the host facts and
+  leaves each program to check the brand; `AltEnter` always, which on a
+  default iTerm2 or Terminal.app offers a key that arrives as enter;
+  `AltEnter` never, which leaves A1's alt+enter to each program; and
+  every §9 quirk by name and version, which needs a `termcap` change
+  under
+  [0005-MADR-terminal-capabilities-and-services.md](0005-MADR-terminal-capabilities-and-services.md).
+
 ## More Information
 
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md):

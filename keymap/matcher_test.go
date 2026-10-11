@@ -189,7 +189,7 @@ func TestSetKeymap(t *testing.T) {
 // TestRelease: a release is matched only by a Release stroke, a press never
 // is, and a release that matches nothing leaves a pending sequence as it is.
 func TestRelease(t *testing.T) {
-	d, _ := dispatcher(t, Settings{Features: EventTypes},
+	d, _ := dispatcher(t, Settings{Features: EventTypes, Facts: Releases},
 		bind(t, ProgramLayer, command.Global, "space:release", "talk"),
 		bind(t, ProgramLayer, command.Global, "a", "cmd.a"),
 		bind(t, ProgramLayer, command.Global, "ctrl+x f", "find"),

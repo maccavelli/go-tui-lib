@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/maccavelli/go-tui-lib/command"
 	"github.com/maccavelli/go-tui-lib/glyph"
 )
 
@@ -105,6 +106,17 @@ func (s Stroke) keyLabel(g glyph.Set) string {
 		return d
 	}
 	return text
+}
+
+// Shortcut is the label of id's primary sequence along a path, or "" when
+// nothing binds it there, so a hint built from it is dropped rather than
+// left stale after a rebind (amendment A1).
+func (k *Keymap) Shortcut(id command.ID, p Path, goos string, g glyph.Set) string {
+	qs := k.Bindings(id, p)
+	if len(qs) == 0 {
+		return ""
+	}
+	return qs[0].Label(goos, g)
 }
 
 // Label is the strokes' labels, joined by one space. A keymap's bindings

@@ -381,6 +381,11 @@ along the path. Below, read `KeyBinding` for the method `Binding`.
 
 ### Step 7: move `workspace` onto the engine
 
+*2026-10-11 (from Step 10's D1):* `workspace.PushMode(command.Scope) (pop
+func())` joins this step, with Step 10's test (`PushMode` adds the scope at
+the end of `KeyPath`; `pop` removes it; a second `pop` does nothing) and
+its mutation (`pop` removes the wrong mode when two are pushed).
+
 *2026-10-10, A4 items 1 and 2:*
 
 * **The two commands of Q8,** in `workspace/commands.go`, before the
@@ -511,6 +516,16 @@ joins the step. With A3's names: `Settings.GOOS` and `Dispatcher.Update`.
 
 *2026-10-10:* `FactsFrom(termcap.Caps)` reads `Caps.Keyboard()`: `Kitty`,
 `Enhancements`, `Accepted` and `Releases`.
+
+*2026-10-11 (D1, MADR A9):* `FactsFrom` reads `Caps.Keyboard()` and
+`Caps.Brand`, as A9 says. `workspace.PushMode`, its test (the modes
+bullet below) and its mutation (`pop` removes the wrong mode) move to Step
+7, which builds the `KeyPath` a mode extends and runs after this step in
+the owner's order. With A3's names: `Settings.Facts`.
+
+*2026-10-11 (D2):* `KeyFacts` is `uint16`, as A1 declares, and
+`internal/enum`'s `Bits` took only a `uint8` set. `Bits` takes `~uint8 |
+~uint16`, so `internal/enum/enum.go` and its test join the step.
 
 * `KeyFacts`, `Alternative`, `Default.Alternatives`, `Options.Facts`,
   `Rebuild` with facts, the release rule, `Keymap.Reachable`,
@@ -1402,3 +1417,141 @@ Where A1 leaves a detail open, the step reads it so, needing no choice:
   exit 0, where `Settings.GOOS` left empty is `windows`;
   `go-fuzz_test.py`, "27 passed"; `make fuzz FUZZTIME=3s`, "9 packages
   ran clean".
+
+### Step 10 (A1): terminal facts, alternatives, reachability and hints
+
+#### Deviations
+
+* **D1 (2026-10-11): `PushMode`'s place, and what `FactsFrom` reads.**
+  * **Found,** reading the step against the tree, before any of its code
+    was written:
+    * `workspace.PushMode`'s test and mutation need `Workspace.KeyPath`,
+      which Step 7 builds, and the owner's order runs this step first;
+    * the 2026-10-10 note has `FactsFrom` read `Caps.Keyboard()` only,
+      which cannot show `HostTakesCtrlQ` or `HostTakesCtrlI`: only the
+      brand does.
+  * **The owner's choices,** each the recommendation: `PushMode`, its
+    test and its mutation move to Step 7, whose text now says so; and
+    `FactsFrom` reads `Keyboard()` and `Caps.Brand`, recorded as MADR A9.
+  * **A correction before A9 was committed.** A9 first said `AltEnter`
+    always holds, as "every terminal in 0003-REPORT §9" delivers ESC CR.
+    The claim was the agent's, not the report's, and is wrong where
+    Option types characters by default: iTerm2's Option key defaults to
+    Normal, and Terminal.app needs "Use Option as Meta key". The owner
+    chose, again the recommendation: `AltEnter` holds unless the brand
+    is Apple Terminal or iTerm2. A9 says so, with the others not chosen.
+  * **The others:** a mode stack and part of `KeyPath` built here;
+    `Keyboard()` only; every §9 quirk by name and version, which needs a
+    `termcap` change; `AltEnter` always, or never.
+* **D2 (2026-10-11): a `uint16` bit set.**
+  * **Found,** as `KeyFacts` was first compiled: A1 declares it `uint16`,
+    and `internal/enum`'s `Bits` took only `~uint8`, formatting a set's
+    unnamed bits as a `uint8` (`internal/enum/enum.go`, then :85, :106
+    and :115). Pre-existing: `Features` and `command.Surface` are
+    `uint8`.
+  * **The owner's choice,** the recommendation: `Bits` takes `~uint8 |
+    ~uint16`. No MADR change.
+  * **The other:** `KeyFacts` as a `uint8`, which amends A1 and makes a
+    ninth fact a change of the exported type's width.
+  * **Files added to the step's scope:** `internal/enum/enum.go` and its
+    test; and `internal/conformance/enums_test.go`'s `as`, which took
+    only `~uint8 | ~int`.
+
+#### Readings
+
+Where A1 and A9 leave a detail open, the step reads it so, needing no
+choice:
+
+* **The facts a key carries.** A release or repeat stroke needs
+  `Releases` (A1), and a host's taking ctrl+q or ctrl+i bars those
+  strokes in a default. The other facts are an `Alternative`'s to name,
+  as the PLAN's alt+enter "needs `AltEnter`"; a default's own keys need
+  their features, as shift+enter needs `Disambiguate`.
+* **A user's binding** needs its features and, for a release or repeat
+  stroke, `Releases`; a host's keys do not bar a user's own choice. The
+  NotSupported error names the fact: "needs event-types and releases".
+* **`Rebuild(f Features, facts KeyFacts)`** takes both, and builds from
+  the same defaults and layers.
+* **A removal** matches a default's own keys, the keys bound, or any
+  alternative's.
+* **`Reachable`** hides a binding as the dispatcher does, with the `when`
+  values given: one before it in its scope with its keys, or one in an
+  inner scope with related keys, each only when its own `when` holds.
+  Each command comes once, innermost scope first.
+* **`Shortcut`** is the label of `Bindings`' first sequence, so it hides
+  as `Bindings` does, with no `when` values.
+* **`keymap` imports `termcap`** for `FactsFrom`, as Q7 allows while
+  `termcap` stays a leaf that does no I/O at import: it and its internal
+  imports have no `init` and no package-level I/O.
+* **Earlier tests** that bind a release or repeat stroke now plant the
+  `Releases` fact beside `EventTypes`, as A1's rule asks of the terminal
+  they describe (`TestKeyBindingMatches`, `TestKeyBindingChord`,
+  `TestRelease`); no assertion changed. Step 3's feature test is the
+  one-alternative case: `ctrl+m`, which needs `Disambiguate`, else
+  `ctrl+j`.
+
+#### What was built
+
+* **`keymap/facts.go` (new):** `KeyFacts`, with its text forms through
+  `enum.Bits`; `Alternative`; and `FactsFrom`.
+* **`keymap/keymap.go`:** `Default.Alternatives` in place of `Needs` and
+  `Fallback`; `Settings.Facts`; `Rebuild` with facts; the release rule;
+  `Reachable`.
+* **`keymap/label.go`:** `Shortcut`.
+* **`keymap/conflict.go`:** the NotSupported message names the fact.
+* **`internal/enum/enum.go`:** `Bits` over `uint16` too.
+* **`internal/conformance/enums_test.go`:** `KeyFacts` in the enum table
+  and among the bit sets.
+* **Tests:** `keymap/facts_test.go` (new): `TestAlternatives` (the
+  newline default under five planted terminals), `TestNoAlternative`,
+  `TestHostKeys`, `TestReleaseRule`, `TestRebuildFacts` (the help and the
+  shortcut follow), `TestReachable`, `TestShortcut` and `TestFactsFrom`
+  (eleven brands and flag sets, and one through `New`);
+  `internal/enum/enum_test.go`: `TestBitsWide`; and the earlier tests
+  above.
+
+#### Checks
+
+* **Mutations,** on scratch copies, each killed by the tests named:
+  * **K10-1** (alternatives are tried last first): `TestAlternatives`;
+  * **K10-2** (a fact named in `Facts` is ignored): `TestAlternatives`;
+  * **K10-3** (`Shortcut` returns text for an unbound command):
+    `TestShortcut`;
+  * **K10-4** (a user's release binding needs no `Releases`):
+    `TestReleaseRule`;
+  * **K10-5** (a host's keys do not bar a default): `TestHostKeys`;
+  * **K10-6** (a host's keys bar a user's own binding): `TestHostKeys`;
+  * **K10-7** (`Reachable` ignores the `when`): `TestReachable`;
+  * **K10-8** (`Reachable` ignores an inner scope's binding):
+    `TestReachable`;
+  * **K10-9** (an inner binding whose `when` fails still hides):
+    `TestReachable`;
+  * **K10-10** (`FactsFrom` gives `AltEnter` on iTerm2): `TestFactsFrom`;
+  * **K10-11** (`FactsFrom` never sets the host facts): `TestFactsFrom`;
+  * **K10-12** (`FactsFrom` gives `CtrlEnter` on Apple Terminal):
+    `TestFactsFrom`;
+  * **K10-13** (a removal does not match an alternative's keys):
+    `TestRemoval`;
+  * **K10-14** (the NotSupported message leaves out the fact):
+    `TestReleaseRule`;
+  * **K10-15** (`enum.Bits` writes an unnamed bit as a `uint8`):
+    `TestBitsWide`.
+
+  K10-1 to K10-3 are the PLAN's three that stay in this step; the fourth,
+  `pop`'s, moved to Step 7 with `PushMode`. K10-4 to K10-15 are added.
+* **macOS,** go1.27.2: `make pre-add-check FILES=<the 11 files>`, "11
+  file(s) clean"; `make lint`; the cross `go vet`; `-race`, `-shuffle=on
+  -count=2`, `LC_ALL=C` and workspace mode; `go mod tidy -diff` (no
+  requirement added); `make vuln`; `make apicheck`, "against v0.10.0, 0
+  incompatible change(s)"; `make examples`; `scripts/go-modules.py
+  --check`; `make release-check`, "220 file(s) clean";
+  `shellcheck`, `markdownlint-cli2`, `actionlint` and the five Python
+  tests. All clean, each on its first run. This PLAN and the MADR, under
+  the repository's markdownlint rules, raise only MD004.
+* **The Windows test host,** go1.27.2 windows/amd64, with the index
+  synced: `make pre-add-check`, "222 file(s) clean", with the
+  new files; `make lint`, `make vuln` and `make examples`, each exit 0;
+  the step's tests in `keymap` and `internal/enum` and the conformance
+  checks, 16 passed, 0 failed; `keymap` under `-shuffle=on
+  -count=2`, exit 0; `go-fuzz_test.py`, "27 passed"; `make fuzz
+  FUZZTIME=3s`, "9 packages ran clean".

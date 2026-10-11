@@ -1,5 +1,5 @@
-// Package enum gives an exported enum over uint8 or int its text forms from one
-// table of tokens: the token String prints, and the MarshalText and
+// Package enum gives an exported enum over uint8 or int, or a bit set over
+// uint8 or uint16, its text forms from one table of tokens: the token String prints, and the MarshalText and
 // UnmarshalText pair, which accept exactly those tokens
 // (docs/decisions/0014-MADR-native-integration-api.md W0.4;
 // docs/decisions/0014-PLAN-canonicalization.md Step 6). Names is the table
@@ -81,8 +81,9 @@ func (e *wrapError) Unwrap() error { return e.err }
 
 // Bits is a bit set's tokens: Tokens[i] is the bit 1<<i's, and None is
 // the empty set's. A set's text is its bits' tokens, lowest first, joined
-// with "|".
-type Bits[T ~uint8] struct {
+// with "|". A set is a uint8 or a uint16
+// (docs/decisions/0007-PLAN-keymap-engine.md Step 10, D2).
+type Bits[T ~uint8 | ~uint16] struct {
 	Pkg, Type string
 	Tokens    []string
 	None      string
@@ -103,7 +104,7 @@ func (s Bits[T]) String(v T) string {
 		}
 	}
 	if rest := v &^ s.known(); rest != 0 {
-		out = append(out, fmt.Sprintf("%#x", uint8(rest)))
+		out = append(out, fmt.Sprintf("%#x", uint64(rest)))
 	}
 	return strings.Join(out, "|")
 }
@@ -112,7 +113,7 @@ func (s Bits[T]) String(v T) string {
 // naming the package and the set.
 func (s Bits[T]) Marshal(v T) ([]byte, error) {
 	if rest := v &^ s.known(); rest != 0 {
-		return nil, fmt.Errorf("%s: %s %#x has no name", s.Pkg, s.Type, uint8(rest))
+		return nil, fmt.Errorf("%s: %s %#x has no name", s.Pkg, s.Type, uint64(rest))
 	}
 	return []byte(s.String(v)), nil
 }

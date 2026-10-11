@@ -127,12 +127,17 @@ func FeaturesFrom(flags int) Features {
 	return f
 }
 
-// Default is a binding a package or program gives, which may need
-// features and name a fallback for a terminal without them.
+// Default is a binding a package or program gives, with keys to bind
+// instead where the terminal cannot deliver its own (MADR amendment A1).
+// Its own keys need their features, and, like any alternative's, the
+// Releases fact for a release or repeat stroke; a host's taking ctrl+q or
+// ctrl+i bars those strokes.
 type Default struct {
 	Binding
-	Needs    Features // features the binding needs, besides its keys' own
-	Fallback Sequence // bound when Needs are missing; empty means no binding
+	// Alternatives are tried in order when the binding's own keys cannot
+	// be delivered: the first whose needs and facts hold is bound, and
+	// with none, nothing is, and nothing is reported.
+	Alternatives []Alternative
 }
 
 // Settings configure a keymap.
@@ -140,6 +145,7 @@ type Settings struct {
 	Leader   string        // the sequence <leader> stands for; "" means none
 	Timeout  time.Duration // how long a pending chord or leader waits; 0 means one second
 	Features Features      // what the terminal reports; empty until it says
+	Facts    KeyFacts      // what the terminal and its host deliver, as FactsFrom reads them
 	Reserved []string      // sequences only the program may bind, such as "ctrl+c"
 	// GOOS is the system the keys come from, as runtime.GOOS names it, for
 	// Normalize's AltGr; "" means runtime.GOOS. A program serving a remote
@@ -174,10 +180,11 @@ type Keymap struct {
 // chosen, its when parsed, and the layer it came in.
 type entry struct {
 	Binding
-	layer         int // 0 for the defaults, then each layer of New's in turn
-	when          when.Expr
-	hasWhen       bool
-	own, fallback Sequence // a default's own keys and its fallback, expanded
+	layer   int // 0 for the defaults, then each layer of New's in turn
+	when    when.Expr
+	hasWhen bool
+	own     Sequence   // a default's own keys, expanded
+	alts    []Sequence // a default's alternatives' keys, expanded
 }
 
 // goos is Settings.GOOS, or runtime.GOOS when it is empty.
@@ -206,7 +213,10 @@ func New(s Settings, defaults []Default, layers ...[]Binding) (*Keymap, error) {
 	k := &Keymap{settings: s, defaults: slices.Clone(defaults), layers: make([][]Binding, len(layers))}
 	for i := range k.defaults {
 		k.defaults[i].Binding = cloneBinding(k.defaults[i].Binding)
-		k.defaults[i].Fallback = slices.Clone(k.defaults[i].Fallback)
+		k.defaults[i].Alternatives = slices.Clone(k.defaults[i].Alternatives)
+		for j := range k.defaults[i].Alternatives {
+			k.defaults[i].Alternatives[j].Keys = slices.Clone(k.defaults[i].Alternatives[j].Keys)
+		}
 	}
 	for i, l := range layers {
 		k.layers[i] = make([]Binding, len(l))
@@ -225,10 +235,11 @@ func cloneBinding(b Binding) Binding {
 }
 
 // Rebuild is the keymap built again from the same defaults and layers with
-// new features, as when a tea.KeyboardEnhancementsMsg arrives.
-func (k *Keymap) Rebuild(f Features) (*Keymap, error) {
+// new features and facts, as when a tea.KeyboardEnhancementsMsg or a late
+// probe reply arrives.
+func (k *Keymap) Rebuild(f Features, facts KeyFacts) (*Keymap, error) {
 	s := k.settings
-	s.Features = f
+	s.Features, s.Facts = f, facts
 	return New(s, k.defaults, k.layers...)
 }
 
@@ -358,23 +369,28 @@ func (b *builder) add(bd Binding, layer int, d *Default) {
 		b.remove(bd)
 		return
 	}
-	have := b.k.settings.Features
 	switch {
 	case d != nil:
-		fallback, err := b.expand(d.Fallback, d.Fallback.String())
-		if err != nil {
-			b.fail(bd, fmt.Errorf("fallback: %w", err))
-			return
+		e.own = bd.Keys
+		chosen := b.deliverable(bd.Keys, 0, 0)
+		for i, a := range d.Alternatives {
+			keys, err := b.expand(a.Keys, a.Keys.String())
+			if err == nil && len(keys) == 0 {
+				err = errors.New("binds no keys")
+			}
+			if err != nil {
+				b.fail(bd, fmt.Errorf("alternative %d: %w", i+1, err))
+				return
+			}
+			e.alts = append(e.alts, keys)
+			if !chosen && b.deliverable(keys, a.Needs, a.Facts) {
+				e.Keys, chosen = keys, true
+			}
 		}
-		e.own, e.fallback = bd.Keys, fallback
-		switch {
-		case have&(d.Needs|needs(bd.Keys)) == d.Needs|needs(bd.Keys):
-		case len(fallback) > 0 && have&needs(fallback) == needs(fallback):
-			e.Keys = fallback
-		default:
+		if !chosen {
 			b.off[e] = true // no binding, and nothing to report
 		}
-	case have&needs(bd.Keys) != needs(bd.Keys):
+	case !b.supported(bd.Keys):
 		b.errs = append(b.errs, BindingConflict{Kind: NotSupported, Keys: bd.Keys, Scope: bd.Scope, Bindings: []Binding{bd}})
 		return
 	case bd.Location.Layer == UserLayer:
@@ -388,6 +404,28 @@ func (b *builder) add(bd Binding, layer int, d *Default) {
 	b.all = append(b.all, e)
 }
 
+// deliverable reports whether a default's keys can be delivered: their
+// features and f are reported, their facts and facts hold, and no fact
+// bars them.
+func (b *builder) deliverable(q Sequence, f Features, facts KeyFacts) bool {
+	s := b.k.settings
+	f |= needs(q)
+	need, bar := keyFacts(q)
+	need |= facts
+	return s.Features&f == f && s.Facts&need == need && s.Facts&bar == 0
+}
+
+// supported reports whether a binding's keys can be delivered: their
+// features are reported and, for a release or repeat stroke, the
+// Releases fact holds (amendment A1). A host's keys do not bar a user's
+// own choice.
+func (b *builder) supported(q Sequence) bool {
+	s := b.k.settings
+	f := needs(q)
+	need, _ := keyFacts(q)
+	return s.Features&f == f && s.Facts&need == need
+}
+
 // remove takes away what an earlier binding made: with keys, those keys of
 // that command in that scope, and an error when none is bound; with none,
 // every binding of the command in the scope. A when limits it to bindings
@@ -398,7 +436,8 @@ func (b *builder) remove(bd Binding) {
 		if e.Scope != bd.Scope || e.Command != bd.Command || bd.When != "" && e.When != bd.When {
 			return false
 		}
-		if len(bd.Keys) > 0 && !slices.Equal(e.Keys, bd.Keys) && !slices.Equal(e.own, bd.Keys) && !slices.Equal(e.fallback, bd.Keys) {
+		if len(bd.Keys) > 0 && !slices.Equal(e.Keys, bd.Keys) && !slices.Equal(e.own, bd.Keys) &&
+			!slices.ContainsFunc(e.alts, func(q Sequence) bool { return slices.Equal(q, bd.Keys) }) {
 			return false
 		}
 		found = true
@@ -491,6 +530,51 @@ func (k *Keymap) Bindings(id command.ID, p Path) []Sequence {
 		out = append(out, e.Keys)
 	}
 	return out
+}
+
+// Reachable is the commands a key can reach along a path with ctx: each
+// with a binding in a scope on the path whose when holds, not hidden by
+// another whose when holds, one in an inner scope whose keys start it or
+// start with it, or one before it in its scope with the same keys
+// (amendment A1). Each command comes once, innermost scope first and in
+// resolution order.
+func (k *Keymap) Reachable(p Path, ctx when.Context) iter.Seq[command.ID] {
+	return func(yield func(command.ID) bool) {
+		seen := map[command.ID]bool{}
+		for i, scope := range slices.Backward(p) {
+			for j, e := range k.scopes[scope] {
+				if seen[e.Command] || !e.holds(ctx) || k.blocked(e, ctx, p[i+1:], k.scopes[scope][:j]) {
+					continue
+				}
+				seen[e.Command] = true
+				if !yield(e.Command) {
+					return
+				}
+			}
+		}
+	}
+}
+
+// blocked reports whether a binding whose when holds in ctx hides e: one
+// before it in its scope with its keys, or one in the inner scopes whose
+// keys are related to e's.
+func (k *Keymap) blocked(e *entry, ctx when.Context, inner Path, before []*entry) bool {
+	for _, o := range before {
+		if o.holds(ctx) && slices.Equal(o.Keys, e.Keys) {
+			return true
+		}
+	}
+	for _, scope := range inner {
+		if scope == e.Scope {
+			continue
+		}
+		for _, o := range k.index[scope][e.Keys[0]] {
+			if o.holds(ctx) && related(o.Keys, e.Keys) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // shown is the entries Bindings gives the sequences of.

@@ -64,13 +64,23 @@ func (c BindingConflict) Error() string {
 	case Reserved:
 		what = fmt.Sprintf("starts with %s, which the program reserves", c.Keys)
 	case NotSupported:
-		what = fmt.Sprintf("needs %s, which the terminal has not reported", needs(c.Keys))
+		what = fmt.Sprintf("needs %s, which the terminal has not reported", requirement(c.Keys))
 	case Shadow:
 		what = fmt.Sprintf("hides %s's %s at %s", other.Command, other.Keys, other.Location)
 	default:
 		what = c.Kind.String()
 	}
 	return where(last) + ": " + what
+}
+
+// requirement is what a sequence needs: its features, and the Releases
+// fact for a release or repeat stroke.
+func requirement(q Sequence) string {
+	s := needs(q).String()
+	if f, _ := keyFacts(q); f != 0 {
+		s += " and " + f.String()
+	}
+	return s
 }
 
 // check finds the conflicts among the bindings in effect: in each scope,
