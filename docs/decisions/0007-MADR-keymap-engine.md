@@ -1240,6 +1240,30 @@ shift+enter apart from enter reports the flag that says so.
   under
   [0005-MADR-terminal-capabilities-and-services.md](0005-MADR-terminal-capabilities-and-services.md).
 
+### A10 (2026-10-11): editing a pending sequence, and the which-key labels
+
+*Status: accepted (2026-10-11)*, the owner's choices, each the
+recommendation, found as Step 11 of
+[0007-PLAN-keymap-engine.md](0007-PLAN-keymap-engine.md) began (its D1).
+A1's §6 items are read with these, under A3's names.
+
+1. **`Settings.EscReplays` and `Settings.BackspaceReplays`** in place of
+   A1's `Options.EscClearsPending` and `Options.BackspacePops`. Since A4.6
+   the keymap takes a `Settings` struct, whose bools are false unless set,
+   so the fields name the behaviour that is off by default: Q6's answer,
+   "on by default", is the zero `Settings`. Unset, `esc` clears a pending
+   sequence and is swallowed, and `backspace` removes its last stroke;
+   set, each ends the sequence and is replayed with it, as §6 says.
+   * *Not chosen:* A1's names, off by default, which reverses Q6; and
+     `*bool` fields, nil meaning on, unlike every other field.
+2. **`ActiveKeys(p Path, ctx when.Context, goos string, g glyph.Set)
+   []ActiveKey`.** `ActiveKey.Label` is written as `Label` writes it, which
+   needs a system and a glyph set; the caller gives both, as Step 10's
+   `Shortcut(id, p, goos, g)` takes them.
+   * *Not chosen:* a `Settings.Glyphs`, a display setting in the keymap
+     whose zero value draws nothing; and no `Label`, which leaves each
+     which-key panel to write it.
+
 ## More Information
 
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md):

@@ -146,7 +146,15 @@ type Settings struct {
 	Timeout  time.Duration // how long a pending chord or leader waits; 0 means one second
 	Features Features      // what the terminal reports; empty until it says
 	Facts    KeyFacts      // what the terminal and its host deliver, as FactsFrom reads them
-	Reserved []string      // sequences only the program may bind, such as "ctrl+c"
+	// EscReplays makes esc end a pending sequence and be replayed with it,
+	// as MADR §6 says. Unset, the default, esc clears the sequence and is
+	// swallowed (amendment A10).
+	EscReplays bool
+	// BackspaceReplays makes backspace end a pending sequence and be
+	// replayed with it. Unset, the default, backspace removes the
+	// sequence's last stroke.
+	BackspaceReplays bool
+	Reserved         []string // sequences only the program may bind, such as "ctrl+c"
 	// GOOS is the system the keys come from, as runtime.GOOS names it, for
 	// Normalize's AltGr; "" means runtime.GOOS. A program serving a remote
 	// client sets the client's.

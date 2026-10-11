@@ -94,7 +94,11 @@ func (d *Dispatcher) cancel() {
 //   - a release is matched only by a Release stroke, and one that matches
 //     nothing leaves a pending sequence as it is;
 //   - a path that differs from the one the pending sequence started on
-//     cancels it, and the key is taken afresh.
+//     cancels it, and the key is taken afresh;
+//   - while a sequence is pending, an esc no binding takes clears it and
+//     is Handled, and a backspace no binding takes removes its last
+//     stroke, unless Settings.EscReplays or BackspaceReplays is set
+//     (amendment A10).
 //
 // Any other message gives a zero Outcome.
 func (d *Dispatcher) Update(msg tea.Msg, p Path, ctx when.Context) (Outcome, tea.Cmd) {
@@ -134,12 +138,28 @@ func (d *Dispatcher) Update(msg tea.Msg, p Path, ctx when.Context) (Outcome, tea
 		return Outcome{Handled: true}, d.tick()
 	case ev.release:
 		return Outcome{}, nil
+	case plain(ev, tea.KeyEscape) && !d.k.settings.EscReplays:
+		d.cancel()
+		return Outcome{Handled: true}, nil
+	case plain(ev, tea.KeyBackspace) && !d.k.settings.BackspaceReplays:
+		d.keys, d.strokes = slices.Clone(d.keys[:len(d.keys)-1]), slices.Clone(d.strokes[:len(d.strokes)-1])
+		if len(d.keys) == 0 {
+			d.cancel()
+			return Outcome{Handled: true}, nil
+		}
+		return Outcome{Handled: true}, d.tick()
 	}
 	replay := d.replay()
 	d.cancel()
 	out, cmd := d.fresh(p, ctx, ev)
 	out.Replay = replay
 	return out, cmd
+}
+
+// plain reports whether ev is the key code pressed with no modifier but a
+// lock.
+func plain(ev keyEvent, code rune) bool {
+	return !ev.text && ev.key.Code == code && ev.key.Mod&^locks == 0
 }
 
 // fresh takes a key with nothing pending.

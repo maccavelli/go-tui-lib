@@ -559,6 +559,13 @@ the owner's order. With A3's names: `Settings.Facts`.
 
 ### Step 11 (A1): which-key data and the key-debug explanation
 
+*2026-10-11 (D1, MADR A10):* `Settings.EscReplays` and
+`Settings.BackspaceReplays`, whose zero value is Q6's default, in place of
+`Options.EscClearsPending` and `Options.BackspacePops`; and
+`Dispatcher.ActiveKeys(p, ctx, goos, g)`, which takes the label's system
+and glyph set. With A3's names: `Dispatcher`, `Settings` and `Binding`.
+"With both options off" below reads "with both fields set".
+
 * `Matcher.ActiveKeys`, `Options.EscClearsPending`,
   `Options.BackspacePops` (on by default, Q6) and `Matcher.Explain`, with
   `ActiveKey` and `Explanation`.
@@ -1555,3 +1562,113 @@ choice:
   checks, 16 passed, 0 failed; `keymap` under `-shuffle=on
   -count=2`, exit 0; `go-fuzz_test.py`, "27 passed"; `make fuzz
   FUZZTIME=3s`, "9 packages ran clean".
+
+### Step 11 (A1): which-key data and the key-debug explanation
+
+#### Deviations
+
+* **D1 (2026-10-11): the editing fields, and the labels' inputs.**
+  * **Found,** reading A1 against A4 and Steps 9 and 10, before any of
+    this step's code was written:
+    * Q6 answered "on by default" for `EscClearsPending` and
+      `BackspacePops`, and since A4.6 the keymap takes a `Settings`
+      struct, whose bools are false unless set;
+    * `ActiveKey.Label` is `Label`'s, which needs a system and a glyph
+      set, and A1's `ActiveKeys(p, ctx)` takes neither.
+  * **The owner's choices,** each the recommendation, recorded as MADR
+    A10: `Settings.EscReplays` and `Settings.BackspaceReplays`, whose zero
+    value is Q6's default; and `ActiveKeys(p, ctx, goos, g)`, as
+    `Shortcut` takes them.
+  * **The others:** A1's names, off by default; `*bool` fields; a
+    `Settings.Glyphs`; no `Label`.
+  * **Files:** none added to the step's scope.
+
+#### Readings
+
+Where A1 and A10 leave a detail open, the step reads it so, needing no
+choice:
+
+* **A binding wins over the editing.** While a sequence is pending, an
+  esc or backspace that continues or completes a binding is taken by it;
+  only one that matches nothing clears or pops. An esc or backspace with
+  a modifier is a key like any other.
+* **Backspace** removes the last stroke and starts a new timer, and
+  removing the only stroke ends the sequence; either way it is Handled,
+  with no `Replay`.
+* **`ActiveKeys`** decides each next stroke as `Update` does: the
+  innermost scope with a binding whose `when` holds and whose keys go on
+  with it, where one the key completes wins over one it continues. Keys
+  pending on another path, which `Update` would cancel, count as nothing
+  pending.
+* **`Explain`** reads the key after the pending sequence, as `Update`
+  would. `Matches` is the deciding scope's bindings whose `when` holds,
+  the winner first: the one the keys complete, else the first they
+  continue. `Shadowed` is the bindings it also meets in outer scopes,
+  and those after one with the same keys. A binding whose `when` fails
+  is in neither. `Stroke` is the normalised key, its locks left out.
+* **AltGr text** meets no binding in `Explain`, through the same
+  `matchAll` the dispatcher uses.
+
+#### What was built
+
+* **`keymap/whichkey.go` (new):** `ActiveKey`, `ActiveKeys`,
+  `Explanation` and `Explain`.
+* **`keymap/matcher.go`:** the editing of a pending sequence.
+* **`keymap/keymap.go`:** `Settings.EscReplays` and
+  `Settings.BackspaceReplays`.
+* **`keymap/whichkey_test.go` (new):** `TestActiveKeys` (the first
+  strokes; after `ctrl+x`, every completing and continuing stroke, each
+  decided by the innermost scope that has it; a `when`; labels; another
+  path; `Pending()` before and after); `TestActiveKeysPrefix`;
+  `TestEditPending` (esc, backspace, a binding that takes esc, alt+esc,
+  and both fields set); and `TestExplain` (a planted keymap with
+  Shadows, the winner first; a Prefix pair; legacy ctrl+5; AltGr; the
+  pending sequence; `Pending()` before and after).
+
+#### Checks
+
+* **Tests the mutation plan found missing,** added before the run: an
+  esc with a modifier; a Prefix pair whose completing binding comes
+  second in resolution order; and a binding for AltGr's text.
+* **A redundant check.** K11-13 first removed `Explain`'s own test for
+  AltGr text and survived: `matchAll` refuses AltGr text already. The
+  redundant test was removed, and K11-13 now mutates `matchAll`'s.
+* **Mutations,** on scratch copies, each killed by the tests named:
+  * **K11-1** (backspace clears the whole sequence): `TestEditPending`;
+  * **K11-2** (`ActiveKeys` omits continuing strokes): `TestActiveKeys`;
+  * **K11-3** (`Explain` lists the shadowed binding as the winner):
+    `TestExplain`;
+  * **K11-4** (esc replays by default) and **K11-5** (backspace):
+    `TestEditPending`;
+  * **K11-6** (an esc with a modifier clears the sequence):
+    `TestEditPending`;
+  * **K11-7** (`ActiveKeys` ignores the `when`): `TestActiveKeys`;
+  * **K11-8** (`ActiveKeys` lets an outer scope's binding through):
+    `TestActiveKeys`;
+  * **K11-9** (a continuing binding wins over a completing one in a
+    scope): `TestActiveKeysPrefix`;
+  * **K11-10** (`Explain` ignores the pending sequence): `TestExplain`;
+  * **K11-11** (keys pending on another path are read): `TestActiveKeys`;
+  * **K11-12** (`Explain` does not shadow a binding after one with its
+    keys): `TestExplain`;
+  * **K11-13** (AltGr text meets a binding): `TestExplain`;
+  * **K11-14** (`Explain` puts the first binding first, not the one the
+    key completes): `TestExplain`.
+
+  K11-1 to K11-3 are the PLAN's three; K11-4 to K11-14 are added.
+* **macOS,** go1.27.2: `make pre-add-check FILES=<the 4 files>`, "4
+  file(s) clean"; `make lint`; the cross `go vet`; `-race`, `-shuffle=on
+  -count=2`, `LC_ALL=C` and workspace mode; `go mod tidy -diff` (no
+  requirement added); `make vuln`; `make apicheck`, "against v0.10.0, 0
+  incompatible change(s)"; `make examples`; `scripts/go-modules.py
+  --check`; `make release-check`, "222 file(s) clean";
+  `shellcheck`, `markdownlint-cli2`, `actionlint` and the five Python
+  tests. All clean, each on its first run. This PLAN and the MADR, under
+  the repository's markdownlint rules, raise only MD004.
+* **The Windows test host,** go1.27.2 windows/amd64, with the index
+  synced: `make pre-add-check`, "224 file(s) clean", with the
+  new files; `make lint`, `make vuln` and `make examples`, each exit 0;
+  the step's tests, Step 4's dispatcher tests and the conformance checks,
+  12 passed, 0 failed; `keymap` under `-shuffle=on -count=2`,
+  exit 0; `go-fuzz_test.py`, "27 passed"; `make fuzz FUZZTIME=3s`, "9
+  packages ran clean".
