@@ -357,6 +357,12 @@ edit.
 *2026-10-10:* `Describer` is an interface with `DescriberFunc`, and
 `FromRegistry` returns one (A4.4). A test plants a `DescriberFunc`.
 
+*2026-10-11 (D1, MADR A7):* the method is `KeyBinding`, not `Binding`, as
+A3 gave `Binding` to a type. `Help`'s full help lists the IDs given, each
+once, in the column of the scope its primary sequence is bound in,
+innermost first; with no IDs, short and full help list every command bound
+along the path. Below, read `KeyBinding` for the method `Binding`.
+
 * `Describer`, `FromRegistry`, `Binding` and `Help`, as MADR §7 gives
   them.
 * **Tests:**
@@ -1110,3 +1116,133 @@ Where §8 leaves a detail open, the step reads it so, needing no choice:
   17 passed, 0 failed; `keymap` under `-shuffle=on -count=2`,
   exit 0; `go-fuzz_test.py`, "27 passed"; `make fuzz FUZZTIME=3s`, "9
   packages ran clean".
+
+### Step 6: bubbles adapters and help
+
+#### Deviations
+
+* **D1 (2026-10-11): §7's method name, and what the full help lists.**
+  * **Found,** reading §7 against A3 and Step 3's code, before any of
+    this step's code was written:
+    * §7's `func (k *Keymap) Binding(id command.ID, p Path, d Describer)
+      key.Binding` takes the name A3 gave the type §3 called `Rule`, and
+      Step 3 built `Bindings(id, p) []Sequence` beside it: one package,
+      three meanings of the name (`AGENTS.md`, "API conventions", rule
+      3);
+    * §7's full help is "grouped by context, innermost first", but which
+      commands it lists is not said, and Step 7's workspace help depends
+      on it.
+  * **The owner's choices,** each the recommendation, recorded as MADR
+    A7: the method is `KeyBinding`; `Help` lists the IDs given, each
+    once, in its primary sequence's scope's column, and with no IDs every
+    command bound along the path.
+  * **The others:** `BubblesBinding`, or keeping `Binding`; a full help of
+    every command bound along the path, whatever the IDs.
+  * **Files:** none added to the step's scope.
+
+#### Readings
+
+Where §7 and A7 leave a detail open, the step reads it so, needing no
+choice:
+
+* **A release or repeat stroke** is listed in `KeyBinding` as its full
+  text, as a chord is. A `key.Binding` cannot tell either from a press,
+  so its `BubblesKeys` would match where the dispatcher does not.
+* **`KeyBinding` agrees with the dispatcher** wherever Step 2's
+  `BubblesKeys` agrees with `Matches`. The differences Step 2's D1 pinned
+  (a caps-lock letter, a shifted symbol written as shift and its key, a
+  scan stroke) carry over, and the test pins each.
+* **A `key.Binding` has no `when`,** and §7's signature takes no
+  context, so a binding with a `when` matches whether it holds or not.
+* **A title** is the `Describer`'s, or the ID when it gives none or is
+  nil. `FromRegistry` gives no title for a command the registry does not
+  hold, or one whose `Title` is empty.
+* **`Help`** is built once, as the keymap does not change, and
+  `ShortHelp` and `FullHelp` return copies. A path naming a scope twice
+  gives that scope one column.
+* **`Bindings`** now reads an internal list of the entries it shows, so
+  `Help` knows the scope of each primary sequence; what it returns is
+  unchanged, and Step 3's tests pass as before.
+* **The golden help model** is drawn as `workspace.Help` draws it: the
+  glyph set's `Bullet` and `Ellipsis`, and the theme's styles.
+
+#### What was built
+
+* **`keymap/help.go` (new):** `Describer`, `DescriberFunc`,
+  `FromRegistry`, `KeyBinding` and `Help`.
+* **`keymap/keymap.go`:** `Bindings` over the new `shown`.
+* **`keymap/help_test.go` (new):**
+  * `TestKeyBindingMatches`: over Step 2's table of keys as ultraviolet
+    decodes them, each stroke bound alone, `key.Matches` on its
+    `KeyBinding` against the table's bubbles column, a release or repeat
+    stroke never matching, and the dispatcher against its `Matches`
+    column; `shift+a` gives `shift+a` and `A`;
+  * `TestKeyBindingScopeDecides`: a binding an inner scope hides is
+    disabled, as the dispatcher does not run it;
+  * `TestKeyBindingChord`: a chord and a release stroke are enabled,
+    listed as their text, and never matched; the help key is the
+    primary sequence; help shows the chord;
+  * `TestKeyBindingDisabled`: an unbound command, and one the user's file
+    removes, give a disabled binding, which the short and full help
+    leave out;
+  * `TestDescriber`: a planted `DescriberFunc`, no `Describer`, and
+    `FromRegistry` over a registry with a titled and an untitled command;
+  * `TestHelpColumns`: the short help in the order given; the full help
+    innermost first, a command bound in two scopes once, in its primary's
+    column; every command with no IDs; a path naming global twice; and
+    copies returned;
+  * `TestHelpGolden`: the short and full help through `help.Model` across
+    the 0001-MADR §6 matrix at 40 and 80 cells.
+* **`keymap/testdata/golden/` (new):** the 16 golden files, written with
+  `-tuitest.update` and each read: three columns innermost first; at 40
+  cells both helps end in the case's ellipsis, `…` or `~`; an ASCII
+  case's separator `*`. A script checked that each line, its escapes
+  stripped, is no wider than its case and as wide as its annotation, and
+  that an ASCII case holds only ASCII; on a copy with a `•` planted in an
+  ASCII file, it failed naming that file.
+
+#### Checks
+
+* **A guessed number dropped.** A first draft of `TestKeyBindingMatches`
+  also asserted at least 25 agreeing cases, a number not derived from the
+  table, and failed at 23. Each case is pinned already, so the count was
+  removed, not tuned.
+* **Mutations,** on scratch copies, each killed by the tests named:
+  * **K6-1** (the chord's full text is its first stroke):
+    `TestKeyBindingChord`;
+  * **K6-2** (`Help` groups scopes outermost first): `TestHelpColumns`,
+    `TestHelpGolden`;
+  * **K6-3** (a release or repeat stroke is spelled as a press):
+    `TestKeyBindingMatches`, `TestKeyBindingChord`;
+  * **K6-4** (an unbound command's binding is enabled):
+    `TestKeyBindingDisabled`;
+  * **K6-5** (the IDs given are not the only ones listed):
+    `TestHelpColumns`;
+  * **K6-6** (the help key is the last sequence, not the primary):
+    `TestKeyBindingChord`;
+  * **K6-7** (the `Describer` is not asked): `TestDescriber`;
+  * **K6-8** (`FromRegistry` gives an empty title): `TestDescriber`;
+  * **K6-9** (a command is listed in its last scope's column):
+    `TestHelpColumns`;
+  * **K6-10** (the full help is shared with the caller):
+    `TestHelpColumns`.
+
+  K6-1 and K6-2 are the PLAN's two; K6-3 to K6-10 are added.
+* **macOS,** go1.27.2: `make pre-add-check FILES=<the 3 files>`, "3
+  file(s) clean"; `make lint`; the cross `go vet`; `-race`, `-shuffle=on
+  -count=2`, `LC_ALL=C` and workspace mode; `go mod tidy -diff` (no
+  requirement added: bubbles is one); `make vuln`; `make apicheck`,
+  "against v0.10.0, 0 incompatible change(s)"; `make examples`;
+  `scripts/go-modules.py --check`; `make release-check`,
+  "214 file(s) clean", the tracked files, which the new ones
+  join when committed; `shellcheck`, `markdownlint-cli2`, `actionlint`
+  and the five Python tests. All clean. `gofmt` first wrapped one line of
+  the new test. This PLAN and the MADR, under the repository's
+  markdownlint rules, raise only MD004.
+* **The Windows test host,** go1.27.2 windows/amd64, with the index
+  synced: `make pre-add-check`, "216 file(s) clean", with the
+  new files; `make lint`, `make vuln` and `make examples`, each exit 0;
+  the step's tests and the conformance checks, 11 passed, 0
+  failed, `TestHelpGolden` among them; `keymap` under `-shuffle=on
+  -count=2`, exit 0; `go-fuzz_test.py`, "27 passed"; `make fuzz
+  FUZZTIME=3s`, "9 packages ran clean".

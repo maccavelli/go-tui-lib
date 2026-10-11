@@ -478,13 +478,22 @@ func (k *Keymap) Lookup(p Path, ctx when.Context, q Sequence) (r Resolved, ok bo
 // inner scope whose keys start it or start with it.
 func (k *Keymap) Bindings(id command.ID, p Path) []Sequence {
 	var out []Sequence
+	for _, e := range k.shown(id, p) {
+		out = append(out, e.Keys)
+	}
+	return out
+}
+
+// shown is the entries Bindings gives the sequences of.
+func (k *Keymap) shown(id command.ID, p Path) []*entry {
+	var out []*entry
 	for i, scope := range slices.Backward(p) {
 		for j, e := range k.scopes[scope] {
-			if e.Command != id || slices.ContainsFunc(out, func(q Sequence) bool { return slices.Equal(q, e.Keys) }) {
+			if e.Command != id || slices.ContainsFunc(out, func(o *entry) bool { return slices.Equal(o.Keys, e.Keys) }) {
 				continue
 			}
 			if !k.hidden(e, p[i+1:], k.scopes[scope][:j]) {
-				out = append(out, e.Keys)
+				out = append(out, e)
 			}
 		}
 	}

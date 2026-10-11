@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-10
+date: 2026-10-11
 decision-makers: owner
 consulted: 0003-REPORT-agent-tui-ecosystem-research.md (§3, §4, §6, §7; §8, §9 and §11 for amendment A1); Charm v2 APIs (bubbletea v2.0.10, bubbles v2.2.1, the ultraviolet revision in go.sum); VS Code keybindings and when-clause documentation; codex, gemini-cli and opencode keymap sources
 informed: pi-go; go-core-lib
@@ -1147,6 +1147,32 @@ recommendation, found as Step 3 of
    unreleased.
    * *Not chosen:* expanding in the loader, which changes `LoadVSCode`'s
      signature, writes the expanded keys back, and moves §6's error.
+
+### A7 (2026-10-11): the help adapters
+
+*Status: accepted (2026-10-11)*, the owner's choices, each the
+recommendation, found as Step 6 of
+[0007-PLAN-keymap-engine.md](0007-PLAN-keymap-engine.md) began (its D1).
+§7 is read with these; where this record says `Binding` for §7's method,
+read `KeyBinding`.
+
+1. **The method is `KeyBinding`.** §7's `func (k *Keymap) Binding(id
+   command.ID, p Path, d Describer) key.Binding` is `KeyBinding`. A3 gave
+   the name `Binding` to the type §3 called `Rule`, and Step 3 built
+   `Bindings(id, p) []Sequence`, so a method `Binding` would give one
+   package three meanings of the name (`AGENTS.md`, "API conventions",
+   rule 3). The method is named for the `key.Binding` it returns.
+   * *Not chosen:* `BubblesBinding`, after Step 2's `Stroke.BubblesKeys`,
+     which is longer; and keeping `Binding`, which compiles but keeps the
+     clash.
+2. **`Help` lists the IDs given.** The short help is the primary binding
+   of each listed ID, as §7 says. The full help lists the same IDs, each
+   once, in the column of the scope its primary sequence is bound in,
+   innermost scope first. With no IDs, both list every command bound
+   along the path. Step 7's workspace passes its own IDs.
+   * *Not chosen:* a full help of every command bound along the path,
+     whatever the IDs, which shows another pane's and the program's
+     commands in a component's help.
 
 ## More Information
 
