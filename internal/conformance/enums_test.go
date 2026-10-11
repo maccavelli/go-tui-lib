@@ -40,7 +40,10 @@ var enums = map[string]func(int64) any{
 	"command.Surface":       as[command.Surface],
 	"command.Verdict":       as[command.Verdict],
 	"glyph.Tier":            as[glyph.Tier],
+	"keymap.ConflictKind":   as[keymap.ConflictKind],
 	"keymap.Event":          as[keymap.Event],
+	"keymap.Features":       as[keymap.Features],
+	"keymap.Layer":          as[keymap.Layer],
 	"launch.Choice":         as[launch.Choice],
 	"launch.Target":         as[launch.Target],
 	"layout.Axis":           as[layout.Axis],
@@ -70,7 +73,7 @@ var enums = map[string]func(int64) any{
 
 // bitSets are the enums whose values are sets of bits, with
 // internal/enum's Bits text.
-var bitSets = map[string]bool{"command.Surface": true}
+var bitSets = map[string]bool{"command.Surface": true, "keymap.Features": true}
 
 // enumType is one enum the scan found: its key in enums, its package's
 // name and its own, its type, and the values of its constants with the

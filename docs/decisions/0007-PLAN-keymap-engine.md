@@ -257,6 +257,15 @@ through `internal/enum`, and joins `internal/conformance`'s enum table
 `ConflictKind` take `enum.Names`, and `Features` `enum.Bits`, each in the
 conformance table, `Features` as a bit set. A scope is a `command.Scope`.
 
+*2026-10-10 (D1, MADR A6):* `New(s Settings, defaults []Default, layers
+...[]Binding)`; Prefix within one scope, and the innermost scope decides
+along a path; `New` returns the keymap with its errors; `<leader>` expands
+in `New`, so `keymap/notation.go` and its test join this step, for
+`ParseSequence`'s placeholder. The tests below gain: a scope deciding
+(an inner `g g` hides an outer `g`, and the reverse), and a NotSupported
+binding that binds after `Rebuild`. The conflicts test plants Prefix
+within one scope, and a cross-scope Shadow against Global.
+
 * `Context`, `Global`, `Path`, `Layer`, `Rule`, `Origin`, `Options`,
   `Features`, `FeaturesFrom`, `Default`, `Build`, `Rebuild`, `Lookup`,
   `Bindings`, `Conflicts`, `Rules` and `Conflict`, as MADR §3–§5 give them.
@@ -725,3 +734,144 @@ additions are compatible.
   `go-fuzz_test.py`, "27 passed"; `make fuzz FUZZTIME=3s`, "8 packages ran
   clean". A first run on the code before the lint fixes was stopped, its
   processes ended and its files removed.
+
+### Step 3: rules, layers, contexts and conflicts
+
+#### Deviations
+
+* **D1 (2026-10-10): four points §3 to §6 leave open.**
+  * **Found,** reading §3 to §6 and A4 against Step 2's code, before any
+    of this step's code was written:
+    * A4.3's `New(s Settings, layers ...[]Binding)` takes no `Default`,
+      which §9's `DefaultRules() []keymap.Default` returns and whose
+      fallback `Rebuild` must choose again;
+    * §4's Prefix is "along one path", and `New` sees no path;
+    * §5's features are empty until a `KeyboardEnhancementsMsg`, so a
+      user's `shift+enter` is NotSupported at every start, and a keymap
+      returned only without errors leaves nothing to `Rebuild`;
+    * §6 expands `<leader>` when the keymap is built, but Step 2's
+      `ParseSequence` refuses it with no leader
+      (`keymap/notation.go`, its comment; `TestNormalization`'s row
+      `"<leader> a"`), and Step 5's loader has no leader to give.
+  * **The owner's choices,** each the recommendation, recorded as MADR
+    A6: a `defaults` parameter; Prefix within one scope, with the
+    innermost scope deciding along a path; the keymap with its errors;
+    `<leader>` kept as a placeholder and expanded in `New`.
+  * **The others:** `Needs` and `Fallback` on `Binding`, or a
+    `Settings.Defaults` field; a Prefix error against Global, or a
+    `Check(Path)` method; `nil` on any error, or no NotSupported while
+    the features are empty; expanding in the loader.
+  * **Decided in the step, needing no choice,** each read from the MADR:
+    * `command.Global` is a scope like any other: a path lists it, as
+      §9's `KeyPath` does, and `Lookup` walks only the scopes the path
+      holds;
+    * a binding needs `Disambiguate` for §5's strokes (`ctrl+i`,
+      `ctrl+m`, `ctrl+[`, `shift+enter`, `alt+[`, `alt+]`),
+      `EventTypes` for a release or repeat stroke, and `AlternateKeys`
+      for a `Scan` stroke; a default needs its `Needs` and its keys'
+      own;
+    * Reserved: a user binding whose keys start with a reserved
+      sequence, which the program's key could then never reach;
+    * a removal with a `when` removes only bindings with that `when`
+      text, and one without removes any, as VS Code's `-command` does; a
+      removal with keys removes a default bound to them or to its
+      fallback, whole;
+    * a `when` is parsed by `New`, and a bad one is an error naming the
+      binding's location;
+    * `Resolved` is the command, its args and the binding that won.
+    * `Settings` holds `Leader`, `Features` and `Reserved`; §3's
+      `Timeout` and `Tick` come with Step 4's dispatcher, which reads
+      them.
+
+#### What was built
+
+* **`keymap/keymap.go` (new):**
+  * `Path`; `Layer` (`DefaultLayer`, `ProgramLayer`, `UserLayer`) and
+    `Features` (`Disambiguate`, `EventTypes`, `AlternateKeys`,
+    `AllKeysAsEscapes`, `AssociatedText`, each the Kitty flag of its bit),
+    with their text forms through `enum.Names` and `enum.Bits`;
+    `FeaturesFrom`;
+  * `Binding`, `Location` with its `String`, `Default`, `Settings` and
+    `Resolved`;
+  * `New(s, defaults, layers...)`, which copies what it is given, expands
+    `<leader>`, parses each `when`, applies the removals, chooses each
+    default's keys, refuses Reserved and NotSupported bindings, and
+    returns the keymap with every error joined; `Rebuild`;
+  * `Lookup`, by scope and first stroke, with the scope deciding;
+    `Bindings`, primary first; `Conflicts`; `Rules`.
+* **`keymap/conflict.go` (new):** `ConflictKind` (`Duplicate`, `Prefix`,
+  `Reserved`, `NotSupported`, `Shadow`) with its text forms;
+  `BindingConflict`, an error naming the binding at fault by location,
+  keys and scope; and the checks: Duplicate and Prefix within a scope, a
+  later layer's Shadow, and a scope's Shadow of a global binding.
+* **`keymap/notation.go`:** `ParseSequence(s, nil)` keeps `<leader>` as a
+  placeholder stroke, which writes `<leader>` in both spellings and
+  matches no key (A6.4).
+* **Tests:** `TestResolution`, `TestScopeDecides`, `TestRemoval`,
+  `TestFeatures`, `TestFeaturesFrom`, `TestLeader`, `TestBindingsOrder`,
+  `TestRules`, `TestLocationText` and `TestImmutable` (`-race`, eight
+  goroutines, and the caller's slices changed after `New`) in
+  `keymap/keymap_test.go`; `TestConflicts`, every error kind planted in
+  one keymap with file locations, and `TestConflictText` in
+  `keymap/conflict_test.go`; `TestLeaderPlaceholder`, and
+  `TestNormalization`'s `"<leader> a"` refusal row replaced by a
+  five-stroke one, in `keymap/notation_test.go`.
+* **`BenchmarkLookup`:** 200 bindings over a five-scope path, go1.27.2 on
+  an Apple M1 Pro: 127.3 to 129.9 ns/op, 0 B/op, 0 allocs/op, over three
+  runs.
+* **`internal/conformance/enums_test.go`:** `keymap.ConflictKind`,
+  `keymap.Features` and `keymap.Layer` join the enum table, and
+  `keymap.Features` the bit sets.
+
+#### Checks
+
+* **Mutations,** on scratch copies, each killed by the test named:
+  * **K3-1** (the path walked outermost first): `TestResolution`,
+    "Lookup([global workspace pane:a], \"x\") = \"g.x\", want \"ws.x\"";
+  * **K3-2** (`New` returns only the first error): `TestConflicts`, one
+    error where four are wanted;
+  * **K3-3** (the Prefix check skipped): `TestConflicts`, no `prefix
+    ctrl+x`;
+  * **K3-4** (reserved keys not checked for the user layer):
+    `TestConflicts`, no Reserved error, `ctrl+c a` bound and the
+    program's `ctrl+c` decided away;
+  * **K3-5** (A6: an inner scope's longer or shorter binding does not
+    decide): `TestScopeDecides`, `g`, `h h` and `j` resolving to global
+    bindings;
+  * **K3-6** (A6: `Rebuild` drops the layers): `TestFeatures`, "after
+    Rebuild, Bindings(indent) = [], want ctrl+i";
+  * **K3-7** (a removal of an unbound key accepted, a MADR Confirmation
+    mutation): `TestRemoval`, "New: <nil>";
+  * **K3-8** (`<leader>` with no leader accepted): `TestLeader`;
+  * **K3-9** (`keymap.Layer` left out of the conformance table):
+    `TestEveryEnumRoundTrips`, "keymap.Layer is an enum the table lacks".
+
+  K3-5 to K3-9 are added to the four this step names. All nine ran again
+  after the lint fixes below, with the same results.
+* **Fixes, found by the checks:**
+  * the first gate run's lint: `modernize`'s `slices.Backward` in
+    `Bindings`; `gocritic`'s `evalOrder` on `return k, k.build()`; and
+    `gosec`'s G115 on `FeaturesFrom`'s `int` to `uint8` conversion, now
+    built bit by bit;
+  * the benchmark's first run: its keys include `ctrl+i` and `ctrl+m`,
+    which `New` rightly refused with no features; it now gives
+    `Disambiguate`.
+* **macOS,** go1.27.2: `make pre-add-check FILES=<the 7 files>`, "7
+  file(s) clean"; `make lint`; the cross `go vet`; `-race`, `-shuffle=on
+  -count=2`, `LC_ALL=C` and workspace mode; `go mod tidy -diff` (no
+  requirement added); `make vuln`; `make apicheck`, "against v0.10.0, 0
+  incompatible change(s)"; `make examples`; `scripts/go-modules.py
+  --check`; `make release-check`, "202 file(s) clean", the tracked
+  files, which the four new ones join when committed; `shellcheck`,
+  `markdownlint-cli2`, `actionlint` and the five Python tests,
+  `go-fuzz_test.py` once more with an empty module cache. All clean.
+  Both records, under the repository's markdownlint rules, raise only
+  MD004, the `*` list markers records use.
+* **The Windows test host,** go1.27.2 windows/amd64, with the index synced:
+  `make pre-add-check`, "206 file(s) clean", with the new files; `make
+  lint`, `make vuln` and `make examples`, each exit 0; the step's tests
+  and the conformance checks, 18 tests passed, 0 failed; `keymap` under
+  `-shuffle=on -count=2`, exit 0;
+  `go-fuzz_test.py`, "27 passed"; `make fuzz FUZZTIME=3s`, "8 packages
+  ran clean". A first run, started before the benchmark's fix, was
+  stopped, its processes ended and its files removed.

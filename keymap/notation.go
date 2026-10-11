@@ -271,9 +271,15 @@ func ParseStroke(s string) (Stroke, error) {
 // leaderName is the token that stands for the leader sequence.
 const leaderName = "<leader>"
 
+// keyLeader is the code of the placeholder stroke that stands for the
+// leader until New expands it (amendment A6): no key has it.
+const keyLeader rune = -1
+
 // ParseSequence reads strokes separated by one space, expanding <leader> to
-// leader. An empty stroke, <leader> with no leader, and more than
-// MaxStrokes strokes are errors wrapping ErrNotation.
+// leader. With no leader, <leader> stays a placeholder stroke, which
+// prints "<leader>" and matches no key; New expands it with
+// Settings.Leader. An empty stroke and more than MaxStrokes strokes are
+// errors wrapping ErrNotation.
 func ParseSequence(s string, leader Sequence) (Sequence, error) {
 	var q Sequence
 	for part := range strings.SplitSeq(s, " ") {
@@ -282,7 +288,8 @@ func ParseSequence(s string, leader Sequence) (Sequence, error) {
 			return nil, bad(s, "an empty stroke; strokes are separated by one space")
 		case strings.EqualFold(part, leaderName):
 			if len(leader) == 0 {
-				return nil, bad(s, "%s, and no leader is set", leaderName)
+				q = append(q, Stroke{Code: keyLeader})
+				continue
 			}
 			q = append(q, leader...)
 		default:
@@ -299,10 +306,14 @@ func ParseSequence(s string, leader Sequence) (Sequence, error) {
 	return q, nil
 }
 
-// keyName is a key's name as Bubble Tea prints it: its name, or the rune.
+// keyName is a key's name as Bubble Tea prints it: its name, or the rune;
+// and the leader placeholder's, "<leader>".
 func keyName(c rune) string {
 	if n, ok := codeNames[c]; ok {
 		return n
+	}
+	if c == keyLeader {
+		return leaderName
 	}
 	return string(c)
 }
@@ -382,7 +393,7 @@ func (s Stroke) printable() bool {
 // A Repeat stroke matches only a repeated key. Whether the message is a
 // press or a release is the message's type, which Matches does not see.
 func (s Stroke) Matches(k tea.Key) bool {
-	if s.Event == Repeat && !k.IsRepeat {
+	if s.Code == keyLeader || s.Event == Repeat && !k.IsRepeat {
 		return false
 	}
 	mod := k.Mod &^ locks

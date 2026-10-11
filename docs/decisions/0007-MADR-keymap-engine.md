@@ -1091,6 +1091,63 @@ this record says the old form, read the new one. A3's names still apply.
    and key names are otherwise case-insensitive. The canonical and VS Code
    spellings write lower case, so a round trip is unaffected.
 
+### A6 (2026-10-10): building the keymap
+
+*Status: accepted (2026-10-10)*, the owner's choices, each the
+recommendation, found as Step 3 of
+[0007-PLAN-keymap-engine.md](0007-PLAN-keymap-engine.md) began (its D1).
+§3 to §6 are read with these.
+
+1. **Defaults are `New`'s first layer:** `New(s Settings, defaults
+   []Default, layers ...[]Binding) (*Keymap, error)`. A4.3's
+   `New(s Settings, layers ...[]Binding)` had no way to take a `Default`,
+   whose `Needs` and `Fallback` (A1: `Alternatives`) `Rebuild` must choose
+   among again when the features change.
+   * *Not chosen:* `Needs` and `Fallback` as fields of `Binding`, which
+     drops the `Default` type the record and the glossary name and lets a
+     user's binding carry fallbacks; and a `Settings.Defaults` field,
+     which puts data in the settings.
+2. **A scope decides; Prefix is checked within one scope.** §4's Prefix
+   "along one path" cannot be checked by `New`, which sees no path: it
+   cannot tell whether two panes' scopes ever nest, and checking every
+   pair would refuse `g` in one pane beside `g g` in another.
+   * `New` checks Prefix within each scope, across its layers, and
+     Duplicate within one scope and one layer.
+   * Along a path, the innermost scope with a binding whose `when` holds
+     and whose keys are the sequence, start it, or start with it decides
+     the sequence; outer scopes are not tried. `Lookup` and the
+     dispatcher both apply this, so a key never waits on a timeout guess
+     across scopes.
+   * A binding an inner scope hides this way is a Shadow. `New` reports
+     the ones it can know: a scope's binding against `command.Global`'s,
+     which is on every path, and a later layer's against an earlier one's
+     in one scope.
+   * *Not chosen:* a Prefix error between any scope and Global, which
+     refuses a pane's `g` beside a global `g g` that the pane would win;
+     and a `Keymap.Check(Path)` method, which is new API and finds a
+     conflict only when a path is first seen.
+3. **`New` returns a keymap with its errors.** It returns a usable
+   `*Keymap` holding every binding that built, and every error joined.
+   Until a `KeyboardEnhancementsMsg` arrives the features are empty (§5),
+   so a user's `shift+enter` is NotSupported at every start; a keymap
+   returned only without errors would leave nothing to `Rebuild`.
+   * A NotSupported binding is kept aside, and binds when `Rebuild` gives
+     its features; a Reserved one is dropped; a Duplicate or Prefix pair
+     stays, and the resolution order decides between them.
+   * *Not chosen:* `nil` on any error; and no NotSupported report while
+     the features are empty, which a legacy terminal, never sending the
+     message, would never show.
+4. **`<leader>` expands in `New`,** as §6 says. `ParseSequence(s, nil)`
+   keeps `<leader>` as a placeholder stroke, which prints `<leader>` in
+   both spellings, so the loader needs no leader and the exporter writes
+   `<leader>` back. `New` expands it with `Settings.Leader`, and a binding
+   that names it with no leader set is an error naming the binding.
+   `ParseSequence` with a leader still expands it. This changes Step 2's
+   `ParseSequence`, which refused `<leader>` with no leader; it is
+   unreleased.
+   * *Not chosen:* expanding in the loader, which changes `LoadVSCode`'s
+     signature, writes the expanded keys back, and moves §6's error.
+
 ## More Information
 
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md):

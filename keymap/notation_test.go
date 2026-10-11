@@ -138,8 +138,8 @@ func TestNormalization(t *testing.T) {
 		part   string
 	}{
 		{"a b c d e", nil, "5 strokes"}, {"a  b", nil, "empty stroke"}, {" a", nil, "empty stroke"},
-		{"<leader> a", nil, "no leader"}, {"<leader> <leader> <leader> <leader> a", leader, "5 strokes"},
-		{"a ctrl+foo", nil, `"foo"`},
+		{"<leader> <leader> <leader> <leader> a", leader, "5 strokes"},
+		{"<leader> a b c d", nil, "5 strokes"}, {"a ctrl+foo", nil, `"foo"`},
 	} {
 		_, err := ParseSequence(c.in, c.leader)
 		if !errors.Is(err, ErrNotation) || !strings.Contains(err.Error(), c.part) {
@@ -149,6 +149,32 @@ func TestNormalization(t *testing.T) {
 	q, err := ParseSequence("<Leader> q", leader)
 	if err != nil || q.String() != "ctrl+x q" {
 		t.Errorf("<leader> q = %v, %v; want ctrl+x q", q, err)
+	}
+}
+
+// TestLeaderPlaceholder: with no leader, <leader> stays a placeholder that
+// both spellings write back, for New to expand, and that matches no key
+// (amendment A6).
+func TestLeaderPlaceholder(t *testing.T) {
+	q, err := ParseSequence("<LEADER> f", nil)
+	if err != nil || len(q) != 2 || q[0].Code != keyLeader {
+		t.Fatalf(`ParseSequence("<LEADER> f", nil) = %v, %v; want the placeholder and f`, q, err)
+	}
+	for _, text := range []string{q.String(), q.VSCode()} {
+		if text != "<leader> f" {
+			t.Errorf("the placeholder writes %q, want %q", text, "<leader> f")
+		}
+		if got, err := ParseSequence(text, nil); err != nil || !slices.Equal(got, q) {
+			t.Errorf("ParseSequence(%q) = %v, %v; want %v", text, got, err, q)
+		}
+	}
+	for _, k := range []tea.Key{{}, {Code: keyLeader}, {Code: 'f'}} {
+		if q[0].Matches(k) {
+			t.Errorf("the placeholder matches %+v", k)
+		}
+	}
+	if _, err := ParseStroke("<leader>"); !errors.Is(err, ErrNotation) {
+		t.Errorf(`ParseStroke("<leader>") = %v; want ErrNotation: the placeholder is a sequence's`, err)
 	}
 }
 
