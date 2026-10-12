@@ -46,6 +46,25 @@ type RequestMsg struct {
 	Request command.Request
 }
 
+// CommandConsumer is a pane, or an overlay's content, that runs some
+// commands itself, as a picker runs its moves. A matched command that is
+// not the workspace's own is offered, before it becomes a RequestMsg, to
+// whoever has the keyboard: the top modal overlay alone, when one is open;
+// else the open overlays, top first, then the focused pane. The first whose
+// ConsumesCommand reports true is sent CommandMsg at once, so its commands
+// run in the order their keys were pressed
+// (docs/decisions/0008-MADR-command-palette.md A3 item 1).
+type CommandConsumer interface {
+	ConsumesCommand(id command.ID) bool
+}
+
+// CommandMsg is a matched key's command, delivered to the CommandConsumer
+// that takes it. Request is the one a RequestMsg would carry: Origin
+// command.OriginKey and the workspace's WhenContext.
+type CommandMsg struct {
+	Request command.Request
+}
+
 // seq is a default's keys, which are fixed: an error is a bug.
 func seq(s string) keymap.Sequence {
 	q, err := keymap.ParseSequence(s, nil)
@@ -225,8 +244,9 @@ func (w *Workspace) deliver(msg tea.Msg) tea.Cmd {
 }
 
 // run runs a matched command: the workspace's own through its handler,
-// with an error as a command.ResultMsg; any other as a RequestMsg for the
-// program. workspace.overlay.close's key goes to a top overlay that is an
+// with an error as a command.ResultMsg; any other through the
+// CommandConsumer that takes it, or else as a RequestMsg for the program.
+// workspace.overlay.close's key goes to a top overlay that is an
 // EscConsumer consuming esc, instead.
 func (w *Workspace) run(o keymap.Outcome, msg tea.Msg, ctx when.Context) tea.Cmd {
 	if n := len(w.overlays); o.Command == cmdOverlayClose && n > 0 {
@@ -237,6 +257,9 @@ func (w *Workspace) run(o keymap.Outcome, msg tea.Msg, ctx when.Context) tea.Cmd
 	req := command.Request{ID: o.Command, Args: o.Args, Origin: command.OriginKey, WhenContext: ctx}
 	c, ok := w.own()[o.Command]
 	if !ok {
+		if cmd, taken := w.offer(req); taken {
+			return cmd
+		}
 		return func() tea.Msg { return RequestMsg{Request: req} }
 	}
 	res, err := c.Handler.Run(context.Background(), &command.Invocation{
@@ -246,4 +269,32 @@ func (w *Workspace) run(o keymap.Outcome, msg tea.Msg, ctx when.Context) tea.Cmd
 		return func() tea.Msg { return command.ResultMsg{Request: req, Err: err} }
 	}
 	return res.Cmd
+}
+
+// offer sends req as a CommandMsg to the first CommandConsumer that takes
+// it, in CommandConsumer's order, and reports whether one did.
+func (w *Workspace) offer(req command.Request) (tea.Cmd, bool) {
+	msg := CommandMsg{Request: req}
+	if w.modal() != nil {
+		n := len(w.overlays) - 1
+		if consumes(w.overlays[n].Pane, req.ID) {
+			return w.updateOverlay(n, msg), true
+		}
+		return nil, false
+	}
+	for i, o := range slices.Backward(w.overlays) {
+		if consumes(o.Pane, req.ID) {
+			return w.updateOverlay(i, msg), true
+		}
+	}
+	if p, ok := w.panes[w.focus]; ok && consumes(p, req.ID) {
+		return w.Send(w.focus, msg), true
+	}
+	return nil, false
+}
+
+// consumes reports whether p is a CommandConsumer that takes id.
+func consumes(p Pane, id command.ID) bool {
+	c, ok := p.(CommandConsumer)
+	return ok && c.ConsumesCommand(id)
 }

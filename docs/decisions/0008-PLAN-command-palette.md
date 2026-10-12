@@ -513,3 +513,85 @@ follow recommendation.") and approved execution ("committed, proceed").
   `origin/main` (`04182bf` after a fetch), so until it is pushed `make
   apicheck` compares with `v0.11.0`. Step 2 waits for the owner's push of
   `a0537d3`, `d297371` and this step.
+
+*Met, 2026-10-11:* the owner pushed; `origin/main` is `d9930f8`, and `make
+apicheck` reports "against v0.12.0, 0 incompatible change(s)", clean.
+
+### Step 2: the workspace and glyph additions
+
+*2026-10-11.* The owner approved ("committed, pushed, proceed"), and asked
+during the step for the gates on the idle Linux host as well.
+
+* **`workspace`:**
+  * `CommandConsumer` and `CommandMsg` (`workspace/bindings.go`);
+  * `run` offers a matched command that is not the workspace's own
+    before making a `RequestMsg`, through `offer`: the top modal overlay
+    alone; else the open overlays top first (`slices.Backward`), then the
+    focused pane; delivered at once through `updateOverlay` or `Send`;
+  * `Close(id) tea.Msg`, handled in `Update` by `closeOverlay`, a no-op for
+    an ID not open (`workspace/overlay.go`, `workspace/workspace.go`);
+  * `(*Workspace).Theme()` and `(*Workspace).Bindings()`.
+* **`glyph`:** `Set.Prompt` (`❯`, `>`) and `Set.Mask` (`•`, `*`).
+* **`docs/glossary.md`:** `CommandConsumer` and `CommandMsg` under "One
+  meaning each".
+* **Tests:**
+  * `workspace/consumer_test.go`: `TestModalConsumer`, `TestConsumerOrder`,
+    `TestModalConsumerRefuses`, `TestConsumedInKeyOrder`,
+    `TestOwnCommandsFirst`, `TestClose`, `TestThemeAndBindings`;
+  * `glyph/glyph_test.go`: the walks count 70 glyphs (was 68);
+    `TestOneCellInBothMethods` measures every glyph under `ansi.WcWidth`
+    and `ansi.GraphemeWidth`; `TestPromptAndMask`;
+  * every existing workspace golden and key test passes unchanged.
+* **Mutations,** each on a scratch copy, each killed:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | the offer skips the overlays (`slices.Backward(w.overlays[:0])`) | `TestConsumerOrder`: "top 0, low 0, pane 1; want the top overlay alone" |
+  | a modal overlay's refusal falls through to the panes beneath | `TestModalConsumerRefuses`: "the pane beneath a modal overlay was given [...]" and "got []; want one RequestMsg" |
+  | `CommandMsg` is returned as a command, not delivered at once | `TestConsumedInKeyOrder`: "after key 0 the consumer holds []; want [x.a] in order" |
+  | `Close` closes the top overlay whatever the ID | `TestClose`: "Close of an ID not open: [a b], cmd false" |
+  | `Mask` is two cells in `Unicode()` | `TestEveryGlyphIsOneCell`: `Unicode.Mask = "••" is 2 cells, want 1`, and the two other width tests |
+
+* **Found and fixed during the step,** in the step's own files:
+  * `gofmt` realigned the two new fields in `Unicode()` and `ASCII()`.
+  * `make modernize` suggested `slices.Backward` for the overlay loop in
+    `offer`; applied, and the first mutation's anchor moved with it.
+  * golangci-lint 2.14.0 failed on all three `GOOS` with a panic in
+    go-critic v0.15.0's `evalOrder` checker
+    (`evalOrder_checker.go:83`, `hasPtrRecv`), on the test fake's
+    `return c, c.on(m)`: it takes the function field `on` for a method
+    and reads a receiver it has not got. The fake calls `c.on(m)` before
+    the return, with a comment saying why. The library's code was not the
+    cause.
+  * The first Linux run's copy had no `.git`, so `make pre-add-check`,
+    `lint`, `tidy-check` and `vuln`, which find the modules with git,
+    failed there ("Stopping at filesystem boundary"). The script now makes
+    an index of the copy first, as the Windows script does.
+* **Gates, macOS** (load average near 55 from another job's mutation run):
+  gofmt clean; `make pre-add-check FILES=…` "6 file(s) clean"; `make lint`
+  0; the cross `go vet` 0; `-race` 0; `-shuffle=on -count=2` 0; `LC_ALL=C`
+  0; workspace mode 0; `go mod tidy -diff` 0; `make vuln` "No
+  vulnerabilities found"; `scripts/go-modules.py --check` 0; `make
+  apicheck` "against v0.12.0, 0 incompatible change(s)", clean; `make
+  examples` clean; `make release-check` "226 file(s) clean". `shellcheck`,
+  `actionlint`, `markdownlint-cli2` and the five `scripts/*_test.py` exit
+  0.
+* **Gates, the idle Linux host** (Go 1.27.2 linux/amd64, golangci-lint
+  2.14.0): gofmt clean; `make pre-add-check FILES=…` "6 file(s) clean";
+  `make lint` 0; the cross `go vet` 0; `-race` 0, 21 packages ok,
+  `internal/conformance` in 112 s; `-shuffle=on -count=2` 0; `LC_ALL=C` 0;
+  workspace mode 0; `make tidy-check` 0; `make vuln` "No vulnerabilities
+  found". The API diff, the examples and `release-check` need the tags,
+  and ran on macOS and Windows.
+* **Gates, the Windows test host** (Go 1.27.2 windows/amd64, a copy of the
+  tree with its history from a bundle, HEAD `d9930f8`, the index synced):
+  `make pre-add-check` "227 file(s) clean" (apicheck and examples
+  included; the count has the new test file, which the index tracks);
+  `make lint` "0 issues."; `make vuln` "No vulnerabilities found"; `make
+  examples` clean; the step's 14 tests pass; `workspace` under
+  `-shuffle=on -count=2` 0; `go-fuzz_test.py` 27 passed; `make fuzz
+  FUZZTIME=3s` "9 packages ran clean".
+  * A first run on the host, and one on the Linux host, were stopped and
+    restarted once the lint and modernize findings above were fixed, since
+    their copies predated the fix.
+* **Identifier scan** of the step's diff: nothing.

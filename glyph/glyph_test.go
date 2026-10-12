@@ -50,10 +50,38 @@ func TestEveryGlyphIsOneCell(t *testing.T) {
 				t.Errorf("%s = %q is %d runes, want 1", path, s, utf8.RuneCountInString(s))
 			}
 		})
-		// 4 borders × 13 glyphs, plus 16 single glyphs.
-		if n != 68 {
-			t.Errorf("%s: walked %d glyphs, want 68", name, n)
+		// 4 borders × 13 glyphs, plus 18 single glyphs.
+		if n != 70 {
+			t.Errorf("%s: walked %d glyphs, want 70", name, n)
 		}
+	}
+}
+
+// TestOneCellInBothMethods: every glyph is one cell whichever way the
+// terminal measures, before and after it reports grapheme clustering (mode
+// 2027), so a workspace that switches method lays a view out the same.
+func TestOneCellInBothMethods(t *testing.T) {
+	for name, set := range map[string]Set{"Unicode": Unicode(), "ASCII": ASCII()} {
+		glyphs(set, name, func(path, s string) {
+			for _, m := range []ansi.Method{ansi.WcWidth, ansi.GraphemeWidth} {
+				if w := m.StringWidth(s); w != 1 {
+					t.Errorf("%s = %q is %d cells under method %d, want 1", path, s, w, m)
+				}
+			}
+		})
+	}
+}
+
+// TestPromptAndMask: the input prompt and the secret mask a picker draws in
+// place of bubbles' "> " and '*' (docs/decisions/0008-MADR-command-palette.md
+// A3 item 8) differ between the sets, so the ASCII set is a real twin.
+func TestPromptAndMask(t *testing.T) {
+	u, a := Unicode(), ASCII()
+	if u.Prompt == a.Prompt || u.Mask == a.Mask {
+		t.Errorf("Prompt %q/%q, Mask %q/%q: a Unicode glyph equals its ASCII twin", u.Prompt, a.Prompt, u.Mask, a.Mask)
+	}
+	if a.Prompt != ">" || a.Mask != "*" {
+		t.Errorf("ASCII Prompt %q, Mask %q; want > and *", a.Prompt, a.Mask)
 	}
 }
 
@@ -79,8 +107,8 @@ func TestTierWidths(t *testing.T) {
 				t.Errorf("%s = %q is %d cells and %d runes, want 1 and 1", path, s, w, utf8.RuneCountInString(s))
 			}
 		})
-		if n != 68 {
-			t.Errorf("%s: walked %d glyphs, want 68", tier, n)
+		if n != 70 {
+			t.Errorf("%s: walked %d glyphs, want 70", tier, n)
 		}
 	}
 }

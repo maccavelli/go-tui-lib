@@ -100,6 +100,17 @@ func (w *Workspace) Pop() tea.Cmd {
 	return nil
 }
 
+// closeMsg is Close's message.
+type closeMsg struct{ id string }
+
+// Close wraps a request to close the open overlay id, which Update carries
+// out as Pop does the top one, focus messages included; an ID not open is
+// ignored. An overlay closes itself by returning a command that sends it,
+// since calling Pop from its own Update would remove the overlay the
+// workspace is updating (docs/decisions/0008-MADR-command-palette.md A3
+// item 3).
+func Close(id string) tea.Msg { return closeMsg{id: id} }
+
 // closeOverlay closes overlay i, moving the keyboard on if it had it.
 func (w *Workspace) closeOverlay(i int) tea.Cmd {
 	was := w.focusTarget()

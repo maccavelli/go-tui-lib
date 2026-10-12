@@ -53,6 +53,11 @@ type Set struct {
 	// BadgeOpen and BadgeClose enclose a pane's badge, such as an unread
 	// count.
 	BadgeOpen, BadgeClose string
+	// Prompt starts an input line, as a text input's prompt
+	// (docs/decisions/0008-MADR-command-palette.md A3 item 8).
+	Prompt string
+	// Mask stands for each character of a secret as it is typed.
+	Mask string
 	// Keys are the modifier and arrow labels a key binding is shown with.
 	Keys KeyGlyphs
 }
@@ -98,6 +103,8 @@ func Unicode() Set {
 		ScrollUp: "▲", ScrollDown: "▼", ScrollThumb: "┃", ScrollTrack: "│",
 		Bullet:    "•",
 		BadgeOpen: "[", BadgeClose: "]",
+		Prompt: "❯",
+		Mask:   "•",
 		Keys: KeyGlyphs{
 			Option: "⌥", Command: "⌘", Control: "⌃", Shift: "⇧",
 			Up: "↑", Down: "↓", Left: "←", Right: "→",
@@ -125,6 +132,8 @@ func ASCII() Set {
 		ScrollUp: "^", ScrollDown: "v", ScrollThumb: "#", ScrollTrack: "|",
 		Bullet:    "*",
 		BadgeOpen: "[", BadgeClose: "]",
+		Prompt: ">",
+		Mask:   "*",
 		Keys: KeyGlyphs{
 			Option: "opt+", Command: "cmd+", Control: "ctrl+", Shift: "shift+",
 			Up: "up", Down: "down", Left: "left", Right: "right",

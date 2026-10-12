@@ -459,6 +459,17 @@ func (w *Workspace) State() layout.State { return w.state }
 // measure the same way.
 func (w *Workspace) WidthMethod() ansi.Method { return w.method }
 
+// Theme is the theme the workspace draws with now, so a pane can draw the
+// same way. It changes with SetTheme, and when the workspace follows the
+// terminal's colour profile and background
+// (docs/decisions/0008-MADR-command-palette.md A3 item 2).
+func (w *Workspace) Theme() theme.Theme { return w.theme }
+
+// Bindings is the keymap the workspace's keys go through now: WithBindings'
+// or SetBindings', or else DefaultRules', so a pane can show the key that
+// runs a command.
+func (w *Workspace) Bindings() *keymap.Keymap { return w.km }
+
 // setMethod changes how the workspace measures. Every cached view misses,
 // since its key holds the method, and the next frame is drawn anew.
 func (w *Workspace) setMethod(m ansi.Method) {
@@ -534,6 +545,11 @@ func (w *Workspace) Update(msg tea.Msg) tea.Cmd {
 		return w.resolve()
 	case targeted:
 		return w.Send(m.id, m.msg)
+	case closeMsg:
+		if i := w.overlayIndex(m.id); i >= 0 {
+			return w.closeOverlay(i)
+		}
+		return nil
 	case tea.KeyPressMsg, keymap.TimeoutMsg:
 		cmd, _ := w.key(m)
 		return cmd
