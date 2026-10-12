@@ -865,6 +865,55 @@ recommendation, so items 1 to 3 stand as written.
 [0008-PLAN-command-palette.md](0008-PLAN-command-palette.md), revised on
 2026-10-11, is written against these answers.
 
+
+### A4 (2026-10-12): x/ansi's `WcWidth.Cut`, and where highlights are cut
+
+*Status: item 1 accepted (2026-10-12), the owner's choice; item 2 open,
+decided before
+[0008-PLAN-command-palette.md](0008-PLAN-command-palette.md) Step 6.*
+Found in Step 3 (its D1). The Context's "`Method` has `StringWidth` and
+`Cut`" holds for the names, not for `Cut`'s result under `WcWidth`.
+
+**Found.**
+
+1. **`ansi.WcWidth.Cut` ignores its left edge.** In x/ansi v0.11.8
+   `truncate.go:35-45`, `cut` sets `truncateLeft = TruncateWc` where
+   `TruncateLeftWc` is meant, so `WcWidth.Cut("abcdef", 2, 4)` is `"ab"`.
+   v0.11.9, the newest release on 2026-10-12, has the same code.
+   `GraphemeWidth.Cut`, and the package's `Cut`, are right. ~~x/ansi's
+   `Method.Truncate` and `Method.TruncateLeft` are right under both
+   methods: their composition cuts every cell range `fuzzy.Cells` gives
+   back to its text, in a probe outside the repository.~~ *Corrected
+   later on 2026-10-12:* under `WcWidth` they disagree too.
+   `WcWidth.Truncate` counts a ZWJ family as 2 cells, and `StringWidth`
+   and `TruncateLeft` count it as 6: on `"ab👨‍👩‍👧cd"`, `Truncate(s, 6)`
+   keeps all 10 cells. The repository met this before:
+   `internal/sanitize`'s `Truncate` cuts rune by rune under `WcWidth`, for
+   it ([0014-PLAN-hardening.md](0014-PLAN-hardening.md) Step 9, D8).
+2. **`lipgloss.StyleRanges` always cuts in grapheme width.** lipgloss
+   v2.0.6 `ranges.go:25-33` calls the package-level `ansi.Cut` and
+   `ansi.TruncateLeft`. §7's highlights "use `fuzzy.Cells` and
+   `lipgloss.StyleRanges`, in the terminal's width method", which cannot
+   hold while the workspace measures with `WcWidth`, its method until the
+   terminal reports mode 2027: a cluster whose widths differ, such as a
+   ZWJ family (6 cells under `WcWidth`, 2 under `GraphemeWidth`), shifts
+   every highlight after it.
+
+**Decided.**
+
+1. **Step 3's oracle** (the owner, 2026-10-12): `fuzzy.Cells` is checked
+   against `ansi.Cut` under `GraphemeWidth`, as planned, and under
+   `WcWidth` ~~against `m.TruncateLeft(m.Truncate(s, end, ""), start, "")`,
+   the composition `Cut` should make~~ *(the owner's second answer, later
+   on 2026-10-12, once that composition failed on a ZWJ family)* against
+   the repository's own cutter: the text of cells `[a, b)` is
+   `sanitize.Truncate(s, b, m, "")` less its prefix
+   `sanitize.Truncate(s, a, m, "")`, the cutter AGENTS.md's width rule
+   gives the workspace. `fuzzy` itself uses none of them: `Cells` measures
+   with `Method.StringWidth`.
+2. **Where the palette cuts a highlighted row:** open. Step 6 does not
+   start until it is decided, by an amendment of this item.
+
 ## More Information
 
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md):

@@ -24,7 +24,7 @@ it was when they were written
 | 0006 | PLAN | [Implement the command registry (`when`, `command`, `command/cli`, and the Cobra and Kong front ends)](decisions/0006-PLAN-command-registry.md) | complete |
 | 0007 | MADR | [Bind keys to command IDs through a context-aware keymap engine, with chords, a leader key and VS Code-format user keymaps](decisions/0007-MADR-keymap-engine.md) | accepted; A1, A2 accepted; A3 recorded; A4–A12 accepted; Q8 answered (A4) |
 | 0007 | PLAN | [Implement the keymap engine](decisions/0007-PLAN-keymap-engine.md) | complete |
-| 0008 | MADR | [Find and run anything from one command palette, built on an in-repository fuzzy matcher and asynchronous, scoped providers](decisions/0008-MADR-command-palette.md) | accepted; A1 accepted; A2 recorded; A3 accepted |
+| 0008 | MADR | [Find and run anything from one command palette, built on an in-repository fuzzy matcher and asynchronous, scoped providers](decisions/0008-MADR-command-palette.md) | accepted; A1 accepted; A2 recorded; A3 accepted; A4 item 1 accepted, item 2 open |
 | 0008 | PLAN | [Implement the command palette and the fuzzy matcher](decisions/0008-PLAN-command-palette.md) | in-progress |
 | 0009 | MADR | [Stream agent output through a stable-prefix Markdown engine, a frame scheduler, an input filter and a safe-text sanitizer](decisions/0009-MADR-streaming-content-engine.md) | accepted; A1–A3 accepted; A4 recorded; Q9 open |
 | 0009 | PLAN | [Implement the streaming content engine](decisions/0009-PLAN-streaming-content-engine.md) | proposed |
@@ -49,6 +49,8 @@ it was when they were written
 | 0016 | PLAN | [Implement: the toolchain floor moves to Go 1.27.2](decisions/0016-PLAN-go-1-27-2-for-go-2026-6604.md) | complete |
 | 0017 | MADR | [Write the repository's scripts in Python, standard library only, and port the ten shell scripts](decisions/0017-MADR-python-repository-scripts.md) | accepted; built |
 | 0017 | PLAN | [Implement Python repository scripts: port the ten shell scripts, `go-fuzz` first with the case-6 fix](decisions/0017-PLAN-python-repository-scripts.md) | complete |
+| 0018 | MADR | [Keep the agent's verification tooling in the repository, as one modular Python package under `tools/`](decisions/0018-MADR-python-verification-tools.md) | proposed |
+| 0018 | PLAN | [Implement the Python verification tools](decisions/0018-PLAN-python-verification-tools.md) | proposed |
 
 ## I want to…
 

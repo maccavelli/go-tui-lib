@@ -241,6 +241,11 @@ and this repository's `workspace`, `command`, `when`, `keymap`, `theme`,
   * a 10 000-grapheme query matches as its first 256;
   * `RankContext` returns `ctx.Err()` promptly once cancelled;
   * `Cells` gives the same ranges as `ansi.Cut` under both width methods;
+    *2026-10-12 (D1, MADR A4):* as `ansi.Cut` under `GraphemeWidth`, and
+    ~~as `m.TruncateLeft(m.Truncate(s, end, ""), start, "")`~~ under
+    `WcWidth`, whose `Cut` ignores its left edge upstream, as
+    `internal/sanitize`'s `Truncate` cuts: `Truncate(s, b)` less its prefix
+    `Truncate(s, a)` (D1, second answer);
   * `FuzzMatch` finds no panic and no out-of-range range, and `make fuzz`
     picks it up.
 * **Benchmarks** (`b.Loop`): `Score` on ASCII reports 0 allocations;
@@ -309,6 +314,11 @@ and this repository's `workspace`, `command`, `when`, `keymap`, `theme`,
   * the drain loop ignores the 64-hit bound.
 
 ### Step 6: `palette`, the pane and its keys
+
+*2026-10-12 (D1, MADR A4 item 2):* `lipgloss.StyleRanges` cuts in grapheme
+width whatever the workspace measures with. Where the palette cuts a
+highlighted row is decided by an amendment of MADR A4 item 2 before this
+step starts, and this step is amended to match.
 
 * MADR §7 with A3 items 1–4, 9, 11 and 12:
   * `NewPicker(w, opts...)`, `Register`, `Open(...OverlayOption)`
