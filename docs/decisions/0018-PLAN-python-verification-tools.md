@@ -301,3 +301,89 @@ proceed").
 * **Checks** through `tools.verify gates --only`: `tools-tests`,
   `markdownlint` and the five `script-test-*`, "7 passed, 0 failed";
   `compileall` 0; the identifier scan of `tools/`: nothing.
+
+### Step 4: `remote`
+
+*2026-10-12.* The owner committed Step 3 as `a3a654e` ("committed,
+proceed.").
+
+* **Files:** `tools/verify/remote.py`, `tools/verify/_bootstrap.py`;
+  `__main__.py` gains `remote`, and splits its arguments at `--` before
+  argparse (an `argparse.REMAINDER` positional swallowed `--config`, which
+  a test caught); `proc.py` gains `resolve`; tests
+  `tools/verify/tests/test_remote.py`, `tests/fakes/{__init__,ssh,scp}.py`,
+  and a case in `test_proc.py`.
+* **`remote HOST [--label L] [--config PATH] -- GATES-ARGS…`:** a tar of
+  the tree and a git bundle of `HEAD` and the tags, uploaded with `scp`;
+  then `ssh HOST python3 -` with `_bootstrap.py`'s source and its
+  parameters on stdin, so the remote command is two fixed words and no
+  shell string carries anything. The bootstrap unpacks into a new
+  temporary directory, makes the repository from the bundle with the
+  copied files as its index, runs `python3 -m tools.verify gates` there,
+  and removes the directory, the outputs and the uploads whatever
+  happened. Output comes back line by line, home paths and the config's
+  identifiers redacted, ssh's own notices dropped.
+* **The local config,** written outside the repository from the host
+  names the owner gave: two hosts, `posix` and `windows`, each with an
+  empty `path_prepend`, since a plain `ssh` session there already has
+  `python3` 3.14.7, Go, `make`, golangci-lint and govulncheck on its
+  `PATH` (a one-off probe, fed to each host's `python3` on stdin).
+* **Tests:** "Ran 44 tests", OK. The fakes are Python programs run by
+  `sys.executable`, so the tests run on Windows too: a round trip to a
+  fake host lists the gates; after a passing and a failing run the fake
+  home and temporary directory are empty; the `ssh` call is exactly
+  `-o BatchMode=yes -T far-host python3 -`; the bootstrap's copy has
+  `HEAD`, the tags and the untracked file in its index; a corrupt bundle
+  leaves nothing behind; redaction of POSIX, macOS and both Windows path
+  styles, identifiers and noise.
+* **Mutations,** through `tools.verify mutate`, each killed:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | the bootstrap leaves its work directory | `test_nothing_is_left_on_the_host`, for a passing and a failing run |
+  | redaction misses a Windows-style home path | `test_homes_identifiers_and_noise`: `'in C:\\Users\\carol\\…' != 'in C:\\Users\\<user>\\…'` |
+  | a label is not checked | `test_a_bad_label`: "RemoteError not raised" |
+  | `tree.copy` drops the file modes (D3) | `test_copy_keeps_paths_and_modes`: "420 != 493" |
+
+* **Acceptance:** 0008 Step 3's gates through `remote`, over its 14 files,
+  with nothing skipped: on the Linux host "gates: 25 passed, 0 failed, 0
+  skipped", and on the Windows host the same; each with `apicheck`
+  "against v0.12.0, 0 incompatible change(s)", `examples` clean and
+  `release-check` "240 file(s) clean". The output named no account: the
+  work directories came back as `C:\Users\<user>\…`.
+* **Checks** through `tools.verify gates --only`: `tools-tests`,
+  `markdownlint`, `shellcheck` and the five `script-test-*`, "8 passed, 0
+  failed"; `compileall` 0. The identifier scan of `tools/`, the docs and
+  AGENTS.md for the account, host and organisation names: nothing. A scan
+  for home-path shapes matches only the redaction test's made-up names,
+  which are there to be redacted.
+
+#### Deviations
+
+* **D1 (2026-10-12): a stray `.git` on the Linux host.** The first Linux
+  run failed 7 gates (`examples`, `release-check` and five
+  `script-test-*`) with "error obtaining VCS status: exit status 128":
+  every `go build` in a temporary directory found an empty
+  `/data/cache/tmp/.git` (created 2026-08-25, not by this work), and git
+  failed there. The Windows host passed the same gates. *Resolution, the
+  owner's:* the agent removed it with `rmdir`, which removes only an empty
+  directory. The rerun passed every gate.
+* **D2 (2026-10-12): gate tools missing on the hosts.** `actionlint` was
+  on neither host, and `markdownlint-cli2` not on the Linux host ("npx
+  canceled due to missing packages"). *Resolution, the owner's:* install
+  them, over a skip list or a per-run `--skip`. The agent installed
+  `actionlint` v1.7.12, CI's version, on both with `go install`, and
+  `markdownlint-cli2@0.23.3` on the Linux host with `npm install -g`,
+  the macOS host's version; CI pins 0.23.2. The first acceptance runs had
+  skipped `actionlint`; the reruns skipped nothing.
+* **D3 (2026-10-12): a test of Step 2's that held on POSIX only.** On
+  Windows, `test_copy_keeps_paths_and_modes` failed ("0 is not true"): it
+  asserted an executable bit, which NTFS has not got. It now asserts the
+  copy's permission bits equal the source's, which keeps the executable
+  bit on POSIX and holds on Windows; the mutation above shows it still
+  fails when modes are dropped.
+* **D4 (2026-10-12): commands are resolved on their own `PATH`.** On
+  Windows, `npx` is `npx.CMD`, which a bare name in an argument list does
+  not reach. `proc.run` resolves the first argument with `shutil.which`
+  against the environment the gate runs with; a test pins it. The MADR's
+  A1 records this and the transport's shape.

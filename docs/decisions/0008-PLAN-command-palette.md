@@ -644,3 +644,19 @@ The range-end anchor moved with the lint fixes (`End: us[pos[j]].end`).
 | `fuzzy.Grade` is missing from the conformance enum table | `TestEveryEnumRoundTrips`: "fuzzy.Grade is an enum the table lacks" |
 
 The Linux and Windows gates wait for 0018-PLAN Step 4.
+
+*Linux and Windows, 2026-10-12,* through `python3 -m tools.verify remote`
+over the same 14 files, nothing skipped: on each host "gates: 25 passed,
+0 failed, 0 skipped", with `pre-add-check` "14 file(s) clean", `-race`,
+the cross `go vet`, `LC_ALL=C`, workspace mode, `apicheck` "against
+v0.12.0, 0 incompatible change(s)", `examples` clean and `release-check`
+"240 file(s) clean". The first Linux run failed 7 gates on a stray `.git`
+in that host's temporary directory, which the owner had removed
+(0018-PLAN Step 4, D1).
+
+*Done, 2026-10-12.* Step 3's code is `79de568`; its gates have passed on
+macOS, the Linux host and the Windows host, and its nine mutations are
+killed. `FuzzMatch` ran clean for 30 s (868 271 executions) before the
+lint fixes, and is not run again here: `make fuzz` is not one of the
+gates, and CI's fuzz step runs it on the push. The benchmarks are recorded
+at Step 9, with the index's.

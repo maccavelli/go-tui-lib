@@ -39,7 +39,9 @@ class TestCopyAndTar(RepoCase):
         dest = self.tmp / "copy"
         self.assertEqual(tree.copy(self.repo, dest), ["README", "scripts/run.py"])
         self.assertEqual((dest / "scripts/run.py").read_text(), "print(1)\n")
-        self.assertTrue((dest / "scripts/run.py").stat().st_mode & stat.S_IXUSR)
+        # The copy's permission bits are the source's: on POSIX that keeps
+        # the executable bit set above; Windows has only read-only.
+        self.assertEqual(stat.S_IMODE((dest / "scripts/run.py").stat().st_mode), stat.S_IMODE(script.stat().st_mode))
 
     def test_tar_holds_the_files(self) -> None:
         self.write("a.go")

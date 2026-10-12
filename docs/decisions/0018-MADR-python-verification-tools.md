@@ -201,6 +201,30 @@ owner approved it on 2026-10-12 ("approved to proceed").
 * Bad, because the owner asked for the repository, and scratch files were
   already lost once.
 
+## Amendments
+
+### A1 (2026-10-12): how `remote` reaches a host, as built
+
+*Status: accepted (2026-10-12),* recording what
+[0018-PLAN-python-verification-tools.md](0018-PLAN-python-verification-tools.md)
+Step 4 built and its deviations D1 to D4. Item 3 stands; these are its
+details.
+
+1. **Both kinds of host get the bundle.** Item 3 gives the Windows host a
+   git bundle; every host gets one, so `apicheck` and `release-check` run
+   everywhere, and no gate is skipped for want of history.
+2. **The bootstrap goes on stdin.** The remote command is `python3 -`, two
+   fixed words; `_bootstrap.py`'s source and the run's parameters follow
+   on stdin. No argument reaches a remote shell to be parsed.
+3. **Commands are found on their own `PATH`** (`proc.resolve`): on
+   Windows a bare name reaches only a `.exe`, and `npx` is `npx.CMD`.
+4. **The hosts carry the gates' tools.** A host without one fails that
+   gate with 127. On 2026-10-12 the owner chose to install them over
+   skipping, so both hosts have `actionlint` and the Linux host
+   `markdownlint-cli2` (D2); and a stray empty `.git` in the Linux host's
+   temporary directory, which broke every `go build` there, was removed
+   (D1).
+
 ## More Information
 
 * The scratch tools named above are the ones

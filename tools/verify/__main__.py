@@ -8,7 +8,7 @@ import tempfile
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
-from . import gates, mutate, tree
+from . import config, gates, mutate, remote, tree
 
 
 def _names(values: Sequence[str] | None) -> list[str]:
@@ -30,7 +30,8 @@ def cmd_gates(args: argparse.Namespace, gate_list: Callable[[Path], list[gates.G
         return 2
     out_dir = Path(args.out) if args.out else Path(tempfile.mkdtemp(prefix=f"verify-{args.label}-"))
     print(f"gates: {args.label}: outputs in {out_dir}")
-    outcomes = gates.run(chosen, repo=repo, files=args.files, out_dir=out_dir, history=not args.no_history)
+    files = [*args.files, *getattr(args, "rest", [])]
+    outcomes = gates.run(chosen, repo=repo, files=files, out_dir=out_dir, history=not args.no_history)
     return 1 if any(o.failed for o in outcomes) else 0
 
 
@@ -44,6 +45,18 @@ def cmd_mutate(args: argparse.Namespace) -> int:
     work = Path(args.work) if args.work else Path(tempfile.mkdtemp(prefix="verify-mutate-"))
     outcomes = mutate.run(mutations, repo=repo, work=work, keep=args.keep)
     return 0 if all(o.verdict == mutate.KILLED for o in outcomes) else 1
+
+
+def cmd_remote(args: argparse.Namespace, transport: remote.Transport = remote.Transport()) -> int:
+    repo = tree.root(Path.cwd())
+    gate_args = getattr(args, "rest", [])
+    try:
+        cfg = config.load(Path(args.config) if args.config else None)
+        host = cfg.host(args.host)
+        return remote.run(host, gate_args, repo=repo, label=args.label, identifiers=cfg.identifiers, transport=transport)
+    except (config.ConfigError, remote.RemoteError) as err:
+        print(f"remote: {err}", file=sys.stderr)
+        return 2
 
 
 def parser() -> argparse.ArgumentParser:
@@ -63,11 +76,23 @@ def parser() -> argparse.ArgumentParser:
     m.add_argument("--work", help="where the copies go (default: a new temporary directory)")
     m.add_argument("--keep", action="store_true", help="keep each mutated copy")
     m.set_defaults(func=cmd_mutate)
+    r = sub.add_parser("remote", help="run the gates on a host the local config names")
+    r.add_argument("host", help="the host's name in the config")
+    r.add_argument("--label", default="remote", help="names the uploads and the run")
+    r.add_argument("--config", help="the config file (default: $XDG_CONFIG_HOME/go-tui-lib/verify.json)")
+    r.set_defaults(func=cmd_remote)
+    p.epilog = "remote passes everything after -- to gates on the host"
     return p
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    rest: list[str] = []
+    if "--" in argv:
+        i = argv.index("--")
+        argv, rest = argv[:i], argv[i + 1 :]
     args = parser().parse_args(argv)
+    args.rest = rest
     return args.func(args)
 
 

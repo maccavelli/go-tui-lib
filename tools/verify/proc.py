@@ -4,6 +4,7 @@ status kept before anything reads the output."""
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -41,15 +42,24 @@ def environ(changes: Mapping[str, str | None], base: Mapping[str, str] = os.envi
     return env
 
 
+def resolve(name: str, env: Mapping[str, str]) -> str:
+    """name as a path, found on env's PATH when it is a bare name: on
+    Windows a bare name finds only a .exe, and npx, for one, is npx.CMD."""
+    if os.path.dirname(name):
+        return name
+    return shutil.which(name, path=env.get("PATH")) or name
+
+
 def run(args: Sequence[str], *, cwd: Path, out: Path, env: Mapping[str, str | None] | None = None) -> Result:
     """Run args in cwd, with env's changes to this process's environment,
     writing stdout and stderr to out. A command that cannot be started
     gets NOT_FOUND, and the reason is written to out."""
     out.parent.mkdir(parents=True, exist_ok=True)
     full = environ(env or {})
+    argv = [resolve(args[0], full), *args[1:]]
     with out.open("wb") as f:
         try:
-            p = subprocess.run(list(args), cwd=cwd, env=full, stdout=f, stderr=subprocess.STDOUT, check=False)
+            p = subprocess.run(argv, cwd=cwd, env=full, stdout=f, stderr=subprocess.STDOUT, check=False)
         except OSError as err:
             f.write(f"cannot run {args[0]}: {err}\n".encode())
             return Result(tuple(args), NOT_FOUND, out)
