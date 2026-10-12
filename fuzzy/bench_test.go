@@ -2,6 +2,7 @@ package fuzzy
 
 import (
 	"fmt"
+	"math/rand/v2"
 	"slices"
 	"testing"
 )
@@ -23,6 +24,36 @@ func BenchmarkScoreASCII(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		m.Score(cand)
+	}
+}
+
+func BenchmarkNewIndex100000Paths(b *testing.B) {
+	paths := corpus(rand.New(rand.NewPCG(17, 18)), 100_000)
+	b.ReportAllocs()
+	for b.Loop() {
+		NewIndex(paths)
+	}
+}
+
+// BenchmarkIndexedRank100000Paths is a four-cluster query through the
+// index, scoring only the candidates it yields; BenchmarkFullRank is the
+// same query over every path.
+func BenchmarkIndexedRank100000Paths(b *testing.B) {
+	paths := corpus(rand.New(rand.NewPCG(17, 18)), 100_000)
+	ix := NewIndex(paths)
+	m := NewMatcher("sesstor")
+	b.ReportAllocs()
+	for b.Loop() {
+		m.Rank(ix.Candidates(m), ix.At, 50)
+	}
+}
+
+func BenchmarkFullRank100000Paths(b *testing.B) {
+	paths := corpus(rand.New(rand.NewPCG(17, 18)), 100_000)
+	m := NewMatcher("sesstor")
+	b.ReportAllocs()
+	for b.Loop() {
+		m.Rank(slices.Values(paths), func(s string) string { return s }, 50)
 	}
 }
 

@@ -70,6 +70,7 @@ of its own.
 | `Binding`, `Keymap`, `Path`, `Sequence`, `Stroke` | keys bound to a command in a scope, the built set of bindings, the scopes a key is resolved in, a key sequence, one key | `keymap` |
 | `Dispatcher`, `Outcome`, `Resolved` | the key matcher, what it made of a message, what a sequence resolves to | `keymap` |
 | `Matcher`, `Match`, `Score`, `Grade`, `Range`, `Ranked`, `CellRange`, `CaseMode`, `Normalizer` | a compiled fuzzy query, a match with its byte ranges, its grade and value, the grades, a byte range on cluster boundaries, a ranked item, a range in cells, letter-case handling, a rune-mapping hook ([0008-MADR](decisions/0008-MADR-command-palette.md) §2, A2, A3) | `fuzzy` |
+| `Index`, `IndexOption` | the trigram index that narrows a large candidate set before scoring, and its options ([0008-MADR](decisions/0008-MADR-command-palette.md) §3, A2, A3) | `fuzzy` |
 | `CommandConsumer`, `CommandMsg` | a pane or overlay that runs some matched commands itself, and the matched command it is sent ([0008-MADR](decisions/0008-MADR-command-palette.md) A3 item 1) | `workspace` |
 
 ## Names the planned records must not take

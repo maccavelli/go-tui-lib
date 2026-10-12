@@ -660,3 +660,77 @@ killed. `FuzzMatch` ran clean for 30 s (868 271 executions) before the
 lint fixes, and is not run again here: `make fuzz` is not one of the
 gates, and CI's fuzz step runs it on the push. The benchmarks are recorded
 at Step 9, with the index's.
+
+### Step 4: `fuzzy`, the index
+
+*2026-10-12.* The owner approved ("committed, proceed") after
+`8c34cff`.
+
+* **`fuzzy/index.go`:** `Index`, `NewIndex`, `IndexOption`
+  (`WithMinOverlap`, default 0.3; `WithMaxCandidates`, default 2000),
+  `Update`, `Len`, `At`, `Candidates`, and the constants
+  `DefaultMinOverlap` and `DefaultMaxCandidates`. The matcher's terms keep
+  their text, which `Candidates` reads (`fuzzy/matcher.go`).
+  * **One cluster:** candidates where it starts the text or follows a
+    separator (`/\ ._-:,;|`), those that start with it first.
+  * **Two or three:** candidates holding every rune, by a 64-bit mask of
+    folded ASCII bytes, and by the folded text for a rune beyond ASCII;
+    those holding the query in one piece first.
+  * **Four or more:** candidates sharing at least the minimum share of
+    the query's trigrams, padded with spaces, a separator read as a space,
+    most shared first. A candidate equal to the query, or whose path
+    element or word starts with it, holds every one of them, so it comes
+    before candidates that only contain the query.
+  * **An extended query** is narrowed by its longest term that is not
+    negated. Folding is the matcher's simple case folding; a `Normalizer`
+    is not applied, and the type's documentation says so.
+  * **`Update`** returns a new index of the kept candidates and the added
+    ones, with the same options, built afresh; the old one is untouched.
+  * Posting IDs are `int32` from a counter, and trigram keys `int64`, so
+    no conversion narrows; an index of more than `MaxInt32` candidates
+    panics.
+* **Tests** (`fuzzy/index_test.go`): `TestIndexStrategies` (each strategy,
+    case folding, Cyrillic, the 30% and 20% thresholds),
+    `TestIndexKeepsExactAndPrefix` (three exact or prefix matches survive a
+    limit of 10 filled by fifty containing ones; and 500 prefixes of a
+    3000-path corpus each yield their path), `TestIndexUpdate` (the old
+    index unchanged; both read by eight goroutines under `-race`),
+    `TestIndexRecall`. `FuzzIndex` (`fuzzy/fuzz_test.go`): no index out of
+    range or yielded twice, never more than the limit, and `Update` leaves
+    the old index alone; 30 s clean, 914 395 executions.
+* **Recall** on 20 000 synthetic paths, 100 queries of each kind, against
+  a full scan, at the default options:
+
+  | Queries | All matches kept | Ten best kept |
+  | :--- | :--- | :--- |
+  | prefixes of a last element, 4 to 6 bytes | 104 962 of 135 342 (77.6%) | 998 of 998 (100%) |
+  | whole words | 178 128 of 191 184 (93.2%) | 1000 of 1000 (100%) |
+  | sparse subsequences of a last element, 2 or 3 bytes | 113 069 of 355 735 (31.8%) | 564 of 1000 (56.4%) |
+  | sparse subsequences of a path, 4 to 6 bytes | 5 881 of 44 699 (13.2%) | 190 of 932 (20.4%) |
+
+  No exact or prefix match was lost. The two- and three-cluster rows lose
+  to the limit, not the filter: about 3 500 candidates hold the runes and
+  2000 are kept. Putting candidates that hold the query in one piece
+  first raised their ten-best share from 54.0% to 56.4%; the rest of a
+  sparse query's best matches are scattered, and only scoring tells them
+  apart. The four-to-six row is the trigram filter's trade, which MADR §3
+  names. Step 7's file provider uses the index only above 5000
+  candidates, and its options are tuned there.
+* **Benchmarks:** they run (`-benchtime 1x`, all five); their figures are
+  taken at Step 9 on a quiet host. This one's load average was 51.
+* **Mutations,** through `python3 -m tools.verify mutate`, each killed:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | the overlap threshold is ignored | `TestIndexStrategies`: `file yields [… "f_i_l_e"]` |
+  | padding is dropped, so starts and ends lose their trigrams | `TestIndexStrategies`, and `TestIndexKeepsExactAndPrefix`: `"lib/file.go" was dropped under a limit of 10` |
+  | `Update` changes the receiver | `TestIndexUpdate`: "Update changed the old index" |
+  | the candidate limit is ignored | `TestIndexKeepsExactAndPrefix`: "53 candidates under a limit of 10" |
+
+* **Gates,** through `tools.verify` over the step's five Go files, nothing
+  skipped: macOS, the Linux host and the Windows host each "gates: 25
+  passed, 0 failed, 0 skipped", with `pre-add-check` "5 file(s) clean",
+  `apicheck` "against v0.12.0, 0 incompatible change(s)", and
+  `release-check` clean (240 tracked files on macOS; 242 on the hosts,
+  whose copies' index tracks the two new files).
+* **Docs:** `docs/glossary.md` gains `Index` and `IndexOption` under `fuzzy`.

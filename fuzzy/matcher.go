@@ -25,6 +25,7 @@ const (
 type term struct {
 	kind    termKind
 	inverse bool // !term: the candidate must not match
+	text    string
 	units   []unit
 }
 
@@ -85,7 +86,7 @@ func NewMatcher(query string, opts ...Option) *Matcher {
 		if text == "" {
 			return
 		}
-		m.terms = append(m.terms, term{kind: kind, inverse: inverse, units: m.prepare(nil, text, &buf, true, false)})
+		m.terms = append(m.terms, term{kind: kind, inverse: inverse, text: text, units: m.prepare(nil, text, &buf, true, false)})
 	}
 	if !cfg.extended {
 		compile(query, termFuzzy, false)
