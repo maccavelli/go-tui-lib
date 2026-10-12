@@ -387,3 +387,52 @@ proceed.").
   not reach. `proc.run` resolves the first argument with `shutil.which`
   against the environment the gate runs with; a test pins it. The MADR's
   A1 records this and the transport's shape.
+
+### Step 5: `scan` and `names`
+
+*2026-10-12.* The owner committed Step 4 as `ee43407` ("committed,
+proceed.").
+
+* **Files:** `tools/verify/scan.py`, `tools/verify/names.py`;
+  `__main__.py` gains both; `tests/test_scan.py`, `tests/test_names.py`;
+  `tests/support.py` gains `commit` (no hooks, no signing, a throwaway
+  identity), which `test_remote.py` now uses.
+* **`scan [--base REV] [--config PATH]`:** every line the work tree adds
+  against `--base` (default `HEAD`; the empty tree before a first commit),
+  staged or not, from `git diff --unified=0`, and every line of each
+  untracked, unignored text file. A hit prints as `file:line: matches
+  identifier pattern N`, never the text; exit 1 on any hit, 0 when clean,
+  2 with no patterns or a bad base. `--base origin/main` scans what a push
+  would send.
+* **`names FILE.json`:** a JSON object of package directory to planned
+  type names; each is checked against the exported type names of every
+  public package (tests, `internal`, `testdata` and hidden directories
+  left out, as the conformance scan does), and allowed only when
+  `sharedNames`, read from `internal/conformance`, names it with `*` or
+  with exactly the packages that would share it.
+* **Tests:** "Ran 58 tests", OK: a planted identifier in a staged, an
+  unstaged and an untracked file, each found and never printed; an
+  unchanged committed line and an ignored file not reported; `--base`
+  reaching back past a commit; binary files skipped; a repository with no
+  commit; for `names`, grouped and generic declarations, lower-case,
+  internal, test and `testdata` types left out, the three ways
+  `sharedNames` allows a name, and the repository's own `sharedNames`
+  parsed.
+* **Mutations,** through `tools.verify mutate`, each killed:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | `scan` skips untracked files | `test_staged_unstaged_and_untracked` and `test_exit_status_and_config` ("0 != 1") |
+  | `scan` prints the match | `test_staged_unstaged_and_untracked`, `test_a_base_reaches_back`, `test_everything_is_new` |
+  | `names` counts internal packages | `test_public_exported_types`: "'Hidden' unexpectedly found" |
+  | `names` ignores `sharedNames` | `test_clashes_and_allowances` |
+
+* **Acceptance:** `scan` on this step's change: "scan: clean (5
+  pattern(s))". `names` on 0008's planned `palette` types, with
+  `RegistryOption` added as a known positive: "names:
+  palette.RegistryOption: also in command", the one clash, which MADR A3
+  item 7 had already steered `palette` away from; the 22 others clean.
+* **Checks** through `tools.verify gates --only`: `tools-tests`,
+  `markdownlint`, `shellcheck` and the five `script-test-*`, "8 passed, 0
+  failed"; `compileall` 0. From this step on, the identifier scan is
+  `python3 -m tools.verify scan`.

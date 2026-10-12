@@ -34,6 +34,14 @@ class RepoCase(unittest.TestCase):
         path.write_text(text)
         return path
 
+    def commit(self, message: str = "c") -> None:
+        """Commit everything, with no hooks, signing or real identity: the
+        machine's hooks are not this repository's to run."""
+        hooks = self.tmp / "no-hooks"
+        hooks.mkdir(exist_ok=True)
+        git(self.repo, "add", "-A")
+        git(self.repo, "-c", f"core.hooksPath={hooks}", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", "commit", "-q", "-m", message)
+
 
 def py(code: str) -> tuple[str, ...]:
     """The argument list that runs code in this Python."""

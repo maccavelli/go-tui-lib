@@ -8,7 +8,7 @@ import tempfile
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
-from . import config, gates, mutate, remote, tree
+from . import config, gates, mutate, names, remote, scan, tree
 
 
 def _names(values: Sequence[str] | None) -> list[str]:
@@ -59,6 +59,28 @@ def cmd_remote(args: argparse.Namespace, transport: remote.Transport = remote.Tr
         return 2
 
 
+def cmd_scan(args: argparse.Namespace) -> int:
+    repo = tree.root(Path.cwd())
+    try:
+        cfg = config.load(Path(args.config) if args.config else None)
+        if not cfg.identifiers:
+            print(f"scan: {cfg.path}: no identifier patterns", file=sys.stderr)
+            return 2
+        return 1 if scan.run(repo, cfg.identifiers, base=args.base) else 0
+    except (config.ConfigError, scan.ScanError) as err:
+        print(f"scan: {err}", file=sys.stderr)
+        return 2
+
+
+def cmd_names(args: argparse.Namespace) -> int:
+    repo = tree.root(Path.cwd())
+    try:
+        return 1 if names.run(repo, names.load(Path(args.file))) else 0
+    except names.NamesError as err:
+        print(f"names: {err}", file=sys.stderr)
+        return 2
+
+
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="python3 -m tools.verify", description="Verify a PLAN step.")
     sub = p.add_subparsers(dest="command", required=True)
@@ -81,6 +103,13 @@ def parser() -> argparse.ArgumentParser:
     r.add_argument("--label", default="remote", help="names the uploads and the run")
     r.add_argument("--config", help="the config file (default: $XDG_CONFIG_HOME/go-tui-lib/verify.json)")
     r.set_defaults(func=cmd_remote)
+    s = sub.add_parser("scan", help="the identifier scan of the change and the untracked files")
+    s.add_argument("--base", default="HEAD", help="scan what the work tree adds against this commit, such as origin/main before a push")
+    s.add_argument("--config", help="the config file (default: $XDG_CONFIG_HOME/go-tui-lib/verify.json)")
+    s.set_defaults(func=cmd_scan)
+    n = sub.add_parser("names", help="check a record's planned type names against the public packages'")
+    n.add_argument("file", help="a JSON object of package directory to planned type names")
+    n.set_defaults(func=cmd_names)
     p.epilog = "remote passes everything after -- to gates on the host"
     return p
 

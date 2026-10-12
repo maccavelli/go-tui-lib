@@ -35,10 +35,7 @@ class RemoteCase(RepoCase):
         super().setUp()
         shutil.copytree(TOOLS, self.repo / "tools", ignore=shutil.ignore_patterns("__pycache__"))
         self.write("README", "r\n")
-        hooks = self.tmp / "no-hooks"
-        hooks.mkdir()
-        git(self.repo, "add", "-A")
-        git(self.repo, "-c", f"core.hooksPath={hooks}", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "init")
+        self.commit("init")
         git(self.repo, "tag", "v0.0.1")
         self.write("new.txt", "untracked\n")
         self.home, self.ftmp, self.log = self.tmp / "home", self.tmp / "ftmp", self.tmp / "log.jsonl"
