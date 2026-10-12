@@ -436,3 +436,28 @@ proceed.").
   `markdownlint`, `shellcheck` and the five `script-test-*`, "8 passed, 0
   failed"; `compileall` 0. From this step on, the identifier scan is
   `python3 -m tools.verify scan`.
+
+### Step 6: CI, docs and close-out
+
+*2026-10-12.* The owner committed Step 5 as `5b08f32` ("committed,
+proceed").
+
+* **CI:** the `gates` job gains a `verification tools` step, after the
+  scripts' checks: `python3 --version`, `python3 -m compileall -q tools`
+  (the recursive form of `py_compile`), and `python3 -m unittest discover
+  -s tools -t .`. Its runner's `python3` is Ubuntu 24.04's 3.12, the floor
+  0017 set.
+* **Seen to fail,** on copies through `tools.verify mutate`: a syntax
+  error in `tools/verify/scan.py` fails the `compileall` line ("SyntaxError:
+  expected ':'"); a runner that runs a history gate under `--no-history`
+  fails the `unittest` line ("0 is not None").
+* **Python 3.12,** locally, before CI: `compileall` 0 and "Ran 58 tests",
+  OK.
+* **Docs:** `docs/architecture.md`'s tree gains `tools/verify/`, and its
+  CI list the step; `docs/README.md`'s "I want to…" table gains "verify a
+  PLAN step", and 0018-MADR's row reads "accepted; A1 accepted; built".
+* **Checks** through `tools.verify gates --only`: `tools-tests`,
+  `markdownlint`, `actionlint`, `shellcheck` and the five `script-test-*`,
+  "9 passed, 0 failed"; `tools.verify scan`: "clean (5 pattern(s))".
+* **Close-out:** this PLAN becomes `complete` once CI is green on the
+  pushed tree, which is the owner's to push.

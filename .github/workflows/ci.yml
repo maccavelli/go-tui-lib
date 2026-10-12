@@ -197,3 +197,12 @@ jobs:
           python3 -m py_compile scripts/*.py
           npx --yes markdownlint-cli2@0.23.2
           go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+      # The verification tools compile and pass their tests on the runner's
+      # python3, the 3.12 floor; nothing here runs them on the repository
+      # (docs/decisions/0018-MADR-python-verification-tools.md, item 7).
+      - name: verification tools
+        shell: bash
+        run: |
+          python3 --version
+          python3 -m compileall -q tools
+          python3 -m unittest discover -s tools -t .

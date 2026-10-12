@@ -177,6 +177,12 @@ scripts/
   go-examples_test.py       its offline test
   go-precheck_test.py       the pre-add check's gofmt step and its files,
                             and the shim, on throwaway repositories
+tools/verify/               python3 -m tools.verify: a step's gates, its
+                            mutation proofs, the gates on another host, the
+                            identifier scan, planned type names; run by a
+                            person or an agent, never by make or CI; its
+                            hosts come from a local config, never committed
+  tests/                    its unittest suite, with fake ssh and scp
 glyph/ theme/ layout/ workspace/ tuitest/ termcap/ termsvc/
 when/ command/              the packages; goldens under testdata/golden/
                             where a package renders
@@ -362,7 +368,9 @@ docs/
     - `examples`: the examples gate's test, then `make examples`;
     - `precheck test`: the pre-add check's own test;
     - `shellcheck` v0.11.0 (pinned by SHA-256 and first on `PATH`),
-      `markdownlint-cli2` 0.23.2 and `actionlint` v1.7.12.
+      `markdownlint-cli2` 0.23.2 and `actionlint` v1.7.12;
+    - `verification tools`: `tools/` compiles, and its unittest suite
+      passes, on the runner's `python3` 3.12.
   - One run per ref (`concurrency`, cancel in progress). Actions are pinned
     to commit SHAs.
 
