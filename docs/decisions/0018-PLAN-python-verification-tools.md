@@ -225,3 +225,46 @@ package is installed.
   unfinished work (`fuzzy/`, `internal/conformance/enums_test.go`, its
   record and the glossary), which is not this step's and is committed
   apart.
+
+### Step 2: the package, the runner and `gates`
+
+*2026-10-12.* The owner committed Step 1 as `07b01e5` ("committed,
+proceed"), and 0008 Step 3's code as `79de568` before it.
+
+* **Files:** `tools/__init__.py`; `tools/verify/__init__.py`,
+  `__main__.py`, `config.py`, `proc.py`, `tree.py`, `gates.py` and
+  `verify.example.json`; `tools/verify/tests/__init__.py`, `support.py`,
+  `test_config.py`, `test_proc.py`, `test_tree.py` and `test_gates.py`.
+* **`gates`:** 25 gates, in the scratch `gates.sh`'s order, then CI's other
+  checks, the five `scripts/*_test.py` and the tools' own tests
+  (`python3 -m tools.verify gates --list`). `--only`, `--skip`,
+  `--no-history`, `--label`, `--out`; one `name: exit=N` line per gate,
+  its quoted lines, or its last 15 lines when it fails; a summary line;
+  exit 1 when any failed, 2 for an unknown gate name.
+* **Correction to the MADR (item 2), recorded there:** `make examples`
+  needs a git root, not tags, so only `apicheck` and `release-check` are
+  marked `needs_history`; `test_history` pins it.
+* **Tests:** `python3 -m unittest discover -s tools -t .`: "Ran 25 tests",
+  OK. `python3 -m compileall -q tools`: 0.
+* **Mutations,** through the scratch `mutate.py`, which gained a `cmd` key
+  for a non-Go command (Python, scratch only, until Step 3):
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | the runner stops at the first failing gate | `test_a_failure_does_not_stop_the_run`: "Lists differ: [0, 3] != [0, 3, 0]" |
+  | `tree` lists a deleted file | `test_tracked_untracked_ignored_and_deleted`: "['.gitignore', 'gone.go', 'kept.go', 'sub/new.py'] != ['.gitignore', 'kept.go', 'sub/new.py']" |
+  | `--no-history` runs the history gates anyway | `test_history_gates_are_skipped_without_history`: "0 is not None" |
+  | `apicheck` is not marked as needing history | `test_history`: "Items in the second set but not the first" |
+
+* **Acceptance:** `python3 -m tools.verify gates --label p8s3` over 0008
+  Step 3's 14 files, on macOS: "gates: 25 passed, 0 failed, 0 skipped",
+  with `pre-add-check` "14 file(s) clean", `apicheck` "against v0.12.0, 0
+  incompatible change(s)", `examples` clean, and `release-check` "240
+  file(s) clean".
+  * **Against `gates.sh`:** the MADR's Confirmation asks for the same exit
+    statuses as the scratch `gates.sh` on the same tree. That comparison
+    is not available: `gates.sh` last ran on Step 3's code before its lint
+    fixes (`pre-add-check`, `lint` and `release-check` failed there, every
+    other gate 0), and it is not run again. Every gate `gates.sh` ran is
+    in this list, under the same command.
+* **Identifier scan** of `tools/`, as one `git grep --untracked`: nothing.

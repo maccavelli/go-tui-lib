@@ -108,9 +108,12 @@ owner approved it on 2026-10-12 ("approved to proceed").
    environment and the lines worth quoting from its output. A step names
    its Go files; the runner writes each gate's full output to a file and
    prints one line per gate, `name: exit=N`, with the quoted lines. A gate
-   that needs git history, such as `make apicheck`, `make examples` and
+   that needs git history, such as `make apicheck`, ~~`make examples`~~ and
    `make release-check`, says so, and the runner skips it, saying it did,
-   in a copy with none.
+   in a copy with none. *Corrected 2026-10-12, in the PLAN's Step 2:*
+   `make examples` needs a git root (`scripts/go-examples.py:348`), which
+   a copy with an index has, and no tags; only `apicheck` and
+   `release-check`, which runs it, read the tags.
 3. **One gate definition on every host.** `remote` copies the tree (the
    files `tree.py` lists), and on the Windows host a git bundle of `main`
    and its tags, to a temporary directory on the host. It starts `python3

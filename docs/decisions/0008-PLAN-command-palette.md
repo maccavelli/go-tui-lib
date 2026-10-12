@@ -620,3 +620,9 @@ This step's gates, and its mutation proofs, which were killed before the
 lint fixes changed the code, run again through `tools/verify`: locally
 after 0018's Step 2, and on the two other hosts after its Step 4. The
 step's record is written then.
+
+*macOS, 2026-10-12:* the owner committed the step's code as `79de568`
+before its gates ran. `python3 -m tools.verify gates --label p8s3` over
+its 14 files: "gates: 25 passed, 0 failed, 0 skipped" (0018-PLAN Step 2's
+acceptance). The mutation proofs, and the Linux and Windows gates, are
+still to run.

@@ -1,0 +1,17 @@
+{
+  "hosts": {
+    "linux": {
+      "kind": "posix",
+      "ssh": "<linux-ssh-destination>",
+      "path_prepend": ["$HOME/sdk/go<version>/bin", "$HOME/go/bin"],
+      "python": "python3"
+    },
+    "windows": {
+      "kind": "windows",
+      "ssh": "<windows-ssh-destination>",
+      "path_prepend": [],
+      "python": "python3"
+    }
+  },
+  "identifiers": ["<account-name>", "<host-name>", "<org-domain>"]
+}
