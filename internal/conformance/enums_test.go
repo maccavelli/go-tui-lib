@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/maccavelli/go-tui-lib/command"
+	"github.com/maccavelli/go-tui-lib/fuzzy"
 	"github.com/maccavelli/go-tui-lib/glyph"
 	"github.com/maccavelli/go-tui-lib/keymap"
 	"github.com/maccavelli/go-tui-lib/launch"
@@ -39,6 +40,8 @@ var enums = map[string]func(int64) any{
 	"command.SourceKind":    as[command.SourceKind],
 	"command.Surface":       as[command.Surface],
 	"command.Verdict":       as[command.Verdict],
+	"fuzzy.CaseMode":        as[fuzzy.CaseMode],
+	"fuzzy.Grade":           as[fuzzy.Grade],
 	"glyph.Tier":            as[glyph.Tier],
 	"keymap.ConflictKind":   as[keymap.ConflictKind],
 	"keymap.Event":          as[keymap.Event],
