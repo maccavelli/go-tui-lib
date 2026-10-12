@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-10-12
 decision-makers: the repository owner
 consulted: the agent that executes the PLANs
@@ -30,8 +30,8 @@ bash:
 | :--- | :--- | :--- |
 | `gates.sh` | bash | every local gate of a step: gofmt, `make pre-add-check FILES=…`, `make lint`, the cross `go vet` for `freebsd/amd64`, `openbsd/amd64` and `linux/386`, `-race`, `-shuffle=on -count=2`, `LC_ALL=C`, workspace mode, `go mod tidy -diff`, `make vuln`, `scripts/go-modules.py --check`, `make apicheck`, `make examples`, `make release-check` |
 | `mutate.py` | Python | each mutation on a scratch copy of the tree; the named test must fail |
-| `wonder.py` | Python | copies the tree to the idle Linux host, runs a script there, redacts the output |
-| `wonder_gates.sh`, `wonder_s*.sh` | bash | the gates on that host, with no git history |
+| `<host>.py` | Python | copies the tree to the idle Linux host, runs a script there, redacts the output |
+| `<host>_gates.sh`, `<host>_s*.sh` | bash | the gates on that host, with no git history |
 | `winprobe_exist.sh` | bash | copies the tree to the Windows test host, runs a script there, redacts the output |
 | `make_remote_*.sh` | bash | the gates on that host, with history from a git bundle, one copy per step |
 | `names.py` | Python | checks a record's planned type names against every public package's |
@@ -83,7 +83,8 @@ hosts' names, which must never be committed, out of the repository?
 
 Chosen option: "A", because it is the owner's `tools/` directory, gives
 the gates one definition that every host runs, keeps the hosts' names out
-of the repository, and leaves `scripts/` and its callers as they are.
+of the repository, and leaves `scripts/` and its callers as they are. The
+owner approved it on 2026-10-12 ("approved to proceed").
 
 1. **Layout.** `tools/__init__.py` makes `tools` a package; `tools/verify`
    holds the modules, run as `python3 -m tools.verify <command>` from the

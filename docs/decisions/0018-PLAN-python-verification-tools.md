@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in-progress
 date: 2026-10-12
 associated-madr: "0018-MADR-python-verification-tools.md"
 ---
@@ -210,4 +210,18 @@ package is installed.
 
 ## Execution Record
 
-None yet.
+### Step 1: records
+
+*2026-10-12.* The owner approved the pair ("approved to proceed").
+
+* **The MADR** is `accepted`, with the approval in its outcome; **this
+  PLAN** is `in-progress`; `docs/README.md`'s rows say so.
+* **AGENTS.md** gains "Tools": `tools/verify`, its commands, that nothing
+  in `make`, CI or the commit gate runs it, and that its config lives
+  outside the repository and is never committed.
+* **[0008-PLAN-command-palette.md](0008-PLAN-command-palette.md)** gains a
+  Step 3 entry: its gates wait for this PLAN's Steps 2 and 4.
+* **Records and AGENTS.md only.** The tree also holds 0008 Step 3's
+  unfinished work (`fuzzy/`, `internal/conformance/enums_test.go`, its
+  record and the glossary), which is not this step's and is committed
+  apart.

@@ -379,6 +379,29 @@ Every script is Python. The one shell file left,
 same arguments and exit status, because the machine-wide commit gate runs
 it by that name; it holds no logic, and `shellcheck` checks it.
 
+## Tools
+
+`tools/verify` is the verification tooling a person or an agent runs to
+check a PLAN step (`docs/decisions/0018-MADR-python-verification-tools.md`),
+as `python3 -m tools.verify <command>` from the repository root: `gates`
+(every gate of a step, as data), `mutate` (mutation proofs on scratch
+copies), `remote` (the same gates on another host), `scan` (the
+identifier scan of a diff) and `names` (a record's planned type names).
+Nothing in `make`, CI or the commit gate runs it; CI only tests it.
+
+- It follows "Scripts": Python 3.12 or later, the standard library only,
+  argument lists and never `shell=True`.
+- **No shell scripts, for tooling or for a step's checks.** Shell runs one
+  command at a time, at most with one pipe; searching and editing use the
+  agent's native tools, not `grep`, `sed`, `awk` or `cut`. Logic that is
+  run a second time belongs in `tools/verify`, not a scratch directory.
+- **Its config is local:** the hosts and the identifier patterns are read
+  from `$XDG_CONFIG_HOME/go-tui-lib/verify.json` (default
+  `~/.config/go-tui-lib/verify.json`), or `--config`. It is never
+  committed, and no file under `tools/` names a host, an account or a real
+  path; `tools/verify/verify.example.json` shows the shape with
+  placeholders.
+
 ## Identifiers
 
 Nothing committed carries a hostname, account name, org-internal path, or a

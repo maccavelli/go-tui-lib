@@ -605,3 +605,18 @@ during the step for the gates on the idle Linux host as well.
     restarted once the lint and modernize findings above were fixed, since
     their copies predated the fix.
 * **Identifier scan** of the step's diff: nothing.
+
+### Step 3: `fuzzy`, the matcher
+
+*In progress, 2026-10-12.* The package and its tests are written, and the
+fuzzy and conformance tests pass, under `-race` too. D1 (above, in the
+step, and MADR A4) changed `TestCells`' oracle twice, each time by the
+owner's answer.
+
+*Paused, 2026-10-12.* The owner ruled out the bash scripts this PLAN's
+gates had run through, and approved
+[0018-PLAN-python-verification-tools.md](0018-PLAN-python-verification-tools.md).
+This step's gates, and its mutation proofs, which were killed before the
+lint fixes changed the code, run again through `tools/verify`: locally
+after 0018's Step 2, and on the two other hosts after its Step 4. The
+step's record is written then.
