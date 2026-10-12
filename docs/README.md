@@ -50,7 +50,7 @@ it was when they were written
 | 0017 | MADR | [Write the repository's scripts in Python, standard library only, and port the ten shell scripts](decisions/0017-MADR-python-repository-scripts.md) | accepted; built |
 | 0017 | PLAN | [Implement Python repository scripts: port the ten shell scripts, `go-fuzz` first with the case-6 fix](decisions/0017-PLAN-python-repository-scripts.md) | complete |
 | 0018 | MADR | [Keep the agent's verification tooling in the repository, as one modular Python package under `tools/`](decisions/0018-MADR-python-verification-tools.md) | accepted; A1 accepted; built |
-| 0018 | PLAN | [Implement the Python verification tools](decisions/0018-PLAN-python-verification-tools.md) | in-progress |
+| 0018 | PLAN | [Implement the Python verification tools](decisions/0018-PLAN-python-verification-tools.md) | complete |
 
 ## I want to…
 

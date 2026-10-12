@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-10-12
 associated-madr: "0018-MADR-python-verification-tools.md"
 ---
@@ -461,3 +461,20 @@ proceed").
   "9 passed, 0 failed"; `tools.verify scan`: "clean (5 pattern(s))".
 * **Close-out:** this PLAN becomes `complete` once CI is green on the
   pushed tree, which is the owner's to push.
+
+#### The push, CI and the close-out
+
+* The owner committed this step as `c0d1488`. Before the push, the agent
+  ran the disclosure guard over the nine outgoing commits,
+  `d9930f8..c0d1488`: exit 0, no output; and `python3 -m tools.verify scan
+  --base origin/main`: "clean (5 pattern(s))".
+* The owner pushed `main`. CI run `38289280504` on `c0d1488` concluded
+  `success`, every job: `modules`, `gates`, and `test` on
+  `ubuntu-24.04`, `macos-15` and `windows-2025`. In `gates`, the
+  `verification tools` step printed "Python 3.12.3", compiled `tools/`,
+  and "Ran 58 tests", OK.
+* Every item under Verification holds: the tests pass on macOS, the Linux
+  host (through `remote`, Step 4) and the Windows host, and on CI's 3.12;
+  every step's mutations are killed; 0008 Step 3's gates ran through the
+  tools on all three hosts; `scan` is clean; CI is green.
+* **This PLAN is `complete`,** and its `docs/README.md` row says so.
