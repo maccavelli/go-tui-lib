@@ -268,3 +268,36 @@ proceed"), and 0008 Step 3's code as `79de568` before it.
     other gate 0), and it is not run again. Every gate `gates.sh` ran is
     in this list, under the same command.
 * **Identifier scan** of `tools/`, as one `git grep --untracked`: nothing.
+
+### Step 3: `mutate`
+
+*2026-10-12.* The owner committed Step 2 as `babf00c` ("committed,
+proceed").
+
+* **Files:** `tools/verify/mutate.py`; `__main__.py` gains `mutate`;
+  `tools/verify/tests/test_mutate.py`.
+* **`mutate FILE.json [--work DIR] [--keep]`:** the scratch `mutate.py`'s
+  format, with its `cmd` key: `name`, `file`, `old`, `new`, then `test`
+  (after `go test -count=1`) or `cmd`, and optional `extra` and `env`. Each
+  mutation gets a fresh copy from `tree.copy`; every anchor must occur
+  exactly once, or the mutation is an `ERROR` naming the file and the
+  count; `KILLED` or `SURVIVED` with the exit status and up to 8 failing
+  lines; a summary line; exit 0 only when every mutation is killed, 2 for
+  a file that does not parse.
+* **Tests:** "Ran 33 tests", OK, among them a real `go test` in a
+  throwaway module (skipped where `go` is missing), and an `env` case that
+  survives only if the variable reaches the test.
+* **Mutations,** through `tools.verify mutate` itself, each on a copy:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | an anchor found twice is applied anyway | `test_killed_survived_and_errors`: "['KILLED', 'SURVIVED', 'SURVIVED', 'ERROR'] != ['KILLED', 'SURVIVED', 'ERROR', 'ERROR']" |
+  | a survivor exits zero | `test_exit_status`: "0 != 1" |
+  | the verdict is inverted | `test_exit_status`, `test_a_go_test`, `test_env_reaches_the_test`, `test_extra_edits` |
+
+* **Acceptance:** 0008 Step 3's nine mutations, on its committed code
+  (`79de568`), one anchor moved with its lint fixes: "mutate: 9 killed, 0
+  survived, 0 errors" (0008-PLAN's Step 3 entry quotes each).
+* **Checks** through `tools.verify gates --only`: `tools-tests`,
+  `markdownlint` and the five `script-test-*`, "7 passed, 0 failed";
+  `compileall` 0; the identifier scan of `tools/`: nothing.

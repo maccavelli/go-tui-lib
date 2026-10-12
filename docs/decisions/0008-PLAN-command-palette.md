@@ -626,3 +626,21 @@ before its gates ran. `python3 -m tools.verify gates --label p8s3` over
 its 14 files: "gates: 25 passed, 0 failed, 0 skipped" (0018-PLAN Step 2's
 acceptance). The mutation proofs, and the Linux and Windows gates, are
 still to run.
+
+*Mutations, 2026-10-12,* through `python3 -m tools.verify mutate` on the
+committed code, each on a copy: "mutate: 9 killed, 0 survived, 0 errors".
+The range-end anchor moved with the lint fixes (`End: us[pos[j]].end`).
+
+| Mutation | Killed by |
+| :--- | :--- |
+| grades are ignored in the order | `TestOrder/paths` and `/ZWJ_emoji`: `"file" ranks ["file" "file_test.go" … "src/file.go" …]` |
+| a range ends inside a grapheme | `TestProperties`: `in "п" the range {0 1} is out of place` |
+| the boundary bonus is dropped | `TestOrder/camelCase` and `/digits`: `"fb" ranks ["fooBar" "FooBar" "fab" "f_b" "foobar"]` |
+| ties are broken against input order | `TestRankStableAndTotal`: "the order is [6 3 1 4 2 0]; want [1 3 6 4 0 2]" |
+| Smart case is always insensitive | `TestSmartCase`: `"Fb" in "fooBar": matched true; want false` |
+| the 256-cluster cap is removed | `TestLongQuery`: "the query keeps 10000 clusters; want 256" |
+| the boost is unbounded | `TestBoostBounded`: `a boost of 1000 over a lead of 9: "xa__xb" first` |
+| `Cells` counts bytes | `TestCells`: `cells {13 32} cut … the range {28 47} is …` |
+| `fuzzy.Grade` is missing from the conformance enum table | `TestEveryEnumRoundTrips`: "fuzzy.Grade is an enum the table lacks" |
+
+The Linux and Windows gates wait for 0018-PLAN Step 4.
