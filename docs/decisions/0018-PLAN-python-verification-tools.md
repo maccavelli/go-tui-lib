@@ -30,6 +30,7 @@ gates have run through it on all three hosts.
 | 4 | `tools/verify/remote.py`, its tests | `remote`, for a `posix` and a `windows` host |
 | 5 | `tools/verify/scan.py`, `tools/verify/names.py`, their tests | `scan` and `names` |
 | 6 | `.github/workflows/ci.yml`, `docs/` | the checks in CI; the docs; the close-out |
+| 7 (A2) | `tools/verify/gates.py`, its tests, `docs/decisions/0008-PLAN-command-palette.md` | flushed and timed output; the default list without repeats |
 
 The standard library only; nothing is added to `go.mod`, and no Python
 package is installed.
@@ -187,6 +188,44 @@ package is installed.
 * `docs/README.md` rows; `docs/architecture.md` notes `tools/` beside
   `scripts/`.
 * This PLAN becomes `complete` after CI is green on the pushed tree.
+
+### Step 7 (A2): live output, timed gates, no repeats
+
+*Proposed 2026-10-14, for MADR amendment A2. It runs once the owner
+approves A2; this PLAN is then `in-progress` until Step 7 is done.*
+
+* **`gates.py`:**
+  * every line the runner emits is flushed;
+  * each gate is timed with `time.monotonic`, and reported as `name:
+    exit=N (Ns)`; the summary ends with the total;
+  * the default list as A2 item 3 gives it, `modernize` (`make
+    modernize`) in place of `lint`; the removed gates stay defined, and
+    `--only` runs them;
+  * `Gate` gains `without_history`, the environment a gate runs with when
+    there is no history, in place of being skipped; `release-check`'s is
+    `{"GO_PRECHECK_SKIP_APICHECK": "1"}`.
+* **Tests:**
+  * a gate's line carries its time, and the summary the total;
+  * the runner's lines reach a pipe as they are emitted, not at exit: a
+    child process runs two gates, the first printing at once and the
+    second sleeping, and the parent reads the first gate's line before
+    the second ends;
+  * the default list holds each A2 item 3 gate and none of the removed
+    ones; every removed gate is still selectable with `--only`;
+  * with `--no-history`, `release-check` runs with
+    `GO_PRECHECK_SKIP_APICHECK=1`, and a gate with no `without_history`
+    is still skipped.
+* **Mutations:** the flush is removed; the time is left out; `lint` is
+  back in the default list; `release-check` is skipped without history.
+* **0008-PLAN, Rule 3,** gains a dated note: its checks are met by the
+  default list, where `release-check` covers `pre-add-check`, `make
+  lint`'s golangci-lint, `go mod tidy -diff`, workspace mode, the modules
+  check, `make apicheck` and `make examples`, and `modernize` covers the
+  rest of `make lint`.
+* **Acceptance:** 0008 Step 5's gates run with the new list on all three
+  hosts, each gate timed, and the Windows run's lines arrive as its gates
+  end; the record gives each host's total and its slowest gates.
+* **Checks:** `tools-tests`, `markdownlint` and `scan`.
 
 ## Verification
 

@@ -225,6 +225,61 @@ details.
    temporary directory, which broke every `go build` there, was removed
    (D1).
 
+### A2 (2026-10-14): live output, timed gates, and no gate run twice
+
+*Status: proposed (2026-10-14).* At the owner's request, after
+[0008-PLAN-command-palette.md](0008-PLAN-command-palette.md) Step 4's
+Windows run showed nothing for its whole length. Implemented by
+[0018-PLAN-python-verification-tools.md](0018-PLAN-python-verification-tools.md)
+Step 7.
+
+**Found.**
+
+1. **Remote output comes all at once, at the end.** `gates` prints with
+   Python's default buffering, which holds whole blocks while stdout is a
+   pipe, as it is under `ssh`; the bootstrap's own line flushes, the gates'
+   do not. A run that is half done looks stuck.
+2. **The default list runs some checks twice.** `make release-check` runs
+   `scripts/go-precheck.py` over every module and file: gofmt,
+   golangci-lint for three targets, `go vet`, `go test`, `go mod tidy
+   -diff`, govulncheck, `go test` again in workspace mode,
+   `scripts/go-modules.py --check`, the API diff and the examples. So the
+   gates `pre-add-check` (on the step's files, a subset), `lint`'s
+   golangci-lint, `tidy`, `workspace-mode`, `modules`, `apicheck` and
+   `examples` repeat it. Two parts of the separate gates do not repeat:
+   * `make lint` runs `make modernize` (`go fix -diff` for three
+     targets) first, which the precheck does not;
+   * `make vuln` fails when govulncheck cannot reach its database, where
+     the precheck prints "skipped" and goes on.
+   * The precheck with no file list formats only tracked files, so the
+     step's new, untracked files need the `gofmt` gate.
+3. **What the repeats cost.** On 0008 Step 4's macOS run, from each
+   output file's last write: 386 s in all, of which the repeated gates
+   took 68 s (18%): `workspace-mode` 37, `pre-add-check` 16, `apicheck`
+   6, `lint` 5, `examples` 4. Most of the time is the test suite under
+   different flags, each its own check: `race` 89 s, `shuffle` 70,
+   `release-check` 63, `lc-all-c` 35, and the scripts' and tools' tests 59.
+   The Windows host's times are not known: `remote` removes its outputs.
+
+**Decided (proposed).**
+
+1. **Every line flushes**, so `remote` shows each gate as it ends.
+2. **Each gate is timed:** `name: exit=N (Ns)`, and the summary gives the
+   total, so the next record can say where a host's time goes.
+3. **The default list runs each check once:** `gofmt`, `modernize`, the
+   three cross `go vet`, `race`, `shuffle`, `lc-all-c`, `vuln`,
+   `release-check`, `shellcheck`, `markdownlint`, `actionlint`, the
+   `script-test-*` and `tools-tests`. `pre-add-check`, `lint`, `tidy`,
+   `workspace-mode`, `modules`, `apicheck` and `examples` leave the default
+   list, and stay runnable by name with `--only`.
+4. **Without history, `release-check` still runs,** with
+   `GO_PRECHECK_SKIP_APICHECK=1`, in place of being skipped; it is then
+   the one gate that lints, so a copy with no tags is not left unlinted.
+5. **What is not changed:** each step still runs every check the PLANs'
+   rules name, on every host; only the repeats go. The larger savings, the
+   scripts' and tools' tests only when a step touches them, or fewer test
+   runs, would drop checks, and are the owner's to ask for.
+
 ## More Information
 
 * The scratch tools named above are the ones
