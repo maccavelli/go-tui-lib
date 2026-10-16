@@ -19,6 +19,7 @@ from pathlib import Path
 
 from . import tree
 from .config import Host
+from .proc import say
 
 #: A label names the uploads, so it is kept to a file name's characters.
 LABEL = re.compile(r"[A-Za-z0-9._-]+")
@@ -90,7 +91,7 @@ def run(
     label: str,
     identifiers: Iterable[re.Pattern[str]] = (),
     transport: Transport = Transport(),
-    emit: Callable[[str], None] = print,
+    emit: Callable[[str], None] = say,
 ) -> int:
     """Run the gates on host, with gate_args, and return their exit
     status."""

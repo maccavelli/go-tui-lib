@@ -227,7 +227,8 @@ details.
 
 ### A2 (2026-10-14): live output, timed gates, and no gate run twice
 
-*Status: proposed (2026-10-14).* At the owner's request, after
+*Status: accepted (2026-10-14),* the owner's "approved". At the owner's
+request, after
 [0008-PLAN-command-palette.md](0008-PLAN-command-palette.md) Step 4's
 Windows run showed nothing for its whole length. Implemented by
 [0018-PLAN-python-verification-tools.md](0018-PLAN-python-verification-tools.md)
@@ -261,7 +262,7 @@ Step 7.
    `release-check` 63, `lc-all-c` 35, and the scripts' and tools' tests 59.
    The Windows host's times are not known: `remote` removes its outputs.
 
-**Decided (proposed).**
+**Decided.**
 
 1. **Every line flushes**, so `remote` shows each gate as it ends.
 2. **Each gate is timed:** `name: exit=N (Ns)`, and the summary gives the

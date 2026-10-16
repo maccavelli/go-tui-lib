@@ -1,6 +1,6 @@
 ---
-status: complete
-date: 2026-10-12
+status: in-progress
+date: 2026-10-14
 associated-madr: "0018-MADR-python-verification-tools.md"
 ---
 # Implement the Python verification tools
@@ -191,8 +191,8 @@ package is installed.
 
 ### Step 7 (A2): live output, timed gates, no repeats
 
-*Proposed 2026-10-14, for MADR amendment A2. It runs once the owner
-approves A2; this PLAN is then `in-progress` until Step 7 is done.*
+*Added 2026-10-14, for MADR amendment A2, which the owner approved the
+same day ("approved"); this PLAN is `in-progress` until Step 7 is done.*
 
 * **`gates.py`:**
   * every line the runner emits is flushed;
@@ -517,3 +517,73 @@ proceed").
   every step's mutations are killed; 0008 Step 3's gates ran through the
   tools on all three hosts; `scan` is clean; CI is green.
 * **This PLAN is `complete`,** and its `docs/README.md` row says so.
+
+### Step 7 (A2): live output, timed gates, no repeats
+
+*2026-10-15.* The owner committed the amendment as `e6ee706` and approved
+it ("approved", then "proceed").
+
+* **`proc.say`** prints each line with `flush=True`; `gates.run`,
+  `mutate.run` and `remote.run` emit through it by default, and the
+  `gates` command's header line uses it.
+* **`gates.py`:** each gate is timed with `time.monotonic` and reported as
+  `name: exit=N (Ns)`; the summary ends `in Ts`. `Gate` gains `default`
+  and `without_history`. `select` takes the default gates when `--only`
+  is empty. The default list is A2 item 3's; `pre-add-check`, `lint`,
+  `workspace-mode`, `tidy`, `modules`, `apicheck` and `examples` are
+  defined with `default=False`, and `--list` marks them "(only when
+  named)". `release-check`'s `without_history` is
+  `{"GO_PRECHECK_SKIP_APICHECK": "1"}`; `--no-history`'s help says so.
+* **Tests** (`tools/verify/tests/test_gates.py`, 58 to 62 tests):
+  `test_each_gate_is_timed`, `test_without_history_a_gate_may_run_differently`,
+  `TestLiveOutput`, and `TestDefaultGates.test_the_default_list`;
+  `test_select` and `test_history` cover `default` and
+  `without_history`; the existing line checks take the timed format.
+  A gate's time is matched as `(\d+s)` except in the timed test, which
+  compares it with the measured seconds, so a loaded host cannot round a
+  quick gate to `(1s)`.
+* **Found while proving the live-output test.** Its first form read the
+  first line and then asked `poll()` whether the child still ran. With
+  the flush removed the mutation survived: a child that flushes at exit
+  is still seen as running between the flush and its exit. A probe on a
+  scratch script measured the wait from the first line to EOF instead:
+  0.00s without the flush, 2.01s with it, against a two-second sleep. The
+  test now asserts that wait is over 1.5s against a three-second gate.
+* **Mutations** through `tools.verify mutate`, after the change above,
+  7 killed, 0 survived:
+  * the flush removed: "0.005475166020914912 not greater than 1.5 : the
+    first line came only when the run ended";
+  * the time left out of the line: "Regex didn't match: '^broken: exit=3
+    \\(\\d+s\\)$' not found in 'broken: exit=3'", and three more;
+  * the time not measured: "0.0 not greater than or equal to 1.2";
+  * `lint` back in the default list, and `select` ignoring `default`:
+    `test_the_default_list`, "Items in the first set but not the
+    second"; `test_select`, "['a', 'b', 'c'] != ['a', 'b']";
+  * `release-check` skipped without history: "None !=
+    {'GO_PRECHECK_SKIP_APICHECK': '1'}";
+  * the runner ignoring `without_history`: "5 != 0".
+* **0008-PLAN, Rule 3,** has the dated note.
+* **Acceptance.** 0008 Step 5 has no code yet, so its gates ran on this
+  step's tree: the default list Step 5 will run, with this step's files,
+  none of them Go, so `gofmt` is skipped. Each host: "18 passed, 0
+  failed, 1 skipped".
+
+  | Host | Total | Slowest gates |
+  | :--- | ---: | :--- |
+  | macOS | 310s | race 84s, shuffle 69s, release-check 65s, lc-all-c 35s |
+  | Linux | 860s | race 310s, shuffle 179s, release-check 153s, lc-all-c 81s |
+  | Windows | 1618s | release-check 1131s, race 171s, shuffle 156s, lc-all-c 75s |
+
+  macOS's 310s compares with 386s for 0008 Step 4's run under the old
+  list. On Windows the lines arrived as the gates ended: read mid-run,
+  the log held the first five gates' lines while `race` ran.
+  `release-check` took 70% of the Windows run; which of its parts is
+  slow there was not measured, as the gate's output stays on the host.
+* **Checks:** the remote runs uploaded the tests before their time
+  assertions were loosened, so `tools-tests` ran again on both hosts:
+  "Ran 62 tests", OK, on Linux (9s) and Windows (19s). Locally, through
+  `tools.verify gates --only`, `markdownlint` and `tools-tests`: "2
+  passed, 0 failed"; under Python 3.12, CI's floor, "Ran 62 tests", OK;
+  `tools.verify scan`: "clean (5 pattern(s))".
+* **Close-out:** this PLAN becomes `complete` once CI is green on the
+  pushed tree, which is the owner's to push.

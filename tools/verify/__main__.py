@@ -21,7 +21,7 @@ def cmd_gates(args: argparse.Namespace, gate_list: Callable[[Path], list[gates.G
     all_gates = gate_list(repo)
     if args.list:
         for g in all_gates:
-            print(g.name)
+            print(g.name if g.default else f"{g.name} (only when named)")
         return 0
     try:
         chosen = gates.select(all_gates, _names(args.only), _names(args.skip))
@@ -29,7 +29,7 @@ def cmd_gates(args: argparse.Namespace, gate_list: Callable[[Path], list[gates.G
         print(f"gates: {err}", file=sys.stderr)
         return 2
     out_dir = Path(args.out) if args.out else Path(tempfile.mkdtemp(prefix=f"verify-{args.label}-"))
-    print(f"gates: {args.label}: outputs in {out_dir}")
+    gates.say(f"gates: {args.label}: outputs in {out_dir}")
     files = [*args.files, *getattr(args, "rest", [])]
     outcomes = gates.run(chosen, repo=repo, files=files, out_dir=out_dir, history=not args.no_history)
     return 1 if any(o.failed for o in outcomes) else 0
@@ -90,7 +90,7 @@ def parser() -> argparse.ArgumentParser:
     g.add_argument("--out", help="where each gate's output is kept (default: a new temporary directory)")
     g.add_argument("--only", action="append", help="run only these gates, comma-separated")
     g.add_argument("--skip", action="append", help="skip these gates, comma-separated")
-    g.add_argument("--no-history", action="store_true", help="skip the gates that need git tags or history")
+    g.add_argument("--no-history", action="store_true", help="run with no git tags or history: a gate that needs them runs its fallback, or is skipped")
     g.add_argument("--list", action="store_true", help="list the gates and stop")
     g.set_defaults(func=cmd_gates)
     m = sub.add_parser("mutate", help="run mutation proofs: each named test must fail")

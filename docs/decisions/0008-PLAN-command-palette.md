@@ -129,6 +129,15 @@ and this repository's `workspace`, `command`, `when`, `keymap`, `theme`,
      host the owner named, under `-race`.
    * `make apicheck` must report no incompatible change: every change in
      this PLAN is an addition.
+
+   *2026-10-15, for
+   [0018-MADR-python-verification-tools.md](0018-MADR-python-verification-tools.md)
+   A2:* these checks are met by `python3 -m tools.verify gates`'s default
+   list, which runs each check once. `release-check` covers
+   `pre-add-check`, `make lint`'s golangci-lint, `go mod tidy -diff`,
+   workspace mode, the modules check, `make apicheck` and `make examples`;
+   `modernize` covers the rest of `make lint`. The gates that repeat them
+   are run by name, with `--only`, when a step needs one alone.
 4. **Conventions.** Every package follows AGENTS.md's TUI and API
    conventions. In particular: nothing writes to `os.Stdout` or
    `os.Stderr`, sets the alternate screen, installs a signal handler,

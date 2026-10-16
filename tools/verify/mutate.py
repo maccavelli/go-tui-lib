@@ -116,7 +116,7 @@ def apply(m: Mutation, root: Path) -> None:
         target.write_text(text.replace(e.old, e.new), encoding="utf-8")
 
 
-def run(mutations: Sequence[Mutation], *, repo: Path, work: Path, emit: Callable[[str], None] = print, keep: bool = False) -> list[Outcome]:
+def run(mutations: Sequence[Mutation], *, repo: Path, work: Path, emit: Callable[[str], None] = proc.say, keep: bool = False) -> list[Outcome]:
     """Run each mutation in its own copy of repo under work, and report it.
     A copy is removed after its test, unless keep."""
     outcomes = []

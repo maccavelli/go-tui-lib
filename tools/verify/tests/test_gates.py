@@ -5,15 +5,21 @@ from __future__ import annotations
 import contextlib
 import io
 import os
+import subprocess
+import sys
+import time
 import unittest
 from pathlib import Path
 
 from tools.verify import __main__ as cli
-from tools.verify import gates
+from tools.verify import gates, proc
 from tools.verify.tests.support import RepoCase, py
 
+ROOT = Path(__file__).resolve().parents[3]
 OK = py("print('fine'); print('Summary: 0 issues')")
 FAIL = py("import sys; print('broke at line 9'); sys.exit(3)")
+#: A gate line's time, whatever a loaded host makes it.
+TIME = r"\(\d+s\)"
 
 
 class TestRunner(RepoCase):
@@ -25,11 +31,17 @@ class TestRunner(RepoCase):
     def test_a_failure_does_not_stop_the_run(self) -> None:
         outcomes, lines = self.run_gates([gates.Gate("first", OK), gates.Gate("broken", FAIL), gates.Gate("last", OK)])
         self.assertEqual([o.status for o in outcomes], [0, 3, 0])
-        self.assertIn("broken: exit=3", lines)
-        self.assertIn("  | broke at line 9", lines)
-        self.assertIn("last: exit=0", lines)
-        self.assertEqual(lines[-1], "gates: 2 passed, 1 failed, 0 skipped")
+        self.assertRegex(lines[1], rf"^broken: exit=3 {TIME}$")
+        self.assertEqual(lines[2], "  | broke at line 9")
+        self.assertRegex(lines[3], rf"^last: exit=0 {TIME}$")
+        self.assertRegex(lines[-1], rf"^gates: 2 passed, 1 failed, 0 skipped in \d+s$")
         self.assertTrue((self.tmp / "out" / "broken.out").is_file())
+
+    def test_each_gate_is_timed(self) -> None:
+        outcomes, lines = self.run_gates([gates.Gate("slow", py("import time; time.sleep(1.2)")), gates.Gate("quick", OK)])
+        self.assertGreaterEqual(outcomes[0].seconds, 1.2)
+        self.assertEqual(lines[0], f"slow: exit=0 ({outcomes[0].seconds:.0f}s)")
+        self.assertEqual(lines[-1], f"gates: 2 passed, 0 failed, 0 skipped in {sum(o.seconds for o in outcomes):.0f}s")
 
     def test_history_gates_are_skipped_without_history(self) -> None:
         g = gates.Gate("tags", OK, needs_history=True)
@@ -38,6 +50,15 @@ class TestRunner(RepoCase):
         self.assertIn("tags: skipped (needs git history)", lines)
         outcomes, _ = self.run_gates([g], history=True)
         self.assertEqual(outcomes[0].status, 0)
+
+    def test_without_history_a_gate_may_run_differently(self) -> None:
+        code = "import os, sys; sys.exit(0 if os.environ.get('VERIFY_TEST_NO_HISTORY') == '1' else 5)"
+        g = gates.Gate("tags", py(code), needs_history=True, without_history={"VERIFY_TEST_NO_HISTORY": "1"})
+        outcomes, lines = self.run_gates([g], history=False)
+        self.assertEqual(outcomes[0].status, 0)
+        self.assertRegex(lines[0], rf"^tags: exit=0 {TIME}$")
+        outcomes, _ = self.run_gates([g], history=True)
+        self.assertEqual(outcomes[0].status, 5)
 
     def test_go_file_gates_need_go_files(self) -> None:
         g = gates.Gate("fmt", py("import sys; print(sys.argv[1:])") + (gates.GO_FILES,), needs_go_files=True)
@@ -53,7 +74,43 @@ class TestRunner(RepoCase):
 
     def test_quoted_lines_of_a_passing_gate(self) -> None:
         _, lines = self.run_gates([gates.Gate("lint", OK, quote=(r"^Summary:",))])
-        self.assertEqual(lines[:2], ["lint: exit=0", "  | Summary: 0 issues"])
+        self.assertRegex(lines[0], rf"^lint: exit=0 {TIME}$")
+        self.assertEqual(lines[1], "  | Summary: 0 issues")
+
+
+#: A child that runs a quick gate, then one that sleeps, and prints as the
+#: runner does by default.
+CHILD = """
+import sys
+from pathlib import Path
+from tools.verify import gates
+gates.run(
+    [gates.Gate("quick", (sys.executable, "-c", "pass")), gates.Gate("slow", (sys.executable, "-c", "import time; time.sleep(3)"))],
+    repo=Path(sys.argv[1]), files=[], out_dir=Path(sys.argv[2]),
+)
+"""
+
+
+class TestLiveOutput(RepoCase):
+    def test_each_line_arrives_as_its_gate_ends(self) -> None:
+        # stdout is a pipe here, as it is under remote: the quick gate's line
+        # must come through while the slow gate still runs. That is measured
+        # as the wait from it to the end of the output, since poll() can see
+        # a child that has flushed at exit as still running.
+        env = proc.environ({"PYTHONUNBUFFERED": None})
+        with subprocess.Popen(
+            [sys.executable, "-c", CHILD, str(self.repo), str(self.tmp / "out")],
+            cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+        ) as p:
+            assert p.stdout is not None
+            first = p.stdout.readline()
+            start = time.monotonic()
+            rest = p.stdout.read()
+            wait = time.monotonic() - start
+        self.assertEqual(p.returncode, 0, first + rest)
+        self.assertRegex(first, rf"^quick: exit=0 {TIME}\n$")
+        self.assertGreater(wait, 1.5, "the first line came only when the run ended")
+        self.assertRegex(rest, rf"(?m)^slow: exit=0 {TIME}$")
 
 
 class TestGate(unittest.TestCase):
@@ -62,27 +119,46 @@ class TestGate(unittest.TestCase):
         self.assertEqual(g.argv(["a.go", "b.go"]), ["make", "pre-add-check", "FILES=a.go b.go", "a.go", "b.go"])
 
     def test_select(self) -> None:
-        gs = [gates.Gate(n, OK) for n in ("a", "b", "c")]
-        self.assertEqual([g.name for g in gates.select(gs)], ["a", "b", "c"])
+        gs = [gates.Gate("a", OK), gates.Gate("b", OK), gates.Gate("c", OK, default=False)]
+        self.assertEqual([g.name for g in gates.select(gs)], ["a", "b"])
         self.assertEqual([g.name for g in gates.select(gs, only=["c", "a"])], ["a", "c"])
-        self.assertEqual([g.name for g in gates.select(gs, skip=["b"])], ["a", "c"])
+        self.assertEqual([g.name for g in gates.select(gs, skip=["b"])], ["a"])
         with self.assertRaisesRegex(gates.SelectError, "no gate z"):
             gates.select(gs, only=["z"])
 
 
+#: The default list (MADR A2), less the script tests, which follow scripts/.
+DEFAULT = {
+    "gofmt", "modernize", "vet-freebsd-amd64", "vet-openbsd-amd64", "vet-linux-386", "race", "shuffle", "lc-all-c",
+    "vuln", "release-check", "shellcheck", "markdownlint", "actionlint", "tools-tests",
+}
+#: The gates whose checks release-check runs, by name only.
+REPEATS = ["pre-add-check", "lint", "workspace-mode", "tidy", "modules", "apicheck", "examples"]
+
+
 class TestDefaultGates(unittest.TestCase):
     def setUp(self) -> None:
-        self.gates = {g.name: g for g in gates.default_gates(Path(__file__).resolve().parents[3])}
+        self.list = gates.default_gates(ROOT)
+        self.gates = {g.name: g for g in self.list}
 
     def test_history(self) -> None:
         needing = {n for n, g in self.gates.items() if g.needs_history}
         self.assertEqual(needing, {"apicheck", "release-check"})
+        self.assertEqual(self.gates["release-check"].without_history, {"GO_PRECHECK_SKIP_APICHECK": "1"})
+        self.assertIsNone(self.gates["apicheck"].without_history)
 
     def test_go_files(self) -> None:
         self.assertEqual({n for n, g in self.gates.items() if g.needs_go_files}, {"gofmt", "pre-add-check"})
 
+    def test_the_default_list(self) -> None:
+        chosen = [g.name for g in gates.select(self.list)]
+        self.assertEqual({n for n in chosen if not n.startswith("script-test-")}, DEFAULT)
+        self.assertIn("script-test-go-precheck", chosen)
+        self.assertEqual([n for n in chosen if n in REPEATS], [])
+        self.assertEqual(sorted(g.name for g in gates.select(self.list, only=REPEATS)), sorted(REPEATS))
+
     def test_the_step_gates_are_all_there(self) -> None:
-        for n in ("lint", "vet-linux-386", "race", "shuffle", "lc-all-c", "workspace-mode", "tidy", "vuln", "modules", "examples", "markdownlint", "actionlint", "tools-tests", "script-test-go-precheck"):
+        for n in (*DEFAULT, *REPEATS, "script-test-go-precheck"):
             self.assertIn(n, self.gates)
         self.assertEqual(self.gates["workspace-mode"].env, {"GOWORK": None})
         self.assertEqual(self.gates["race"].env, {"GOWORK": "off"})

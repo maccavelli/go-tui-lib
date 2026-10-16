@@ -31,6 +31,13 @@ class Result:
         return self.out.read_text(encoding="utf-8", errors="replace")
 
 
+def say(line: str) -> None:
+    """Print line at once. Under remote, stdout is a pipe, where Python
+    would otherwise hold whole blocks back until the run ends
+    (docs/decisions/0018-MADR-python-verification-tools.md A2)."""
+    print(line, flush=True)
+
+
 def environ(changes: Mapping[str, str | None], base: Mapping[str, str] = os.environ) -> dict[str, str]:
     """base with changes applied: a value sets a variable, None removes it."""
     env = dict(base)
