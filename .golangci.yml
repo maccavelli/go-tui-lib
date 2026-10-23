@@ -112,6 +112,7 @@ linters:
             - "**/internal/enum/*.go"
             - "**/internal/sanitize/*.go"
             - "**/layout/*.go"
+            - "**/safetext/*.go"
             - "**/when/*.go"
             - "!$test"
           deny:

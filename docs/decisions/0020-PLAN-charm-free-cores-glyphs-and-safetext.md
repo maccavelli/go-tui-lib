@@ -1292,3 +1292,148 @@ loop test); `command/registry.go` imports Bubble Tea
   Linux host `… in 814s`; the Windows host `… in 1954s`; `release-check`
   "243 file(s) clean" on each; `make apicheck` "against v0.12.0, 0
   incompatible change(s)".
+* Committed by the owner.
+
+### Step 4: `safetext` (2026-10-23)
+
+* **The package,** 7 files: `doc.go` (the grammar and what survives, the
+  stability line), `rules.go` (`Rules`, the five presets,
+  `DefaultMaxString`), `clean.go` (the parser, `Clean`, `IsClean`),
+  `utf8.go` (maximal-subpart decoding), `escape.go` (the removed sets,
+  `Escape`'s form), `sanitizer.go` (`Sanitizer`, `NewSanitizer`,
+  `ErrClosed`), `url.go` (`SafeURL`, `URLs`). Imports: the standard
+  library and `glyph`. `charmfree` covers `**/safetext/*.go`, and `cores`
+  holds `safetext`; `internal/conformance` passes.
+* **Exported beyond the step's list:** `DefaultMaxString`, the constant
+  `MaxString`'s zero means, and `ErrClosed`, `Write`'s error after
+  `Close`. Neither is a type, so the glossary does not list them.
+* **The grammar, as built.** Reading x/ansi v0.11.8 showed two
+  tokenizers, not one: `ansi.Strip` runs the DEC transition table
+  (`parser/transition_table.go`), and `ansi.DecodeSequence` a simpler
+  decoder; `internal/sanitize`'s `Line` uses the first and `Styled` the
+  second, and they split malformed input differently (a C0 inside a CSI,
+  an intermediate then a parameter, a DEL, UTF-8 inside an APC).
+  `safetext` follows the transition table, as 0009-MADR §2 names it, with
+  §2's rules where they differ from it:
+  * a C1 code point is its 7-bit form (x/ansi prints U+009B as a
+    character);
+  * BEL ends a DCS, SOS, PM or APC as well as an OSC (x/ansi keeps it as
+    data);
+  * a string past `MaxString` is abandoned, and the byte past it is text;
+  * every byte of a sequence is removed, so UTF-8 inside an SOS, PM or APC
+    is part of it (x/ansi's table leaves such a string and prints the
+    rest).
+
+  Where §2 is silent, the table's own recovery is kept: a C0 control
+  inside a CSI or an escape is executed as text and the sequence goes on;
+  DEL inside one is ignored; a parameter byte after an intermediate ends a
+  CSI there; an ESC right after a DCS's introducer is data. Step 5's
+  differential against `Styled` will meet the classes where
+  `DecodeSequence` splits malformed input differently; they are named
+  there.
+* **Invalid UTF-8.** The Unicode Standard 18.0's §3.9.6 has four worked
+  examples, Tables 3-8 to 3-11, read from the specification on
+  2026-10-23. The PLAN's "Table 3-8's example" is Table 3-8, non-shortest
+  forms; `TestUnicodeTables` pins all four, and the MADR's two, `E2 82`
+  and `C0 AF`.
+* **Tests:** `TestSequences` (0009-PLAN Step 2's classes, the codex string),
+  `TestControls`, `TestRemovedSet` (S1), `TestFlatten` (S3), `TestEscape`
+  (S4, each escape as `strconv.QuoteToASCII`), `TestKeepSGR`,
+  `TestVisible`, `TestMaxString`, `TestIsClean`, `TestCleanReturnsItsInput`
+  (the same string data), `TestSanitizerClose`, `TestUnicodeTables`,
+  `TestMaximalSubparts` (decode against a plain Table 3-7 over every one-,
+  two- and three-byte string of 0x80–0xFF and every lead byte with every
+  second byte), `TestDecodePartial`, `TestSafeURL`, `TestURLs`,
+  `TestAgainstStrip` (0009-PLAN Step 2's differential, 2000 generated
+  inputs from a fixed seed), `TestAllocations`. Every table case also runs
+  through a `Sanitizer` split at every byte, and through `IsClean`.
+* **`FuzzClean`:** 0009-PLAN Step 2's four properties and `IsClean`'s,
+  and a fifth: a `Sanitizer` written one byte at a time equals `Clean`.
+  Run locally for 120 s (9.2 million inputs) and, after the fast path
+  below, for 180 s (30.9 million inputs), with no failure.
+* **Performance, and what changed for it.** The first build met the
+  allocation bar but not the speed Step 5 needs. That step's bar is
+  `internal/sanitize` at the current commit, measured on this machine
+  (a scratch copy of `HEAD` with the benchmark added; Apple M1 Pro,
+  median of five):
+
+  | 4 KiB input | `Line` | `Styled` | `HasControl` |
+  | :--- | ---: | ---: | ---: |
+  | clean ASCII | 1.93 µs | 1.92 µs | 1.92 µs |
+  | clean CJK and emoji | 8.17 µs | 8.36 µs | 8.17 µs |
+  | tool output | 37.75 µs | 46.73 µs | 39.39 µs |
+  | styled | 17.69 µs | 13.32 µs | 17.82 µs |
+  | hostile | 16.46 µs | 32.34 µs | 16.51 µs |
+
+  The changes, each with the tests and the fuzz above passing: the
+  machine is readied in place rather than copied; text that passes as it
+  is goes out in one piece without being compared with itself; the
+  standard library's decoder reads well-formed UTF-8, and Table 3-7's
+  subparts are worked out only for the rest; a string's printable content
+  and a CSI's parameters are taken in bulk; a whole CSI or OSC of the
+  plainest form is decided in one step, as the parser would decide it,
+  which the byte-at-a-time fuzz property holds; the link check is a
+  scan of RFC 3986's scheme and authority, not `net/url`, which allocated
+  on every link (`StatusLine` on the styled input made 261 allocations
+  before it). `Rules.LinkSchemes`'s documentation says the rule exactly.
+* **Benchmarks, after** (median of five, the same machine):
+
+  | 4 KiB input | `Line()` | `Rules{Flatten, KeepSGR}` | `IsClean(Line())` |
+  | :--- | ---: | ---: | ---: |
+  | clean ASCII | 2.04 µs, 0 allocs | 2.04 µs, 0 allocs | 2.02 µs |
+  | clean CJK and emoji | 8.64 µs, 0 allocs | 8.63 µs, 0 allocs | 8.60 µs |
+  | tool output | 9.70 µs, 1 alloc | 10.86 µs, 1 alloc | 0.11 µs |
+  | styled | 6.52 µs, 1 alloc | 6.31 µs, 0 allocs | 0.10 µs |
+  | hostile | 14.38 µs, 1 alloc | 15.21 µs, 1 alloc | 0.17 µs |
+
+  1 MiB of prose: 0.91 ms, 0 allocations; 1 MiB half escapes: 1.58 ms,
+  1 allocation. A warm `Sanitizer.Write` allocates nothing on any input.
+  Each is within 1.10 of the bar, clean ASCII the nearest (2.04 µs
+  against 2.11 µs for `Styled`'s); Step 5 measures the wrappers
+  themselves.
+* **Mutations,** through `python3 -m tools.verify mutate`:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | BEL no longer ends an OSC (the parser) | `TestSequences`: `U+009D is OSC: Clean("a\u009d0;t\ab") = "a", want "ab"` |
+  | encoded C1 code points pass through | `TestSequences`: `U+009D is OSC: … = "a\u009d0;tb", want "ab"` |
+  | the `Sanitizer` forgets its state between writes | `TestSequences`: `Sanitizer split at 1 of "\x1b]0;x\x1b\\\x1b\\b" gives "]0;xb"; Clean gives "b"` |
+  | `MaxString` is ignored (the parser) | `TestMaxString`: `Clean = "a", want a6789b` |
+  | `MaxString` is ignored (the whole-sequence path) | `TestMaxString`: `Clean = "ab", want a6789b: the string abandoned before its BEL` |
+  | `SafeURL` accepts any scheme | `TestSafeURL`: `SafeURL("javascript:alert(1)") = …, true; want false` |
+  | invalid UTF-8 is one U+FFFD per byte | `TestUnicodeTables`: `Table 3-11: … = "��������A", want "����A"`; `TestMaximalSubparts` |
+  | `Flatten` turns each break, not each run, into a space | `TestFlatten`: `Line: Clean("a\n\x00\nb") = "a  b", want "a b"` |
+  | `Escape` drops instead of escaping | `TestEscape` |
+  | `KeepSGR` keeps 33 parameters | `TestKeepSGR`: `33 parameters: …` |
+  | `KeepSGR` keeps an SGR with a prefix | `TestKeepSGR`: `a prefix is not an SGR: Clean("\x1b[?1mx") = "\x1b[?1mx", want "x"` |
+  | `IsClean` true when only a prefix survives | `TestIsClean`: `IsClean("a\u200b", Text) = true, want false` |
+  | the whole-sequence path keeps any OSC | `TestKeepSGR`: `other OSC removed: Clean("\x1b]0;title\ax") = "\x1b]0;title\ax", want "x"` |
+
+  *Replaced, Rule 4:* "BEL no longer ends an OSC (the whole-sequence
+  path)" survived. It is an equivalent mutant: with BEL refused there, the
+  OSC falls to the parser, which removes it the same way, so only speed
+  changes. It was replaced by the last row, a change the path's output
+  shows. `TestIsClean` was added so that the step's `IsClean` mutation
+  had a test that can see it: a removal at the very end, where the output
+  is a prefix of the input.
+* **Found while building, and fixed:** `TestMaxString`'s first expectation
+  counted wrong (the hidden 8 bytes are `0;012345`); `TestAllocations`'s
+  first form took the styled input for dirty under `StatusLine`, where it
+  is clean; the editing tools turned `\uXXXX` escapes into the raw
+  characters in ten places, bidirectional controls among them, which a
+  scan of every new file found and a script turned back into escapes;
+  none is left in any file of the step.
+* **Lint:** `golangci-lint` for linux, darwin and windows, 0 issues, after
+  five findings were fixed (an `errors.Is`, a one-case switch, two De
+  Morgan rewrites, an unused helper); `modernize` asked for one range loop
+  in a test.
+* **Gates,** `python3 -m tools.verify gates` over the step's 15 files
+  (`safetext/*.go`, `internal/conformance/charmfree_test.go`,
+  `.golangci.yml`). The first run failed on every host at `modernize`
+  alone (`go fix` asked for `for c := range rune(0x20)` in
+  `TestControls`), which was applied; the second, nothing skipped: macOS
+  `gates: 19 passed, 0 failed, 0 skipped in 384s`; the Linux host
+  `… in 811s`; the Windows host `… in 1994s`. `release-check` is clean on
+  each (243 files on macOS, 256 on the hosts, whose copies' index tracks
+  the new files); `make apicheck` "against v0.12.0, 0 incompatible
+  change(s)".

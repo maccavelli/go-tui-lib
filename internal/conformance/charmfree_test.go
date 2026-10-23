@@ -21,6 +21,7 @@ var cores = []string{
 	"internal/enum",
 	"internal/sanitize",
 	"layout",
+	"safetext",
 	"when",
 }
 
