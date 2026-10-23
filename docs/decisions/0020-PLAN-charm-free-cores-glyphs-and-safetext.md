@@ -1197,3 +1197,57 @@ loop test); `command/registry.go` imports Bubble Tea
   identifier scan; a scan for raw bidi, format and control characters
   over the changed records. Their results are in the handoff.
 * **Records only:** no source, test, CI or configuration file changed.
+* Committed by the owner as `44a4890`.
+
+### Step 2: the closure gate (2026-10-23)
+
+* **Facts re-read:** `git diff 63c68d6 HEAD` over `internal/conformance`,
+  `.golangci.yml` and the six cores is empty; the facts table stands.
+* **`internal/conformance/charmfree_test.go`** (new): `cores` (`fuzzy`,
+  `glyph`, `internal/enum`, `internal/sanitize`, `layout`, `when`);
+  `charm`; `TestCharmPredicate`; `listDeps`, one
+  `go list -e -deps` per GOOS over every core, so a missing core comes back
+  as an error line rather than failing the run; `charmChains`, the
+  breadth-first walk, which stops at a Charm package so each chain names
+  the Charm package a non-Charm one imports; `TestCoresAreCharmFree`,
+  one subtest per GOOS.
+* **`.golangci.yml`:** the `charmfree` rule after `xterm`, as the step
+  gives it, each `deny` with a `desc` naming 0020-MADR D11 (D2 for
+  `internal/teamsg`), and a comment that its file list and `cores` stay
+  the same.
+* **On the tree:** `TestCharmPredicate` and `TestCoresAreCharmFree` pass,
+  linux, darwin and windows; `golangci-lint` over the six cores reports
+  `0 issues.`
+* **Mutations,** through `python3 -m tools.verify mutate`, each killed:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | `glyph/glyph.go` imports `_ "charm.land/bubbletea/v2"` | `TestCoresAreCharmFree`, for each GOOS: `glyph (GOOS=linux) links charm.land/bubbletea/v2: glyph → charm.land/bubbletea/v2` |
+  | `internal/enum` imports the same | `TestCoresAreCharmFree`: `fuzzy (GOOS=linux) links charm.land/bubbletea/v2: fuzzy → internal/enum → charm.land/bubbletea/v2`, and the same for `glyph`, `layout`, `when` and `internal/enum` itself |
+  | `cores` gains `nosuch` | `TestCoresAreCharmFree`: `cores lists nosuch, which go list does not find (stat …/nosuch: directory not found)` |
+  | `charm` lets any `github.com/charmbracelet/x/` path through | `TestCharmPredicate`: `charm("github.com/charmbracelet/x/term") = false, want true`, and `x/ansix` |
+  | `glyph/glyph.go` imports and uses Bubble Tea (lint) | depguard: `glyph/glyph.go:17:2: import 'charm.land/bubbletea/v2' is not allowed from list 'charmfree': no Bubble Tea in a Charm-free core; …` |
+  | `charmfree` also covers `**/termcap/*.go` (lint over `./termcap/...`) | depguard, four issues: `termcap/caps.go:9:2` (`colorprofile`), `termcap/prober.go:13:2` (Bubble Tea), `termcap/prober.go:17:2` (`internal/teamsg`), `termcap/views.go:7:2` (Bubble Tea) |
+
+  *Replaced, Rule 4:* the step's lint mutation as first written, a blank
+  import `_ "charm.land/bubbletea/v2"` in `glyph/glyph.go`, failed lint
+  through revive's `blank-imports` rule alone (`a blank import should be
+  only in a main or test package…`), not through depguard, so it proved
+  nothing about `charmfree`. It was replaced by a named import that a
+  type alias uses, which depguard refuses (the fifth row; `unused` also
+  reports the alias).
+* **Controls,** read from the last mutation's output: no file under
+  `termcap/termcaptest/`, whose `termcaptest.go` imports Bubble Tea and
+  `colorprofile`, is flagged, so `*` does not reach a sub-package; and no
+  `termcap` test file, several of which import Bubble Tea and
+  `colorprofile`, is flagged, so `!$test` leaves tests out.
+* **Gates,** `python3 -m tools.verify gates` over the step's two files,
+  nothing skipped:
+  * macOS: `gates: 19 passed, 0 failed, 0 skipped in 446s`;
+    `release-check` "242 file(s) clean"; `make apicheck`
+    "against v0.12.0, 0 incompatible change(s)";
+  * the Linux host: `gates: 19 passed, 0 failed, 0 skipped in 981s`;
+  * the Windows host: `gates: 19 passed, 0 failed, 0 skipped in 1982s`.
+
+  The hosts' `release-check` counts 243 files, their copies' index
+  tracking the new test file.

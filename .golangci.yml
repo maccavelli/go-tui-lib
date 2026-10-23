@@ -97,6 +97,38 @@ linters:
           deny:
             - pkg: github.com/charmbracelet/x/term
               desc: "x/term only in launch (docs/decisions/0013-MADR-cli-integration-helpers.md A1, docs/decisions/0014-MADR-native-integration-api.md W1)"
+        # The cores link no Charm module but x/ansi, so a line-mode CLI may
+        # import them (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md
+        # D1, D11). Each pattern is one core's own non-test files: depguard
+        # compiles it with '/' as the separator, so "*" does not reach a
+        # sub-package, such as an adapter. internal/conformance's
+        # TestCoresAreCharmFree checks the whole closure; this rule fails a
+        # direct import at lint. Keep the two lists the same.
+        charmfree:
+          list-mode: lax
+          files:
+            - "**/fuzzy/*.go"
+            - "**/glyph/*.go"
+            - "**/internal/enum/*.go"
+            - "**/internal/sanitize/*.go"
+            - "**/layout/*.go"
+            - "**/when/*.go"
+            - "!$test"
+          deny:
+            - pkg: charm.land/bubbletea/v2
+              desc: "no Bubble Tea in a Charm-free core; its form goes in the adapter (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md D11)"
+            - pkg: charm.land/bubbles/v2
+              desc: "no Bubbles in a Charm-free core (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md D11)"
+            - pkg: charm.land/lipgloss/v2
+              desc: "no Lip Gloss in a Charm-free core (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md D11)"
+            - pkg: github.com/charmbracelet/colorprofile
+              desc: "no colorprofile in a Charm-free core (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md D11)"
+            - pkg: github.com/charmbracelet/ultraviolet
+              desc: "no ultraviolet in a Charm-free core (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md D11)"
+            - pkg: github.com/charmbracelet/x/term
+              desc: "no x/term in a Charm-free core (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md D11)"
+            - pkg: github.com/maccavelli/go-tui-lib/internal/teamsg
+              desc: "internal/teamsg imports Bubble Tea: adapters only (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md D2, D11)"
     errcheck:
       check-type-assertions: true
       check-blank: true
