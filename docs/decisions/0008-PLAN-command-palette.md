@@ -30,6 +30,17 @@ The steps are rewritten against the tree at `a0537d3`, after 0006 and
   each with the recommendation, and approved execution ("committed,
   proceed").
 
+**Note, 2026-10-23, for
+[0020-MADR-charm-free-cores-glyphs-and-safetext.md](0020-MADR-charm-free-cores-glyphs-and-safetext.md)
+Q7.** Steps 1 to 4 stand. Steps 5 to 9 wait until
+[0020-PLAN-charm-free-cores-glyphs-and-safetext.md](0020-PLAN-charm-free-cores-glyphs-and-safetext.md)
+is `complete`, and `palette` is then written against `commandtea` and
+`keymaptea`, the Bubble Tea forms of `command` and `keymap` that 0020
+moves out of the cores. `fuzzy` ships in `v0.13.0` by 0020-PLAN Step 6,
+so Step 9's release is the next minor release after `v0.14.0`, and its
+migration section names that version. Nothing else here changes until
+this PLAN is next amended, before Step 5.
+
 ## Goal
 
 Ship `fuzzy` and `palette`, so that a program finds and runs any command,

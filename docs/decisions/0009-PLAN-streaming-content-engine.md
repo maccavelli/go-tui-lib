@@ -46,6 +46,19 @@ stays proposed until the owner approves its execution.
   first step that builds one.
 * `workspace/render.go`'s `local` is now at `:460`.
 
+*2026-10-23, for
+[0020-MADR-charm-free-cores-glyphs-and-safetext.md](0020-MADR-charm-free-cores-glyphs-and-safetext.md)
+D9:* Step 2 (`safetext`) is carried out by
+[0020-PLAN-charm-free-cores-glyphs-and-safetext.md](0020-PLAN-charm-free-cores-glyphs-and-safetext.md)
+Step 4, with the names of 0009-MADR A4 (`Rules`, `Sanitizer`,
+`NewSanitizer`) and 0020-MADR D9's decisions: what is removed is at least
+what `internal/sanitize` removes, invalid UTF-8 is one U+FFFD per maximal
+subpart, `Flatten` collapses runs, `Escape` keeps what `Tabs` and
+`Newlines` keep, `IsClean` is added, and `internal/sanitize` wraps it.
+`glyph.Set.Control` is added there too. Step A1.1 here then adds
+`Interpret` and nothing else. This PLAN stays proposed; its Step 2 is
+not run from here.
+
 ## Goal
 
 Ship `safetext`, `frame`, `inputfilter`, `stream` and `stream/glamourmd`,

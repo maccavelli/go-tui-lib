@@ -28,8 +28,23 @@ are the only ones; none is added.
 
 ## Reserved by accepted records
 
-None today. A name an accepted record takes before it is built is listed
-here, and a later record does not reuse it for something else.
+A name an accepted record takes before it is built is listed here, and a
+later record does not reuse it for something else.
+
+[0020-MADR-charm-free-cores-glyphs-and-safetext.md](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
+(A1.3, A2.2) reserves these, built by its PLAN:
+
+| Name | Means | Belongs to |
+| :--- | :--- | :--- |
+| `Rules`, `Sanitizer` | what survives cleaning; the streaming cleaner | `safetext` |
+| `KeyEvent`, `Mod`, `Decoder`, `Input`, `InputKind` | a decoded key, its modifiers, the byte decoder, what it yields and its kind | `termkey` |
+| `ColorProfile` | the colour profile, in `Caps` | `termcap` |
+| `Probe`, `ProbeEvent`, `ProbeEventKind`, `ProbeHook` | the I/O-free probe engine, an event it returns and its kind, a program hook it asks the host to run | `termcap` |
+| `ReplyKind`, `ModeSetting` | what a `Reply` is; a DECRPM setting | `termcap` |
+| `Effect` | a follow-up a host runs, in `command.Result` | `command` |
+
+`Prober` moves from `termcap` to `termcap/termcaptea` in `v0.14.0`, with
+one meaning; `Query` and `Reply` stay `termcap`'s.
 
 ## Built from those records
 
