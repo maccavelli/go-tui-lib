@@ -51,6 +51,8 @@ it was when they were written
 | 0017 | PLAN | [Implement Python repository scripts: port the ten shell scripts, `go-fuzz` first with the case-6 fix](decisions/0017-PLAN-python-repository-scripts.md) | complete |
 | 0018 | MADR | [Keep the agent's verification tooling in the repository, as one modular Python package under `tools/`](decisions/0018-MADR-python-verification-tools.md) | accepted; A1, A2 accepted; A1 built |
 | 0018 | PLAN | [Implement the Python verification tools](decisions/0018-PLAN-python-verification-tools.md) | in-progress (Step 7, A2) |
+| 0019 | MADR | [Skip the full CI for a push or pull request that changes only the documents, and check them with a one-job docs workflow instead](decisions/0019-MADR-skip-full-ci-for-docs-only-pushes.md) | accepted |
+| 0019 | PLAN | [Implement: a docs-only push or pull request runs a docs job instead of the full CI](decisions/0019-PLAN-skip-full-ci-for-docs-only-pushes.md) | in-progress |
 
 ## I want to…
 

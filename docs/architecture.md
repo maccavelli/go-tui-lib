@@ -160,6 +160,7 @@ Makefile                    development targets (below)
 .gitignore
 .github/workflows/
   ci.yml                    CI
+  docs.yml                  the documents' checks, for a docs-only change
 scripts/
   go-precheck.py            the pre-add check, per module
   go-precheck.sh            a shim that runs it, for the machine-wide gate
@@ -373,6 +374,19 @@ docs/
       passes, on the runner's `python3` 3.12.
   - One run per ref (`concurrency`, cancel in progress). Actions are pinned
     to commit SHAs.
+  - **Documents only:** a push to `main` or a pull request that changes
+    only Markdown at the root or under `docs/`, `.claude/`, `.grok/` or
+    `.opencode/` skips `ci.yml` (`paths-ignore`) and runs `docs.yml`
+    instead. Markdown under `command/testdata/`, which the tests read, is
+    never skipped, and a tag push is never path-filtered
+    ([0019-MADR-skip-full-ci-for-docs-only-pushes.md](decisions/0019-MADR-skip-full-ci-for-docs-only-pushes.md)).
+- **Docs** (`.github/workflows/docs.yml`) runs on a push to `main` or a
+  pull request that changes those documents, `.markdownlint-cli2.jsonc`
+  or the workflow itself. One `ubuntu-24.04` job runs `markdownlint-cli2`
+  0.23.2, with `ci.yml`'s command, and
+  `scripts/go-examples.py --check-guide`, the guides' excerpt check. Its
+  `paths` list `ci.yml`'s five `paths-ignore` patterns, and the two lists
+  must agree. A change to code and documents runs both workflows.
 
 ## What is not here
 

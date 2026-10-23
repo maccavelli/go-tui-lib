@@ -1,9 +1,16 @@
 name: CI
+# A push or pull request that changes only these documents runs
+# .github/workflows/docs.yml instead, whose paths list the same patterns;
+# the two lists must agree. A tag push is never path-filtered. Markdown
+# under command/testdata/ stays out of the list, since tests read it
+# (docs/decisions/0019-MADR-skip-full-ci-for-docs-only-pushes.md).
 on:
   push:
     branches: [main]
     tags: ['v*']
+    paths-ignore: ['*.md', 'docs/**/*.md', '.claude/**/*.md', '.grok/**/*.md', '.opencode/**/*.md']
   pull_request:
+    paths-ignore: ['*.md', 'docs/**/*.md', '.claude/**/*.md', '.grok/**/*.md', '.opencode/**/*.md']
 
 # One run per ref: a newer push, or a duplicate trigger for the same one,
 # cancels the older run

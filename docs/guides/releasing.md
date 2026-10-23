@@ -62,12 +62,23 @@ echo "refs/heads/main $(git rev-parse HEAD) refs/heads/main $(git rev-parse orig
 1. `make release-check`, `make lint` and `make vuln` pass.
 2. The disclosure guard passes, the owner pushes `main`, and CI passes:
    every `test (<module>, <os>)` entry, `modules` and `gates`.
-3. The owner tags the commit CI passed, and pushes the tag:
+
+   A push that changes only documents (Markdown at the root, or under
+   `docs/`, `.claude/`, `.grok/` or `.opencode/`) runs the Docs workflow
+   instead of CI, and Docs passes. The code proof is then the last full
+   CI run on `main`, on the last commit that changed anything else: a
+   commit that changes only documents changes no code
+   ([0019-MADR-skip-full-ci-for-docs-only-pushes.md](../decisions/0019-MADR-skip-full-ci-for-docs-only-pushes.md)).
+3. The owner tags the commit CI passed, or after a docs-only push the
+   commit Docs passed, and pushes the tag:
 
    ```bash
    git tag -a vX.Y.Z -m "vX.Y.Z" <commit>
    git push origin vX.Y.Z
    ```
+
+   A root tag push runs the full CI, since a tag is never path-filtered,
+   and it passes too.
 
 4. Run the consumer smoke test below for the root.
 
@@ -79,7 +90,11 @@ adapter" shows.
 
 1. The adapter's `go.mod` already requires a published root tag.
 2. `make release-check` passes, the disclosure guard passes before the
-   push, and CI passes on the pushed commit.
+   push, and CI passes on the pushed commit. A push that changes only
+   documents runs Docs instead, as in "Release the root alone", and the
+   code proof is the last full CI run, on the last commit that changed
+   anything else. An adapter tag (`<dir>/vX.Y.Z`) runs no CI at all, so
+   for an adapter that last full run is the only code proof.
 3. The owner tags it with the directory prefix, and pushes the tag:
 
    ```bash
@@ -94,8 +109,10 @@ adapter" shows.
 The change lands in two steps, because an adapter can only require a root
 that is already published.
 
-1. **The root first.** The root's part lands, CI passes, and the owner tags
-   `vX.Y.Z`, as above. While developing, `go.work` builds the adapter
+1. **The root first.** The root's part lands, CI passes (or, after a
+   docs-only push, Docs passes and the last full CI run is the code
+   proof), and the owner tags `vX.Y.Z`, as above; the tag push runs the
+   full CI. While developing, `go.work` builds the adapter
    against the unreleased root. Until this tag exists, the adapter's
    `GOWORK=off` gates fail, by design: it does not yet build against any
    root a consumer can get.
@@ -108,7 +125,9 @@ that is already published.
    ```
 
    The adapter's part lands, CI passes, and the owner tags
-   `stream/glamourmd/vA.B.C`.
+   `stream/glamourmd/vA.B.C`. The adapter's tag runs no CI, so that CI
+   run, or after a docs-only push the last full CI run, is its only code
+   proof.
 
 ## Retire a module
 
