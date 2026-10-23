@@ -54,7 +54,7 @@ it was when they were written
 | 0019 | MADR | [Skip the full CI for a push or pull request that changes only the documents, and check them with a one-job docs workflow instead](decisions/0019-MADR-skip-full-ci-for-docs-only-pushes.md) | accepted |
 | 0019 | PLAN | [Implement: a docs-only push or pull request runs a docs job instead of the full CI](decisions/0019-PLAN-skip-full-ci-for-docs-only-pushes.md) | in-progress |
 | 0020 | MADR | [Give a line-mode CLI Charm-free cores of `termcap`, `termsvc`, `command` and `keymap`, with their Bubble Tea forms in sub-packages, status and meter glyphs in `glyph`, and `safetext` as the one sanitizer](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md) | accepted; Q1–Q8 answered; A1.1 answered (c); A1.2–A1.3 recorded; A2 accepted |
-| 0020 | PLAN | [Implement Charm-free cores of `termcap`, `termsvc`, `command` and `keymap`, the `termkey` decoder, the status and meter glyphs, and `safetext`](decisions/0020-PLAN-charm-free-cores-glyphs-and-safetext.md) | in-progress (Step 2) |
+| 0020 | PLAN | [Implement Charm-free cores of `termcap`, `termsvc`, `command` and `keymap`, the `termkey` decoder, the status and meter glyphs, and `safetext`](decisions/0020-PLAN-charm-free-cores-glyphs-and-safetext.md) | in-progress (Step 3) |
 
 ## I want to…
 

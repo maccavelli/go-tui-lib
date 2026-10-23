@@ -50,9 +50,9 @@ func TestEveryGlyphIsOneCell(t *testing.T) {
 				t.Errorf("%s = %q is %d runes, want 1", path, s, utf8.RuneCountInString(s))
 			}
 		})
-		// 4 borders × 13 glyphs, plus 18 single glyphs.
-		if n != 70 {
-			t.Errorf("%s: walked %d glyphs, want 70", name, n)
+		// 4 borders × 13 glyphs, plus 26 single glyphs.
+		if n != 78 {
+			t.Errorf("%s: walked %d glyphs, want 78", name, n)
 		}
 	}
 }
@@ -85,6 +85,52 @@ func TestPromptAndMask(t *testing.T) {
 	}
 }
 
+// TestStatusAndMeter pins the status, heading, meter and control glyphs
+// of both sets (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md
+// D8): each field's two forms differ, and the four status glyphs are four
+// shapes in each set, so a state never rests on colour alone.
+func TestStatusAndMeter(t *testing.T) {
+	type row struct{ done, failed, running, pending, heading, fill, track, control string }
+	get := func(s Set) row {
+		return row{s.Done, s.Failed, s.Running, s.Pending, s.Heading, s.MeterFill, s.MeterTrack, s.Control}
+	}
+	want := map[string]row{
+		"Unicode": {"✓", "✗", "●", "○", "▸", "━", "╌", "␛"},
+		"ASCII":   {"+", "x", "*", "-", ">", "#", "-", "^"},
+	}
+	sets := map[string]Set{"Unicode": Unicode(), "ASCII": ASCII()}
+	for name, set := range sets {
+		if got := get(set); got != want[name] {
+			t.Errorf("%s: %+v, want %+v", name, got, want[name])
+		}
+		status := []string{set.Done, set.Failed, set.Running, set.Pending}
+		for i, a := range status {
+			for _, b := range status[i+1:] {
+				if a == b {
+					t.Errorf("%s: the status glyph %q stands for two states", name, a)
+				}
+			}
+		}
+	}
+	u, a := reflect.ValueOf(get(Unicode())), reflect.ValueOf(get(ASCII()))
+	for i := range u.NumField() {
+		if u.Field(i).String() == a.Field(i).String() {
+			t.Errorf("%s is %q in both sets", u.Type().Field(i).Name, u.Field(i).String())
+		}
+	}
+}
+
+// TestControlIsNotEmoji pins Control's Unicode form, U+241B SYMBOL FOR
+// ESCAPE. Checked against Unicode 18.0's emoji-data.txt when it was
+// chosen, it has no emoji property, so no terminal draws it two cells wide
+// as an emoji presentation (0020-PLAN Step 3); a replacement is checked the
+// same way before it changes this test.
+func TestControlIsNotEmoji(t *testing.T) {
+	if got := Unicode().Control; got != "␛" {
+		t.Errorf("Unicode().Control = %q (%U), want U+241B, the code point checked against emoji-data.txt", got, []rune(got))
+	}
+}
+
 func TestASCIISetIsASCII(t *testing.T) {
 	fields(reflect.ValueOf(ASCII()), "ASCII", func(path, s string) {
 		for _, r := range s {
@@ -107,8 +153,8 @@ func TestTierWidths(t *testing.T) {
 				t.Errorf("%s = %q is %d cells and %d runes, want 1 and 1", path, s, w, utf8.RuneCountInString(s))
 			}
 		})
-		if n != 70 {
-			t.Errorf("%s: walked %d glyphs, want 70", tier, n)
+		if n != 78 {
+			t.Errorf("%s: walked %d glyphs, want 78", tier, n)
 		}
 	}
 }

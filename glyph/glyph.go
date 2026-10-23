@@ -58,6 +58,23 @@ type Set struct {
 	Prompt string
 	// Mask stands for each character of a secret as it is typed.
 	Mask string
+	// Done, Failed, Running and Pending mark a step's or an item's state:
+	// it succeeded, it failed, it is under way, or it has not started
+	// (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md D8).
+	// Each has its own shape in both sets, so the state is not carried by
+	// colour alone (rule 4).
+	Done, Failed, Running, Pending string
+	// Heading starts an item's first line, such as a tool call's header.
+	// It may draw as Focus does; it is its own field, so that a theme that
+	// changes one changes only that one.
+	Heading string
+	// MeterFill and MeterTrack draw a meter: its filled cells and its empty
+	// ones.
+	MeterFill, MeterTrack string
+	// Control stands where an escape sequence was removed from untrusted
+	// text, for an audit or approval view
+	// (docs/decisions/0009-MADR-streaming-content-engine.md §1).
+	Control string
 	// Keys are the modifier and arrow labels a key binding is shown with.
 	Keys KeyGlyphs
 }
@@ -105,6 +122,10 @@ func Unicode() Set {
 		BadgeOpen: "[", BadgeClose: "]",
 		Prompt: "❯",
 		Mask:   "•",
+		Done:   "✓", Failed: "✗", Running: "●", Pending: "○",
+		Heading:   "▸",
+		MeterFill: "━", MeterTrack: "╌",
+		Control: "␛",
 		Keys: KeyGlyphs{
 			Option: "⌥", Command: "⌘", Control: "⌃", Shift: "⇧",
 			Up: "↑", Down: "↓", Left: "←", Right: "→",
@@ -134,6 +155,10 @@ func ASCII() Set {
 		BadgeOpen: "[", BadgeClose: "]",
 		Prompt: ">",
 		Mask:   "*",
+		Done:   "+", Failed: "x", Running: "*", Pending: "-",
+		Heading:   ">",
+		MeterFill: "#", MeterTrack: "-",
+		Control: "^",
 		Keys: KeyGlyphs{
 			Option: "opt+", Command: "cmd+", Control: "ctrl+", Shift: "shift+",
 			Up: "up", Down: "down", Left: "left", Right: "right",

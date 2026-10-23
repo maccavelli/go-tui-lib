@@ -1251,3 +1251,44 @@ loop test); `command/registry.go` imports Bubble Tea
 
   The hosts' `release-check` counts 243 files, their copies' index
   tracking the new test file.
+* Committed by the owner.
+
+### Step 3: `glyph`, the eight fields (2026-10-23)
+
+* **The emoji check** (the MADR left `␛` to this step): Unicode's
+  `emoji-data.txt`, "Version: 18.0.0", dated 2026-01-30, downloaded on
+  2026-10-23 and read by a script as data. U+2713, U+2717, U+25CF,
+  U+25CB, U+25B8, U+2501, U+254C and U+241B have no property in it; the
+  control, U+2714, reads `Emoji, Extended_Pictographic`. So none of the
+  eight glyphs is an emoji.
+* **`glyph/glyph.go`:** `Set` gains `Done`, `Failed`, `Running`,
+  `Pending`, `Heading`, `MeterFill`, `MeterTrack` and `Control` after
+  `Mask`, with their comments (D8, and 0009-MADR §1 for `Control`);
+  `Unicode()` and `ASCII()` give the step's table. `TierLegacy` gives
+  `ASCII()`, unchanged.
+* **`glyph/glyph_test.go`:** the walked count in
+  `TestEveryGlyphIsOneCell` and `TestTierWidths` goes from 70 to 78
+  ("plus 26 single glyphs"); `TestStatusAndMeter` pins the table, that
+  each field's two forms differ, and that the four status glyphs are
+  four strings in each set; `TestControlIsNotEmoji` pins U+241B, the code
+  point checked above. The existing reflection tests cover the new fields
+  unchanged.
+* **On the tree:** `go test ./...` passes in every package; no golden
+  file changed, since no view draws the new fields yet.
+* **Mutations,** each killed:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | `ASCII().Running` is `-` | `TestStatusAndMeter`: `ASCII: the status glyph "-" stands for two states` |
+  | `Unicode().Done` is `✔` | `TestStatusAndMeter`: `Unicode: {done:✔ …}, want {done:✓ …}` |
+  | `Unicode().MeterTrack` is `╌╌` | `TestEveryGlyphIsOneCell`: `Unicode.MeterTrack = "╌╌" is 2 cells, want 1` |
+  | `ASCII().Control` is `␛` | `TestASCIISetIsASCII`: `ASCII.Control = "␛" holds U+241B, which is not printable ASCII` |
+  | `Unicode().Control` is `⎋` U+238B, a code point not checked | `TestControlIsNotEmoji`: `Unicode().Control = "⎋" ([U+238B]), want U+241B, …` |
+
+  The fifth was added to the step's four so that the new
+  `TestControlIsNotEmoji` is seen failing too.
+* **Gates,** over `glyph/glyph.go` and `glyph/glyph_test.go`, nothing
+  skipped: macOS `gates: 19 passed, 0 failed, 0 skipped in 412s`; the
+  Linux host `… in 814s`; the Windows host `… in 1954s`; `release-check`
+  "243 file(s) clean" on each; `make apicheck` "against v0.12.0, 0
+  incompatible change(s)".
