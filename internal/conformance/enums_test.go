@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go/constant"
 	"go/types"
+	"math/bits"
 	"reflect"
 	"slices"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"github.com/maccavelli/go-tui-lib/v2/launch"
 	"github.com/maccavelli/go-tui-lib/v2/layout"
 	"github.com/maccavelli/go-tui-lib/v2/termcap"
+	"github.com/maccavelli/go-tui-lib/v2/termkey"
 	"github.com/maccavelli/go-tui-lib/v2/termsvc"
 	"github.com/maccavelli/go-tui-lib/v2/theme"
 	"github.com/maccavelli/go-tui-lib/v2/when"
@@ -65,6 +67,8 @@ var enums = map[string]func(int64) any{
 	"termcap.ProbeHook":      as[termcap.ProbeHook],
 	"termcap.ReplyKind":      as[termcap.ReplyKind],
 	"termcap.Support":        as[termcap.Support],
+	"termkey.InputKind":      as[termkey.InputKind],
+	"termkey.Mod":            as[termkey.Mod],
 	"termsvc.ActivityState":  as[termsvc.ActivityState],
 	"termsvc.Display":        as[termsvc.Display],
 	"termsvc.Policy":         as[termsvc.Policy],
@@ -82,7 +86,7 @@ var enums = map[string]func(int64) any{
 
 // bitSets are the enums whose values are sets of bits, with
 // internal/enum's Bits text.
-var bitSets = map[string]bool{"command.Surface": true, "keymap.Features": true, "keymap.KeyFacts": true}
+var bitSets = map[string]bool{"command.Surface": true, "keymap.Features": true, "keymap.KeyFacts": true, "termkey.Mod": true}
 
 // enumType is one enum the scan found: its key in enums, its package's
 // name and its own, its type, and the values of its constants with the
@@ -223,9 +227,10 @@ func TestOutOfRangeText(t *testing.T) {
 			for _, v := range e.values {
 				all |= v
 			}
-			bit := int64(1) << 7
-			if all&bit != 0 || all&1 == 0 {
-				t.Fatalf("%s: the test wants bit 0 named and bit 7 free, in %#x", e.key, all)
+			// The first bit above the named ones, which the type must hold.
+			bit := int64(1) << bits.Len64(uint64(all))
+			if all&1 == 0 || reflect.ValueOf(conv(1|bit)).Convert(reflect.TypeFor[int64]()).Int() != 1|bit {
+				t.Fatalf("%s: the test wants bit 0 named and a free bit above the named ones, in %#x", e.key, all)
 			}
 			s, m, _, _, missing := texts(conv(1 | bit))
 			if missing != "" {

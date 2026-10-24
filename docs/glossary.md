@@ -31,12 +31,9 @@ are the only ones; none is added.
 A name an accepted record takes before it is built is listed here, and a
 later record does not reuse it for something else.
 
+None is reserved now: every name
 [0020-MADR-charm-free-cores-glyphs-and-safetext.md](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
-(A1.3, A2.2) reserves these, built by its PLAN:
-
-| Name | Means | Belongs to |
-| :--- | :--- | :--- |
-| `KeyEvent`, `Mod`, `Decoder`, `Input`, `InputKind` | a decoded key, its modifiers, the byte decoder, what it yields and its kind | `termkey` |
+(A1.3, A2.2) reserved is built, as the next section lists.
 
 ## Built from those records
 
@@ -64,7 +61,9 @@ is and a DECRPM setting, were reserved by its A2.2 and are built for
 `termcap/termcaptea` there, with its one meaning; `Query` and `Reply`
 stay `termcap`'s. `command`'s `Effect`, a follow-up a host runs, in
 `command.Result`, was reserved there too and is built for `v2.0.0`
-(0020-PLAN Step 10).
+(0020-PLAN Step 10). So are `termkey`'s `KeyEvent`, `Mod`, `Decoder`,
+`Input` and `InputKind`: a decoded key, its modifiers, the byte decoder,
+what it yields and its kind (0020-PLAN Step 11).
 Each has one meaning, as its package documents it. `Terminal` is in
 "Deliberate" above; `command.Decision`, `Verdict`'s old name, was removed
 in `v0.10.0`, and `Decision` is `launch`'s alone.

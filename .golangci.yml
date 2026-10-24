@@ -115,6 +115,7 @@ linters:
             - "**/layout/*.go"
             - "**/safetext/*.go"
             - "**/termcap/*.go"
+            - "**/termkey/*.go"
             - "**/termsvc/*.go"
             - "**/when/*.go"
             - "!$test"

@@ -1129,14 +1129,17 @@ loop test); `command/registry.go` imports Bubble Tea
   []byte; Truncated bool }`.
 * **`decode.go`:** `type Decoder struct{ MaxPaste, MaxSequence int; … }`,
   zero value usable (`MaxPaste` 0 means 1 MiB, `MaxSequence` 0 means
-  1 KiB); `func (d *Decoder) Decode(p []byte, out []Input) []Input`;
+  ~~1 KiB~~ 4 KiB, over `ParseReply`'s 1 KiB, and a string cut on an
+  `ESC` leaves it out: deviation of 2026-10-24 in the execution record);
+  `func (d *Decoder) Decode(p []byte, out []Input) []Input`;
   `func (d *Decoder) Pending() bool`;
   `func (d *Decoder) Flush(out []Input) []Input`; and
   `const DefaultEscTimeout = 50 * time.Millisecond`. It decodes MADR D7's
   list. A paste over `MaxPaste` keeps its first `MaxPaste` bytes, sets
   `Truncated`, and consumes the rest up to `CSI 201 ~`. A sequence over
   `MaxSequence` is one `InputUnknown` holding its first `MaxSequence`
-  bytes, the rest consumed up to its end. `Flush` gives up a held lone
+  bytes (one fewer when the cut falls on an `ESC`), the rest consumed up
+  to its end. `Flush` gives up a held lone
   `ESC` as the escape key, and a held incomplete sequence as
   `InputUnknown` with its bytes. The Kitty flags reply `CSI ? flags u` is
   `InputUnknown`, never a key.
@@ -2606,3 +2609,174 @@ loop test); `command/registry.go` imports Bubble Tea
 * **Identifiers:** `python3 -m tools.verify scan`: `scan: clean (5 pattern(s))`.
 * **Not done here:** the release and its migration notes, which are Step
   13's. Nothing is tagged.
+
+### Step 11: `termkey` (2026-10-24)
+
+* The owner committed Step 10 as `8644ae0` and said to proceed
+  ("committed, proceed").
+* **Deviation, 2026-10-24, the decoder's bound.**
+  `TestRepliesReachParseReply`'s row "a reply of 1 KiB + 1" failed at
+  every split. At the step's 1 KiB `MaxSequence` the decoder cut the
+  1025-byte OSC 99 reply on the `ESC` of its `ESC \`, and
+  `termcap.ParseReply`, which reads a bare `ESC` as an end (MADR A2.4),
+  read the cut reply as a whole notification. Offered: leave out an `ESC`
+  the cut falls on; raise the default to 4 KiB; or have hosts skip a
+  `Truncated` input. The owner asked first for 4 KiB in both bounds. With
+  both at 4 KiB the failure moves to a reply of 4097 bytes, and raising
+  `ParseReply`'s cap would supersede
+  `0005-MADR-terminal-capabilities-and-services.md`'s 1 KiB reply cap and
+  let `termcaptea`'s fragment filter swallow up to 4 KiB of input. That
+  went back to the owner with the cap's origin: 0005-MADR A1's reply caps
+  took codex's 1 KiB probe budget
+  (`0003-REPORT-agent-tui-ecosystem-research.md` §8.3), and every reply
+  termcap asks for is far shorter. *Chosen:* `MaxSequence` 0 means 4 KiB,
+  over `ParseReply`'s bound, and a string cut on an `ESC` leaves the `ESC`
+  out, whatever bound a host sets; `ParseReply` keeps 1 KiB. No MADR
+  decision or fact changes: D7 says only "bounded", and A2.4's 1 KiB is
+  `ParseReply`'s. The step carries the note, and
+  `TestRepliesReachParseReply` gains a row cut by a 1 KiB bound and one cut
+  by the default.
+* **The same run's second failing row,** "cut by an ESC before more", came
+  from a change made during the step, not from the PLAN: the decoder had
+  been changed to consume an `ESC` that cuts a string, as ultraviolet does,
+  and `ParseReply` then read `OSC 11 … ESC` as a colour. The `ESC` is left
+  to begin what follows, as ECMA-48 has it and as first written, and the
+  `differ` table records the difference from ultraviolet. The step's own
+  assertion decides it, so it was recorded and not stopped for.
+* **Files beyond the step's list:** `termkey/codes.go`, the key codes,
+  generated from ultraviolet's `key.go` const block in its order (139
+  constants, with `KeyExtended`); `termkey/kitty.go`, the Kitty protocol's
+  key map, ultraviolet's `kittyKeyMap` with its C0 additions; and
+  `termkey/testdata/golden/corpus.golden`. The differential test replays
+  "termkey's table", which lives in `termkey`'s test files and cannot be
+  imported, so `TestCorpus` keeps the tables' inputs, a name and a quoted
+  input a line, in a golden through `tuitest.Text`, and
+  `internal/termevent` reads it; a row added without the golden fails
+  `TestCorpus`. The golden was read in full: 489 rows.
+* **`termkey`:**
+  * `key.go`: `Mod`, a `uint16` `enum.Bits` with ultraviolet's values and
+    the step's tokens; `KeyEvent`, with `Keystroke` and `String` as
+    `tea.Key`'s; `names.go`, ultraviolet's `keyTypeString`.
+  * `input.go`: `InputKind` (`key`, `paste`, `unknown`) and `Input`.
+  * `decode.go`: `Decoder`, a state machine with no goroutine and no
+    clock, reading D7's list. Beyond it, as ultraviolet reads them:
+    urxvt's `CSI n $`, `CSI n ^` and `CSI n @`; `CSI 1 ; m R` as F3; an X10
+    mouse report consumed with its three bytes; a C1 byte 0x80 to 0x9F as
+    ctrl+alt and its letter; `ESC` and an introducer held until `Flush`,
+    then alt and that key. A key a rune: `termkey` imports nothing for
+    grapheme clusters. A paste keeps its bytes, invalid UTF-8 left out,
+    and a stray `CSI 201 ~` is unknown. A string ends at BEL, ST, `ESC \`,
+    CAN or SUB, a bare `ESC` as the input goes quiet, or an `ESC` before
+    anything else, which is left out. Kitty's base-layout key no longer
+    sets `ShiftedCode`, where ultraviolet's parser falls through.
+  * `doc.go`: the package comment, the host's loop, A2.4's rule that a
+    probing host does not `Flush` while its `Probe` awaits a reply, and
+    the stability line.
+  * `GOWORK=off go list -deps ./termkey`, for linux, darwin and windows:
+    no package outside the standard library but `termkey` and
+    `internal/enum`.
+* **`internal/termevent/termkey_test.go`:** `TestKeyCodesMatchUltraviolet`,
+  its 144 code rows generated from ultraviolet's names, each value and
+  `Keystroke` equal, with the nine modifier bits and their names;
+  `TestDecoderMatchesUltraviolet`, each corpus row through Bubble Tea's own
+  reader, `uv.NewTerminalReader` with `StreamEvents`, read whole and then
+  the end of the input, against `termkey`'s keys and pastes. A row in
+  `differ` that agrees fails as stale. Its ten rows, each with its reason:
+  the well-formed U+FFFD; a grapheme of two runes; Kitty's base key, twice;
+  a paste holding an OSC; a paste not ended; a paste end with no start; an
+  OSC cut by an `ESC`; 33 parameters; and win32-input-mode, which D7 leaves
+  out of scope.
+* **An upstream finding, not acted on.** Bubble Tea v2.0.10's reader panics
+  on a CSI of 33 parameters: ultraviolet's `deserializeWin32Input`
+  (`terminal_reader.go:463`, built on every OS) calls x/ansi v0.11.8's
+  `DecodeSequence`, which runs past its 32-parameter buffer, the bug
+  `termcap.ParseReply` already guards against. The differential test
+  recovers the panic and lists the row. Reporting it upstream is the
+  owner's call.
+* **Conformance:** `enums` gains `termkey.InputKind` and `termkey.Mod`,
+  and `bitSets` `termkey.Mod`. `TestOutOfRangeText` took bit 7 as free in
+  every bit set, and `ModNumLock` is bit 7: it now takes the first bit
+  above the named ones and fails when the type cannot hold it.
+  `.golangci.yml`'s `charmfree` gains `**/termkey/*.go`, and `cores` gains
+  `termkey`.
+* **Docs:** `docs/architecture.md` (the dependency graph, the `termkey`
+  row, the cores, the tree), `docs/glossary.md` (`KeyEvent`, `Mod`,
+  `Decoder`, `Input` and `InputKind`, reserved by A1.3, now built, which
+  leaves nothing reserved) and the index.
+* **Checks:**
+  * `gofmt -l` empty; `go vet` exit 0 on the packages changed;
+  * `make lint`: `go fix -diff` empty and golangci-lint `0 issues` for
+    linux, darwin and windows, after nine findings in the new code were
+    fixed (`max` and `any` shadowed, a `rune` conversion, an empty-string
+    test, and `csi`'s complexity, split with `scanParams`);
+  * `make apicheck`: "against v1.13.0, 22 incompatible change(s)",
+    "clean": the step only adds to the API, so it needs no block;
+  * `python3 -m tools.verify names` over `KeyEvent`, `Mod`, `Decoder`,
+    `Input` and `InputKind`: "5 planned name(s), clean";
+  * `go test -race -count=10 ./termkey/ ./internal/termevent/`: ok, the
+    differential test's reader goroutines included;
+  * `FuzzDecode` for 90 s three times, the last on the final code: 22.4, 11.0 and
+    9.7 million executions, no failure, no corpus written to the tree.
+* **Mutations,** each on a fresh copy, 36, every one killed by the test
+  named. Rows 11.1 to 11.6 are the step's list; the rest see each new
+  test and assertion fail (Rule 5):
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | 11.1 the modifier parameter is read without the minus one (TestDecode/legacy) | `decode_test.go:334: CSI 1;2 A: "\x1b[1;2A" gives [key{alt+up raw "\x1b[1;2A"}], want [key{shift+up raw ""}]` |
+  | 11.2 ESC before a key is not alt (TestDecode/alt) | `decode_test.go:334: alt+a: "\x1ba" gives [key{a raw "\x1ba"}], want [key{alt+a raw ""}]` |
+  | 11.3 the paste is not bounded (TestPasteBounded) | `decode_test.go:428: a 16-byte paste over MaxPaste 8 gives [paste{"0123456789abcdef" truncated false} key{x raw "x"}], want [paste{"01234567" trunca…` |
+  | 11.3b a paste of exactly MaxPaste is truncated (TestPasteBounded) | `decode_test.go:440: a paste of exactly MaxPaste gives [paste{"01234567" truncated true}], want it whole and not truncated` |
+  | 11.4 Flush drops a lone ESC (TestFlushEscape) | `decode_test.go:399: Flush gives [], Pending false; want escape, and nothing pending` |
+  | 11.4b Flush drops a paste not ended (TestFlushEscape) | `decode_test.go:414: a paste cut by a read: Flush gives [], Pending true; want [paste{"abc\x1b[20" truncated false}]` |
+  | 11.5 Decode forgets a sequence split across calls (TestSplit) | `decode_test.go:379: alt+a: "\x1ba" split at 1 gives [key{a raw "a"}], want [key{alt+a raw ""}]` |
+  | 11.5b the same, seen by FuzzDecode's seeds | `decode_test.go:510: "\x1ba" split at 1 gives [key{a raw "a"}], whole gives [key{alt+a raw "\x1ba"}]` |
+  | 11.6 ModMeta is 16 (TestKeyCodesMatchUltraviolet) | `termkey_test.go:203: ModMeta: termkey 16, ultraviolet 8` |
+  | 11.7 an upper-case letter keeps its case (TestDecode/text) | `decode_test.go:334: an upper-case letter: "A" gives [key{A raw "A"}], want [key{A raw ""}]` |
+  | 11.8 FS to US are read 0x20 off (TestDecode/control) | `decode_test.go:334: FS: "\x1c" gives [key{ctrl+\| raw "\x1c"}], want [key{ctrl+\ raw ""}]` |
+  | 11.9 SS3's rxvt arrows lose ctrl (TestDecode/ss3) | `decode_test.go:334: SS3 ctrl+up, rxvt: "\x1bOa" gives [key{up raw "\x1bOa"}], want [key{ctrl+up raw ""}]` |
+  | 11.10 modifyOtherKeys gives shift no text (TestDecode/otherkeys) | `decode_test.go:334: modifyOtherKeys shift+A: "\x1b[27;2;65~" gives [key{shift+A raw "\x1b[27;2;65~"}], want [key{A raw ""}]` |
+  | 11.11 Kitty's super reads as meta (TestDecode/kitty) | `decode_test.go:334: Kitty modifier bit 8: "\x1b[97;9u" gives [key{meta+a raw "\x1b[97;9u"}], want [key{super+a raw ""}]` |
+  | 11.12 CSI 200 ~ does not begin a paste (TestDecode/paste) | `decode_test.go:334: a paste: "\x1b[200~hello\x1b[201~" gives [unknown{"\x1b[200~" truncated false} key{h raw "h"} key{e raw "e"} key{l raw "l"} key…` |
+  | 11.13 a prefixed CSI is read as a key (TestDecode/reply) | `decode_test.go:334: the Kitty flags reply: "\x1b[?1u" gives [key{ctrl+a raw "\x1b[?1u"}], want [unknown{"\x1b[?1u" truncated false}]` |
+  | 11.14 a key keeps no bytes (TestDecode, the bytes adding up) | `decode_test.go:348: the Kitty flags reply, then a key: the inputs' bytes add up to "\x1b[?31u", want "\x1b[?31ua"` |
+  | 11.15 Keystroke puts alt before ctrl (TestKeystroke) | `key_test.go:27: alt+ctrl+shift+up.Keystroke() = "alt+ctrl+shift+up", want "ctrl+alt+shift+up"` |
+  | 11.16 Keystroke names a modifier key's own modifier (TestKeystroke) | `key_test.go:27: shift+leftshift.Keystroke() = "shift+leftshift", want "leftshift"` |
+  | 11.17 String gives a space's text (TestKeyString) | `key_test.go:43:  .String() = " ", want "space"` |
+  | 11.18 Contains is true for any one modifier (TestMod) | `key_test.go:57: Contains is wrong for alt\|ctrl` |
+  | 11.19 a row the corpus golden lacks (TestCorpus) | `decode_test.go:370: tuitest: corpus color.utf8.0: line 479 differs` |
+  | 11.20 two rows of one name (TestCorpus) | `decode_test.go:364: two rows are named "a digit"` |
+  | 11.21 a cut on an ESC keeps the ESC (TestSequenceBounded) | `decode_test.go:467: an OSC whose ST crosses the bound: gives [unknown{"\x1b]zzzzzzzzzzzzz\x1b" truncated true} key{x raw "x"}], want [unknown{"\x1b…` |
+  | 11.21b the same, seen by TestRepliesReachParseReply | `reply_test.go:102: a reply of 1 KiB + 1, cut by a 1 KiB bound, split at 0: ParseReply(Raw) = {Kind:notify Raw: Params:[] Mode:0 Setting:not-recogni…` |
+  | 11.22 MaxSequence 0 means 1 KiB (TestSequenceBounded) | `decode_test.go:485: an OSC over the default bound gives 1 inputs, the first of 1024 bytes; want one input of 4 KiB, truncated` |
+  | 11.23 the ESC that cuts a string is consumed with it (TestRepliesReachParseReply) | `reply_test.go:102: cut by an ESC before more, split at 0: ParseReply(Raw) = {Kind:color Raw: Params:[] Mode:0 Setting:not-recognized OSC:11 Index:0…` |
+  | 11.24 SS3's digits are not bounded (TestSequenceBounded) | `decode_test.go:474: an SS3 over the bound: holds 17 bytes, over MaxSequence` |
+  | 11.24b a CSI of exactly MaxSequence is cut (TestSequenceBounded) | `decode_test.go:467: a CSI of exactly the bound: gives [unknown{"\x1b[1111111111111~" truncated true}], want [unknown{"\x1b[1111111111111~" truncate…` |
+  | 11.25 caps lock types lower case (TestDecoderMatchesUltraviolet) | `termkey_test.go:372: Kitty modifier bit 64: "\x1b[97;65u": termkey gives [{paste:false text: key:{Code:97 Mod:64 Text:a ShiftedCode:0 BaseCode:0 Is…` |
+  | 11.26 ultraviolet's fall-through restored, so a differ row is stale (TestDecoderMatchesUltraviolet) | `termkey_test.go:374: Kitty ctrl+ф, its base key: the decoders agree, but differ lists it (ultraviolet's Kitty parser falls through from the base-la…` |
+  | 11.27 page up is named pageup (TestKeyCodesMatchUltraviolet) | `termkey_test.go:198: KeyPgUp: termkey names it "pageup", ultraviolet "pgup"` |
+  | 11.28b the free bit is wider than the type holds (TestOutOfRangeText), replacing 11.28, which left `math/bits` unused and did not compile | `enums_test.go:233: command.Surface: the test wants bit 0 named and a free bit above the named ones, in 0x1f` |
+  | 11.29 two of Mod's bits share a token (TestEveryEnumRoundTrips) | `enums_test.go:196: termkey.Mod: 64 and 128 share the token "capslock"` |
+  | 11.30 termkey imports Bubble Tea (TestCoresAreCharmFree) | `charmfree_test.go:173: termkey (GOOS=linux) links charm.land/bubbletea/v2: termkey → charm.land/bubbletea/v2` |
+  | 11.30b the same, refused by depguard's charmfree | `termkey/key.go:6:2: import 'charm.land/bubbletea/v2' is not allowed from list 'charmfree' … (depguard)` |
+
+  The first run had 36, all killed, but 11.28 by a build failure (the
+  mutation left `math/bits` unused), so it was replaced by 11.28b; and
+  11.30b's depguard line was read from its kept copy, since the run
+  printed none.
+* **Gates,** `python3 -m tools.verify gates` over the step's 19 files,
+  nothing skipped: macOS `gates: 19 passed, 0 failed, 0 skipped in 409s`; the Linux host
+  `gates: 19 passed, 0 failed, 0 skipped in 900s`; the Windows host
+  `gates: 19 passed, 0 failed, 0 skipped in 1801s`, the differential test
+  among them, its reader on a plain `io.Reader` on each. `release-check`
+  is "292 file(s) clean" on macOS, which lists tracked files and so not
+  the step's eleven new Go files, and "303 file(s) clean" on Linux and
+  Windows, whose copies hold them, with the API diff and examples gates.
+* **Identifiers:** `python3 -m tools.verify scan`: `scan: clean (5 pattern(s))`,
+  over the change and the untracked files.
+* **Not done here:** `keymap` and `keymaptea`, with D7's walk of every
+  code and modifier Bubble Tea exports, which are Step 12's; the release,
+  Step 13's. D7's stricter rule for `termkey`, the standard library and
+  `internal/enum` only, holds today (`go list -deps` above), but the gates
+  check only that the closure has no Charm module but `x/ansi`: nothing
+  refuses an `x/ansi` import in `termkey`. Nothing is tagged.

@@ -40,6 +40,7 @@ below).
  termcap       capabilities, the probe    → internal/enum, internal/sanitize; x/ansi
  termcap/termcaptea   the probe in tea   → termcap, internal/termevent, internal/teamsg; bubbletea, x/ansi, colorprofile
  termcap/termcaptest  fake terminals      → termcap; bubbletea, x/ansi, colorprofile (tests)
+ termkey       keys, and their decoder    → internal/enum; standard library
  internal/termevent   pass-through events → ultraviolet
  internal/termevent/termeventtest  those events for tests → ultraviolet, bubbletea
  theme         palettes, roles, styles    → glyph, internal/enum; lipgloss, colorprofile
@@ -76,6 +77,7 @@ below).
 | `termcap` | `Probe`, from `NewProbe`: an I/O-free engine (one batch of queries ended by DA1, a deadline the host times, mode 2031 and its reset), driven by `Start`, `HandleReply`, `HandleTimeout` and `HandleHook`, and drained through `NextEvent`'s `ProbeEvent`s; `ParseReply`, a reply's bytes as a `Reply` of a `ReplyKind`, colours read by XParseColor's grammar at 16 bits; `ColorProfile`; `WithoutModeQuery`; `EnvCaps`, the environment's facts with no program; `Caps` of `Fact`s with origin and reason, as JSON (v2); `ErrUnknownName`; `Env`, whose lookups ignore case on Windows; `FromEnv` and `Identity`; the keyboard, link and notification views; `TmuxQuery`; `Report` and `Findings` |
 | `termcap/termcaptea` | `Prober`, from `NewProber`: the `Probe`'s host in a Bubble Tea program (the batch on the first `tea.EnvMsg`, the deadline from `Init`, tea's own replies turned into `Reply`s, `CapsMsg` after tea's colour profile, `IsReplyFragment`); `KeyboardEnhancements`; `FromColorProfile` and `ToColorProfile` |
 | `termcap/termcaptest` | `Terminal`, a scripted fake terminal, with `SetRunTimeout` and `Reply`; `Profile` and seven profiles; `Run` |
+| `termkey` | `KeyEvent` (`Code`, `Mod`, `Text`, `ShiftedCode`, `BaseCode`, `IsRepeat`, `Release`; `Keystroke` and `String`, as `tea.Key`'s); `Mod`; the key codes, with ultraviolet's values and names; `Decoder` (`Decode`, `Pending`, `Flush`; `MaxPaste` 1 MiB and `MaxSequence` 4 KiB by default) yielding `Input`s of an `InputKind`: a key, a bracketed paste, or a sequence it does not decode, with its bytes for `termcap.ParseReply`; `DefaultEscTimeout`, 50 ms. No goroutine and no clock |
 | `termsvc` | `Notifier` (OSC 99, 777, 9 or the bell; focus policies; `WithNotifyFilter`; a `Backend` or `BackendFunc`; `NotifyResultMsg`; `SetCaps` and `SetFocus`; `Prepare`, the bytes and a `deliver` that reports, or calls the backend; `Sequence`, the bytes alone; `WithBackendTimeout`); `PrepareCopy`, `CopySequence` and `CopiedMsg`, with a `Clipboard` or `ClipboardFunc`; `Link`, `LinkDisplay`, `LinkPolicy`; prompt marks; `Wrap`; `SanitizeTitle`; the activity beacon's sequence; `Pointer`; `ProgressSupported` |
 | `termsvc/termsvctea` | `Notify` and `NotifyContext`, which write `Prepare`'s bytes and call a backend inside the command; `Observe`, `termcap.CapsMsg` and tea's focus messages to the `Notifier`; `Copy` and `CopyContext`, OSC 52 through tea; `Open`; `ActivityBeacon` |
 | `internal/termevent` | `Decode`: the ultraviolet events tea passes through untranslated, as plain values |
@@ -85,7 +87,7 @@ below).
 - **`layout` has no Charm import,** so its solver can serve any front end.
 - **The Charm-free cores** are `command`, `fuzzy`, `glyph`,
   `internal/enum`, `internal/sanitize`, `layout`, `safetext`, `termcap`,
-  `termsvc` and `when`: none links a Charm
+  `termkey`, `termsvc` and `when`: none links a Charm
   module but `x/ansi`, so a line-mode CLI can use them without Bubble Tea
   ([0020-MADR](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
   D1, D11). `internal/conformance` checks their whole import closure, and
@@ -211,6 +213,8 @@ tools/verify/               python3 -m tools.verify: a step's gates, its
 glyph/ theme/ layout/ workspace/ tuitest/ termcap/ termsvc/
 when/ command/ fuzzy/       the packages; goldens under testdata/golden/
 safetext/                   where a package renders
+termkey/                    keys and their decoder; its corpus golden is
+                            replayed by internal/termevent's differential test
 termcap/termcaptea/         the probe's Bubble Tea host
 termcap/termcaptest/        fake terminals for tests
 termsvc/termsvctea/         termsvc's Bubble Tea commands
