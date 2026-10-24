@@ -8,9 +8,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	tea "charm.land/bubbletea/v2"
-	"github.com/maccavelli/go-tui-lib/v2/internal/teamsg"
 )
 
 type doneMsg struct{}
@@ -21,7 +18,7 @@ func TestDispatchLoop(t *testing.T) {
 		c.When = "!off"
 		c.Handler = HandlerFunc(func(context.Context, *Invocation) (Result, error) {
 			ran.Store(true)
-			return Result{Value: 7, Text: "done", Cmd: teamsg.Cmd(doneMsg{})}, nil
+			return Result{Value: 7, Text: "done", Cmd: func() any { return doneMsg{} }}, nil
 		})
 	}))
 	c := r.Dispatch(t.Context(), Request{ID: "a", Origin: OriginKey})
@@ -29,7 +26,7 @@ func TestDispatchLoop(t *testing.T) {
 		t.Fatal("a Loop command did not run during Dispatch")
 	}
 	msgs := collect(c)
-	if !slices.Contains(msgs, tea.Msg(doneMsg{})) {
+	if !slices.Contains(msgs, any(doneMsg{})) {
 		t.Errorf("Result.Cmd's message is not among %v", msgs)
 	}
 	if res := resultOf(t, msgs); res.Err != nil || res.Result.Text != "done" || res.Result.Value != 7 {
@@ -62,7 +59,7 @@ func TestDispatchAsync(t *testing.T) {
 	}
 	res := resultOf(t, collect(c))
 	if !ran.Load() || res.Result.Text != "done" {
-		t.Errorf("after the tea.Cmd ran: ran %v, %+v", ran.Load(), res)
+		t.Errorf("after the Effect ran: ran %v, %+v", ran.Load(), res)
 	}
 }
 
@@ -133,8 +130,8 @@ func blocker(id ID, exclusive bool, started chan<- ID) Command {
 
 // runAsync runs c's message in a goroutine and returns a function that
 // waits for its ResultMsg's error.
-func runAsync(t *testing.T, c tea.Cmd) func() error {
-	ch := make(chan []tea.Msg, 1)
+func runAsync(t *testing.T, c Effect) func() error {
+	ch := make(chan []any, 1)
 	go func() { ch <- collect(c) }()
 	return func() error {
 		t.Helper()

@@ -23,6 +23,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/maccavelli/go-tui-lib/v2/command"
+	"github.com/maccavelli/go-tui-lib/v2/command/commandtea"
 	"github.com/maccavelli/go-tui-lib/v2/glyph"
 	"github.com/maccavelli/go-tui-lib/v2/launch"
 	"github.com/maccavelli/go-tui-lib/v2/launch/launchtest"
@@ -71,7 +72,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		panic("a panic in Update")
 	case command.LoopMsg:
 		m.loops++
-		return m, msg.Run()
+		return m, commandtea.RunLoop(msg)
 	}
 	return m, nil
 }

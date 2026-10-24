@@ -110,7 +110,7 @@ func TestWatchContextEnds(t *testing.T) {
 	before := runtime.NumGoroutine()
 	ctx, cancel := context.WithCancel(t.Context())
 	got := make(chan any, 1)
-	w := r.WatchContext(ctx)
+	w := r.Watch(ctx)
 	go func() { got <- w() }()
 	select {
 	case m := <-got:
@@ -135,7 +135,7 @@ func TestWatchContextEnds(t *testing.T) {
 	}
 
 	// A change still wakes it, as Watch.
-	w = r.WatchContext(t.Context())
+	w = r.Watch(t.Context())
 	if err := r.Register(cmd("a", UI)); err != nil {
 		t.Fatal(err)
 	}

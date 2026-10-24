@@ -6,8 +6,6 @@ import (
 	"errors"
 	"slices"
 	"testing"
-
-	tea "charm.land/bubbletea/v2"
 )
 
 func TestBuiltins(t *testing.T) {
@@ -61,7 +59,7 @@ func TestBuiltins(t *testing.T) {
 	}
 
 	msgs := collect(r.Dispatch(t.Context(), Request{ID: idQuit, Origin: OriginKey}))
-	if len(msgs) != 2 || !slices.Contains(msgs, tea.Msg(QuitRequestMsg{})) || resultOf(t, msgs).Err != nil {
+	if len(msgs) != 2 || !slices.Contains(msgs, any(QuitRequestMsg{})) || resultOf(t, msgs).Err != nil {
 		t.Errorf("app.quit sent %v, want a QuitRequestMsg and its ResultMsg", msgs)
 	}
 	if _, err := r.Run(t.Context(), Request{ID: idQuit, Origin: OriginCLI}); !errors.Is(err, ErrUnavailable) {

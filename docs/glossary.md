@@ -37,7 +37,6 @@ later record does not reuse it for something else.
 | Name | Means | Belongs to |
 | :--- | :--- | :--- |
 | `KeyEvent`, `Mod`, `Decoder`, `Input`, `InputKind` | a decoded key, its modifiers, the byte decoder, what it yields and its kind | `termkey` |
-| `Effect` | a follow-up a host runs, in `command.Result` | `command` |
 
 ## Built from those records
 
@@ -63,7 +62,9 @@ asks its host to run; and `ReplyKind` and `ModeSetting`, what a `Reply`
 is and a DECRPM setting, were reserved by its A2.2 and are built for
 `v2.0.0` (0020-PLAN Steps 7 and 8). `Prober` moved from `termcap` to
 `termcap/termcaptea` there, with its one meaning; `Query` and `Reply`
-stay `termcap`'s.
+stay `termcap`'s. `command`'s `Effect`, a follow-up a host runs, in
+`command.Result`, was reserved there too and is built for `v2.0.0`
+(0020-PLAN Step 10).
 Each has one meaning, as its package documents it. `Terminal` is in
 "Deliberate" above; `command.Decision`, `Verdict`'s old name, was removed
 in `v0.10.0`, and `Decision` is `launch`'s alone.

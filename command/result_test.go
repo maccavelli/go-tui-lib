@@ -8,8 +8,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	tea "charm.land/bubbletea/v2"
 )
 
 // Format and WriteResult
@@ -32,7 +30,7 @@ func TestWriteResult(t *testing.T) {
 		{"value only", Result{Value: value}, `{"a":"1m0s","b":2}` + "\n", `{"a":"1m0s","b":2}` + "\n"},
 		{"both", Result{Text: "done", Value: value}, "done\n", `{"a":"1m0s","b":2}` + "\n"},
 		{"a duration", Result{Value: 90 * time.Second}, `"1m30s"` + "\n", `"1m30s"` + "\n"},
-		{"a Cmd is not run", Result{Text: "x", Cmd: func() tea.Msg { panic("ran") }}, "x\n", "null\n"},
+		{"a Cmd is not run", Result{Text: "x", Cmd: func() any { panic("ran") }}, "x\n", "null\n"},
 	} {
 		for f, want := range map[Format]string{FormatText: tc.text, FormatJSON: tc.json} {
 			var b strings.Builder

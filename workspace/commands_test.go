@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/colorprofile"
 
 	"github.com/maccavelli/go-tui-lib/v2/command"
+	"github.com/maccavelli/go-tui-lib/v2/command/commandtea"
 	"github.com/maccavelli/go-tui-lib/v2/glyph"
 	"github.com/maccavelli/go-tui-lib/v2/layout"
 	"github.com/maccavelli/go-tui-lib/v2/theme"
@@ -58,14 +59,14 @@ func rig(t *testing.T, o ...workspace.CommandOption) (*workspace.Workspace, *com
 // into ws. It returns the ResultMsg's error.
 func dispatch(t *testing.T, ws *workspace.Workspace, r *command.Registry, id command.ID, args string) error {
 	t.Helper()
-	cmd := r.Dispatch(context.Background(), command.Request{ID: id, Args: []byte(args), Origin: command.OriginKey, WhenContext: ws.WhenContext()})
+	cmd := commandtea.Dispatch(context.Background(), r, command.Request{ID: id, Args: []byte(args), Origin: command.OriginKey, WhenContext: ws.WhenContext()})
 	var err error
 	var effects []tea.Cmd
 	for _, m := range flatten(cmd) {
 		switch m := m.(type) {
 		case command.ResultMsg:
 			err = m.Err
-			effects = append(effects, m.Result.Cmd)
+			effects = append(effects, commandtea.Cmd(m.Result.Cmd))
 		}
 	}
 	for _, e := range effects {
@@ -372,7 +373,7 @@ func TestAgentMayZoom(t *testing.T) {
 	th := theme.New(colorprofile.NoTTY, theme.Unknown, glyph.ASCII())
 	ws2 := session(agentRoot(false, layout.FullWidth), th, 120, 30)
 	sent := make(chan tea.Msg, 1)
-	lr := command.NewRegistry(command.WithLoop(func(m tea.Msg) { sent <- m }))
+	lr := command.NewRegistry(commandtea.WithLoop(func(m tea.Msg) { sent <- m }))
 	if err := lr.Register(workspace.Commands(ws2)...); err != nil {
 		t.Fatal(err)
 	}
@@ -387,7 +388,7 @@ func TestAgentMayZoom(t *testing.T) {
 	if ws2.State().Zoom != "" {
 		t.Fatal("the workspace changed before the loop ran the command")
 	}
-	drain(ws2, lm.Run())
+	drain(ws2, commandtea.RunLoop(lm))
 	if res := <-done; res.IsError || ws2.State().Zoom != "logs" {
 		t.Errorf("through the loop: %+v, zoom %q", res, ws2.State().Zoom)
 	}

@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/maccavelli/go-tui-lib/v2/when"
 )
 
@@ -36,25 +34,25 @@ func registryOf(t testing.TB, o []RegistryOption, cmds ...Command) *Registry {
 	return r
 }
 
-// collect runs c, and every command a BatchMsg it returns holds, and
-// returns the messages.
-func collect(c tea.Cmd) []tea.Msg {
-	if c == nil {
+// collect runs e, and every effect a batch it returns holds, and returns
+// the messages; a nil effect in a batch gives none, as a host skips it.
+func collect(e Effect) []any {
+	if e == nil {
 		return nil
 	}
-	m := c()
-	if b, ok := m.(tea.BatchMsg); ok {
-		var out []tea.Msg
+	m := e()
+	if b, ok := m.([]Effect); ok {
+		var out []any
 		for _, x := range b {
 			out = append(out, collect(x)...)
 		}
 		return out
 	}
-	return []tea.Msg{m}
+	return []any{m}
 }
 
 // resultOf is the one ResultMsg among msgs.
-func resultOf(t *testing.T, msgs []tea.Msg) ResultMsg {
+func resultOf(t *testing.T, msgs []any) ResultMsg {
 	t.Helper()
 	var found []ResultMsg
 	for _, m := range msgs {
@@ -261,10 +259,10 @@ func TestSnapshotsUnderRace(t *testing.T) {
 }
 
 // next runs w in a goroutine and returns what it sends, or nil after d.
-func next(w tea.Cmd, d time.Duration) func() tea.Msg {
-	ch := make(chan tea.Msg, 1)
+func next(w Effect, d time.Duration) func() any {
+	ch := make(chan any, 1)
 	go func() { ch <- w() }()
-	return func() tea.Msg {
+	return func() any {
 		select {
 		case m := <-ch:
 			return m
@@ -276,23 +274,23 @@ func next(w tea.Cmd, d time.Duration) func() tea.Msg {
 
 func TestWatch(t *testing.T) {
 	r := NewRegistry()
-	early := next(r.Watch(), 50*time.Millisecond)
+	early := next(r.Watch(context.Background()), 50*time.Millisecond)
 	if m := early(); m != nil {
 		t.Fatalf("Watch returned %v before any change", m)
 	}
-	w := next(r.Watch(), 2*time.Second)
+	w := next(r.Watch(context.Background()), 2*time.Second)
 	if err := r.Register(cmd("a", UI)); err != nil {
 		t.Fatal(err)
 	}
 	if m := w(); m != (ChangedMsg{Version: 1}) {
 		t.Errorf("after Register: %v, want ChangedMsg{1}", m)
 	}
-	w = next(r.Watch(), 2*time.Second)
+	w = next(r.Watch(context.Background()), 2*time.Second)
 	r.Remove("a")
 	if m := w(); m != (ChangedMsg{Version: 2}) {
 		t.Errorf("after Remove: %v, want ChangedMsg{2}", m)
 	}
-	quiet := next(r.Watch(), 50*time.Millisecond)
+	quiet := next(r.Watch(context.Background()), 50*time.Millisecond)
 	r.Remove("missing")
 	if m := quiet(); m != nil || r.Version() != 2 {
 		t.Errorf("removing nothing: %v at version %d", m, r.Version())

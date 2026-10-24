@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/maccavelli/go-tui-lib/v2/command"
+	"github.com/maccavelli/go-tui-lib/v2/command/commandtea"
 	"github.com/maccavelli/go-tui-lib/v2/keymap"
 	"github.com/maccavelli/go-tui-lib/v2/when"
 )
@@ -268,7 +269,7 @@ func (w *Workspace) run(o keymap.Outcome, msg tea.Msg, ctx when.Context) tea.Cmd
 	if err != nil {
 		return func() tea.Msg { return command.ResultMsg{Request: req, Err: err} }
 	}
-	return res.Cmd
+	return commandtea.Cmd(res.Cmd)
 }
 
 // offer sends req as a CommandMsg to the first CommandConsumer that takes

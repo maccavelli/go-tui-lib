@@ -8,8 +8,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	tea "charm.land/bubbletea/v2"
 )
 
 // The registry's loop, attached and detached
@@ -63,8 +61,8 @@ func TestAttachRunsOnLoop(t *testing.T) {
 			return Result{Text: "done"}, nil
 		})
 	}))
-	sent := make(chan tea.Msg, 1)
-	detach := r.Attach(func(m tea.Msg) { sent <- m })
+	sent := make(chan any, 1)
+	detach := r.Attach(func(m any) { sent <- m })
 	defer detach()
 
 	got := runOffLoop(t.Context(), r, Request{ID: "loop", Origin: OriginAgent})
@@ -91,7 +89,7 @@ func TestDetachRunsOnCaller(t *testing.T) {
 	never := make(chan struct{})
 	t.Cleanup(func() { close(never) })
 	sent := make(chan struct{}, 1)
-	detach := r.Attach(func(tea.Msg) { sent <- struct{}{}; <-never })
+	detach := r.Attach(func(any) { sent <- struct{}{}; <-never })
 
 	got := runOffLoop(context.Background(), r, Request{ID: "loop", Origin: OriginAgent})
 	inSecond(t, sent, "Run sent nothing to the attached loop")
@@ -116,7 +114,7 @@ func TestDetachRaceRunsOnce(t *testing.T) {
 		var delivered sync.WaitGroup
 		var detach func()
 		ready := make(chan struct{})
-		detach = r.Attach(func(m tea.Msg) {
+		detach = r.Attach(func(m any) {
 			delivered.Add(1)
 			defer delivered.Done()
 			<-ready
@@ -159,8 +157,8 @@ func TestCancelAfterStartKeepsOutcome(t *testing.T) {
 			return Result{Text: "kept"}, nil
 		})
 	}))
-	sent := make(chan tea.Msg, 1)
-	detach := r.Attach(func(m tea.Msg) { sent <- m })
+	sent := make(chan any, 1)
+	detach := r.Attach(func(m any) { sent <- m })
 	defer detach()
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -188,8 +186,8 @@ func TestLoopPanicReleasesCaller(t *testing.T) {
 			panic("boom")
 		})
 	}))
-	sent := make(chan tea.Msg, 1)
-	detach := r.Attach(func(m tea.Msg) { sent <- m })
+	sent := make(chan any, 1)
+	detach := r.Attach(func(m any) { sent <- m })
 	defer detach()
 
 	got := runOffLoop(t.Context(), r, Request{ID: "loop", Origin: OriginAgent})
@@ -218,14 +216,14 @@ func TestLoopPanicReleasesCaller(t *testing.T) {
 // leave no loop.
 func TestWithLoopUnchanged(t *testing.T) {
 	var n atomic.Int32
-	sent := make(chan tea.Msg, 4)
-	r := registryOf(t, []RegistryOption{WithLoop(func(m tea.Msg) { sent <- m })}, counting(&n, "x"))
+	sent := make(chan any, 4)
+	r := registryOf(t, []RegistryOption{WithLoop(func(m any) { sent <- m })}, counting(&n, "x"))
 	for range 2 {
 		got := runOffLoop(t.Context(), r, Request{ID: "loop", Origin: OriginAgent})
 		inSecond(t, sent, "WithLoop's loop got nothing").(LoopMsg).Run()
 		inSecond(t, got, "Run did not return")
 	}
-	detach := r.Attach(func(tea.Msg) { t.Error("the attached loop was used after detach") })
+	detach := r.Attach(func(any) { t.Error("the attached loop was used after detach") })
 	detach()
 	if res, err := r.Run(t.Context(), Request{ID: "loop", Origin: OriginAgent}); err != nil || res.Text != "x" || n.Load() != 3 {
 		t.Errorf("after Attach and detach: %+v, %v, %d runs", res, err, n.Load())

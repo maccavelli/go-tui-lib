@@ -8,6 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/term"
+	"github.com/maccavelli/go-tui-lib/v2/command/commandtea"
 )
 
 // newProgram is the program constructor seam. Tests replace it.
@@ -95,7 +96,7 @@ func runWith[M tea.Model](ctx context.Context, s Streams, d Decision, m M, open 
 
 	var detach func()
 	if o.registry != nil {
-		detach = o.registry.Attach(p.Send)
+		detach = commandtea.Attach(o.registry, p.Send)
 	}
 	for _, f := range o.onStart {
 		f(p)

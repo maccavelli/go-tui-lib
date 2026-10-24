@@ -8,35 +8,33 @@ import (
 	"sync/atomic"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
-
-	"github.com/maccavelli/go-tui-lib/v2/internal/teamsg"
 	"github.com/maccavelli/go-tui-lib/v2/when"
 )
 
-// Dispatch runs a request from a Bubble Tea program's Update. It finds the
-// command, checks its When and Surfaces against the request, and asks the
-// policy, on the calling goroutine. A Loop command then runs at once, and
-// Dispatch returns its Result.Cmd batched with a ResultMsg. An Async
-// command runs only when the returned tea.Cmd runs, under a context
-// Cancel reaches. A Prompt or Forward command also sends a PromptMsg. A
-// request that cannot run returns a ResultMsg whose Err says why.
-func (r *Registry) Dispatch(ctx context.Context, req Request) tea.Cmd {
+// Dispatch runs a request from a host's loop, such as a Bubble Tea
+// program's Update, which calls commandtea.Dispatch. It finds the command,
+// checks its When and Surfaces against the request, and asks the policy,
+// on the calling goroutine. A Loop command then runs at once, and Dispatch
+// returns the effect: its Result.Cmd batched with a ResultMsg. An Async
+// command runs only when the returned Effect runs, under a context Cancel
+// reaches. A Prompt or Forward command also sends a PromptMsg. A request
+// that cannot run returns a ResultMsg whose Err says why.
+func (r *Registry) Dispatch(ctx context.Context, req Request) Effect {
 	e, inv, d, err := r.admit(ctx, req)
 	if err != nil {
 		r.audit(req, e, d, outcome{started: time.Now()}, err)
-		return teamsg.Cmd(ResultMsg{Request: req, Err: err})
+		return func() any { return ResultMsg{Request: req, Err: err} }
 	}
 	if inv.Command.Mode == Async {
-		return func() tea.Msg {
+		return func() any {
 			o := r.execute(ctx, inv)
 			r.audit(req, e, d, o, o.err)
-			return tea.Batch(effects(req, inv, o)...)()
+			return effects(req, inv, o)
 		}
 	}
 	o := r.execute(ctx, inv)
 	r.audit(req, e, d, o, o.err)
-	return tea.Batch(effects(req, inv, o)...)
+	return func() any { return effects(req, inv, o) }
 }
 
 // Run runs a request to completion, whatever the command's mode, with the
@@ -68,7 +66,8 @@ func (r *Registry) Run(ctx context.Context, req Request) (Result, error) {
 // command started while attached runs on the loop; once detached, or when
 // the loop does not take it, it runs on the caller instead, exactly once.
 //
-// send is a program's Send. A LoopMsg is sent from a goroutine of its own,
+// send is a program's Send; commandtea.Attach takes a tea.Msg one. A
+// LoopMsg is sent from a goroutine of its own,
 // which ends when send returns, and detach cannot end a send that is
 // blocked: Bubble Tea's Send returns once the program has ended, so detach
 // after the program's Run has returned, never before it has started. A
@@ -77,7 +76,7 @@ func (r *Registry) Run(ctx context.Context, req Request) (Result, error) {
 //
 // Attach replaces the current loop, WithLoop's included, and detach then
 // leaves the registry with none. A second detach does nothing.
-func (r *Registry) Attach(send func(tea.Msg)) (detach func()) {
+func (r *Registry) Attach(send func(any)) (detach func()) {
 	l := &loopState{send: send, done: make(chan struct{})}
 	r.mu.Lock()
 	r.loop.Store(l)
@@ -104,7 +103,7 @@ func (r *Registry) Attach(send func(tea.Msg)) (detach func()) {
 func (r *Registry) onLoop(ctx context.Context, inv *Invocation, l *loopState) outcome {
 	var claimed atomic.Bool
 	done := make(chan outcome, 1)
-	msg := LoopMsg{run: func() tea.Cmd {
+	msg := LoopMsg{run: func() Effect {
 		if !claimed.CompareAndSwap(false, true) {
 			return nil
 		}
@@ -239,14 +238,17 @@ func forwardText(inv *Invocation) string {
 	return "/" + name
 }
 
-// effects is what a run sends to the program: its Result.Cmd, a
-// ResultMsg, and for a Prompt or Forward that succeeded a PromptMsg.
-func effects(req Request, inv *Invocation, o outcome) []tea.Cmd {
-	cmds := []tea.Cmd{o.res.Cmd, teamsg.Cmd(ResultMsg{Request: req, Result: o.res, Err: o.err, Duration: o.dur})}
+// effects is what a run sends to the program, as one batch: its
+// Result.Cmd, a ResultMsg, and for a Prompt or Forward that succeeded a
+// PromptMsg. A nil Result.Cmd stays nil, and the host skips it.
+func effects(req Request, inv *Invocation, o outcome) []Effect {
+	result := ResultMsg{Request: req, Result: o.res, Err: o.err, Duration: o.dur}
+	out := []Effect{o.res.Cmd, func() any { return result }}
 	if o.err == nil && inv.Command.Kind != Action {
-		cmds = append(cmds, teamsg.Cmd(PromptMsg{Text: o.res.Text, Command: inv.Command, Request: req}))
+		prompt := PromptMsg{Text: o.res.Text, Command: inv.Command, Request: req}
+		out = append(out, func() any { return prompt })
 	}
-	return cmds
+	return out
 }
 
 // audit records a request when there is an auditor, with the values its

@@ -11,10 +11,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/maccavelli/go-tui-lib/v2/internal/sanitize"
-	"github.com/maccavelli/go-tui-lib/v2/internal/teamsg"
 	"github.com/maccavelli/go-tui-lib/v2/when"
 )
 
@@ -114,7 +111,7 @@ type entry struct {
 // closed when it is detached. WithLoop's done is nil: it is never
 // detached.
 type loopState struct {
-	send func(tea.Msg)
+	send func(any)
 	done chan struct{}
 }
 
@@ -152,8 +149,8 @@ func WithPrefixer(f func(Source) string) RegistryOption {
 // Update must use Dispatch, not Run, or it waits for itself.
 //
 // WithLoop is a permanent Attach, for a registry whose program runs for its
-// whole life.
-func WithLoop(send func(tea.Msg)) RegistryOption {
+// whole life. commandtea.WithLoop takes a program's Send as it is.
+func WithLoop(send func(any)) RegistryOption {
 	return registryOptionFunc(func(r *Registry) { r.loop.Store(&loopState{send: send}) })
 }
 
@@ -459,19 +456,17 @@ func (e *entry) holds(c when.Context) bool {
 // Version counts the changes since NewRegistry. It never falls.
 func (r *Registry) Version() uint64 { return r.snap.Load().version }
 
-// Watch returns a command that waits for the registry's next change and
-// then returns ChangedMsg, with a ConflictMsg when that change renamed or
-// refused a command (docs/decisions/0006-MADR-command-registry.md A6). The
-// host issues it again after each ChangedMsg, as with any subscription.
-// It waits for ever; WatchContext stops waiting.
-func (r *Registry) Watch() tea.Cmd { return r.WatchContext(context.Background()) }
-
-// WatchContext is Watch, and returns a nil message, which Bubble Tea
-// ignores, once ctx ends: a program that stops listening cancels ctx, and
-// leaves no goroutine waiting.
-func (r *Registry) WatchContext(ctx context.Context) tea.Cmd {
+// Watch returns an effect that waits for the registry's next change and
+// then returns ChangedMsg, with a ConflictMsg, as an []Effect of the two,
+// when that change renamed or refused a command
+// (docs/decisions/0006-MADR-command-registry.md A6). The host runs it again
+// after each ChangedMsg, as with any subscription. Once ctx ends it stops
+// waiting and returns nil: a host that stops listening cancels ctx, and
+// leaves no goroutine waiting. commandtea.Watch and WatchContext give a
+// Bubble Tea program the same as a tea.Cmd.
+func (r *Registry) Watch(ctx context.Context) Effect {
 	s := r.snap.Load()
-	return func() tea.Msg {
+	return func() any {
 		select {
 		case <-s.changed:
 		case <-ctx.Done():
@@ -482,7 +477,8 @@ func (r *Registry) WatchContext(ctx context.Context) tea.Cmd {
 		if len(next.conflicts) == 0 {
 			return changed
 		}
-		return tea.BatchMsg{teamsg.Cmd(changed), teamsg.Cmd(ConflictMsg{Conflicts: slices.Clone(next.conflicts)})}
+		conflict := ConflictMsg{Conflicts: slices.Clone(next.conflicts)}
+		return []Effect{func() any { return changed }, func() any { return conflict }}
 	}
 }
 

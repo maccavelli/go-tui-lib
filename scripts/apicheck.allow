@@ -30,3 +30,14 @@
 .	- ./termsvc.Copy: removed
 .	- ./termsvc.CopyContext: removed
 .	- ./termsvc.LinkPolicy.Open: removed
+
+# docs/decisions/0020-PLAN-charm-free-cores-glyphs-and-safetext.md Step 10:
+# command's effects are command.Effect, and its Bubble Tea forms are
+# commandtea's (0020-MADR D6, A1.2). Released in v2.0.0, a major version (A4.2).
+.	- ./command.(*Registry).Attach: changed from func(func(charm.land/bubbletea/v2.Msg)) func() to func(func(any)) func()
+.	- ./command.(*Registry).Dispatch: changed from func(context.Context, Request) charm.land/bubbletea/v2.Cmd to func(context.Context, Request) Effect
+.	- ./command.(*Registry).Watch: changed from func() charm.land/bubbletea/v2.Cmd to func(context.Context) Effect
+.	- ./command.(*Registry).WatchContext: removed
+.	- ./command.LoopMsg.Run: changed from func() charm.land/bubbletea/v2.Cmd to func() Effect
+.	- ./command.Result.Cmd: changed from charm.land/bubbletea/v2.Cmd to Effect
+.	- ./command.WithLoop: changed from func(func(charm.land/bubbletea/v2.Msg)) RegistryOption to func(func(any)) RegistryOption

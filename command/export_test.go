@@ -12,8 +12,6 @@ import (
 	"testing/fstest"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/maccavelli/go-tui-lib/v2/tuitest"
 	"github.com/maccavelli/go-tui-lib/v2/when"
 )
@@ -299,11 +297,11 @@ func TestRunOnLoop(t *testing.T) {
 	loopCmd := func(c *Command) {
 		c.Handler = HandlerFunc(func(context.Context, *Invocation) (Result, error) {
 			ranOn = append(ranOn, "handler")
-			return Result{Text: "done", Cmd: func() tea.Msg { return effectMsg{} }}, nil
+			return Result{Text: "done", Cmd: func() any { return effectMsg{} }}, nil
 		})
 	}
-	sent := make(chan tea.Msg, 1)
-	r := registryOf(t, []RegistryOption{WithLoop(func(m tea.Msg) { sent <- m })}, cmd("loop", UI, loopCmd),
+	sent := make(chan any, 1)
+	r := registryOf(t, []RegistryOption{WithLoop(func(m any) { sent <- m })}, cmd("loop", UI, loopCmd),
 		cmd("async", UI, func(c *Command) { c.Mode = Async; loopCmd(c) }))
 
 	type ran struct {

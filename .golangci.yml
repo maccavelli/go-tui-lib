@@ -107,6 +107,7 @@ linters:
         charmfree:
           list-mode: lax
           files:
+            - "**/command/*.go"
             - "**/fuzzy/*.go"
             - "**/glyph/*.go"
             - "**/internal/enum/*.go"

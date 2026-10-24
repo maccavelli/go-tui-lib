@@ -12,6 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/maccavelli/go-tui-lib/v2/command"
+	"github.com/maccavelli/go-tui-lib/v2/command/commandtea"
 	"github.com/maccavelli/go-tui-lib/v2/layout"
 	"github.com/maccavelli/go-tui-lib/v2/theme"
 )
@@ -88,7 +89,7 @@ func newCommand[A any](b *builder, id command.ID, title string, run func(A) (com
 
 // cmdResult runs a method that takes nothing, returning its command.
 func cmdResult(c func() tea.Cmd) func(command.NoArgs) (command.Result, error) {
-	return func(command.NoArgs) (command.Result, error) { return command.Result{Cmd: c()}, nil }
+	return func(command.NoArgs) (command.Result, error) { return command.Result{Cmd: commandtea.Effect(c())}, nil }
 }
 
 type paneArg struct {
@@ -139,7 +140,7 @@ func (b *builder) focus() command.Command {
 		if !b.w.focusable(layout.PaneID(a.Pane)) {
 			return command.Result{}, paneError("is not a pane on screen that takes focus")
 		}
-		return command.Result{Cmd: b.w.Focus(layout.PaneID(a.Pane))}, nil
+		return command.Result{Cmd: commandtea.Effect(b.w.Focus(layout.PaneID(a.Pane)))}, nil
 	}, b.opts("focus", command.UI, "Moves focus to a pane on screen.", command.WithArgHint("pane")))
 }
 
@@ -159,7 +160,7 @@ func (b *builder) focusIndex() command.Command {
 		if a.Index < 1 || a.Index > len(r) {
 			return command.Result{Text: "No pane " + strconv.Itoa(a.Index) + " in the focus ring."}, nil
 		}
-		return command.Result{Cmd: b.w.Focus(r[a.Index-1])}, nil
+		return command.Result{Cmd: commandtea.Effect(b.w.Focus(r[a.Index-1]))}, nil
 	}, b.opts("", command.UI, "Moves focus to the n-th pane of the focus ring, as alt+n does.", command.WithArgHint("index")))
 }
 
@@ -176,7 +177,7 @@ func (b *builder) resizeDirection() command.Command {
 		if !ok {
 			return command.Result{}, &command.ArgError{Path: "/direction", Reason: "is not left, right, up or down"}
 		}
-		return command.Result{Cmd: b.w.resizeFocused(d.axis, d.delta)}, nil
+		return command.Result{Cmd: commandtea.Effect(b.w.resizeFocused(d.axis, d.delta))}, nil
 	}, b.opts("", command.UI, "Moves the separator nearest the focused pane by one cell, as alt+shift and an arrow do.",
 		command.WithArgHint("left|right|up|down")))
 }
@@ -190,7 +191,7 @@ func (b *builder) zoom() command.Command {
 		if !b.w.known(id) {
 			return command.Result{}, paneError("is not a pane of the layout")
 		}
-		return command.Result{Cmd: b.w.Zoom(id)}, nil
+		return command.Result{Cmd: commandtea.Effect(b.w.Zoom(id))}, nil
 	}, b.opts("zoom", command.UI, "Gives a pane the whole area, or restores the layout when it is zoomed already.",
 		command.WithArgHint("pane")))
 }
@@ -200,7 +201,7 @@ func (b *builder) toggle() command.Command {
 		if !b.w.known(layout.PaneID(a.Pane)) {
 			return command.Result{}, paneError("is not a pane of the layout")
 		}
-		return command.Result{Cmd: b.w.Toggle(layout.PaneID(a.Pane))}, nil
+		return command.Result{Cmd: commandtea.Effect(b.w.Toggle(layout.PaneID(a.Pane)))}, nil
 	}, b.opts("toggle", command.UI, "Hides a pane, or shows it when it is hidden.", command.WithArgHint("pane")))
 }
 
@@ -210,7 +211,7 @@ func (b *builder) resize() command.Command {
 		if err != nil {
 			return command.Result{}, err
 		}
-		return command.Result{Cmd: b.w.Resize(sep, a.Delta)}, nil
+		return command.Result{Cmd: commandtea.Effect(b.w.Resize(sep, a.Delta))}, nil
 	}, b.opts("resize", command.UI, "Moves a named split's separator by delta cells.", command.WithArgHint("split delta")))
 }
 
@@ -246,7 +247,7 @@ func (b *builder) layoutUse(layouts map[string]layout.Node) command.Command {
 		if !ok {
 			return command.Result{}, &command.ArgError{Path: "/name", Reason: "is not a layout's name"}
 		}
-		return command.Result{Cmd: b.w.SetLayout(root)}, nil
+		return command.Result{Cmd: commandtea.Effect(b.w.SetLayout(root))}, nil
 	}, b.opts("layout", command.UI, "Switches to a named layout.", command.WithArgHint("name")))
 	schema, err := withEnum(c.Args, "name", slices.Sorted(maps.Keys(layouts)))
 	if err != nil && b.err == nil {
@@ -273,7 +274,7 @@ func withEnum(schema command.Schema, property string, values []string) (command.
 
 func (b *builder) reset() command.Command {
 	return newCommand(b, "workspace.layout.reset", "Reset the layout", func(command.NoArgs) (command.Result, error) {
-		return command.Result{Cmd: b.w.SetState(layout.State{})}, nil
+		return command.Result{Cmd: commandtea.Effect(b.w.SetState(layout.State{}))}, nil
 	}, b.opts("", command.UI, "Restores the layout: no zoom, no hidden panes, no moved splits."))
 }
 
@@ -291,7 +292,7 @@ func (b *builder) stateSet() command.Command {
 			b.w.SetState(old)
 			return command.Result{}, &command.ArgError{Path: "/state", Reason: err.Error()}
 		}
-		return command.Result{Cmd: cmd}, nil
+		return command.Result{Cmd: commandtea.Effect(cmd)}, nil
 	}, b.opts("", command.UI, "Replaces the layout state; a state the layout cannot use is refused and the old one kept."))
 }
 
@@ -356,7 +357,7 @@ func (b *builder) closeOverlay() command.Command {
 		if len(b.w.overlays) == 0 {
 			return command.Result{Text: "No overlay is open."}, nil
 		}
-		return command.Result{Cmd: b.w.Pop()}, nil
+		return command.Result{Cmd: commandtea.Effect(b.w.Pop())}, nil
 	}, b.opts("close", command.UI, "Closes the top overlay."))
 }
 
@@ -365,7 +366,7 @@ var backgrounds = map[string]theme.Background{"dark": theme.Dark, "light": theme
 
 func (b *builder) themeSet() command.Command {
 	return newCommand(b, "workspace.theme.set", "Set the background", func(a themeArg) (command.Result, error) {
-		return command.Result{Cmd: b.w.SetBackground(backgrounds[a.Background])}, nil
+		return command.Result{Cmd: commandtea.Effect(b.w.SetBackground(backgrounds[a.Background]))}, nil
 	}, b.opts("theme", command.UI, "Builds the theme for a dark or light background, or follows the terminal's again.",
 		command.WithArgHint("dark|light|auto")))
 }

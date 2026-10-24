@@ -5,9 +5,12 @@
 // A Command names its arguments as a JSON Schema, its availability as a
 // when expression, its danger, and the surfaces that offer it. A Registry
 // holds the commands in immutable snapshots, so reads are lock-free and
-// safe from any goroutine. Dispatch runs a command from a Bubble Tea
-// program's Update and returns the effect as a tea.Cmd; Run runs one to
-// completion, for the shell, agents and tests.
+// safe from any goroutine. Dispatch runs a command from a host's loop and
+// returns the effect, an Effect, which a Bubble Tea host gets as a tea.Cmd
+// from commandtea.Dispatch; Run runs one to completion, for the shell,
+// agents and tests. The package links no Charm module, so a line-mode CLI
+// can use it (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md
+// D6).
 //
 // Before a command runs, a policy decides by its danger and the request's
 // origin: read-only and UI commands run for anyone, a mutating command
@@ -16,7 +19,8 @@
 // every request.
 //
 // Nothing here writes to the terminal or the process's streams. Output
-// leaves as a Result, a tea.Msg, or a record on the caller's logger.
+// leaves as a Result, an Effect's message, or a record on the caller's
+// logger.
 //
 // Stability: stable. Exported names change only through the deprecation
 // policy in AGENTS.md, "API conventions".
@@ -208,7 +212,7 @@ type Mode uint8
 // The modes. Loop is the zero value.
 const (
 	Loop  Mode = iota // during Dispatch, on the event loop
-	Async             // inside the tea.Cmd Dispatch returns, under a context Cancel reaches
+	Async             // inside the Effect Dispatch returns, under a context Cancel reaches
 )
 
 var modeNames = enum.Names[Mode]{

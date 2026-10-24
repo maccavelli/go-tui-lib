@@ -4,16 +4,14 @@ import (
 	"context"
 	"encoding/json/jsontext"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/maccavelli/go-tui-lib/v2/when"
 )
 
 // Handler does a command's work. The same handler serves every surface: it
-// returns structured and human output, and a handler that needs the Bubble
-// Tea runtime returns the effect as Result.Cmd. The registry recovers a
-// handler's panic, on every path and on the program's loop too, and
-// returns it as a *PanicError.
+// returns structured and human output, and a handler whose host must act
+// after it, such as a Bubble Tea program, returns the effect as
+// Result.Cmd. The registry recovers a handler's panic, on every path and
+// on the program's loop too, and returns it as a *PanicError.
 type Handler interface {
 	Run(ctx context.Context, inv *Invocation) (Result, error)
 }
@@ -40,10 +38,17 @@ type Invocation struct {
 
 // Result is what a command produced.
 type Result struct {
-	Value any     // structured output: --json, MCP structuredContent
-	Text  string  // human output: the shell's stdout, MCP text, a toast; a prompt's text
-	Cmd   tea.Cmd // a follow-up effect for a TUI host; the shell ignores it
+	Value any    // structured output: --json, MCP structuredContent
+	Text  string // human output: the shell's stdout, MCP text, a toast; a prompt's text
+	Cmd   Effect // a follow-up effect for a TUI host; the shell ignores it
 }
+
+// Effect is a follow-up a host runs, off the command's own goroutine when
+// the host likes. Its value is a message for the host, nil for none, or an
+// []Effect, which the host runs as one batch, each as an Effect of its
+// own. A Bubble Tea host converts one with commandtea.Cmd, and a tea.Cmd
+// into one with commandtea.Effect; nil means no effect.
+type Effect func() any
 
 // Request asks the registry to run a command.
 type Request struct {

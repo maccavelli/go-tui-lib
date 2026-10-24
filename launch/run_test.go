@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/colorprofile"
 
 	"github.com/maccavelli/go-tui-lib/v2/command"
+	"github.com/maccavelli/go-tui-lib/v2/command/commandtea"
 )
 
 // tm is a model whose behaviour each test sets.
@@ -59,7 +60,7 @@ func (m tm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		panic("a panic in Update")
 	case command.LoopMsg:
 		m.loops++
-		return m, msg.Run()
+		return m, commandtea.RunLoop(msg)
 	}
 	return m, nil
 }

@@ -7,8 +7,6 @@ import (
 	"slices"
 	"testing"
 	"time"
-
-	tea "charm.land/bubbletea/v2"
 )
 
 // loaded is a loaded prompt command in src with id and slash name.
@@ -20,9 +18,9 @@ func loaded(id ID, slash string, aliases ...string) Command {
 }
 
 // watchMsgs runs w and returns the messages it gives, flattened.
-func watchMsgs(t *testing.T, w tea.Cmd) []tea.Msg {
+func watchMsgs(t *testing.T, w Effect) []any {
 	t.Helper()
-	ch := make(chan []tea.Msg, 1)
+	ch := make(chan []any, 1)
 	go func() { ch <- collect(w) }()
 	select {
 	case m := <-ch:
@@ -33,7 +31,7 @@ func watchMsgs(t *testing.T, w tea.Cmd) []tea.Msg {
 	}
 }
 
-func conflictsIn(msgs []tea.Msg) []Conflict {
+func conflictsIn(msgs []any) []Conflict {
 	for _, m := range msgs {
 		if c, ok := m.(ConflictMsg); ok {
 			return c.Conflicts
@@ -44,7 +42,7 @@ func conflictsIn(msgs []tea.Msg) []Conflict {
 
 func TestSlashClash(t *testing.T) {
 	r := registryOf(t, nil, cmd("builtin.review", UI, func(c *Command) { c.Slash = "review" }))
-	w := r.Watch()
+	w := r.Watch(context.Background())
 	got := r.ReplaceSource(userSrc, []Command{loaded("user.review", "review", "rv")})
 	want := Conflict{ID: "user.review", Slash: "review", Renamed: "user:review", Holder: "builtin.review"}
 	if len(got) != 1 || got[0] != want {
@@ -54,7 +52,7 @@ func TestSlashClash(t *testing.T) {
 	if c := conflictsIn(msgs); len(c) != 1 || c[0] != want {
 		t.Errorf("Watch sent %v, want a ConflictMsg with %+v", msgs, want)
 	}
-	if !slices.Contains(msgs, tea.Msg(ChangedMsg{Version: 2})) {
+	if !slices.Contains(msgs, any(ChangedMsg{Version: 2})) {
 		t.Errorf("Watch sent %v, want ChangedMsg{2} too", msgs)
 	}
 	if c, ok := r.Slash("user:review"); !ok || c.ID != "user.review" {
@@ -68,12 +66,12 @@ func TestSlashClash(t *testing.T) {
 	}
 
 	// D19: a built-in registered later takes the name.
-	w = r.Watch()
+	w = r.Watch(context.Background())
 	if got := r.ReplaceSource(Source{Kind: Project}, []Command{loaded("project.deploy", "deploy")}); len(got) != 0 {
 		t.Fatalf("conflicts %+v", got)
 	}
 	_ = watchMsgs(t, w)
-	w = r.Watch()
+	w = r.Watch(context.Background())
 	if err := r.Register(cmd("builtin.deploy", UI, func(c *Command) { c.Slash = "deploy" })); err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +114,7 @@ func TestReplaceSource(t *testing.T) {
 	r.ReplaceSource(Source{Kind: Project}, []Command{loaded("project.keep", "keep")})
 	r.ReplaceSource(userSrc, []Command{loaded("user.a", "a"), loaded("user.b", "b")})
 	v := r.Version()
-	w := r.Watch()
+	w := r.Watch(context.Background())
 	if got := r.ReplaceSource(userSrc, []Command{loaded("user.b", "b"), loaded("user.c", "c")}); len(got) != 0 {
 		t.Fatalf("conflicts %+v", got)
 	}

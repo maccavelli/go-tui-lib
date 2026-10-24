@@ -107,18 +107,18 @@ and `zoom`, and two commands with one slash name cannot both register.
 ## Run commands from your program
 
 ```go
-r := command.NewRegistry(command.WithGate(dialog), command.WithLoop(program.Send))
+r := command.NewRegistry(command.WithGate(dialog), commandtea.WithLoop(program.Send))
 if err := r.Register(search); err != nil { … }
 if err := r.Register(workspace.Commands(ws)...); err != nil { … }
 
-func (m *model) Init() tea.Cmd { return tea.Batch(m.ws.Init(), m.r.Watch()) }
+func (m *model) Init() tea.Cmd { return tea.Batch(m.ws.Init(), commandtea.Watch(m.r)) }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     switch msg := msg.(type) {
     case command.LoopMsg: // an agent's command, run here on the loop
-        return m, msg.Run()
+        return m, commandtea.RunLoop(msg)
     case command.ChangedMsg: // the commands changed; listen again
-        return m, m.r.Watch()
+        return m, commandtea.Watch(m.r)
     case command.ConflictMsg: // a loaded command was renamed or refused
         m.toast(msg.Conflicts)
     case command.QuitRequestMsg: // app.quit; quitting stays yours
@@ -127,7 +127,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         if msg.Err != nil { m.toast(msg.Err) }
     case tea.KeyPressMsg:
         if msg.String() == "f2" {
-            return m, m.r.Dispatch(context.Background(), command.Request{
+            return m, commandtea.Dispatch(context.Background(), m.r, command.Request{
                 ID: "workspace.zoom", Origin: command.OriginKey, WhenContext: m.ws.WhenContext(),
             })
         }
@@ -138,9 +138,17 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 - **`Dispatch`** is for `Update`. A `Loop` command, the default mode,
   runs at once, and `Dispatch` returns its `Result.Cmd` with a
-  `ResultMsg`. An `Async` command runs inside the returned `tea.Cmd`,
-  under a context `Cancel` and `CancelAll` reach; `WithExclusive` makes a
-  new run cancel the last.
+  `ResultMsg`. An `Async` command runs inside the returned effect, under a
+  context `Cancel` and `CancelAll` reach; `WithExclusive` makes a new run
+  cancel the last.
+- **`command` needs no Bubble Tea.** An effect is a `command.Effect`, a
+  `func() any` whose value is a message, `nil`, or an `[]command.Effect`
+  to run as one batch. `command/commandtea` gives a Bubble Tea program
+  the same as `tea.Cmd`s: `commandtea.Dispatch`, `Watch` and
+  `WatchContext`, `RunLoop` for a `LoopMsg`, `Attach` and `WithLoop` with
+  `program.Send`, and `commandtea.Cmd` and `commandtea.Effect` to convert;
+  a handler returns `Result{Cmd: commandtea.Effect(ws.Zoom(id))}`. A
+  line-mode CLI runs `r.Dispatch`'s effect and its batch itself.
 - **`Run`** runs to completion and returns the `Result`, for your CLI,
   agents and tests. Under `WithLoop` it hands a `Loop` command to your
   `Update` as a `LoopMsg` and waits, so an agent's tool call, which

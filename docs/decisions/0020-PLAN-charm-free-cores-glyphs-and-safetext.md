@@ -84,7 +84,7 @@ acts on directly:
 | Outside `termcap`, only `termcap/termcaptest/termcaptest.go` uses `Prober`; `termsvc/notify.go` names `Prober` and `EnvCaps` in its documentation; `launch` uses only `termcap.Env`. *Corrected 2026-10-24, and so already at `63c68d6`: `termcaptest.go` names `Prober` only in its documentation; `termcaptest_test.go:31` and `launch/consumer_test.go:372` call `NewProber`; `launch/restore.go:7` and `docs/guides/commands.md:769` name `*termcap.Prober`* | 8 |
 | `Notifier.NotifyContext` checks the policy and numbers on the caller's goroutine, and calls a backend inside its command (`notify.go:279-300`); `CopyContext` writes OSC 52 through `tea.SetClipboard` (`clipboard.go:130-155`) | 8 |
 | `Registry.Dispatch` runs a `Loop` command at once and an `Async` one inside its command, then batches `Result.Cmd`, `ResultMsg` and, for a `Prompt` or `Forward`, `PromptMsg` (`dispatch.go:24-40`, `:244-250`) | 9 |
-| `Result{Cmd: …}` is set at nine sites in `workspace/commands.go` and once in `command/builtin.go:57`; `launch/run.go:98` calls `Attach(p.Send)` | 9 |
+| `Result{Cmd: …}` is set at nine sites in `workspace/commands.go` and once in `command/builtin.go:57`; `launch/run.go:98` calls `Attach(p.Send)`. *Corrected 2026-10-24, and so already at `63c68d6`: twelve sites in `workspace/commands.go`; `workspace/bindings.go:271` returns a handler's `res.Cmd` as a `tea.Cmd`; `docs/guides/keymaps.md:52` calls `Dispatch`* | 9 |
 | ultraviolet's decoder is `uv.EventDecoder.Decode(buf []byte) (n int, Event)` (`decoder.go:234`); `uv.KeyMod` is an `int` with shift 1, alt 2, ctrl 4, meta 8, hyper 16, super 32, caps lock 64, num lock 128, scroll lock 256 (`key.go:12-32`); `KeyExtended = unicode.MaxRune + 1` (`key.go:50`); Bubble Tea re-exports both (`bubbletea key.go`, `mod.go`) | 10, 11 |
 | `keymap/help.go` reads the unexported `(*Keymap).shown` (`keymap.go:589`); `workspace/bindings.go:221` calls `Dispatcher.Update`, `workspace/help.go:33` calls `Keymap.KeyBinding`; `workspace/bindings_test.go:174` is the one user of `Settings.Tick` | 11 |
 | The framework examples under `testdata/frameworks` use `command.Registry`, `Request`, `Result`, `WriteResult` and `launch`, and none of the names that move | 9 |
@@ -1040,7 +1040,9 @@ corrected fact:* `termcap/termcaptest/termcaptest_test.go` and
   is an `[]command.Effect` becomes `tea.Batch` of each converted, run
   at once, as `tea.Batch(...)()` is today); `Dispatch(r, ctx, req)`;
   `Watch(r)`; `WatchContext(r, ctx)`; `Attach(r, send func(tea.Msg))
-  func()`; `WithLoop(send func(tea.Msg)) command.RegistryOption`;
+  func()`; *(2026-10-24, the owner's choice: the context first,
+  `Dispatch(ctx, r, req)` and `WatchContext(ctx, r)`, as Go's convention,
+  revive's `context-as-argument` and `termsvctea.NotifyContext` have it)*; `WithLoop(send func(tea.Msg)) command.RegistryOption`;
   `RunLoop(m command.LoopMsg) tea.Cmd`.
 
 **`command`, the core:**
@@ -1081,6 +1083,10 @@ corrected fact:* `termcap/termcaptest/termcaptest_test.go` and
   `case command.LoopMsg: return m, commandtea.RunLoop(msg)`, and
   `commandtea.Dispatch`. `make examples` passes, its excerpts unchanged.
 * `docs/architecture.md:85`.
+* *Added 2026-10-24, by the corrected fact:* `workspace/bindings.go:271`
+  (`return commandtea.Cmd(res.Cmd)`), all twelve sites of
+  `workspace/commands.go`, and `docs/guides/keymaps.md:52`
+  (`commandtea.Dispatch`).
 
 **New tests:** `TestCmdBatches` (an `Effect` returning two `Effect`s
 gives a `tea.BatchMsg` of two commands whose messages are theirs, in
@@ -2466,3 +2472,137 @@ loop test); `command/registry.go` imports Bubble Tea
   "282 file(s) clean" on macOS and "288 file(s) clean" on Linux and
   Windows, with the API diff and examples gates.
 * **Identifiers:** `python3 -m tools.verify scan`: `scan: clean (5 pattern(s))`.
+
+### Step 10: `command` and `commandtea` (2026-10-24)
+
+* The owner committed Step 9 as `64d3f4d` and said to proceed
+  ("committed, proceed").
+* **Deviation, 2026-10-24, the callers.** The facts table's count was
+  wrong, and so already at `63c68d6`: `workspace/commands.go` sets
+  `Result{Cmd: …}` at twelve sites, not nine; `workspace/bindings.go:271`
+  returns a handler's `res.Cmd` as a `tea.Cmd`; `docs/guides/keymaps.md:52`
+  calls `Dispatch`. Each is a caller of what the step changes, with one
+  correct resolution, converting it here, or the tree does not build: so
+  it was recorded and not stopped for, as Step 6's uncounted additions
+  were. The fact row and the step's callers carry the note.
+* **Deviation, 2026-10-24, the context's place.** The step wrote
+  `commandtea.Dispatch(r, ctx, req)` and `WatchContext(r, ctx)`; revive's
+  `context-as-argument` refuses a context after another parameter. Offered:
+  the context first, or the step's order with a `nolint`. *Chosen:* the
+  context first, `Dispatch(ctx, r, req)` and `WatchContext(ctx, r)`, as
+  Go's convention and `termsvctea.NotifyContext(ctx, n, x)` have it. The
+  step carries the note.
+* **`command`, the core:**
+  * `handler.go`: `type Effect func() any`, documented; `Result.Cmd` is an
+    `Effect`.
+  * `dispatch.go`: `Dispatch` returns an `Effect`: a `ResultMsg` alone for
+    a request that cannot run; for an `Async` command, one that executes,
+    audits and returns `effects(…)`; else `effects(…)` at once, as a
+    batch. `effects` is an `[]Effect` of `Result.Cmd`, the `ResultMsg` and,
+    for a `Prompt` or `Forward`, the `PromptMsg`, a nil `Result.Cmd`
+    staying a nil entry the host skips. `Attach(send func(any))`; `onLoop`'s
+    `LoopMsg` carries a `func() Effect`.
+  * `registry.go`: `Watch(ctx) Effect` is `WatchContext`'s body, giving
+    `ChangedMsg`, or `[]Effect{changed, conflict}`, or nil once ctx ends;
+    `WithLoop(send func(any))`, and `loopState.send` a `func(any)`.
+  * `messages.go`: `LoopMsg{run func() Effect}` and `Run() Effect`;
+    `builtin.go`: `app.quit`'s `Result{Cmd: func() any { return
+    QuitRequestMsg{} }}`; `command.go`'s package comment and `Async`'s.
+  * `GOWORK=off go list -deps ./command`, for linux, darwin and windows:
+    no Charm package but `x/ansi` and `x/ansi/parser`, and no
+    `internal/teamsg`.
+  * `.golangci.yml`'s `charmfree` gains `**/command/*.go`;
+    `internal/conformance`'s `cores` gains `command`.
+* **`command/commandtea/commandtea.go`:** `Effect`, `Cmd` (an
+  `[]command.Effect` run at once as `tea.Batch` of each converted, which
+  gives `nil` when every entry is nil), `Dispatch`, `Watch`,
+  `WatchContext`, `RunLoop`, `Attach` and `WithLoop`. `tea.Msg` is
+  ultraviolet's `Event`, a defined `interface{}` and not an alias of
+  `any`, so `Attach` and `WithLoop` wrap `send`.
+* **Callers:** `workspace/commands.go`, the twelve sites as
+  `commandtea.Effect(x)`; `workspace/bindings.go:271`,
+  `commandtea.Cmd(res.Cmd)`; `launch/run.go:98`, `commandtea.Attach`;
+  `workspace/commands_test.go`, `launch/run_test.go` and
+  `launch/consumer_test.go` as the step says.
+* **Tests, by Rule 7.** `Dispatch`, `Watch`, `Attach`, `WithLoop` and
+  `LoopMsg.Run` stay in `command` with new types, and so do their tests:
+  their only use of Bubble Tea was reading messages, so a scratch script
+  read them through the core (the `collect` helper over `Effect`,
+  `tea.Msg` as `any`, `tea.Cmd` as `Effect`, `teamsg.Cmd(x)` as an
+  `Effect`, `Watch()` and `WatchContext(ctx)` as `Watch(ctx)`), in
+  `builtin_test.go`, `dispatch_test.go`, `export_test.go`, `forms_test.go`,
+  `loop_test.go`, `registry_test.go`, `result_test.go` and
+  `sources_test.go`. No `command` test imports Bubble Tea. The tea forms
+  have tests of their own in `commandtea`, as below.
+* **New tests:** in `commandtea`, `TestCmdBatches`, `TestEffectNil`,
+  `TestDispatch`, `TestDispatchAsync`, `TestWatch` and
+  `TestAttachAndRunLoop`; in `command`, `TestCoreDispatchWithoutTea`; in
+  `workspace`, `TestCommandEffectsReachTheProgram`. The last is beyond the
+  step's list: no `workspace` test saw a command's effect reach the
+  program, before this step or after it (with `commandtea.Effect` made to
+  drop its message, and with the key path dropping its command's effect,
+  every `workspace` test passed), so the twelve converted sites and
+  `bindings.go` were held by the type checker alone. It focuses a pane
+  whose `Focus` returns a command, through `commandtea.Dispatch` and
+  through `alt+.`, and wants the pane's message.
+* **Docs:** `docs/guides/commands.md` (the program example and a bullet on
+  `command.Effect` and `commandtea`), `docs/guides/keymaps.md:52`,
+  `docs/architecture.md` (the dependency rows, the `command` and
+  `commandtea` rows, the cores, the imports, the tree), `docs/glossary.md`
+  (`Effect`, reserved by A1.3, now built) and the index.
+* **Checks:**
+  * `gofmt -l .` empty; `GOWORK=off go vet ./...`: exit 0; `go test ./...`
+    with `GOWORK=off` and in workspace mode: every package ok;
+  * `golangci-lint` over `command/...`, `workspace/...`, `launch/...` and
+    `internal/conformance/...` for linux, darwin and windows: `0 issues`;
+    `go fix -diff ./...`: empty for each, once `go fix` had written one
+    `reflect.TypeFor` in `commandtea_test.go`;
+  * `make examples`: "46 case(s) run", "10 excerpt(s) checked", "clean",
+    its excerpts unchanged;
+  * `make apicheck`: "against v1.13.0, 22 incompatible change(s)",
+    "clean", with a block named "0020-PLAN Step 10" of seven lines, each a
+    declaration the step names;
+  * `python3 -m tools.verify names` over `Effect`: "1 planned name(s),
+    clean";
+  * `markdownlint-cli2` over the changed guides, `architecture.md`, the
+    glossary and the index: "0 issues".
+* **Mutations,** each on a fresh copy, 17, every one killed by the test
+  named. Rows 10.1 to 10.6 are the step's list; the rest see each new or
+  changed test fail (Rule 5):
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | 10.1 Cmd drops a nested []Effect (TestCmdBatches), replacing one that crashed on a nil entry | `commandtea_test.go:83: a nested batch: [{}]` |
+  | 10.2 Effect(nil) is a non-nil function (TestEffectNil) | `commandtea_test.go:94: Effect(nil) is not nil` |
+  | 10.3 Dispatch runs an Async command before returning (command's TestDispatchAsync) | `dispatch_test.go:58: an Async command ran during Dispatch` |
+  | 10.3b the same, seen by commandtea's TestDispatchAsync | `commandtea_test.go:148: the async command ran before its tea.Cmd did` |
+  | 10.4 Watch returns the conflict without ChangedMsg (command's TestSlashClash) | `sources_test.go:56: Watch sent [{[{user.review review user:review builtin.review <nil>}]}], want ChangedMsg{2} too` |
+  | 10.4b the same, seen by commandtea's TestWatch | `commandtea_test.go:197: a renaming change: command.ConflictMsg, want a tea.BatchMsg` |
+  | 10.5 commandtea.Attach drops a message (TestAttachAndRunLoop) | `commandtea_test.go:250: Attach: the loop got nothing` |
+  | 10.6 command/registry.go imports and uses Bubble Tea (TestCoresAreCharmFree) | `charmfree_test.go:172: command (GOOS=linux) links charm.land/bubbletea/v2: command → charm.land/bubbletea/v2` |
+  | 10.6b the same, refused by depguard's charmfree | `command/registry.go:14:2: import 'charm.land/bubbletea/v2' is not allowed from list 'charmfree' … (depguard)` |
+  | 10.7 the core's batch drops the PromptMsg (TestCoreDispatchWithoutTea) | `effect_test.go:39: a prompt's effect: 2 entries, first nil true; want 3, the first nil` |
+  | 10.8 commandtea.Dispatch does not convert the batch (commandtea's TestDispatch) | `commandtea_test.go:117: Dispatch's message is []command.Effect, want a tea.BatchMsg` |
+  | 10.9 RunLoop drops the command's effect (TestAttachAndRunLoop) | `commandtea_test.go:256: Attach: RunLoop's tea.Cmd sent [], want the effect's message` |
+  | 10.10 workspace.focus's effect is lost (TestCommandEffectsReachTheProgram), replacing one TestBuiltinsMatchMethods could not see | `effect_test.go:72: workspace.focus through commandtea.Dispatch sent [{{workspace.focus {"pane":"logs"}  key  [map[workspace.focusedPane:session wor…` |
+  | 10.11 a key's own command loses its effect (TestCommandEffectsReachTheProgram), replacing one that did not compile | `effect_test.go:78: alt+. moved focus logs → footer and sent [], want the new pane's focus message` |
+  | 10.12 the core's batch drops its ResultMsg (command's TestDispatchLoop) | `dispatch_test.go:32: 0 ResultMsgs in [{}], want 1` |
+  | 10.13 a LoopMsg's run loses its claim and runs nothing (command's TestAttachRunsOnLoop) | `loop_test.go:76: Run did not return` |
+  | 10.14 commandtea.Effect runs c and drops its message (TestCommandEffectsReachTheProgram) | `effect_test.go:72: workspace.focus through commandtea.Dispatch sent [<nil> {{workspace.focus {"pane":"logs"}  key  [map[workspace.focusedPane:sessi…` |
+
+  The first run had 16: 13 killed by their test; 10.1 killed by a nil
+  dereference the mutation itself made, on the batch's nil entry, and
+  10.11 by a build failure (the `commandtea` import left unused), so both
+  replaced; and 10.10, `workspace.zoom`'s effect dropped, survived
+  `TestBuiltinsMatchMethods`, which compares state that the command sets
+  at once, so it was replaced by one on `workspace.focus` against the new
+  test, with 10.14 added.
+* **Gates,** `python3 -m tools.verify gates` over the step's 33 files,
+  nothing skipped: macOS `gates: 19 passed, 0 failed, 0 skipped in 422s`; the Linux host
+  `gates: 19 passed, 0 failed, 0 skipped in 961s`; the Windows host
+  `gates: 19 passed, 0 failed, 0 skipped in 1815s`. `release-check` is
+  "288 file(s) clean" on macOS and "292 file(s) clean" on Linux and
+  Windows, with the API diff and examples gates.
+* **Identifiers:** `python3 -m tools.verify scan`: `scan: clean (5 pattern(s))`.
+* **Not done here:** the release and its migration notes, which are Step
+  13's. Nothing is tagged.

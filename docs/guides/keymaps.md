@@ -49,7 +49,7 @@ for your registry:
 
 ```go
 case workspace.RequestMsg:
-    return m, m.r.Dispatch(context.Background(), msg.Request)
+    return m, commandtea.Dispatch(context.Background(), m.r, msg.Request)
 ```
 
 ## Scopes and the focus path

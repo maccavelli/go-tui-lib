@@ -31,7 +31,8 @@ below).
  launch/launchtest  fake streams for tests → launch, termcap (tests)
  workspace     Bubble Tea pane host       → layout, theme, glyph, keymap, internal/cells, internal/enum, internal/limits, internal/sanitize, command, when; bubbletea, bubbles/key, bubbles/help, colorprofile, x/ansi
  keymap        keys to command IDs        → command, when, glyph, termcap, internal/enum; bubbletea, bubbles/key, bubbles/help, x/ansi
- command       the command registry       → when, internal/enum, internal/sanitize, internal/teamsg; bubbletea
+ command       the command registry       → when, internal/enum, internal/sanitize
+ command/commandtea   commands in tea    → command; bubbletea
  when          availability expressions   → internal/enum
  internal/cells  the reused frame buffer  → layout; ultraviolet, x/ansi
  termsvc       terminal services          → termcap, internal/enum, internal/sanitize; x/ansi
@@ -56,7 +57,8 @@ below).
 | Package | What it holds |
 | :--- | :--- |
 | `when` | `Parse` and `MustParse` → `Expr` (`Eval`, `String`, `Keys`), VS Code's when-clause grammar with RE2 regexes, or a `SyntaxError` with its offset; `Check` against `Keys`; `Context`, `Map`, `Layered`, `Value`; typed `Key[T]` |
-| `command` | `Command`, `ID`, `New[A]` and `MustNew[A]` and their options, `SchemaOf` (JSON Schema 2020-12 from Kong-aligned tags), `ArgsOf`, `ArgError`; `Registry` (`NewRegistry` with `WithGate`, `WithAuditor`, `WithPrefixer` and `WithLoop`; `Attach`, a loop that can be detached; `Register`, `ReplaceSource`, `Lookup`, `Slash`, `ParseSlash`, `ParseArgs`, `Complete`, `All`, `Available`, `Watch`, `WatchContext`, `Dispatch`, `Run`, `Cancel`, `CancelAll`, `Remove`, `Version`); `Params` and `Param`; `Format` and `WriteResult`; the policy, `Gate`, `GateFunc`, `AllowIf`, `Verdict`, `Auditor`, `AuditorFunc`, `SlogAuditor`; a `Request`'s `WhenContext`; the errors, each with its exit status, and `PanicError`; `LoadDir` and `LoadDirWith`, with its limits; `WithMaxArgBytes`; `FromMCPPrompts`, `FromACP`; `MCPTools`, `CallMCP`, `ACPCommands`, `Manifest`; `WithLoop` and `LoopMsg`; the messages |
+| `command` | `Command`, `ID`, `New[A]` and `MustNew[A]` and their options, `SchemaOf` (JSON Schema 2020-12 from Kong-aligned tags), `ArgsOf`, `ArgError`; `Registry` (`NewRegistry` with `WithGate`, `WithAuditor`, `WithPrefixer` and `WithLoop`; `Attach`, a loop that can be detached; `Register`, `ReplaceSource`, `Lookup`, `Slash`, `ParseSlash`, `ParseArgs`, `Complete`, `All`, `Available`, `Watch`, `Dispatch`, `Run`, `Cancel`, `CancelAll`, `Remove`, `Version`); `Params` and `Param`; `Format` and `WriteResult`; the policy, `Gate`, `GateFunc`, `AllowIf`, `Verdict`, `Auditor`, `AuditorFunc`, `SlogAuditor`; a `Request`'s `WhenContext`; the errors, each with its exit status, and `PanicError`; `LoadDir` and `LoadDirWith`, with its limits; `WithMaxArgBytes`; `FromMCPPrompts`, `FromACP`; `MCPTools`, `CallMCP`, `ACPCommands`, `Manifest`; `WithLoop` and `LoopMsg`; `Effect`, the follow-up a host runs, and the messages |
+| `command/commandtea` | `Cmd` and `Effect`, between `command.Effect` and `tea.Cmd`; `Dispatch`, `Watch`, `WatchContext`, `RunLoop`, `Attach` and `WithLoop`, the registry's forms for a program's `Update` and `Send` |
 | `glyph` | `Set` (4 border styles, separators with a cross and four tees, focus marker, ellipsis, scroll, bullet, badge brackets, `Prompt` and `Mask`, the states `Done`, `Failed`, `Running` and `Pending`, `Heading`, `MeterFill` and `MeterTrack`, `Control`, and `Keys`, a `KeyGlyphs` of the macOS modifier and arrow labels), `Unicode()`, `ASCII()`, `For(utf8)`; `Tier` (`TierUnicode`, `TierLegacy`, `TierASCII`) and `Tier.Set`; every glyph one cell, except `Keys`' ASCII twins, which are words such as `opt+` and `up` |
 | `fuzzy` | `Matcher`, from `NewMatcher(query)` with `WithCase`, `WithDelimiters`, `WithExtended`, `WithMaxAlign` and `WithNormalizer`: grapheme-cluster matching with smart case, a `Grade` (`Exact`, `Prefix`, `Boundary`, `Subsequence`) and a `Score`; `Match`, `Range`, `Ranked[T]`; `Cells`, a match's ranges in cells; `Index`, a lossy candidate index for large lists, with `WithMaxCandidates` and `WithMinOverlap` |
 | `safetext` | `Rules` and the presets `Text`, `Strict`, `Line`, `Command` and `StatusLine`; `Clean`, `IsClean`; `Sanitizer`, a streaming `io.Writer` with `Close`; `SafeURL` and `URLs`: ECMA-48 with the DEC parser's recovery, C1 code points read as their 7-bit forms, invalid UTF-8 as one U+FFFD per maximal subpart, and the Bidi_Control set removed unless kept ([0020-MADR](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md) D9, A3) |
@@ -81,15 +83,17 @@ below).
 | `tuitest` | `Golden` across {colour, no colour} × {UTF-8, ASCII} × widths; `Case.Profile` and `Case.Glyphs`; `Fits`; `Text` for a single file; `Annotate` |
 
 - **`layout` has no Charm import,** so its solver can serve any front end.
-- **The Charm-free cores** are `fuzzy`, `glyph`, `internal/enum`,
-  `internal/sanitize`, `layout`, `safetext`, `termcap`, `termsvc` and `when`: none links a Charm
+- **The Charm-free cores** are `command`, `fuzzy`, `glyph`,
+  `internal/enum`, `internal/sanitize`, `layout`, `safetext`, `termcap`,
+  `termsvc` and `when`: none links a Charm
   module but `x/ansi`, so a line-mode CLI can use them without Bubble Tea
   ([0020-MADR](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
   D1, D11). `internal/conformance` checks their whole import closure, and
   depguard's `charmfree` rule their own imports (Tooling).
 - **Imports point downward.** `when` imports only the standard library,
-  so the keymap and any front end can use it. `command` imports `when`
-  and Bubble Tea, for `tea.Cmd` and `tea.Msg` only. `workspace` imports
+  so the keymap and any front end can use it. `command` imports `when`,
+  and no Bubble Tea; `command/commandtea` holds its Bubble Tea forms.
+  `workspace` imports
   both to publish its commands and context keys; `command` never imports
   `workspace` ([0006-MADR](decisions/0006-MADR-command-registry.md)
   §1). `keymap` imports `command`, `when`, `glyph` and `termcap`'s facts;
@@ -210,6 +214,7 @@ safetext/                   where a package renders
 termcap/termcaptea/         the probe's Bubble Tea host
 termcap/termcaptest/        fake terminals for tests
 termsvc/termsvctea/         termsvc's Bubble Tea commands
+command/commandtea/         command's Bubble Tea forms
 launch/                     start the TUI from a program's own CLI
 launch/launchtest/          fake streams for a program's tests
 internal/enum/              enum names and text forms
