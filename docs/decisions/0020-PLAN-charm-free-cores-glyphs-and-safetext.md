@@ -551,6 +551,14 @@ comment, which says invalid UTF-8 is removed).
   * `docs/glossary.md`: `Rules` and `Sanitizer` move from "Reserved" to
     "Built";
   * `README.md` Status; `docs/README.md` rows.
+
+  *Deviation, 2026-10-23 (Execution Record, Step 6):* `v0.13.0` also
+  carries 0008-PLAN Steps 2 to 4, which are on `main` and in no tag:
+  `glyph`'s `Prompt` and `Mask`; `workspace`'s `CommandConsumer`,
+  `CommandMsg`, `Close`, `Bindings` and `Theme`; and `fuzzy`, of which
+  this list named only the package. `architecture.md` and *Added* name
+  them too. 0008-PLAN Step 9's guide, `docs/guides/command-palette.md`,
+  stays with that PLAN.
 * **The release,** as `docs/guides/releasing.md` "Release the root alone"
   says:
   * release notes in the execution record;
@@ -1675,3 +1683,133 @@ loop test); `command/registry.go` imports Bubble Tea
   Copies of the two records under other names, linted with the same
   rules, show only `*` list markers, which MADR requires, and hard tabs
   in A2.2's Go block, which predates this step.
+* Committed by the owner.
+
+### Step 6: release `v0.13.0` (2026-10-23)
+
+* **Deviation (2026-10-23): the release carries more than the step's
+  list.** Listing the exported API with apidiff, compatible changes
+  included, from `v0.12.0` to `HEAD` (`220506d`) gives 17 additions. Nine
+  are this PLAN's: `safetext`, and `glyph.Set`'s `Done`, `Failed`,
+  `Running`, `Pending`, `Heading`, `MeterFill`, `MeterTrack` and
+  `Control`. Eight are 0008-PLAN Steps 2 to 4's, on `main` since before
+  this PLAN and in no tag:
+  * `fuzzy`, which the step named;
+  * `glyph.Set`'s `Prompt` and `Mask`;
+  * `workspace`'s `CommandConsumer`, `CommandMsg`, `Close`,
+    `(*Workspace).Bindings` and `(*Workspace).Theme`.
+
+  The step's *Added* list named `fuzzy` alone of them. Release notes that
+  leave out what a tag adds would be wrong, so they and `architecture.md`
+  name all seventeen. 0008-PLAN Step 9's guide,
+  `docs/guides/command-palette.md`, waits for `palette` there, as that
+  PLAN's note says. The MADR's D12 says that release 1 "also carries
+  `fuzzy`", which stays true, so the MADR is not amended.
+* **Docs:**
+  * `docs/architecture.md`:
+    * `fuzzy` and `safetext` in the package tree and table;
+    * `internal/sanitize`'s imports and row, as a wrapper of `safetext`;
+    * `glyph`'s row with its ten new fields;
+    * `workspace`'s row with its five additions;
+    * a bullet naming the Charm-free cores;
+    * `TestCoresAreCharmFree` under Tooling;
+    * the `charmfree` rule under Dependencies;
+    * the tree.
+  * `docs/guides/migrating.md`, "Migrating to `v0.13.0`":
+    * *Changed:* U+FFFD for invalid UTF-8; MADR A3.1's classes, put as
+      what a program sees;
+    * *Added:* the seventeen additions;
+    * a line on the Charm-free cores.
+  * `docs/glossary.md`: `Rules` and `Sanitizer` move from "Reserved" to
+    "Built".
+  * `README.md`: the current release is `v0.13.0`, and a Status bullet
+    for `safetext`, `fuzzy` and the glyphs.
+  * `docs/README.md`: this PLAN's row.
+* **Release notes, `v0.13.0`,** for the owner's release:
+
+  > **`v0.13.0`** adds packages and fields and removes nothing: `make
+  > apicheck` reports 0 incompatible changes against `v0.12.0`.
+  >
+  > *Added*
+  >
+  > * `safetext`: `Clean`, `IsClean` and the streaming `Sanitizer` by
+  >   `Rules`, with the presets `Text`, `Strict`, `Line`, `Command` and
+  >   `StatusLine`; `SafeURL` and `URLs`. It imports only the standard
+  >   library and `glyph` (#12).
+  > * `fuzzy`: grapheme-cluster matching and ranking, and an `Index` for
+  >   large lists (#6).
+  > * `glyph.Set`: `Done`, `Failed`, `Running`, `Pending`, `Heading`,
+  >   `MeterFill`, `MeterTrack` and `Control` (#11); `Prompt` and `Mask`.
+  > * `workspace`: `Bindings`, `Theme`, `CommandConsumer`, `CommandMsg`
+  >   and `Close`.
+  >
+  > *Changed*
+  >
+  > * Untrusted text the library shows has invalid UTF-8 as U+FFFD, one
+  >   per maximal subpart, where it was dropped.
+  > * Malformed escape sequences are read as the DEC parser reads them:
+  >   * an encoded C1 control is its 7-bit form;
+  >   * BEL ends a DCS, SOS, PM or APC;
+  >   * a pane's view splits malformed input as a title does, and keeps
+  >     no SGR or link written with a C1 control.
+  >
+  >   Well-formed text, styles and links are unchanged.
+  > * `internal/sanitize` runs on `safetext`, and is faster: up to four
+  >   times on tool output, and `HasControl` no longer cleans to decide.
+  >
+  > *Charm-free cores:* `fuzzy`, `glyph`, `layout`, `safetext` and `when`
+  > link no Charm module but `x/ansi`, and a test holds them to it.
+  >
+  > [The migration guide](docs/guides/migrating.md#migrating-to-v0130)
+  > has the details. Records:
+  > `0020-MADR-charm-free-cores-glyphs-and-safetext.md` (D8, D9, D11,
+  > A3), and `0008-PLAN-command-palette.md` Steps 2 to 4.
+
+* **Issue comments,** drafted for the owner, to post once `v0.13.0` is
+  tagged and the consumer smoke test passes:
+  * **#6:** "`fuzzy` is in `v0.13.0`. Its closure links `x/ansi` and no
+    other Charm module, which gobble's 0032-MADR A1 admits, and
+    `internal/conformance`'s `TestCoresAreCharmFree` now holds it to
+    that on Linux, macOS and Windows. The consumer smoke test ranked with
+    it from the proxy's copy of the tag."
+  * **#11:** "`v0.13.0`'s `glyph.Set` has `Done` (✓/+), `Failed` (✗/x),
+    `Running` (●/\*) and `Pending` (○/-), each its own shape in both sets;
+    `Heading` (▸/>), its own field though it draws as `Focus`; and
+    `MeterFill` (━/#) and `MeterTrack` (╌/-). The ASCII ellipsis stays
+    `~`. It is the tail a cut adds inside a cell budget, and `...` would
+    take two cells more than `…`, so a view laid out for one set would no
+    longer fit the other; a tilde is a known truncation mark too, as in
+    `PROGRA~1` (0020-MADR D8, Q6)."
+  * **#12:** "`safetext` is in `v0.13.0`, ahead of the rest of 0009, and
+    `internal/sanitize` is now a wrapper over it: one sanitiser. It
+    imports the standard library and `glyph` only. Invalid UTF-8 becomes
+    U+FFFD, one per maximal subpart, so a raw 0x9B opens nothing; the C1
+    code points are read as their 7-bit forms; `Escape` shows the
+    bidirectional controls as `\u202e` and the rest; `IsClean` validates
+    without cleaning. Against gobble's numbers, 4 KiB of tool output
+    cleans in about 10 µs under `Line()`, and `IsClean` decides in 0.1
+    µs. The differences from `v0.12.0` on malformed input are 0020-MADR
+    A3."
+* **Gates,** `python3 -m tools.verify gates` over the step's seven files,
+  all documents: macOS `gates: 18 passed, 0 failed, 1 skipped in 402s`;
+  the Linux host `… 1 skipped in 813s`; the Windows host `… 1 skipped in
+  1968s`. `release-check` is "258 file(s) clean" on each, with `apicheck`
+  among its checks; `make apicheck` alone reported "against v0.12.0, 0
+  incompatible change(s)" at Step 5's commit, and this step changes no
+  Go file.
+  * *Skipped, 2026-10-23:* the `gofmt` gate, on each host, "no Go files":
+    the step's files hold none. `release-check` ran gofmt over every
+    tracked Go file, clean.
+* **The disclosure guard** over the five commits ahead of `origin/main`
+  (`44a4890` to `220506d`) passed, exit 0, with no finding. It runs again
+  over this step's commit before the push.
+* **Not done yet, and the owner's:**
+  1. commit this step;
+  2. the guard over the outgoing commits, which the agent runs again on
+     request;
+  3. the push of `main`, and CI green;
+  4. the annotated tag `v0.13.0` on that commit, pushed, and CI green on
+     the tag.
+
+  Then the agent runs the consumer smoke test and its negative control,
+  records them here, and the owner posts the issue comments above.

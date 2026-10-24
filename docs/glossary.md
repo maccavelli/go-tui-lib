@@ -36,7 +36,6 @@ later record does not reuse it for something else.
 
 | Name | Means | Belongs to |
 | :--- | :--- | :--- |
-| `Rules`, `Sanitizer` | what survives cleaning; the streaming cleaner | `safetext` |
 | `KeyEvent`, `Mod`, `Decoder`, `Input`, `InputKind` | a decoded key, its modifiers, the byte decoder, what it yields and its kind | `termkey` |
 | `ColorProfile` | the colour profile, in `Caps` | `termcap` |
 | `Probe`, `ProbeEvent`, `ProbeEventKind`, `ProbeHook` | the I/O-free probe engine, an event it returns and its kind, a program hook it asks the host to run | `termcap` |
@@ -58,6 +57,12 @@ reserved here and are now built
 [0014-PLAN-hardening](decisions/0014-PLAN-hardening.md)); and `command`'s
 `Verdict` and `WhenContext`, in `v0.9.0`
 ([0014-PLAN-canonicalization](decisions/0014-PLAN-canonicalization.md)).
+`safetext`'s `Rules`, what survives cleaning, and `Sanitizer`, the
+streaming cleaner, were reserved by
+[0020-MADR](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
+A1.3 and are built in `v0.13.0`
+([0020-PLAN](decisions/0020-PLAN-charm-free-cores-glyphs-and-safetext.md)
+Step 4).
 Each has one meaning, as its package documents it. `Terminal` is in
 "Deliberate" above; `command.Decision`, `Verdict`'s old name, was removed
 in `v0.10.0`, and `Decision` is `launch`'s alone.

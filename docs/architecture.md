@@ -37,10 +37,12 @@ below).
  internal/termevent   pass-through events → ultraviolet
  internal/termevent/termeventtest  those events for tests → ultraviolet, bubbletea
  theme         palettes, roles, styles    → glyph, internal/enum; lipgloss, colorprofile
+ fuzzy         match and rank candidates  → internal/enum; x/ansi
+ safetext      untrusted text, made safe  → glyph; standard library
  glyph         Unicode and ASCII glyphs   → internal/enum
  internal/enum  enum names and text forms → standard library
  internal/teamsg  the one-message command → bubbletea
- internal/sanitize  untrusted display text → x/ansi
+ internal/sanitize  untrusted display text → safetext; x/ansi
  internal/limits  the window clamp        → standard library
  layout        geometry and state         → internal/enum
  tuitest       golden rendering           → glyph; x/ansi, colorprofile (tests and examples only)
@@ -50,17 +52,19 @@ below).
 | :--- | :--- |
 | `when` | `Parse` and `MustParse` → `Expr` (`Eval`, `String`, `Keys`), VS Code's when-clause grammar with RE2 regexes, or a `SyntaxError` with its offset; `Check` against `Keys`; `Context`, `Map`, `Layered`, `Value`; typed `Key[T]` |
 | `command` | `Command`, `ID`, `New[A]` and `MustNew[A]` and their options, `SchemaOf` (JSON Schema 2020-12 from Kong-aligned tags), `ArgsOf`, `ArgError`; `Registry` (`NewRegistry` with `WithGate`, `WithAuditor`, `WithPrefixer` and `WithLoop`; `Attach`, a loop that can be detached; `Register`, `ReplaceSource`, `Lookup`, `Slash`, `ParseSlash`, `ParseArgs`, `Complete`, `All`, `Available`, `Watch`, `WatchContext`, `Dispatch`, `Run`, `Cancel`, `CancelAll`, `Remove`, `Version`); `Params` and `Param`; `Format` and `WriteResult`; the policy, `Gate`, `GateFunc`, `AllowIf`, `Verdict`, `Auditor`, `AuditorFunc`, `SlogAuditor`; a `Request`'s `WhenContext`; the errors, each with its exit status, and `PanicError`; `LoadDir` and `LoadDirWith`, with its limits; `WithMaxArgBytes`; `FromMCPPrompts`, `FromACP`; `MCPTools`, `CallMCP`, `ACPCommands`, `Manifest`; `WithLoop` and `LoopMsg`; the messages |
-| `glyph` | `Set` (4 border styles, separators with a cross and four tees, focus marker, ellipsis, scroll, bullet, badge brackets, and `Keys`, a `KeyGlyphs` of the macOS modifier and arrow labels), `Unicode()`, `ASCII()`, `For(utf8)`; `Tier` (`TierUnicode`, `TierLegacy`, `TierASCII`) and `Tier.Set`; every glyph one cell, except `Keys`' ASCII twins, which are words such as `opt+` and `up` |
+| `glyph` | `Set` (4 border styles, separators with a cross and four tees, focus marker, ellipsis, scroll, bullet, badge brackets, `Prompt` and `Mask`, the states `Done`, `Failed`, `Running` and `Pending`, `Heading`, `MeterFill` and `MeterTrack`, `Control`, and `Keys`, a `KeyGlyphs` of the macOS modifier and arrow labels), `Unicode()`, `ASCII()`, `For(utf8)`; `Tier` (`TierUnicode`, `TierLegacy`, `TierASCII`) and `Tier.Set`; every glyph one cell, except `Keys`' ASCII twins, which are words such as `opt+` and `up` |
+| `fuzzy` | `Matcher`, from `NewMatcher(query)` with `WithCase`, `WithDelimiters`, `WithExtended`, `WithMaxAlign` and `WithNormalizer`: grapheme-cluster matching with smart case, a `Grade` (`Exact`, `Prefix`, `Boundary`, `Subsequence`) and a `Score`; `Match`, `Range`, `Ranked[T]`; `Cells`, a match's ranges in cells; `Index`, a lossy candidate index for large lists, with `WithMaxCandidates` and `WithMinOverlap` |
+| `safetext` | `Rules` and the presets `Text`, `Strict`, `Line`, `Command` and `StatusLine`; `Clean`, `IsClean`; `Sanitizer`, a streaming `io.Writer` with `Close`; `SafeURL` and `URLs`: ECMA-48 with the DEC parser's recovery, C1 code points read as their 7-bit forms, invalid UTF-8 as one U+FFFD per maximal subpart, and the Bidi_Control set removed unless kept ([0020-MADR](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md) D9, A3) |
 | `launch` | `Choice` and `Flags` (`--mode`, `--tui`, bound natively in each framework); `Streams`, `StreamSource`, `FromSource`; `Config`, `Decide` → `Decision` with `Target`s and a `Reason` token; `Run[M]` with `WithRegistry`, `WithRestorer`, `OnStart`, `WithProgramOptions`, `WithFilter`; `ErrNotStarted`, `ErrCrashed`; `Frame`; `ExitCode`, `ExitError`; `Restorer` |
 | `launch/launchtest` | `Terminal` (a fake terminal stream with a size and typed keys), `Pipe`, `Streams`, `Env` |
 | `internal/enum` | `Names`, an enum's tokens, on `uint8` or `int`, and `Bits`, a bit set's, on `uint8` or `uint16`, for an enum's `String`, `MarshalText` and `UnmarshalText`; `Name`, `Marshal` and `Unmarshal` over a bare table |
 | `internal/teamsg` | `Cmd`, the `tea.Cmd` that delivers one message |
 | `theme` | `Palette` for dark, light and unknown backgrounds; `LightDarkColor` and `ProfileColor`; `Styles`; `New(profile, background, glyphs)` with `WithPalette` and `WithPaletteFor`; `FromDark`; `Border(style)`; text forms for `Background` and `BorderStyle` |
 | `layout` | `Rect`, `Size` (fixed, percent, ratio, fill; min, max, shrink order), `Node` (`Pane`, `Split`, `Responsive`, or a custom node), `Solve` → `Plan`; `State` (JSON); the sidebar presets and their `With…` options |
-| `workspace` | `Pane` and its optional interfaces, `PlainViewer` among them; `Workspace` (routing, focus, chrome, resize, zoom, hide, overlays, cursor, `View`, `RenderPlain`, `help.KeyMap` and `Help`, the width method, a following theme with `WithGlyphs`, `WithProfile`, `WithBackground` and `GlyphThemeBuilder`, `WithSize`, clamped to `MaxSide` and `MaxCells`, `SetBackground`, `Panes`, `PaneAs`, `WhenContext`); `Wrap`; its keys through a keymap: `DefaultRules`, `WithBindings`, `SetBindings`, `KeyPath`, `KeyContexter`, `PushMode` and `RequestMsg`; `Commands` and the context keys, `FocusedPaneKey()` to `HeightKey()` |
+| `workspace` | `Pane` and its optional interfaces, `PlainViewer` among them; `Workspace` (routing, focus, chrome, resize, zoom, hide, overlays, cursor, `View`, `RenderPlain`, `help.KeyMap` and `Help`, the width method, a following theme with `WithGlyphs`, `WithProfile`, `WithBackground` and `GlyphThemeBuilder`, `WithSize`, clamped to `MaxSide` and `MaxCells`, `SetBackground`, `Panes`, `PaneAs`, `WhenContext`); `Wrap`; its keys through a keymap: `DefaultRules`, `WithBindings`, `SetBindings`, `KeyPath`, `KeyContexter`, `PushMode` and `RequestMsg`; `Bindings` and `Theme`, for a pane to show a key and draw alike; `CommandConsumer` and `CommandMsg`, for a pane or overlay that runs some commands itself; `Close`, an overlay's request to close; `Commands` and the context keys, `FocusedPaneKey()` to `HeightKey()` |
 | `keymap` | the notation: `Stroke`, `Sequence`, `ParseStroke`, `ParseSequence`, `Event`, `Normalize`, `Label`, `ParseAliases`, `DisplayAliases` and `CopyStrokes`; `Keymap`, from `New(Settings, defaults, layers…)`, with `Rebuild`, `Lookup`, `Bindings`, `Reachable`, `Shortcut`, `Conflicts` and `Rules`; `Binding`, `Default` and `Alternative`, `Layer`, `Location`, `Path`; `BindingConflict` and `ConflictKind`; `Features`, `FeaturesFrom`, `KeyFacts` and `FactsFrom`; `Dispatcher` (`Update`, `SetKeymap`, `Pending`, `ActiveKeys`, `Explain`) with `Outcome` and `TimeoutMsg`; `LoadVSCode`, `LoadError`, `ExportVSCode` and `Schema`; `KeyBinding`, `Help`, `Describer`, `DescriberFunc` and `FromRegistry` |
 | `internal/cells` | `Frame`: a reused cell buffer that draws strings into rectangles with a chosen width method |
-| `internal/sanitize` | `Line` for one line of plain text and `Styled` for a pane's view, which keeps SGR and OSC 8 only; `Truncate`, never wider than asked; `Token`; `HasControl` |
+| `internal/sanitize` | `Line` for one line of plain text and `Styled` for a pane's view, which keeps SGR and OSC 8 only, and `HasControl`: calls of `safetext` under rules equal to their behaviour on well-formed input (0020-MADR D9 S5, A3); `Truncate`, never wider than asked; `Token` |
 | `internal/limits` | `MaxSide`, `MaxCells` and `Clamp`, the window clamp `workspace` and `launch` share |
 | `termcap` | `Prober`, from `NewProber` (one batch of queries ended by DA1, a deadline, tea's own replies observed, mode 2031 and its reset, `IsReplyFragment`); `EnvCaps`, the environment's facts with no program; `Caps` of `Fact`s with origin and reason, as JSON (v2); `ErrUnknownName`; `Env`, whose lookups ignore case on Windows; `FromEnv` and `Identity`; the keyboard, link and notification views; `TmuxQuery`; `Report` and `Findings` |
 | `termcap/termcaptest` | `Terminal`, a scripted fake terminal, with `SetRunTimeout`; `Profile` and seven profiles; `Run` |
@@ -70,6 +74,12 @@ below).
 | `tuitest` | `Golden` across {colour, no colour} × {UTF-8, ASCII} × widths; `Case.Profile` and `Case.Glyphs`; `Fits`; `Text` for a single file; `Annotate` |
 
 - **`layout` has no Charm import,** so its solver can serve any front end.
+- **The Charm-free cores** are `fuzzy`, `glyph`, `internal/enum`,
+  `internal/sanitize`, `layout`, `safetext` and `when`: none links a Charm
+  module but `x/ansi`, so a line-mode CLI can use them without Bubble Tea
+  ([0020-MADR](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
+  D1, D11). `internal/conformance` checks their whole import closure, and
+  depguard's `charmfree` rule their own imports (Tooling).
 - **Imports point downward.** `when` imports only the standard library,
   so the keymap and any front end can use it. `command` imports `when`
   and Bubble Tea, for `tea.Cmd` and `tea.Msg` only. `workspace` imports
@@ -185,8 +195,8 @@ tools/verify/               python3 -m tools.verify: a step's gates, its
                             hosts come from a local config, never committed
   tests/                    its unittest suite, with fake ssh and scp
 glyph/ theme/ layout/ workspace/ tuitest/ termcap/ termsvc/
-when/ command/              the packages; goldens under testdata/golden/
-                            where a package renders
+when/ command/ fuzzy/       the packages; goldens under testdata/golden/
+safetext/                   where a package renders
 termcap/termcaptest/        fake terminals for tests
 launch/                     start the TUI from a program's own CLI
 launch/launchtest/          fake streams for a program's tests
@@ -198,8 +208,8 @@ internal/cells/             the reused frame buffer, an ultraviolet importer
 internal/termevent/         pass-through events, the other ultraviolet importer
 internal/conformance/       the conformance scan: terminal ownership,
                             environment, exit and spawn, type names,
-                            stability lines, opaque options, enum text
-                            (tests only)
+                            stability lines, opaque options, enum text,
+                            the Charm-free cores' closure (tests only)
 tuitest/internal/clash/     proves tuitest's -update flag does not clash (tests only)
 testdata/frameworks/        the framework examples: programs on flag, Cobra,
                             Kong and urfave/cli, built in a module of their
@@ -248,6 +258,12 @@ docs/
 - **Kept to one package by `depguard`:** `github.com/charmbracelet/x/term`
   to `launch`, so only `launch` asks the terminal for its state
   ([0013-MADR](decisions/0013-MADR-cli-integration-helpers.md) §11).
+- **Kept out of the Charm-free cores by `depguard`'s `charmfree`:**
+  Bubble Tea, Bubbles, Lip Gloss, colorprofile, ultraviolet, `x/term` and
+  `internal/teamsg`, in the cores' non-test files; `internal/conformance`
+  checks what they link through other packages
+  ([0020-MADR](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
+  D11).
 
 ## Tooling
 
@@ -294,6 +310,10 @@ docs/
   - `TestEveryPackageStatesStability` fails when a package's
     documentation does not end with its stability line (AGENTS.md, "API
     conventions").
+  - `TestCoresAreCharmFree` lists each Charm-free core's non-test import
+    closure with `go list -deps`, for `GOOS=linux`, `darwin` and
+    `windows`, and fails on any Charm module but `x/ansi`, naming the
+    shortest import chain to it; `cores` names the packages.
   - It reads each package's files for the host's `GOOS`; CI's three
     operating systems cover the rest.
 - **`make fuzz`** fuzzes, in every module, each fuzz target of every

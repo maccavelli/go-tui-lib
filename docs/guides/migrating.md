@@ -6,6 +6,60 @@ wrapper, alias or field, and is removed in the next
 `staticcheck` reports each use of one as SA1019, so a program can find
 them all before the removal.
 
+## Migrating to `v0.13.0`
+
+`v0.13.0` adds packages and fields, and removes nothing
+([0020-PLAN-charm-free-cores-glyphs-and-safetext](../decisions/0020-PLAN-charm-free-cores-glyphs-and-safetext.md)
+Step 6). A program needs no change to build. What it shows changes where
+it puts untrusted text on the screen that is not well formed, as
+"Changed" lists.
+
+### Changed
+
+- **Invalid UTF-8 shows as U+FFFD,** one for each maximal subpart (the
+  Unicode Standard, §3.9.6), where the library's output dropped it: in a
+  pane's title and badge, a notification, a window title, a link's text,
+  a beacon's vendor and tmux's reply. A raw byte 0x80 to 0x9F that
+  continues no character is invalid UTF-8, so it shows as U+FFFD and
+  opens no sequence.
+- **Malformed escape sequences are read as the DEC parser reads them**
+  ([0020-MADR](../decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
+  A3):
+  - a C1 control encoded as UTF-8, U+0080 to U+009F, is its 7-bit form:
+    U+009B opens a CSI, U+0090 a DCS, U+009C ends a string, and the
+    sequence goes whole, where only the code point was dropped before;
+  - BEL ends a DCS, SOS, PM or APC, so the text after it shows;
+  - text other than ASCII inside a DCS, SOS, PM or APC is part of it;
+  - a character inside an OSC does not end it, even one whose UTF-8 holds
+    the byte 0x9C, such as `Ü`;
+  - a pane's view splits a malformed sequence as a title always did: an
+    nF escape such as `ESC SP X` is removed, and the text after it stays;
+  - a pane's view keeps no SGR or OSC 8 link written with a C1 control.
+
+  Well-formed text, styles and links come out as before.
+
+### Added
+
+- **`safetext`:** `Clean` and `IsClean` by `Rules`, with the presets
+  `Text`, `Strict`, `Line`, `Command` and `StatusLine`; `Sanitizer`, which
+  cleans a stream; `SafeURL` and `URLs`. It imports only the standard
+  library and `glyph`, so a line-mode CLI can use it without Bubble Tea.
+  `internal/sanitize`, which cleans what the library shows, now runs on
+  it.
+- **`fuzzy`:** a `Matcher` that matches and ranks by grapheme cluster,
+  with grades and fzf's scoring, and an `Index` for large candidate lists.
+- **`glyph.Set`:** `Done`, `Failed`, `Running` and `Pending`, each its own
+  shape in both sets; `Heading`; `MeterFill` and `MeterTrack`; `Control`;
+  `Prompt` and `Mask`.
+- **`workspace`:** `Bindings` and `Theme`, so a pane can show a command's
+  key and draw as the workspace does; `CommandConsumer` and `CommandMsg`,
+  for a pane or an overlay that runs some commands itself; and `Close`,
+  an overlay's request to close itself.
+
+`fuzzy`, `glyph`, `layout`, `safetext` and `when` link no Charm module but
+`x/ansi`. A test holds them to that, so a program that uses only these
+builds without Bubble Tea, Lip Gloss or Bubbles.
+
 ## Migrating to `v0.12.0`
 
 `v0.12.0` removes the names `v0.11.0` deprecated

@@ -18,7 +18,7 @@ pattern, used by every program that needs it.
 
 ## Status
 
-- **The current release is `v0.12.0`.** `v0` means the API may still
+- **The current release is `v0.13.0`.** `v0` means the API may still
   change, and a renamed name keeps working for one minor release:
   [the migration guide](docs/guides/migrating.md) lists them.
 - **Multi-pane workspaces, since `v0.1.0`.** `layout` arranges panes: a main
@@ -75,6 +75,15 @@ pattern, used by every program that needs it.
   terminal can deliver. The workspace's keys go through it, so a user
   rebinds them in the same file
   ([the keymaps guide](docs/guides/keymaps.md)).
+- **Safe text and fuzzy matching without Bubble Tea, since `v0.13.0`.**
+  `safetext` cleans untrusted text for a terminal, a string or a stream at
+  a time, by rules a caller picks: escape sequences read as a terminal
+  reads them, invisible and bidirectional controls removed or shown, and
+  invalid UTF-8 as U+FFFD. `fuzzy` matches and ranks candidates by
+  grapheme cluster. With `glyph`, `layout` and `when` they link no Charm
+  module but `x/ansi`, so a line-mode CLI can use them
+  ([0020-MADR](docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)).
+  `glyph` gains status, heading, meter and control glyphs.
 - **The stack is Charm v2:** `charm.land/bubbletea/v2`,
   `charm.land/lipgloss/v2` and `charm.land/bubbles/v2`, with
   `github.com/charmbracelet/colorprofile` and
