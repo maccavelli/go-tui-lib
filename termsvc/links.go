@@ -5,11 +5,8 @@ import (
 	"slices"
 	"strings"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/maccavelli/go-tui-lib/v2/internal/enum"
 	"github.com/maccavelli/go-tui-lib/v2/internal/sanitize"
-	"github.com/maccavelli/go-tui-lib/v2/internal/teamsg"
 	"github.com/maccavelli/go-tui-lib/v2/termcap"
 )
 
@@ -73,15 +70,7 @@ func (p LinkPolicy) Openable(rawURL string) bool {
 	return slices.ContainsFunc(schemes, func(s string) bool { return strings.EqualFold(s, u.Scheme) })
 }
 
-// OpenURLMsg asks the program to open URL. The library never starts a
-// process; the program opens it.
+// OpenURLMsg asks the program to open URL, as termsvctea.Open delivers it
+// for a URL the policy allows. The library never starts a process; the
+// program opens it.
 type OpenURLMsg struct{ URL string }
-
-// Open returns the command that delivers OpenURLMsg for rawURL, or nil
-// when the policy refuses it.
-func (p LinkPolicy) Open(rawURL string) tea.Cmd {
-	if !p.Openable(rawURL) {
-		return nil
-	}
-	return teamsg.Cmd(OpenURLMsg{URL: rawURL})
-}

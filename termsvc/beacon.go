@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/maccavelli/go-tui-lib/v2/internal/enum"
@@ -126,15 +125,8 @@ func parseActivityState(name string) (ActivityState, bool) {
 // ActivityInterval is how often the beacon repeats.
 const ActivityInterval = 5 * time.Second
 
-// ActivityTickMsg is ActivityBeacon's tick.
+// ActivityTickMsg is termsvctea.ActivityBeacon's tick.
 type ActivityTickMsg struct{ At time.Time }
-
-// ActivityBeacon is the beacon's timer: it delivers ActivityTickMsg after
-// ActivityInterval. A program that opts in writes Activity on each tick
-// and returns ActivityBeacon again.
-func ActivityBeacon() tea.Cmd {
-	return tea.Tick(ActivityInterval, func(t time.Time) tea.Msg { return ActivityTickMsg{At: t} })
-}
 
 // Pointer is the OSC 22 sequence that sets the mouse pointer's shape, such
 // as "pointer" over a link, or "" for the terminal's default. Only Ghostty

@@ -2344,3 +2344,125 @@ loop test); `command/registry.go` imports Bubble Tea
   pattern(s))`.
 * **Not done here:** the release and its migration notes, which are Step
   13's. Nothing is tagged.
+
+### Step 9: `termsvc` and `termsvctea` (2026-10-24)
+
+* The owner committed Steps 7 and 8 as `a559d7c` and said to proceed
+  ("committed, proceed").
+* **The facts it rests on:** `NotifyContext` at `notify.go:280-300`,
+  `CopyContext` at `clipboard.go:130-155` and `ActivityBeacon` at
+  `beacon.go:135` stood as the table cites them; `Update` was at
+  `notify.go:256-266`, one line lower after Step 8's documentation edit.
+  Outside `termsvc` only the guides, `docs/architecture.md` and
+  `internal/conformance/options_test.go` (`termsvc.NotifyOption`, which
+  stays) name what moves.
+* **`termsvc`, the core:**
+  * `notify.go`: `Update`, `Notify` and `NotifyContext` gone;
+    `SetCaps`, `SetFocus` and `Prepare(ctx, x) (seq, deliver)` added.
+    `Prepare` is `NotifyContext` up to its command: cleaning, the skip,
+    `bytesFor` and so the numbering on the caller's goroutine, and a
+    backend called only by `deliver`, under `bounded(ctx, n.timeout)`.
+    `Sequence` is unchanged. The `Notifier`'s and `WhenUnfocused`'s
+    documentation say how a CLI and a TUI drive it.
+  * `clipboard.go`: `Copy` and `CopyContext` gone; `PrepareCopy(ctx, c,
+    text, o...) (Route, func() CopiedMsg)` added, with `RouteNone` and
+    `Failed` over `MaxCopyBytes`, `RouteBackend` and a bounded clipboard
+    call in `deliver`, else `RouteOSC52Tmux` inside tmux or `RouteOSC52`.
+  * `links.go`: `LinkPolicy.Open` gone; `beacon.go`: `ActivityBeacon`
+    gone; `termsvc.go`'s package comment.
+  * `GOWORK=off go list -deps ./termsvc`, for linux, darwin and windows:
+    no Charm package but `x/ansi` and `x/ansi/parser`, and no
+    `internal/teamsg`.
+  * `.golangci.yml`'s `charmfree` gains `**/termsvc/*.go`;
+    `internal/conformance`'s `cores` gains `termsvc`.
+* **`termsvc/termsvctea/termsvctea.go`:** `Observe`, `Notify`,
+  `NotifyContext`, `Copy`, `CopyContext`, `Open` and `ActivityBeacon`, as
+  the step writes them. A skipped notification's command is the
+  `deliver` call, where today's was `teamsg.Cmd` of the same result.
+* **Tests, by Rule 7:**
+  * moved to `termsvctea`, changed only for receivers and `termsvc.`
+    qualifiers: from `termsvc_test.go` the helpers and
+    `TestNotificationBytes`, `TestFocusPolicies` (through `Observe`),
+    `TestEmptyNotificationIsNotSent`, `TestBackend` and `TestCopy`; from
+    `services_test.go` `TestCopyStatus` and `TestActivityBeacon`; all of
+    `forms_test.go` (`TestSequenceMatchesNotify`, `TestCopySequence`,
+    `TestBackendDeadline`, `TestBackendTimeout`) and of `adapter_test.go`;
+    and `TestOpenable`'s `Open` half, as `TestOpen`;
+  * kept in `termsvc`, reading what the core decides through `Prepare`,
+    `deliver` and `PrepareCopy` where they read a command:
+    `TestNotificationBytes`, `TestNotificationsAreWrappedInsideAMultiplexer`,
+    `TestFocusPolicies` (through `SetFocus`), `TestEmptyNotificationIsNotSent`,
+    `TestBackend` (and a skipped notification never reaching it),
+    `TestControlBytesAreStripped`, `TestNotificationText`, `TestGate`,
+    `TestBackendDeadline`, `TestBackendTimeout` and
+    `TestBackendAndClipboardFuncs`; the rest of the package's tests
+    unchanged. So the byte tables are pinned on both sides: the core's,
+    and what the adapter writes.
+  * new: `TestPrepareMatchesSequence` (every protocol, `Off` included,
+    and every policy; one count across both, once per call) and
+    `TestPrepareCopyRoutes` in `termsvc`; `TestBackendOffTheLoop`,
+    `TestObserve`, `TestOpen` and `TestNotifyWritesThenReports` in
+    `termsvctea`.
+  * The four test functions holding `\u` escapes (`TestControlBytesAreStripped`,
+    `TestSanitizeTitle`, `FuzzSanitizers`, `TestActivityVendorSanitized`)
+    were copied byte for byte by a scratch script, since the writing tool
+    decodes `\u` escapes (Steps 7 and 8); a scan finds no raw format or
+    control character in either package.
+  * No `termsvc` test imports Bubble Tea.
+* **Callers:** `docs/guides/terminal-capabilities.md` (the services'
+  bullets, the notifier example, the CLI's `Prepare` and `SetCaps`, the
+  activity row) and `docs/architecture.md` (the dependency rows, the
+  `termsvc` and `termsvctea` rows, the cores, the tree).
+* **Checks:**
+  * `GOWORK=off go build ./...` and `go vet ./...`: exit 0; `go test
+    ./termsvc/...` three times, and with `-race`: ok;
+    `go test ./internal/conformance/`: ok;
+  * `golangci-lint` over `termsvc/...` and `internal/conformance/...` for
+    linux, darwin and windows: `0 issues`; `go fix -diff ./...`: empty
+    for each;
+  * `make apicheck`: "against v1.13.0, 15 incompatible change(s)",
+    "clean", with a block named "0020-PLAN Step 9" of the seven removals,
+    each one the step's list names;
+  * `markdownlint-cli2` over the changed guide, `architecture.md` and the
+    index: "0 issues".
+* **Mutations,** each on a fresh copy, 21, every one killed by the test
+  named (`mutate: 21 killed, 0 survived, 0 errors`, then `mutate: 2
+  killed, 0 survived, 0 errors` for 9.5 and 9.5b replaced). Rows 9.1 to
+  9.5 are the step's list; the rest see each new or changed test fail
+  (Rule 5):
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | 9.1 Prepare numbers twice per call (TestPrepareMatchesSequence) | `forms_test.go:42: protocol auto, policy always, {Title:build Body:passed ID: Urgency:normal}:` |
+  | 9.2 the adapter calls deliver before returning (TestBackendOffTheLoop) | `termsvctea_test.go:37: NotifyContext waited for the backend` |
+  | 9.3 PrepareCopy sends an over-long text (TestPrepareCopyRoutes) | `services_test.go:49: one byte over: osc52, {Status:unconfirmed Route:osc52 Err:<nil>}; want none, {Status:failed Route:none Err:<nil>}` |
+  | 9.4 Observe ignores tea.BlurMsg (TestObserve) | `termsvctea_test.go:92: after blur: focused, want` |
+  | 9.5 termsvc/notify.go imports and uses Bubble Tea (TestCoresAreCharmFree), replacing one that did not compile | `charmfree_test.go:171: termsvc (GOOS=linux) links charm.land/bubbletea/v2: termsvc → charm.land/bubbletea/v2` |
+  | 9.5b the same, refused by depguard's charmfree | `termsvc/notify.go:9:2: import 'charm.land/bubbletea/v2' is not allowed from list 'charmfree' … (depguard)` |
+  | 9.6 the result is delivered before the write (TestNotifyWritesThenReports) | `termsvctea_test.go:65: first {Notification:{Title:t Body: ID: Urgency:normal} Sent:true Skipped: Err:<nil>}, want the bell` |
+  | 9.7 Open ignores the policy (TestOpen) | `termsvctea_test.go:117: Open returned a command for a refused URL` |
+  | 9.8 SetFocus records the opposite (termsvc's TestFocusPolicies) | `termsvc_test.go:144: policy 0, focused: Sent true, Skipped ""; want skipped "focused"` |
+  | 9.9 the same, seen through Observe by termsvctea's TestFocusPolicies | `termsvc_test.go:130: policy 3, focused: Sent true, Skipped ""; want skipped "focused"` |
+  | 9.10 a skipped notification still calls the backend (termsvc's TestBackend) | `termsvc_test.go:192: a skipped notification reached the backend: "", {Notification:{Title:x Body: ID: Urgency:normal} Sent:true Skipped: Err:<nil>}…` |
+  | 9.11 Prepare does not clean the text (TestNotificationText) | `services_test.go:178: title "a\n\n  b\r\nc\x1b[1m d", want line breaks collapsed and the sequence gone` |
+  | 9.12 the bell is wrapped like the rest (termsvc's TestNotificationsAreWrappedInsideAMultiplexer) | `termsvc_test.go:115: tmux bell: "\x1bPtmux;\a\x1b\\", want a bare BEL, which tmux passes on` |
+  | 9.13 OSC 777 keeps its semicolons (termsvc's TestNotificationBytes) | `termsvc_test.go:71: OSC 777:` |
+  | 9.14 the same, seen by termsvctea's TestNotificationBytes | `termsvc_test.go:102: OSC 777:` |
+  | 9.15 a copy's clipboard is not bounded (termsvc's TestBackendDeadline) | `forms_test.go:136: the default, clipboard: deadline -2562047h47m16.854775808s (false), want 5s` |
+  | 9.16 a blocked clipboard is not ended by its timeout (termsvc's TestBackendTimeout) | `--- FAIL: TestBackendTimeout: panic: deadlock: all goroutines in bubble are blocked` |
+  | 9.17 a clipboard's error is not reported (TestBackendAndClipboardFuncs) | `adapter_test.go:41: PrepareCopy reported backend, {Status:confirmed Route:backend Err:<nil>}` |
+  | 9.18 a gated notification is prepared (termsvc's TestGate) | `services_test.go:196: gated: {Notification:{Title:working Body: ID: Urgency:normal} Sent:true Skipped: Err:<nil>}` |
+  | 9.19 an empty notification is prepared (termsvc's TestEmptyNotificationIsNotSent) | `termsvc_test.go:156: a notification of controls only: "\a", {Notification:{Title: Body: ID: Urgency:normal} Sent:true Skipped: Err:<nil>}` |
+  | 9.20 tmux copies are not wrapped again (termsvctea's TestCopy) | `termsvc_test.go:203: inside tmux, the extra copy is "\x1b]52;c;aGVsbG8=\a", want "\x1bPtmux;\x1b\x1b]52;c;aGVsbG8=\a\x1b\\"` |
+
+  9.5 and 9.5b as first written added the import without using it, so
+  the package did not compile, and each kill was a build or type-check
+  failure rather than the check named; both were replaced by a form that
+  uses the import, whose kills are the rows above.
+* **Gates,** `python3 -m tools.verify gates` over the step's 21 files,
+  nothing skipped: macOS `gates: 19 passed, 0 failed, 0 skipped in 459s`; the Linux host
+  `gates: 19 passed, 0 failed, 0 skipped in 883s`; the Windows host
+  `gates: 19 passed, 0 failed, 0 skipped in 1826s`. `release-check` is
+  "282 file(s) clean" on macOS and "288 file(s) clean" on Linux and
+  Windows, with the API diff and examples gates.
+* **Identifiers:** `python3 -m tools.verify scan`: `scan: clean (5 pattern(s))`.

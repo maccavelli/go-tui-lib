@@ -11,8 +11,10 @@ CLI. These packages do the work:
   so a line-mode CLI drives it itself.
 - `termcap/termcaptea` is the `Probe`'s host in a Bubble Tea program: its
   `Prober` sits beside your model.
-- `termsvc` turns those facts into commands and strings: notifications, the
-  clipboard, links, prompt marks, titles and the activity beacon.
+- `termsvc` turns those facts into strings and decisions: notifications,
+  the clipboard, links, prompt marks, titles and the activity beacon. It
+  links no Charm module but `x/ansi` either.
+- `termsvc/termsvctea` turns the same services into Bubble Tea commands.
 - `termcap/termcaptest` runs your program against scripted fake terminals,
   so all of this can be tested without a real one.
 
@@ -266,18 +268,19 @@ terminal through tmux's passthrough, which needs `allow-passthrough on`.
 
 ```go
 n := termsvc.NewNotifier() // WhenUnfocused, Auto
-// in Update: n.Update(msg), beside the prober
-return m, n.Notify(termsvc.Notification{Title: "Done", Body: "3 files changed"})
+// in Update: termsvctea.Observe(n, msg), beside the prober
+return m, termsvctea.Notify(n, termsvc.Notification{Title: "Done", Body: "3 files changed"})
 ```
 
 - **`Auto`** picks OSC 99 when the terminal answered its query, then OSC 9
   or OSC 777 by brand, then the bell; inside tmux or screen the sequence is
   wrapped for passthrough.
 - **Focus comes from `tea.FocusMsg` and `tea.BlurMsg`,** which need
-  `View.ReportFocus`. `WhenUnfocused` sends only after a blur;
+  `View.ReportFocus`, through `termsvctea.Observe`, which calls
+  `n.SetFocus`; `termcap.CapsMsg` reaches `n.SetCaps` the same way. `WhenUnfocused` sends only after a blur;
   `UnlessFocused` also sends while focus is unknown; `Always` and `Never`
   do what they say.
-- **Every call delivers `NotifyResultMsg`**: `Sent`, or the `Skipped`
+- **Every notification delivers `NotifyResultMsg`**: `Sent`, or the `Skipped`
   reason (`disabled`, `empty`, `focused`, `focus-unknown`, `gated`,
   `failed`), and a backend's `Err`.
 - **Text is cleaned:** escape sequences and controls removed, line breaks
@@ -286,29 +289,34 @@ return m, n.Notify(termsvc.Notification{Title: "Done", Body: "3 files changed"})
   only; `WithBackend(b)` sends through a desktop API you supply, and
   `termsvc.BackendFunc` makes one of a function.
 - **A backend runs under a deadline:** 5 s by default,
-  `WithBackendTimeout(d)` to change it. `NotifyContext(ctx, x)` also
-  ends it with your context; a backend that misses the deadline gives
-  `failed`, with the context's error in `Err`. `Notify` is
-  `NotifyContext` under `context.Background()`.
+  `WithBackendTimeout(d)` to change it. `termsvctea.NotifyContext(ctx, n,
+  x)` also ends it with your context; a backend that misses the deadline
+  gives `failed`, with the context's error in `Err`. `termsvctea.Notify`
+  is `NotifyContext` under `context.Background()`. The command decides on
+  your loop and calls the backend only when it runs, off the loop.
 - **From your own command line,** which runs no Bubble Tea program,
-  `n.Sequence(x)` returns the bytes `Notify` would write, with the same
-  cleaning and numbering, or the reason it would skip. Write them to the
-  terminal yourself. Such a program never sees focus, so build the
-  notifier `WithPolicy(termsvc.Always)`, and give it the environment's
-  facts with `n.Update(termcap.CapsMsg{Caps: termcap.EnvCaps(…)})`.
+  `n.Prepare(ctx, x)` returns the bytes to write, with the same cleaning
+  and numbering, and `deliver`, which runs a backend, if any, and returns
+  the `NotifyResultMsg`. Write the bytes yourself, then call `deliver`;
+  `n.Sequence(x)` gives the bytes alone, or the reason it would skip.
+  Such a program never sees focus, so build the notifier
+  `WithPolicy(termsvc.Always)`, and give it the environment's facts with
+  `n.SetCaps(termcap.EnvCaps(…))`, or a `termcap.Probe`'s.
 
 ## Clipboard and links
 
-- **`termsvc.Copy(caps, text)`** writes OSC 52 through tea, and inside tmux
-  also wraps it for passthrough. It delivers `CopiedMsg`: `Unconfirmed`,
-  because OSC 52 never replies. With `WithClipboard(b)` your clipboard
-  confirms or fails; `termsvc.ClipboardFunc` makes one of a function. Over 100,000 bytes it fails and sends nothing.
-  `CopyContext` and `WithCopyTimeout` bound your clipboard as
+- **`termsvctea.Copy(caps, text)`** writes OSC 52 through tea, and inside
+  tmux also wraps it for passthrough. It delivers `CopiedMsg`:
+  `Unconfirmed`, because OSC 52 never replies. With `WithClipboard(b)` your
+  clipboard confirms or fails; `termsvc.ClipboardFunc` makes one of a
+  function. Over 100,000 bytes it fails and sends nothing.
+  `termsvctea.CopyContext` and `WithCopyTimeout` bound your clipboard as
   `NotifyContext` and `WithBackendTimeout` bound a backend.
-- **`termsvc.CopySequence(caps, text)`** returns the bytes `Copy` has
-  written, OSC 52 and inside tmux the same wrapped for passthrough, with
-  the route, for your own command line to write. Over 100,000 bytes it
-  returns `ErrCopyTooLarge`.
+- **`termsvc.CopySequence(caps, text)`** returns the bytes a copy writes,
+  OSC 52 and inside tmux the same wrapped for passthrough, with the route,
+  for your own command line to write. Over 100,000 bytes it returns
+  `ErrCopyTooLarge`. `termsvc.PrepareCopy(ctx, caps, text, …)` gives the
+  route and the `deliver` that reports it, calling your clipboard there.
 - **`CopyPlan(caps)`** orders the routes to try: your clipboard, tmux's
   buffer (run `TmuxLoadBuffer()` with the text on standard input), OSC 52.
 - **`ImageReadCommands(goos, wayland)`** lists the commands that read an
@@ -317,8 +325,9 @@ return m, n.Notify(termsvc.Notification{Title: "Done", Body: "3 files changed"})
   link, or the label with its URL, where links do not work.
   **`termsvc.Link(url, text)`** builds a link, refusing schemes other than
   http, https, file and mailto. **`LinkPolicy.Openable(url)`** decides
-  whether a click may open it (http and https by default); `Open` delivers
-  `OpenURLMsg`, and your program opens it.
+  whether a click may open it (http and https by default);
+  `termsvctea.Open(policy, url)` delivers `OpenURLMsg`, and your program
+  opens it.
 
 ## Titles, marks and more
 
@@ -326,7 +335,7 @@ return m, n.Notify(termsvc.Notification{Title: "Done", Body: "3 files changed"})
 | :--- | :--- |
 | `SanitizeTitle(s)` | `View.WindowTitle`: no controls or bidirectional marks, at most 240 characters |
 | `PromptStart`, `CommandStart`, `CommandExecuted`, `CommandFinished(exit)` | OSC 133 marks in inline output; on the alternate screen they mean nothing |
-| `Activity(vendor, state, t)`, `ParseActivity`, `ActivityBeacon` | an opt-in beacon for an editor that embeds the terminal, every 5 s |
+| `Activity(vendor, state, t)`, `ParseActivity`, `termsvctea.ActivityBeacon` | an opt-in beacon for an editor that embeds the terminal, every 5 s |
 | `Pointer(caps, shape)` | the mouse pointer's shape, on Ghostty and kitty outside a multiplexer |
 | `ProgressSupported(caps)` | whether `View.ProgressBar` shows as a bar |
 

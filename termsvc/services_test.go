@@ -7,11 +7,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"testing/synctest"
 	"time"
 	"unicode/utf8"
 
-	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/maccavelli/go-tui-lib/v2/termcap"
@@ -27,63 +25,51 @@ func (c *clipboard) Copy(_ context.Context, text string) error {
 	return c.err
 }
 
-// copiedOf runs cmd, and returns its CopiedMsg and whether it wrote to the
-// clipboard through tea or tea.Raw.
-func copiedOf(t *testing.T, cmd tea.Cmd) (CopiedMsg, bool) {
-	t.Helper()
-	setClipboard := reflect.TypeOf(tea.SetClipboard("x")())
-	var got []CopiedMsg
-	wrote := false
-	for _, m := range run(cmd) {
-		switch v := m.(type) {
-		case CopiedMsg:
-			got = append(got, v)
-		case tea.RawMsg:
-			wrote = true
-		default:
-			if reflect.TypeOf(m) == setClipboard {
-				wrote = true
-			}
-		}
-	}
-	if len(got) != 1 {
-		t.Fatalf("%d CopiedMsg, want 1", len(got))
-	}
-	return got[0], wrote
-}
-
-func TestCopyStatus(t *testing.T) {
+// TestPrepareCopyRoutes: each route PrepareCopy picks, what its deliver
+// reports, and that a clipboard is called only by deliver.
+func TestPrepareCopyRoutes(t *testing.T) {
 	var tmux termcap.Caps
 	tmux.Mux.Set(termcap.Tmux, termcap.Environment)
-	cases := []struct {
+	ctx := context.Background()
+	for _, c := range []struct {
 		name  string
-		cmd   tea.Cmd
+		caps  termcap.Caps
+		text  string
+		route Route
 		want  CopiedMsg
-		wrote bool
 	}{
-		{"OSC 52", Copy(termcap.Caps{}, "x"), CopiedMsg{Status: Unconfirmed, Route: RouteOSC52}, true},
-		{"OSC 52 inside tmux", Copy(tmux, "x"), CopiedMsg{Status: Unconfirmed, Route: RouteOSC52Tmux}, true},
-		{"the largest payload", Copy(termcap.Caps{}, strings.Repeat("x", MaxCopyBytes)), CopiedMsg{Status: Unconfirmed, Route: RouteOSC52}, true},
-		{"one byte over", Copy(termcap.Caps{}, strings.Repeat("x", MaxCopyBytes+1)), CopiedMsg{Status: Failed}, false},
-	}
-	for _, c := range cases {
-		got, wrote := copiedOf(t, c.cmd)
-		if got != c.want || wrote != c.wrote {
-			t.Errorf("%s: %+v, wrote %v; want %+v, wrote %v", c.name, got, wrote, c.want, c.wrote)
+		{"OSC 52", termcap.Caps{}, "x", RouteOSC52, CopiedMsg{Status: Unconfirmed, Route: RouteOSC52}},
+		{"OSC 52 inside tmux", tmux, "x", RouteOSC52Tmux, CopiedMsg{Status: Unconfirmed, Route: RouteOSC52Tmux}},
+		{"the largest payload", termcap.Caps{}, strings.Repeat("x", MaxCopyBytes), RouteOSC52, CopiedMsg{Status: Unconfirmed, Route: RouteOSC52}},
+		{"one byte over", termcap.Caps{}, strings.Repeat("x", MaxCopyBytes+1), RouteNone, CopiedMsg{Status: Failed}},
+		{"one byte over, inside tmux", tmux, strings.Repeat("x", MaxCopyBytes+1), RouteNone, CopiedMsg{Status: Failed}},
+	} {
+		route, deliver := PrepareCopy(ctx, c.caps, c.text)
+		if got := deliver(); route != c.route || got != c.want {
+			t.Errorf("%s: %v, %+v; want %v, %+v", c.name, route, got, c.route, c.want)
+		}
+		if _, r, _ := CopySequence(c.caps, c.text); r != route {
+			t.Errorf("%s: CopySequence's route %v, PrepareCopy's %v", c.name, r, route)
 		}
 	}
 
 	ok := &clipboard{}
-	got, wrote := copiedOf(t, Copy(tmux, "hello", WithClipboard(ok)))
-	if got != (CopiedMsg{Status: Confirmed, Route: RouteBackend}) || wrote || len(ok.got) != 1 || ok.got[0] != "hello" {
-		t.Errorf("a clipboard's success: %+v, wrote %v, clipboard got %q", got, wrote, ok.got)
+	route, deliver := PrepareCopy(ctx, tmux, "hello", WithClipboard(ok))
+	if route != RouteBackend || len(ok.got) != 0 {
+		t.Fatalf("a clipboard: route %v, called %d times before deliver", route, len(ok.got))
+	}
+	if got := deliver(); got != (CopiedMsg{Status: Confirmed, Route: RouteBackend}) || len(ok.got) != 1 || ok.got[0] != "hello" {
+		t.Errorf("a clipboard's success: %+v, clipboard got %q", got, ok.got)
 	}
 	bad := &clipboard{err: errors.New("no display")}
-	if got, _ := copiedOf(t, Copy(termcap.Caps{}, "x", WithClipboard(bad))); got.Status != Failed || got.Route != RouteBackend || !errors.Is(got.Err, bad.err) {
-		t.Errorf("a clipboard's error: %+v", got)
+	if _, deliver := PrepareCopy(ctx, termcap.Caps{}, "x", WithClipboard(bad)); func() bool {
+		got := deliver()
+		return got.Status != Failed || got.Route != RouteBackend || !errors.Is(got.Err, bad.err)
+	}() {
+		t.Error("a clipboard's error was not reported")
 	}
-	if got, _ := copiedOf(t, Copy(termcap.Caps{}, strings.Repeat("x", MaxCopyBytes+1), WithClipboard(ok))); got.Status != Failed || len(ok.got) != 1 {
-		t.Errorf("an oversized copy reached the clipboard: %+v, %d calls", got, len(ok.got))
+	if route, deliver := PrepareCopy(ctx, termcap.Caps{}, strings.Repeat("x", MaxCopyBytes+1), WithClipboard(ok)); route != RouteNone || deliver().Status != Failed || len(ok.got) != 1 {
+		t.Errorf("an oversized copy reached the clipboard: route %v, %d calls", route, len(ok.got))
 	}
 }
 
@@ -183,17 +169,11 @@ func TestOpenable(t *testing.T) {
 	if !files.Openable("file:///tmp/x") || files.Openable("https://example.com") {
 		t.Error("a policy of file only")
 	}
-	if msgs := run(p.Open("https://example.com")); len(msgs) != 1 || msgs[0] != (OpenURLMsg{URL: "https://example.com"}) {
-		t.Errorf("Open sent %v", msgs)
-	}
-	if p.Open("javascript:x") != nil {
-		t.Error("Open returned a command for a refused URL")
-	}
 }
 
 func TestNotificationText(t *testing.T) {
 	n := notifier(termcap.Caps{}, WithProtocol(OSC777))
-	r := sent(t, n.Notify(Notification{Title: "a\n\n  b\r\nc\x1b[1m d", Body: strings.Repeat("漢字", 200)}))
+	_, r := prepared(n, Notification{Title: "a\n\n  b\r\nc\x1b[1m d", Body: strings.Repeat("漢字", 200)})
 	if r.Notification.Title != "a b c d" {
 		t.Errorf("title %q, want line breaks collapsed and the sequence gone", r.Notification.Title)
 	}
@@ -204,7 +184,7 @@ func TestNotificationText(t *testing.T) {
 	if !utf8.ValidString(body) || utf8.RuneCountInString(body) != BodyCells/2 {
 		t.Errorf("body cut to %d runes, valid %v; want %d whole characters", utf8.RuneCountInString(body), utf8.ValidString(body), BodyCells/2)
 	}
-	long := sent(t, n.Notify(Notification{Title: strings.Repeat("t", 100)}))
+	_, long := prepared(n, Notification{Title: strings.Repeat("t", 100)})
 	if len(long.Notification.Title) != TitleCells {
 		t.Errorf("title of %d, want %d", len(long.Notification.Title), TitleCells)
 	}
@@ -212,11 +192,10 @@ func TestNotificationText(t *testing.T) {
 
 func TestGate(t *testing.T) {
 	n := notifier(termcap.Caps{}, WithProtocol(Bell), WithNotifyFilter(func(x Notification) bool { return x.Title == "done" }))
-	if r := sent(t, n.Notify(Notification{Title: "working"})); r.Sent || r.Skipped != SkipGated {
+	if _, r := prepared(n, Notification{Title: "working"}); r.Sent || r.Skipped != SkipGated {
 		t.Errorf("gated: %+v", r)
 	}
-	cmd := n.Notify(Notification{Title: "done"})
-	if r := sent(t, cmd); !r.Sent || raw(cmd) != "\a" {
+	if seq, r := prepared(n, Notification{Title: "done"}); !r.Sent || seq != "\a" {
 		t.Errorf("passed the gate: %+v", r)
 	}
 }
@@ -283,16 +262,6 @@ func TestParseActivity(t *testing.T) {
 	if r.Vendor != "kilo" || r.State != ActivityWaiting || !r.At.Equal(now) {
 		t.Errorf("report %+v", r)
 	}
-}
-
-func TestActivityBeacon(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		began := time.Now()
-		msg := ActivityBeacon()()
-		if _, ok := msg.(ActivityTickMsg); !ok || time.Since(began) != ActivityInterval {
-			t.Errorf("tick %T after %v, want ActivityTickMsg after %v", msg, time.Since(began), ActivityInterval)
-		}
-	})
 }
 
 func TestPointer(t *testing.T) {

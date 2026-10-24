@@ -3,43 +3,28 @@ package termsvc
 import (
 	"context"
 	"errors"
-	"fmt"
-	"reflect"
-	"strings"
 	"testing"
 
-	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/maccavelli/go-tui-lib/v2/termcap"
 )
 
-// run executes cmd and every command it batches, and returns the messages.
-func run(cmd tea.Cmd) []tea.Msg {
-	if cmd == nil {
-		return nil
-	}
-	msg := cmd()
-	v := reflect.ValueOf(msg)
-	if v.Kind() == reflect.Slice && v.Type().Elem() == reflect.TypeFor[tea.Cmd]() {
-		var out []tea.Msg
-		for i := range v.Len() {
-			out = append(out, run(v.Index(i).Interface().(tea.Cmd))...)
-		}
-		return out
-	}
-	return []tea.Msg{msg}
+// The commands' cases moved to termsvc/termsvctea with the commands
+// (docs/decisions/0020-PLAN-charm-free-cores-glyphs-and-safetext.md Step 9);
+// what the core decides is read here through Prepare.
+
+// prepared is what n.Prepare gives for x: the bytes, and the result its
+// deliver returns.
+func prepared(n *Notifier, x Notification) (string, NotifyResultMsg) {
+	seq, deliver := n.Prepare(context.Background(), x)
+	return seq, deliver()
 }
 
-// raw is the tea.Raw writes cmd makes, joined.
-func raw(cmd tea.Cmd) string {
-	var b strings.Builder
-	for _, m := range run(cmd) {
-		if r, ok := m.(tea.RawMsg); ok {
-			fmt.Fprint(&b, r.Msg)
-		}
-	}
-	return b.String()
+// seqOf is the bytes n.Prepare gives for x.
+func seqOf(n *Notifier, x Notification) string {
+	seq, _ := prepared(n, x)
+	return seq
 }
 
 // caps is a terminal of brand inside mux, whose answer to the OSC 99 query
@@ -52,25 +37,10 @@ func caps(brand termcap.Brand, mux termcap.Mux, notify termcap.Support) termcap.
 	return c
 }
 
-// sent is the NotifyResultMsg among msgs.
-func sent(t *testing.T, cmd tea.Cmd) NotifyResultMsg {
-	t.Helper()
-	var got []NotifyResultMsg
-	for _, m := range run(cmd) {
-		if r, ok := m.(NotifyResultMsg); ok {
-			got = append(got, r)
-		}
-	}
-	if len(got) != 1 {
-		t.Fatalf("%d NotifyResultMsg, want 1", len(got))
-	}
-	return got[0]
-}
-
-// notifier is an Always notifier that has seen c.
+// notifier is an Always notifier that knows c.
 func notifier(c termcap.Caps, o ...NotifyOption) *Notifier {
 	n := NewNotifier(append([]NotifyOption{WithPolicy(Always)}, o...)...)
-	n.Update(termcap.CapsMsg{Caps: c})
+	n.SetCaps(c)
 	return n
 }
 
@@ -97,7 +67,7 @@ func TestNotificationBytes(t *testing.T) {
 		{"off", Off, Notification{Title: "Done"}, ""},
 	}
 	for _, c := range cases {
-		if got := raw(notifier(kitty, WithProtocol(c.p)).Notify(c.x)); got != c.want {
+		if got := seqOf(notifier(kitty, WithProtocol(c.p)), c.x); got != c.want {
 			t.Errorf("%s:\n got %q\nwant %q", c.name, got, c.want)
 		}
 	}
@@ -134,26 +104,29 @@ func TestNotificationsAreWrappedInsideAMultiplexer(t *testing.T) {
 	x := Notification{Title: "Done", ID: "a"}
 	inner := "\x1b]99;i=a;Done\x07"
 	tmux := caps(termcap.BrandKitty, termcap.Tmux, termcap.Supported)
-	if got := raw(notifier(tmux).Notify(x)); got != ansi.TmuxPassthrough(inner) {
+	if got := seqOf(notifier(tmux), x); got != ansi.TmuxPassthrough(inner) {
 		t.Errorf("tmux: %q, want the tmux passthrough of %q", got, inner)
 	}
 	screen := caps(termcap.BrandKitty, termcap.Screen, termcap.Supported)
-	if got := raw(notifier(screen).Notify(x)); got != ansi.ScreenPassthrough(inner, screenLimit) {
+	if got := seqOf(notifier(screen), x); got != ansi.ScreenPassthrough(inner, screenLimit) {
 		t.Errorf("screen: %q, want the screen passthrough of %q", got, inner)
 	}
-	if got := raw(notifier(tmux, WithProtocol(Bell)).Notify(x)); got != "\a" {
+	if got := seqOf(notifier(tmux, WithProtocol(Bell)), x); got != "\a" {
 		t.Errorf("tmux bell: %q, want a bare BEL, which tmux passes on", got)
 	}
 }
 
 // TestFocusPolicies drives each policy through unknown, focused, blurred
-// and focused-again, and checks what was sent and why not (MADR A1, Q6).
+// and focused-again, and checks what was prepared and why not (MADR A1,
+// Q6). termsvctea's TestFocusPolicies does the same through tea's focus
+// messages.
 func TestFocusPolicies(t *testing.T) {
 	x := Notification{Title: "Done"}
+	focus := func(f bool) func(*Notifier) { return func(n *Notifier) { n.SetFocus(f) } }
 	steps := []struct {
 		name string
-		msg  tea.Msg
-	}{{"unknown", nil}, {"focused", tea.FocusMsg{}}, {"blurred", tea.BlurMsg{}}, {"focused again", tea.FocusMsg{}}}
+		set  func(*Notifier)
+	}{{"unknown", nil}, {"focused", focus(true)}, {"blurred", focus(false)}, {"focused again", focus(true)}}
 	want := map[Policy][]SkipReason{
 		WhenUnfocused: {SkipFocusUnknown, SkipFocused, NotSkipped, SkipFocused},
 		UnlessFocused: {NotSkipped, SkipFocused, NotSkipped, SkipFocused},
@@ -163,31 +136,26 @@ func TestFocusPolicies(t *testing.T) {
 	for policy, reasons := range want {
 		n := NewNotifier(WithProtocol(Bell), WithPolicy(policy))
 		for i, s := range steps {
-			if s.msg != nil {
-				n.Update(s.msg)
+			if s.set != nil {
+				s.set(n)
 			}
-			cmd := n.Notify(x)
-			r := sent(t, cmd)
+			seq, r := prepared(n, x)
 			if r.Skipped != reasons[i] || r.Sent != (reasons[i] == NotSkipped) {
 				t.Errorf("policy %d, %s: Sent %v, Skipped %q; want skipped %q", policy, s.name, r.Sent, r.Skipped, reasons[i])
 			}
-			if wrote := raw(cmd); (wrote == "\a") != r.Sent {
-				t.Errorf("policy %d, %s: wrote %q with Sent %v", policy, s.name, wrote, r.Sent)
+			if (seq == "\a") != r.Sent {
+				t.Errorf("policy %d, %s: bytes %q with Sent %v", policy, s.name, seq, r.Sent)
 			}
 		}
 	}
 }
 
 func TestEmptyNotificationIsNotSent(t *testing.T) {
-	n := notifier(termcap.Caps{}, WithProtocol(Bell))
-	cmd := n.Notify(Notification{Title: "\x1b\x07", Body: "\x9b\x1b[31m\n"})
-	if r := sent(t, cmd); r.Sent || r.Skipped != SkipEmpty {
-		t.Fatalf("a notification of controls only: %+v", r)
+	seq, r := prepared(notifier(termcap.Caps{}, WithProtocol(Bell)), Notification{Title: "\x1b\x07", Body: "\x9b\x1b[31m\n"})
+	if r.Sent || r.Skipped != SkipEmpty || seq != "" {
+		t.Fatalf("a notification of controls only: %q, %+v", seq, r)
 	}
-	if raw(cmd) != "" {
-		t.Fatal("a notification of controls only wrote something")
-	}
-	if r := sent(t, notifier(termcap.Caps{}, WithProtocol(Off)).Notify(Notification{Title: "x"})); r.Skipped != SkipDisabled {
+	if _, r := prepared(notifier(termcap.Caps{}, WithProtocol(Off)), Notification{Title: "x"}); r.Skipped != SkipDisabled {
 		t.Fatalf("protocol Off: %+v", r)
 	}
 }
@@ -204,26 +172,30 @@ func (b *backend) Notify(_ context.Context, x Notification) error {
 
 func TestBackend(t *testing.T) {
 	b := &backend{}
-	msgs := run(notifier(termcap.Caps{}, WithBackend(b)).Notify(Notification{Title: "Do\x1b[1mne", Body: "b"}))
-	if len(msgs) != 1 {
-		t.Fatalf("a backend's notification sent %v, want its result alone, nothing written", msgs)
+	seq, deliver := notifier(termcap.Caps{}, WithBackend(b)).Prepare(context.Background(), Notification{Title: "Do\x1b[1mne", Body: "b"})
+	if seq != "" || len(b.got) != 0 {
+		t.Fatalf("a backend's notification: bytes %q, backend called %d times before deliver", seq, len(b.got))
 	}
-	if r, ok := msgs[0].(NotifyResultMsg); !ok || !r.Sent || r.Skipped != NotSkipped {
-		t.Errorf("a backend's success: %+v", msgs[0])
+	if r := deliver(); !r.Sent || r.Skipped != NotSkipped {
+		t.Errorf("a backend's success: %+v", r)
 	}
 	if len(b.got) != 1 || b.got[0].Title != "Done" {
 		t.Errorf("backend got %+v, want the cleaned notification", b.got)
 	}
 	failing := &backend{err: errors.New("no desktop")}
-	r := sent(t, notifier(termcap.Caps{}, WithBackend(failing)).Notify(Notification{Title: "x"}))
+	_, r := prepared(notifier(termcap.Caps{}, WithBackend(failing)), Notification{Title: "x"})
 	if r.Sent || r.Skipped != SkipFailed || !errors.Is(r.Err, failing.err) || r.Notification.Title != "x" {
 		t.Errorf("a backend's error came back as %+v", r)
+	}
+	gated := &backend{}
+	if seq, r := prepared(notifier(termcap.Caps{}, WithBackend(gated), WithPolicy(Never)), Notification{Title: "x"}); seq != "" || r.Skipped != SkipDisabled || len(gated.got) != 0 {
+		t.Errorf("a skipped notification reached the backend: %q, %+v, %d calls", seq, r, len(gated.got))
 	}
 }
 
 func TestControlBytesAreStripped(t *testing.T) {
 	evil := "a\x1b]52;c;aGk=\x07b\x9bc\x00d\x7fe"
-	got := raw(notifier(termcap.Caps{}, WithProtocol(OSC9)).Notify(Notification{Title: evil, Body: evil}))
+	got := seqOf(notifier(termcap.Caps{}, WithProtocol(OSC9)), Notification{Title: evil, Body: evil})
 	// The OSC 52 sequence goes whole. The raw byte 0x9b is CSI in its 8-bit
 	// form, so it goes with the "c" that ends it, as a terminal in 8-bit
 	// mode would read it; NUL and DEL go too.
@@ -268,31 +240,6 @@ func TestLinkSchemes(t *testing.T) {
 	}
 	if s, _ := Link("https://example.com", "site"); s != "\x1b]8;;https://example.com\x07site\x1b]8;;\x07" {
 		t.Errorf("Link = %q", s)
-	}
-}
-
-func TestCopy(t *testing.T) {
-	setClipboard := reflect.TypeOf(tea.SetClipboard("x")())
-	count := func(msgs []tea.Msg) (n int) {
-		for _, m := range msgs {
-			if reflect.TypeOf(m) == setClipboard {
-				n++
-			}
-		}
-		return n
-	}
-	local := run(Copy(termcap.Caps{}, "hello"))
-	if count(local) != 1 || len(local) != 2 {
-		t.Errorf("outside tmux, Copy sent %v, want tea's OSC 52 and its CopiedMsg", local)
-	}
-	var tmux termcap.Caps
-	tmux.Mux.Set(termcap.Tmux, termcap.Environment)
-	msgs := run(Copy(tmux, "hello"))
-	if count(msgs) != 1 {
-		t.Errorf("inside tmux, Copy sent %v, want tea's OSC 52", msgs)
-	}
-	if got, want := raw(Copy(tmux, "hello")), ansi.TmuxPassthrough(ansi.SetSystemClipboard("hello")); got != want {
-		t.Errorf("inside tmux, the extra copy is %q, want %q", got, want)
 	}
 }
 

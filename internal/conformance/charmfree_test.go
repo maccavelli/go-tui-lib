@@ -23,6 +23,7 @@ var cores = []string{
 	"layout",
 	"safetext",
 	"termcap",
+	"termsvc",
 	"when",
 }
 

@@ -6,12 +6,10 @@ import (
 	"strings"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/maccavelli/go-tui-lib/v2/internal/enum"
 	"github.com/maccavelli/go-tui-lib/v2/internal/sanitize"
-	"github.com/maccavelli/go-tui-lib/v2/internal/teamsg"
 	"github.com/maccavelli/go-tui-lib/v2/termcap"
 )
 
@@ -90,8 +88,9 @@ type Policy uint8
 
 const (
 	// WhenUnfocused sends only while the terminal is known to be unfocused.
-	// Focus comes from tea.FocusMsg and tea.BlurMsg, which need the
-	// program's View.ReportFocus; with neither seen, nothing is sent.
+	// Focus comes from SetFocus: in a Bubble Tea program, termsvctea.Observe
+	// sets it from tea.FocusMsg and tea.BlurMsg, which need the program's
+	// View.ReportFocus. With no focus known, nothing is sent.
 	WhenUnfocused Policy = iota
 	// Always sends whatever the focus.
 	Always
@@ -117,7 +116,7 @@ func (p Policy) MarshalText() ([]byte, error) { return policyNames.Marshal(p) }
 // UnmarshalText reads a token MarshalText wrote, exactly, case included.
 func (p *Policy) UnmarshalText(b []byte) error { return policyNames.Unmarshal(b, p) }
 
-// SkipReason is why Notify sent nothing.
+// SkipReason is why a notification was not sent.
 type SkipReason uint8
 
 const (
@@ -151,9 +150,10 @@ func (s SkipReason) MarshalText() ([]byte, error) { return skipNames.Marshal(s) 
 // UnmarshalText reads a token MarshalText wrote, exactly, case included.
 func (s *SkipReason) UnmarshalText(b []byte) error { return skipNames.Unmarshal(b, s) }
 
-// NotifyResultMsg reports what Notify did. Sent says the notification
-// left: written to the terminal, which does not confirm it, or accepted by
-// the backend.
+// NotifyResultMsg reports what became of a notification: Prepare's
+// deliver returns it, and termsvctea.Notify delivers it as a message. Sent
+// says the notification left: written to the terminal, which does not
+// confirm it, or accepted by the backend.
 type NotifyResultMsg struct {
 	Notification Notification
 	Sent         bool
@@ -219,16 +219,19 @@ const (
 	BodyCells  = 240
 )
 
-// Notifier sends notifications that suit the terminal. A program passes it
-// every message, as it does a termcaptea.Prober, so it learns the
-// terminal's capabilities and focus.
+// Notifier sends notifications that suit the terminal. It learns the
+// terminal's capabilities from SetCaps and its focus from SetFocus, and
+// Prepare gives the bytes to write and the result to report. A Bubble Tea
+// program passes every message to termsvctea.Observe and sends with
+// termsvctea.Notify.
 //
 // A program's own command line, which runs no Bubble Tea program, never
-// sees focus: it passes WithPolicy(Always), gives the notifier
-// termcap.EnvCaps, or a termcap.Probe's Caps, through
-// Update(termcap.CapsMsg{Caps: …}), and writes
-// Sequence's bytes to the terminal itself
-// (docs/decisions/0014-MADR-native-integration-api.md W2).
+// sees focus: it passes WithPolicy(Always), calls SetCaps with
+// termcap.EnvCaps or a termcap.Probe's Caps, then Prepare; it writes seq
+// to the terminal itself, and calls deliver, which runs the backend, if
+// any, and returns the result
+// (docs/decisions/0014-MADR-native-integration-api.md W2;
+// docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md D5).
 type Notifier struct {
 	protocol Protocol
 	policy   Policy
@@ -251,40 +254,35 @@ func NewNotifier(o ...NotifyOption) *Notifier {
 	return n
 }
 
-// Update observes termcap.CapsMsg, tea.FocusMsg and tea.BlurMsg. It sends
-// nothing.
-func (n *Notifier) Update(msg tea.Msg) tea.Cmd {
-	switch m := msg.(type) {
-	case termcap.CapsMsg:
-		n.caps = m.Caps
-	case tea.FocusMsg:
-		n.focused, n.focusKnown = true, true
-	case tea.BlurMsg:
-		n.focused, n.focusKnown = false, true
-	}
-	return nil
-}
+// SetCaps records what termcap learned about the terminal, which picks the
+// protocol under Auto and the multiplexer's wrapping.
+func (n *Notifier) SetCaps(c termcap.Caps) { n.caps = c }
 
-// Notify returns the command that sends x, and delivers NotifyResultMsg
-// to say what it did. The title and body are cleaned first: escape
-// sequences removed, line breaks collapsed to a space, controls removed,
-// and cut to TitleCells and BodyCells cells. It is NotifyContext under
-// context.Background().
-func (n *Notifier) Notify(x Notification) tea.Cmd {
-	return n.NotifyContext(context.Background(), x)
-}
+// SetFocus records whether the terminal has focus. Until it is called, focus
+// is unknown.
+func (n *Notifier) SetFocus(focused bool) { n.focused, n.focusKnown = focused, true }
 
-// NotifyContext is Notify, with a backend called under ctx, bounded by
-// WithBackendTimeout. A backend that fails, its deadline included, gives
-// SkipFailed with its error in Err.
-func (n *Notifier) NotifyContext(ctx context.Context, x Notification) tea.Cmd {
+// Prepare decides x now, on the caller's goroutine, and returns the bytes
+// to write to the terminal, if any, and deliver, which reports the result.
+// The title and body are cleaned first: escape sequences removed, line
+// breaks collapsed to a space, controls removed, and cut to TitleCells and
+// BodyCells cells; the policy, the filter and the numbering of OSC 99
+// notifications are applied here.
+//
+// Skipped, seq is "" and deliver returns the reason. Through the terminal,
+// seq is the sequence, which the caller writes before calling deliver, and
+// deliver returns Sent. Through WithBackend, seq is "", and deliver calls
+// the backend under ctx, bounded by WithBackendTimeout, so a caller that
+// must not block, such as a TUI's loop, calls it elsewhere; a backend that
+// fails, its deadline included, gives SkipFailed with its error in Err.
+func (n *Notifier) Prepare(ctx context.Context, x Notification) (seq string, deliver func() NotifyResultMsg) {
 	x.Title, x.Body = clean(x.Title, TitleCells), clean(x.Body, BodyCells)
 	if n.backend != nil {
 		if skip := n.skip(x, false); skip != NotSkipped {
-			return teamsg.Cmd(NotifyResultMsg{Notification: x, Skipped: skip})
+			return "", func() NotifyResultMsg { return NotifyResultMsg{Notification: x, Skipped: skip} }
 		}
 		b, d := n.backend, n.timeout
-		return func() tea.Msg {
+		return "", func() NotifyResultMsg {
 			ctx, cancel := bounded(ctx, d)
 			defer cancel()
 			if err := b.Notify(ctx, x); err != nil {
@@ -295,14 +293,14 @@ func (n *Notifier) NotifyContext(ctx context.Context, x Notification) tea.Cmd {
 	}
 	seq, skip := n.bytesFor(x)
 	if skip != NotSkipped {
-		return teamsg.Cmd(NotifyResultMsg{Notification: x, Skipped: skip})
+		return "", func() NotifyResultMsg { return NotifyResultMsg{Notification: x, Skipped: skip} }
 	}
-	return tea.Sequence(tea.Raw(seq), teamsg.Cmd(NotifyResultMsg{Notification: x, Sent: true}))
+	return seq, func() NotifyResultMsg { return NotifyResultMsg{Notification: x, Sent: true} }
 }
 
-// Sequence is the bytes Notify would write to the terminal for x, cleaned
-// and encoded as Notify does, with the same numbering, or "" and why it
-// would send nothing. It is for a program that writes to the terminal
+// Sequence is the bytes Prepare would give for x through the terminal,
+// cleaned and encoded as Prepare does, with the same numbering, or "" and
+// why it would send nothing. It is for a program that writes to the terminal
 // itself, such as its own command line. It ignores WithBackend: the bytes
 // are the terminal's.
 func (n *Notifier) Sequence(x Notification) (string, SkipReason) {

@@ -9,8 +9,8 @@ import (
 )
 
 // TestBackendAndClipboardFuncs: a function used as a Backend or a
-// Clipboard is called with what Notify and Copy send, and its error is
-// reported (docs/decisions/0014-PLAN-canonicalization.md Step 7).
+// Clipboard is called with what a notification and a copy send, and its
+// error is reported (docs/decisions/0014-PLAN-canonicalization.md Step 7).
 func TestBackendAndClipboardFuncs(t *testing.T) {
 	kitty := caps(termcap.BrandKitty, termcap.NoMux, termcap.Supported)
 	var sent []Notification
@@ -18,12 +18,12 @@ func TestBackendAndClipboardFuncs(t *testing.T) {
 		sent = append(sent, x)
 		return nil
 	})
-	msgs := run(notifier(kitty, WithBackend(backend)).Notify(Notification{Title: "t", Body: "b"}))
+	seq, r := prepared(notifier(kitty, WithBackend(backend)), Notification{Title: "t", Body: "b"})
 	if len(sent) != 1 || sent[0].Title != "t" || sent[0].Body != "b" {
 		t.Errorf("the backend was sent %+v", sent)
 	}
-	if len(msgs) != 1 || !msgs[0].(NotifyResultMsg).Sent {
-		t.Errorf("Notify reported %+v", msgs)
+	if seq != "" || !r.Sent {
+		t.Errorf("Prepare gave %q, %+v", seq, r)
 	}
 
 	refused := errors.New("no clipboard")
@@ -32,11 +32,12 @@ func TestBackendAndClipboardFuncs(t *testing.T) {
 		copied = append(copied, text)
 		return refused
 	})
-	msgs = run(Copy(kitty, "x", WithClipboard(clip)))
+	route, deliver := PrepareCopy(context.Background(), kitty, "x", WithClipboard(clip))
+	m := deliver()
 	if len(copied) != 1 || copied[0] != "x" {
 		t.Errorf("the clipboard was given %q", copied)
 	}
-	if m, ok := msgs[len(msgs)-1].(CopiedMsg); !ok || m.Status != Failed || !errors.Is(m.Err, refused) {
-		t.Errorf("Copy reported %+v", msgs)
+	if route != RouteBackend || m.Status != Failed || !errors.Is(m.Err, refused) {
+		t.Errorf("PrepareCopy reported %v, %+v", route, m)
 	}
 }

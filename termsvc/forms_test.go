@@ -3,22 +3,25 @@ package termsvc
 import (
 	"context"
 	"errors"
-	"reflect"
 	"strings"
 	"testing"
 	"testing/synctest"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/maccavelli/go-tui-lib/v2/termcap"
 )
 
 // The byte forms and the context forms
-// (docs/decisions/0014-PLAN-component-native-forms.md Step 9).
+// (docs/decisions/0014-PLAN-component-native-forms.md Step 9), read through
+// Prepare and PrepareCopy (docs/decisions/0020-PLAN-charm-free-cores-glyphs-and-safetext.md
+// Step 9). The pairing of the commands with Sequence and CopySequence is
+// termsvctea's.
 
-func TestSequenceMatchesNotify(t *testing.T) {
+// TestPrepareMatchesSequence: for each protocol and policy, Prepare's bytes
+// are Sequence's, and both take the next number from one count.
+func TestPrepareMatchesSequence(t *testing.T) {
 	kitty := caps(termcap.BrandKitty, termcap.NoMux, termcap.Supported)
 	tmux := caps(termcap.BrandUnknown, termcap.Tmux, termcap.Unsupported)
 	xs := []Notification{
@@ -29,29 +32,32 @@ func TestSequenceMatchesNotify(t *testing.T) {
 		{Title: "esc \x1b[31mred\x1b[m\nline", Body: strings.Repeat("long ", 80)},
 	}
 	for _, c := range []termcap.Caps{kitty, tmux} {
-		for _, p := range []Protocol{Auto, OSC99, OSC777, OSC9, Bell} {
-			byNotify, bySequence := notifier(c, WithProtocol(p)), notifier(c, WithProtocol(p))
-			for _, x := range xs {
-				want := raw(byNotify.Notify(x))
-				got, skip := bySequence.Sequence(x)
-				if got != want || skip != NotSkipped {
-					t.Errorf("protocol %d, %+v:\n Sequence %q, %v\n   Notify %q", p, x, got, skip, want)
+		for _, p := range []Protocol{Auto, OSC99, OSC777, OSC9, Bell, Off} {
+			for _, policy := range []Policy{Always, WhenUnfocused, UnlessFocused, Never} {
+				byPrepare, bySequence := notifier(c, WithProtocol(p), WithPolicy(policy)), notifier(c, WithProtocol(p), WithPolicy(policy))
+				for _, x := range xs {
+					got, r := prepared(byPrepare, x)
+					want, skip := bySequence.Sequence(x)
+					if got != want || r.Skipped != skip || r.Sent != (skip == NotSkipped) {
+						t.Errorf("protocol %v, policy %v, %+v:\n Prepare %q, %+v\nSequence %q, %v", p, policy, x, got, r, want, skip)
+					}
 				}
 			}
 		}
 	}
 	// One numbering: each notification without an ID takes the next number,
-	// whether Notify or Sequence encodes it.
+	// whether Prepare or Sequence encodes it, once per call.
 	n := notifier(kitty, WithProtocol(OSC99))
 	first, _ := n.Sequence(Notification{Title: "a"})
-	second := raw(n.Notify(Notification{Title: "b"}))
+	second := seqOf(n, Notification{Title: "b"})
 	third, _ := n.Sequence(Notification{Title: "c"})
-	for i, s := range []string{first, second, third} {
-		if id := "i=n" + string(rune('1'+i)); !strings.Contains(s, id) {
+	fourth := seqOf(n, Notification{Title: "d"})
+	for i, s := range []string{first, second, third, fourth} {
+		if id := "i=n" + string(rune('1'+i)) + ";"; !strings.Contains(s, id) {
 			t.Errorf("notification %d: %q has no %s", i+1, s, id)
 		}
 	}
-	// The reasons, and WithBackend ignored.
+	// The reasons, and WithBackend ignored by Sequence.
 	for _, tc := range []struct {
 		n    *Notifier
 		x    Notification
@@ -70,43 +76,6 @@ func TestSequenceMatchesNotify(t *testing.T) {
 	b := &backend{}
 	if got, skip := notifier(kitty, WithBackend(b), WithProtocol(OSC9)).Sequence(Notification{Title: "t"}); got != ansi.Notify("t") || skip != NotSkipped || len(b.got) != 0 {
 		t.Errorf("with a backend: %q, %v, backend got %v", got, skip, b.got)
-	}
-}
-
-// clipboardText is the text of the tea.SetClipboard message cmd makes.
-func clipboardText(cmd tea.Cmd) string {
-	setClipboard := reflect.TypeOf(tea.SetClipboard("x")())
-	for _, m := range run(cmd) {
-		if reflect.TypeOf(m) == setClipboard {
-			return reflect.ValueOf(m).String()
-		}
-	}
-	return ""
-}
-
-func TestCopySequence(t *testing.T) {
-	plain := caps(termcap.BrandUnknown, termcap.NoMux, termcap.Unsupported)
-	tmux := caps(termcap.BrandUnknown, termcap.Tmux, termcap.Unsupported)
-	for _, tc := range []struct {
-		c     termcap.Caps
-		route Route
-	}{{plain, RouteOSC52}, {tmux, RouteOSC52Tmux}} {
-		for _, text := range []string{"hello", "", strings.Repeat("x", MaxCopyBytes)} {
-			cmd := Copy(tc.c, text)
-			// tea writes its clipboard message as ansi.SetSystemClipboard.
-			want := ansi.SetSystemClipboard(clipboardText(cmd)) + raw(cmd)
-			got, route, err := CopySequence(tc.c, text)
-			if got != want || route != tc.route || err != nil {
-				t.Errorf("mux %v, %d bytes: %q, %v, %v; want %q, %v", tc.c.Mux.Value, len(text), got, route, err, want, tc.route)
-			}
-			if m, _ := copiedOf(t, Copy(tc.c, text)); m.Route != route {
-				t.Errorf("Copy's route %v, CopySequence's %v", m.Route, route)
-			}
-		}
-	}
-	got, route, err := CopySequence(plain, strings.Repeat("x", MaxCopyBytes+1))
-	if got != "" || route != RouteNone || !errors.Is(err, ErrCopyTooLarge) {
-		t.Errorf("one byte over: %q, %v, %v", got, route, err)
 	}
 }
 
@@ -155,8 +124,10 @@ func TestBackendDeadline(t *testing.T) {
 				no, co = []NotifyOption{WithBackendTimeout(tc.opt)}, []CopyOption{WithCopyTimeout(tc.opt)}
 			}
 			n, c := &recorder{}, &recorder{}
-			run(notifier(kitty, append(no, WithBackend(n))...).NotifyContext(ctx, Notification{Title: "t"}))
-			run(CopyContext(ctx, kitty, "x", append(co, WithClipboard(c))...))
+			_, deliver := notifier(kitty, append(no, WithBackend(n))...).Prepare(ctx, Notification{Title: "t"})
+			deliver()
+			_, copied := PrepareCopy(ctx, kitty, "x", append(co, WithClipboard(c))...)
+			copied()
 			for what, r := range map[string]*recorder{"backend": n, "clipboard": c} {
 				switch {
 				case tc.want < 0 && r.has:
@@ -165,13 +136,6 @@ func TestBackendDeadline(t *testing.T) {
 					t.Errorf("%s, %s: deadline %v (%v), want %v", tc.name, what, r.deadline.Sub(start), r.has, tc.want)
 				}
 			}
-		}
-		// Notify and Copy are the context forms under context.Background().
-		n, c := &recorder{}, &recorder{}
-		run(notifier(kitty, WithBackend(n)).Notify(Notification{Title: "t"}))
-		run(Copy(kitty, "x", WithClipboard(c)))
-		if n.deadline.Sub(start) != 5*time.Second || c.deadline.Sub(start) != 5*time.Second {
-			t.Errorf("Notify and Copy: deadlines %v and %v, want 5s", n.deadline.Sub(start), c.deadline.Sub(start))
 		}
 	})
 }
@@ -186,20 +150,20 @@ func TestBackendTimeout(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		kitty := caps(termcap.BrandKitty, termcap.NoMux, termcap.Supported)
 		start := time.Now()
-		r := sent(t, notifier(kitty, WithBackend(blocker{}), WithBackendTimeout(20*time.Millisecond)).Notify(Notification{Title: "t"}))
+		_, r := prepared(notifier(kitty, WithBackend(blocker{}), WithBackendTimeout(20*time.Millisecond)), Notification{Title: "t"})
 		if r.Sent || r.Skipped != SkipFailed || !errors.Is(r.Err, context.DeadlineExceeded) || time.Since(start) != 20*time.Millisecond {
-			t.Errorf("Notify: %+v after %v", r, time.Since(start))
+			t.Errorf("Prepare's deliver: %+v after %v", r, time.Since(start))
 		}
-		m, _ := copiedOf(t, Copy(kitty, "x", WithClipboard(blocker{}), WithCopyTimeout(30*time.Millisecond)))
-		if m.Status != Failed || m.Route != RouteBackend || !errors.Is(m.Err, context.DeadlineExceeded) {
-			t.Errorf("Copy: %+v", m)
+		_, copied := PrepareCopy(context.Background(), kitty, "x", WithClipboard(blocker{}), WithCopyTimeout(30*time.Millisecond))
+		if m := copied(); m.Status != Failed || m.Route != RouteBackend || !errors.Is(m.Err, context.DeadlineExceeded) {
+			t.Errorf("PrepareCopy's deliver: %+v", m)
 		}
 		// A caller's cancel ends it too.
 		ctx, cancel := context.WithCancel(t.Context())
 		cancel()
-		r = sent(t, notifier(kitty, WithBackend(blocker{})).NotifyContext(ctx, Notification{Title: "t"}))
-		if r.Skipped != SkipFailed || !errors.Is(r.Err, context.Canceled) {
-			t.Errorf("NotifyContext, cancelled: %+v", r)
+		_, deliver := notifier(kitty, WithBackend(blocker{})).Prepare(ctx, Notification{Title: "t"})
+		if r := deliver(); r.Skipped != SkipFailed || !errors.Is(r.Err, context.Canceled) {
+			t.Errorf("Prepare, cancelled: %+v", r)
 		}
 	})
 }

@@ -34,7 +34,8 @@ below).
  command       the command registry       → when, internal/enum, internal/sanitize, internal/teamsg; bubbletea
  when          availability expressions   → internal/enum
  internal/cells  the reused frame buffer  → layout; ultraviolet, x/ansi
- termsvc       terminal services          → termcap, internal/enum, internal/sanitize, internal/teamsg; bubbletea, x/ansi
+ termsvc       terminal services          → termcap, internal/enum, internal/sanitize; x/ansi
+ termsvc/termsvctea   services in tea    → termsvc, termcap, internal/teamsg; bubbletea, x/ansi
  termcap       capabilities, the probe    → internal/enum, internal/sanitize; x/ansi
  termcap/termcaptea   the probe in tea   → termcap, internal/termevent, internal/teamsg; bubbletea, x/ansi, colorprofile
  termcap/termcaptest  fake terminals      → termcap; bubbletea, x/ansi, colorprofile (tests)
@@ -73,14 +74,15 @@ below).
 | `termcap` | `Probe`, from `NewProbe`: an I/O-free engine (one batch of queries ended by DA1, a deadline the host times, mode 2031 and its reset), driven by `Start`, `HandleReply`, `HandleTimeout` and `HandleHook`, and drained through `NextEvent`'s `ProbeEvent`s; `ParseReply`, a reply's bytes as a `Reply` of a `ReplyKind`, colours read by XParseColor's grammar at 16 bits; `ColorProfile`; `WithoutModeQuery`; `EnvCaps`, the environment's facts with no program; `Caps` of `Fact`s with origin and reason, as JSON (v2); `ErrUnknownName`; `Env`, whose lookups ignore case on Windows; `FromEnv` and `Identity`; the keyboard, link and notification views; `TmuxQuery`; `Report` and `Findings` |
 | `termcap/termcaptea` | `Prober`, from `NewProber`: the `Probe`'s host in a Bubble Tea program (the batch on the first `tea.EnvMsg`, the deadline from `Init`, tea's own replies turned into `Reply`s, `CapsMsg` after tea's colour profile, `IsReplyFragment`); `KeyboardEnhancements`; `FromColorProfile` and `ToColorProfile` |
 | `termcap/termcaptest` | `Terminal`, a scripted fake terminal, with `SetRunTimeout` and `Reply`; `Profile` and seven profiles; `Run` |
-| `termsvc` | `Notifier` (OSC 99, 777, 9 or the bell; focus policies; `WithNotifyFilter`; a `Backend` or `BackendFunc`; `NotifyResultMsg`; `Sequence`, its bytes for a CLI; `NotifyContext` and `WithBackendTimeout`); `Copy`, `CopyContext`, `CopySequence` and `CopiedMsg`, with a `Clipboard` or `ClipboardFunc`; `Link`, `LinkDisplay`, `LinkPolicy`; prompt marks; `Wrap`; `SanitizeTitle`; the activity beacon; `Pointer`; `ProgressSupported` |
+| `termsvc` | `Notifier` (OSC 99, 777, 9 or the bell; focus policies; `WithNotifyFilter`; a `Backend` or `BackendFunc`; `NotifyResultMsg`; `SetCaps` and `SetFocus`; `Prepare`, the bytes and a `deliver` that reports, or calls the backend; `Sequence`, the bytes alone; `WithBackendTimeout`); `PrepareCopy`, `CopySequence` and `CopiedMsg`, with a `Clipboard` or `ClipboardFunc`; `Link`, `LinkDisplay`, `LinkPolicy`; prompt marks; `Wrap`; `SanitizeTitle`; the activity beacon's sequence; `Pointer`; `ProgressSupported` |
+| `termsvc/termsvctea` | `Notify` and `NotifyContext`, which write `Prepare`'s bytes and call a backend inside the command; `Observe`, `termcap.CapsMsg` and tea's focus messages to the `Notifier`; `Copy` and `CopyContext`, OSC 52 through tea; `Open`; `ActivityBeacon` |
 | `internal/termevent` | `Decode`: the ultraviolet events tea passes through untranslated, as plain values |
 | `internal/termevent/termeventtest` | those events built for tests outside `internal/termevent` |
 | `tuitest` | `Golden` across {colour, no colour} × {UTF-8, ASCII} × widths; `Case.Profile` and `Case.Glyphs`; `Fits`; `Text` for a single file; `Annotate` |
 
 - **`layout` has no Charm import,** so its solver can serve any front end.
 - **The Charm-free cores** are `fuzzy`, `glyph`, `internal/enum`,
-  `internal/sanitize`, `layout`, `safetext`, `termcap` and `when`: none links a Charm
+  `internal/sanitize`, `layout`, `safetext`, `termcap`, `termsvc` and `when`: none links a Charm
   module but `x/ansi`, so a line-mode CLI can use them without Bubble Tea
   ([0020-MADR](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
   D1, D11). `internal/conformance` checks their whole import closure, and
@@ -207,6 +209,7 @@ when/ command/ fuzzy/       the packages; goldens under testdata/golden/
 safetext/                   where a package renders
 termcap/termcaptea/         the probe's Bubble Tea host
 termcap/termcaptest/        fake terminals for tests
+termsvc/termsvctea/         termsvc's Bubble Tea commands
 launch/                     start the TUI from a program's own CLI
 launch/launchtest/          fake streams for a program's tests
 internal/enum/              enum names and text forms

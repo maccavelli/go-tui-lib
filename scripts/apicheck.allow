@@ -19,3 +19,14 @@
 .	- ./termcap.Reply.Msg: removed
 .	- ./termcap.Reply: old is comparable, new is not
 .	- ./termcap.ReportSchemaVersion: value changed from 1 to 2
+
+# docs/decisions/0020-PLAN-charm-free-cores-glyphs-and-safetext.md Step 9:
+# termsvc's commands move to termsvctea, over Prepare and PrepareCopy
+# (0020-MADR D5, A1.2). Released in v2.0.0, a major version (A4.2).
+.	- ./termsvc.(*Notifier).Notify: removed
+.	- ./termsvc.(*Notifier).NotifyContext: removed
+.	- ./termsvc.(*Notifier).Update: removed
+.	- ./termsvc.ActivityBeacon: removed
+.	- ./termsvc.Copy: removed
+.	- ./termsvc.CopyContext: removed
+.	- ./termsvc.LinkPolicy.Open: removed

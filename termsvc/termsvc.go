@@ -1,10 +1,13 @@
 // Package termsvc offers terminal services, notifications, the clipboard,
-// hyperlinks and shell-integration prompt marks, as Bubble Tea commands or
-// strings built from what termcap learned about the terminal
-// (docs/decisions/0005-MADR-terminal-capabilities-and-services.md §5).
+// hyperlinks and shell-integration prompt marks, as strings and decisions
+// built from what termcap learned about the terminal
+// (docs/decisions/0005-MADR-terminal-capabilities-and-services.md §5). It
+// links no Charm module but x/ansi, so a line-mode CLI can use it;
+// termsvc/termsvctea turns the same services into Bubble Tea commands
+// (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md D5).
 //
 // Nothing here writes to the terminal itself or starts a process. A
-// sequence leaves as a tea.Cmd or a string the caller places, and a native
+// sequence leaves as a string the caller places, and a native
 // clipboard or notifier is a hook the program supplies. Text from a
 // program, which may be an agent's, is stripped of control bytes before it
 // is encoded, so it cannot smuggle a sequence into the terminal.
