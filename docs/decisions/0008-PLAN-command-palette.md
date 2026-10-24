@@ -41,6 +41,11 @@ so Step 9's release is the next minor release after `v0.14.0`, and its
 migration section names that version. Nothing else here changes until
 this PLAN is next amended, before Step 5.
 
+**Note, 2026-10-24, for 0020-MADR A4.** The release that carries Steps 1
+to 4 was tagged `v1.13.0`, in place of `v0.13.0`, and kept; there is no
+`v0.13.0`. Where this PLAN says `v0.13.0`, read `v1.13.0`. Step 9's
+release follows 0020's release 2, whose version 0020-MADR A4.1 decides.
+
 ## Goal
 
 Ship `fuzzy` and `palette`, so that a program finds and runs any command,

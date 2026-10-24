@@ -6,9 +6,14 @@ wrapper, alias or field, and is removed in the next
 `staticcheck` reports each use of one as SA1019, so a program can find
 them all before the removal.
 
-## Migrating to `v0.13.0`
+## Migrating to `v1.13.0`
 
-`v0.13.0` adds packages and fields, and removes nothing
+`v1.13.0` follows `v0.12.0` directly. It was tagged in place of
+`v0.13.0` and kept, and there is no `v0.13.0`
+([0020-MADR](../decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
+A4). `go get github.com/maccavelli/go-tui-lib@latest` gives it.
+
+`v1.13.0` adds packages and fields, and removes nothing
 ([0020-PLAN-charm-free-cores-glyphs-and-safetext](../decisions/0020-PLAN-charm-free-cores-glyphs-and-safetext.md)
 Step 6). A program needs no change to build. What it shows changes where
 it puts untrusted text on the screen that is not well formed, as

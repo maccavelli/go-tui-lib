@@ -751,6 +751,9 @@ disagree.
 
 ### D10. Migration: one breaking minor release for every split, by exception to rule 1
 
+*A4, 2026-10-24: under `v1`, a breaking minor release goes against Go's
+import compatibility rule; A4.1, open, decides release 2's form.*
+
 * **This record grants the exception API rule 1 allows a record to
   grant,** for the declarations D4 to D7 move or retype. A wrapper cannot
   be left in the core (an import cycle), a retyped field has no
@@ -807,6 +810,9 @@ disagree.
 *Revised 2026-10-23 for the owner's answer to Q1, which put every split
 in one release; the draft had a release for `termcap`, `termsvc` and
 `command` and another for `termkey` and `keymap`.*
+
+*A4, 2026-10-24: release 1 is `v1.13.0`, tagged in place of `v0.13.0`;
+release 2's version and form wait for A4.1.*
 
 1. **Release 1, additive:** the gate and the clean packages, then `glyph`
    (D8) and `safetext` (D9). It also carries `fuzzy`, and so answers #6,
@@ -1499,6 +1505,104 @@ keep is. Every sequence `KeepSGR` keeps is then the input's own bytes, as
 8-bit C1 byte" is dropped). Keeping it rewritten in its 7-bit form, the
 other option, was as safe, but a kept sequence would then differ from what
 the program wrote.
+
+### A4 (2026-10-24): release 1 is `v1.13.0` (changes D12's numbering; opens A4.1)
+
+*Status: A4 accepted (2026-10-24); A4.1 answered (2026-10-24): release 2
+is `v2.0.0` at `/v2`; A4.2 proposed (2026-10-24), for the owner.*
+
+**Found.** At 0020-PLAN Step 6 the owner tagged `8be11e7`, the commit CI
+passed, as `v1.13.0`, not `v0.13.0`, and pushed it. Before the consumer
+smoke test the agent found:
+* `git ls-remote` shows `refs/tags/v1.13.0` and no `v0.13.0`;
+* `proxy.golang.org` lists `v1.13.0` and answers `@latest` with it,
+  fetched at 00:52 UTC.
+
+A published tag is never moved or deleted (`docs/guides/releasing.md`,
+"The rules"), and the proxy keeps every version it has served. Go orders
+`v1.13.0` above every `v0.x`, so a later `v0` tag would never be
+`@latest`.
+
+**The options** put to the owner, the recommended one first:
+* (a) retract `v1.13.0` with a `v1.13.1` that retracts both, and tag
+  `v0.13.0`;
+* (b) keep `v1`, and number the releases from it;
+* (c) leave it.
+
+**Chosen: (b),** by the owner, 2026-10-24. Release 1 (D12) is `v1.13.0`.
+Its content is the commit the PLAN planned for `v0.13.0`, unchanged.
+
+**A4.1 (open): release 2 under `v1`.** D10 and D12 make release 2 one
+breaking minor release, `v0.14.0`, by exception to API rule 1. Under
+`v1` that is not available as written:
+* a `v0.14.0` would sort below `v1.13.0`;
+* Go's import compatibility rule ("If an old package and a new package
+  have the same import path, the new package must be backwards
+  compatible with the old package") lets a module break its API only
+  under a new major version's path, `…/v2`.
+
+The owner chooses among:
+* release 2 as `v2.0.0` at the module path
+  `github.com/maccavelli/go-tui-lib/v2`;
+* the new cores beside today's packages, with the old names kept and
+  deprecated, so that release 2 is `v1.14.0` and breaks nothing, which is
+  this record's option B;
+* a breaking `v1.14.0` against that rule.
+
+Whichever is chosen also settles API rule 1's "removed in the next minor
+release" (AGENTS.md) for `v1`, and `releasing.md`'s versions. Steps 7 to
+13 of the PLAN wait for the answer.
+
+**A4.1 answered: release 2 is `v2.0.0`, at the module path
+`github.com/maccavelli/go-tui-lib/v2`,** chosen by the owner, 2026-10-24,
+the recommended option. It is the one form Go's import compatibility rule
+allows for a breaking change. D2 to D7's split ships as designed, and a
+`v1` user's `go get -u` never meets it.
+* *D10 under it:* the exception to API rule 1 stands, as a major release
+  in place of a minor one. A `v1` caller moves once, to `/v2`, and the
+  moves D4 to D7 list are its only API changes.
+* *D12 under it:* release 2 is `v2.0.0`.
+* *Costs:* every import path in the repository, the depguard and
+  conformance paths, and the guides' import lines move to `/v2`. gobble
+  and pi-go change their imports when they adopt `v2`.
+* *What is still to be decided:* how the PLAN sequences the move, and
+  what API rule 1 says under a major version. The next PLAN amendment
+  proposes both, for the owner's approval.
+
+**A4.2 (proposed, 2026-10-24): how the move lands, and the rules under a
+major version.**
+
+* **The move lands first,** as 0020-PLAN Step 6A, before any split. From
+  that commit `main`'s `go.mod` names `…/v2`, and the go command refuses
+  a `v1.x` tag of such a commit ("go.mod has post-v1 module path").
+  Steps 7 to 12 then build the splits at the path they ship at. The other
+  order would put the move in the release step: no step would change
+  path, but `main` would carry a breaking API at the `v1` path for six
+  steps, where a mistaken `v1` tag, like the one A4 records, would
+  publish it.
+* **The API diff gate across a major boundary.** apidiff compares types
+  by import path. Compared with `v1.13.0` as it is, the `/v2` tree shows
+  every signature that names another of the module's packages as
+  changed. That was tried on a scratch copy, at `220506d` with every path
+  moved: `./command.(*Registry).Available: changed from
+  func(github.com/maccavelli/go-tui-lib/when.Context, …)` and many more.
+  With the base's own import paths moved to the tree's module path before
+  it is exported, the same comparison reported nothing. So
+  `scripts/go-apicheck.py` does that move when the base's module path and
+  the tree's differ only by a `/vN` suffix. Steps 7 to 12's allow-list
+  blocks then list their real moves against `v1.13.0`, as the PLAN's Rule
+  3 asks.
+* **API rule 1 under a major version** (AGENTS.md). Within one major
+  version nothing is removed or retyped: a renamed name keeps its old one,
+  deprecated, until the next major version, and a removal needs a major
+  release and a record.
+* **API rule 2.** An `apicheck.allow` block is allowed only in a PLAN
+  whose release changes the major version. From `v2.0.0` on, a minor
+  release has 0 incompatible changes.
+* **`v1` users** keep `v1.13.0`. A fix for them would be a `v1.13.x` from
+  a branch cut at that tag; this record plans none.
+* **0008-PLAN's release** (Step 9) becomes the next minor version after
+  `v2.0.0`.
 
 ## More Information
 

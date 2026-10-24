@@ -26,6 +26,15 @@ six classes of difference beyond S2; the owner's resolution is MADR A3 and
 the Execution Record's Step 5 entry, and Steps 5 and 6 carry notes where
 it changes them.
 
+*Deviation, 2026-10-24, Step 6:* release 1 was tagged `v1.13.0` in place
+of `v0.13.0`, and the owner kept it (MADR A4). Where this PLAN says
+`v0.13.0`, read `v1.13.0`. Release 2's version and form, written below as
+a breaking `v0.14.0`, wait for MADR A4.1, and Steps 7 to 13 are amended
+for its answer before Step 7 starts. *Later on 2026-10-24:* A4.1 is
+answered, `v2.0.0` at `/v2`. Step 6A, proposed with MADR A4.2, moves the
+path and says how Steps 7 to 13 read under it; where they say `v0.14.0`,
+read `v2.0.0`.
+
 ## Goal
 
 Release two versions:
@@ -83,7 +92,8 @@ acts on directly:
 | 3 | `glyph/` | the eight fields of D8 |
 | 4 | `safetext/` | the package (D9) |
 | 5 | `internal/sanitize/` | the wrapper (D9 S5), the `v0.12.0` oracle, the differential fuzz |
-| 6 | `README.md`, `docs/` | release `v0.13.0` |
+| 6 | `README.md`, `docs/` | release `v0.13.0` (tagged `v1.13.0`, MADR A4) |
+| 6A | `go.mod`, the Go files, `.golangci.yml`, `scripts/go-apicheck.py`, `scripts/go-examples.py`, `testdata/frameworks/go.mod.tmpl`, `AGENTS.md`, `docs/` | the module path to `/v2` (MADR A4.1, A4.2; proposed) |
 | 7 | `termcap/`, `internal/conformance/` | the I/O-free probe engine and `ParseReply` (D4, A2) |
 | 8 | `termcap/termcaptea/`, `termcap/termcaptest/`, `termcap/` (tests moved), `internal/conformance/`, `docs/` | `termcaptea.Prober` over the engine, the differential test (D4, A2) |
 | 9 | `termsvc/`, `termsvc/termsvctea/`, `docs/` | the `termsvc` split (D5, A1.2) |
@@ -113,6 +123,8 @@ imports its core and modules the root already requires.
 ## Prerequisites
 
 * MADR A2 is accepted before Step 7. Steps 1 to 6 do not depend on it.
+* *(2026-10-24, MADR A4: the tag is `v1.13.0`; and A4.1 is answered,
+  and Steps 7 to 13 amended for it, before Step 7.)*
 * `v0.13.0` is tagged, and CI is green on the tag, before Step 7, since
   Steps 7 to 12 diff the API against it.
 * `63c68d6`, or a later commit with no change under the paths above, is
@@ -578,6 +590,84 @@ comment, which says invalid UTF-8 is removed).
   `charm.land/bubbletea/v2` in the list.
 * **Issue comments** for #6, #11 and #12, drafted in the record for the
   owner.
+
+### Step 6A: the module path moves to `/v2` (MADR A4.1, A4.2)
+
+*Proposed 2026-10-24, for the owner's approval. It is lettered, not
+numbered, so that Steps 7 to 13 and MADR A2's references to them keep
+their numbers.*
+
+**Files:**
+* `go.mod`: `module github.com/maccavelli/go-tui-lib/v2`;
+* every tracked `.go` file that imports one of the module's packages.
+  At `220506d` the module path appears 293 times in Go files;
+* `.golangci.yml`: `charmfree`'s `internal/teamsg` path;
+* `testdata/frameworks/go.mod.tmpl`, and `scripts/go-examples.py` and its
+  test: the `replace` and `require` of the root;
+* `scripts/go-apicheck.py` and `scripts/go-apicheck_test.py`: the move
+  across a major boundary;
+* `AGENTS.md`: the module path, and API rules 1 and 2 as MADR A4.2 words
+  them;
+* `docs/guides/releasing.md`: a section "Release a new major version",
+  and the root's tags `vX.Y.Z` with `/v2` in its module path;
+* the import lines and module path in `README.md`, `docs/architecture.md`
+  and `docs/guides/*.md`.
+
+Records under `docs/decisions/` and `docs/reports/` keep the path they
+were written with, since they are history.
+
+* **The move:**
+  * done by a script in the scratch directory, never committed. It
+    rewrites `github.com/maccavelli/go-tui-lib` not followed by `/v2` to
+    `github.com/maccavelli/go-tui-lib/v2`, in the files above only;
+  * it asserts each file's count before it writes;
+  * it prints the counts, which the record holds;
+  * `gofmt` and `goimports` then re-sort the import blocks.
+* **The API diff gate across a major boundary:**
+  * `go-apicheck.py` reads the base's module path from its `go.mod`.
+    When it differs from the tree's only by a `/vN` suffix, the gate moves
+    the base's own import paths to the tree's path, in its `.go` files and
+    `go.mod`, before exporting it;
+  * otherwise it is unchanged;
+  * the script's docstring and `docs/architecture.md`'s Tooling say so.
+* **Tests:** `go-apicheck_test.py` gains three cases, on throwaway
+  repositories, as its others do:
+  * a module tagged `v1.0.0` and moved to `/v2` with no API change is
+    clean;
+  * the same with one function removed reports that function, and only
+    it;
+  * a module whose path changes otherwise, not by a major suffix, is
+    compared as before.
+* **Checks:**
+  * `GOWORK=off go list -m` prints `github.com/maccavelli/go-tui-lib/v2`;
+  * `go build`, `go vet` and `go test` pass for every module, in both
+    modes, and `go mod tidy -diff` is clean;
+  * `make apicheck` reports "against v1.13.0, 0 incompatible change(s)";
+  * `make examples` is clean;
+  * no tracked file outside `docs/decisions/` and `docs/reports/` names
+    the module path without `/v2`, by a scan the record quotes.
+* **Mutations:**
+  * the gate without the boundary move: the second new test fails on the
+    noise lines, and `make apicheck` on a scratch copy reports every
+    cross-package signature;
+  * the boundary move applied whatever the paths: the third new test
+    fails;
+  * one `.go` file left at the old path: `go build` fails.
+* **Gates** on every host, as Rule 2. Nothing is tagged: `v2.0.0` is Step
+  13's.
+
+**Under this step, the later steps change as follows:**
+* *Rule 3, Steps 7 to 12:* against `v1.13.0`, through the boundary move;
+  each step's `apicheck.allow` block lists its real moves.
+* *Steps 7 to 12:* their files, names and tests are unchanged; their
+  imports read `/v2`.
+* *Step 13* releases `v2.0.0`:
+  * `docs/guides/migrating.md` gains "Migrating to `v2.0.0`", whose first
+    item is the import path, then D10's table;
+  * the smoke test runs
+    `go get github.com/maccavelli/go-tui-lib/v2@v2.0.0`;
+  * the owner's tag is `v2.0.0`;
+  * the close-out removes the allow-list blocks, as written.
 
 ### Step 7: `termcap`, the I/O-free probe engine (D4, A2)
 
@@ -1813,3 +1903,58 @@ loop test); `command/registry.go` imports Bubble Tea
 
   Then the agent runs the consumer smoke test and its negative control,
   records them here, and the owner posts the issue comments above.
+* **Deviation (2026-10-24): the tag is `v1.13.0`.** The owner committed
+  the step as `8be11e7`. The guard passed over the six outgoing commits,
+  `44a4890` to `8be11e7`, exit 0, with `main` not behind `origin/main`. CI
+  and Docs passed on `main` at `8be11e7`. The owner then tagged that
+  commit and pushed the tag as `v1.13.0`.
+  * *Found* before the smoke test:
+    * `git ls-remote` showed `refs/tags/v1.13.0` (an annotated tag, at
+      `8be11e7`) and no `v0.13.0`;
+    * `proxy.golang.org` listed `v1.13.0` and answered `@latest` with it.
+  * *Options:*
+    * (a) retract it with a `v1.13.1` and tag `v0.13.0`, recommended;
+    * (b) keep `v1` and number from it;
+    * (c) leave it.
+  * *Chosen:* (b), by the owner. MADR A4 records it, and opens A4.1 on
+    release 2's version and form, which Steps 7 to 13 wait for.
+  * *Files added to the step:*
+    * `README.md`, `docs/guides/migrating.md`, `docs/glossary.md` and
+      `docs/README.md`, which now name `v1.13.0` where this step wrote
+      `v0.13.0`;
+    * `docs/decisions/0008-PLAN-command-palette.md`, a dated note;
+    * the MADR, A4 and its notes on D10 and D12.
+  * *The drafts above:* in the release notes and the three issue
+    comments, read `v1.13.0` for `v0.13.0`, and the guide's anchor is
+    `#migrating-to-v1130`. A reader of the tag's own `README.md` and
+    `migrating.md` sees `v0.13.0`. That copy cannot change, and the GitHub
+    release's notes can say so.
+* **The consumer smoke test**, `releasing.md`'s procedure, run on
+  2026-10-24 in a scratch module outside the repository by a script in the
+  scratch directory.
+  * *Steps:* `go mod init example.com/smoke`, then
+    `go get github.com/maccavelli/go-tui-lib@v1.13.0`, which downloaded
+    from `proxy.golang.org`, `go mod tidy`, an empty `go env GOWORK`,
+    `go vet ./...`, `go build ./...` and `go run .`, each with exit 0. The
+    module required is `github.com/maccavelli/go-tui-lib v1.13.0`.
+  * *The program* cleans codex's injection string with invalid UTF-8 after
+    it under `safetext.Text()`, checks `IsClean` on the result, draws
+    `glyph.For(false).Done` and ranks `"rsm"` with `fuzzy`. It printed
+    `clean "\n\tok�", done "+", best "resume"`.
+  * *Its closure,* `go list -deps .` with `CGO_ENABLED=0`, judged by the
+    closure gate's `charm` rule:
+    * `GOOS=linux`: 133 packages, no Charm beyond `x/ansi`;
+    * `darwin`: 131;
+    * `windows`: 133;
+    * on each, two `x/ansi` packages.
+
+    `smoke: PASS`.
+  * *The negative control:* the same procedure, with a program that
+    imports `termcap` and `glyph`; each step had exit 0. Its closure holds
+    `charm.land/bubbletea/v2`, `colorprofile`, `ultraviolet` and `x/term`
+    on all three, with `x/termios` on linux and darwin and `x/windows` on
+    each: 163, 161 and 168 packages. `control: PASS`.
+* **CI on the tag:** in progress when this was written; the owner
+  confirms it green.
+* **Not done:** the issue comments are the owner's to post, as read above.
+  The step's other items are done.

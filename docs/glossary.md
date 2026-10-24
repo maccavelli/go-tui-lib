@@ -42,7 +42,8 @@ later record does not reuse it for something else.
 | `ReplyKind`, `ModeSetting` | what a `Reply` is; a DECRPM setting | `termcap` |
 | `Effect` | a follow-up a host runs, in `command.Result` | `command` |
 
-`Prober` moves from `termcap` to `termcap/termcaptea` in `v0.14.0`, with
+`Prober` moves from `termcap` to `termcap/termcaptea` in that record's
+release 2, whose version its A4.1 decides, with
 one meaning; `Query` and `Reply` stay `termcap`'s.
 
 ## Built from those records
@@ -60,7 +61,7 @@ reserved here and are now built
 `safetext`'s `Rules`, what survives cleaning, and `Sanitizer`, the
 streaming cleaner, were reserved by
 [0020-MADR](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
-A1.3 and are built in `v0.13.0`
+A1.3 and are built in `v1.13.0`
 ([0020-PLAN](decisions/0020-PLAN-charm-free-cores-glyphs-and-safetext.md)
 Step 4).
 Each has one meaning, as its package documents it. `Terminal` is in
