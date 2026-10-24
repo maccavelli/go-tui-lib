@@ -38,7 +38,11 @@ type Rules struct {
 	Escape bool
 	// KeepSGR keeps each SGR, the CSI that sets colour and style, of at
 	// most 32 parameters, and each OSC 8 hyperlink whose parameters and
-	// target are printable ASCII. Every other sequence is still removed.
+	// target are printable ASCII. Every other sequence is still removed,
+	// and so is one introduced or ended by a C1 code point (U+009B,
+	// U+009D, U+009C): what KeepSGR keeps is the input's own bytes
+	// (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md
+	// A3.3).
 	KeepSGR bool
 	// LinkSchemes, with KeepSGR, keeps an OSC 8 link only when its target's
 	// scheme, compared without case, is one of these, and the target has a

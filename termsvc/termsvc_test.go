@@ -233,9 +233,11 @@ func TestControlBytesAreStripped(t *testing.T) {
 	if got := strip("one\ntwo\tthree\r"); got != "one two three " {
 		t.Errorf("strip turned whitespace into %q", got)
 	}
-	// C1 controls encoded as UTF-8, CSI and NEL among them, as well as the
-	// raw 8-bit byte above.
-	if got := strip("a\u009b31mb\u0085c\u0080d\u009fe"); got != "a31mbcde" {
+	// C1 controls encoded as UTF-8 are their 7-bit forms: CSI 31m, NEL and
+	// ESC @ go whole, and U+009F opens an APC, which hides the rest
+	// (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md
+	// A3.1, class 1).
+	if got := strip("a\u009b31mb\u0085c\u0080d\u009fe"); got != "abcd" {
 		t.Errorf("strip left UTF-8 C1 controls: %q", got)
 	}
 	link, err := Link("https://example.com/\x1b]8;;evil\x07x", "te\x1bxt\x9b", "id=\x07a")
@@ -244,8 +246,11 @@ func TestControlBytesAreStripped(t *testing.T) {
 	}
 	// sanitize.Line drops each escape sequence whole: the URL's embedded OSC
 	// 8, and in the text "\x1bx", which is ESC x, as a terminal reads it
-	// (docs/decisions/0014-PLAN-hardening.md Step 2).
-	if want := "\x1b]8;id=a;https://example.com/x\x07tet\x1b]8;;\x07"; link != want {
+	// (docs/decisions/0014-PLAN-hardening.md Step 2). The raw 0x9b at the
+	// text's end is invalid UTF-8, one U+FFFD
+	// (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md
+	// D9 S2).
+	if want := "\x1b]8;id=a;https://example.com/x\x07tet\ufffd\x1b]8;;\x07"; link != want {
 		t.Errorf("link %q, want %q", link, want)
 	}
 }

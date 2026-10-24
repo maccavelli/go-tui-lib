@@ -88,8 +88,10 @@ func CommandExecuted() string { return ansi.FinalTermCmdExecuted() }
 func CommandFinished(exit int) string { return ansi.FinalTermCmdFinished(strconv.Itoa(exit)) }
 
 // strip is sanitize.Line: escape sequences, controls, bidirectional and
-// invisible characters, and invalid UTF-8 removed, and each run of tabs
-// and line breaks one space (docs/decisions/0014-PLAN-hardening.md Step 2).
+// invisible characters removed, invalid UTF-8 shown as U+FFFD, and each
+// run of tabs and line breaks one space
+// (docs/decisions/0014-PLAN-hardening.md Step 2;
+// docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md D9 S2).
 func strip(s string) string { return sanitize.Line(s) }
 
 // lineBreaks is a run of line breaks with the blanks around it.

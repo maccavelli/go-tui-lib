@@ -21,6 +21,11 @@ renumbered 9 to 13.
 ("i accept the design, i approve executing the plan, proceed"). This PLAN
 is `in-progress`.
 
+*Deviation, 2026-10-23, Step 5:* the differential against `v0.12.0` found
+six classes of difference beyond S2; the owner's resolution is MADR A3 and
+the Execution Record's Step 5 entry, and Steps 5 and 6 carry notes where
+it changes them.
+
 ## Goal
 
 Release two versions:
@@ -450,6 +455,14 @@ imports its core and modules the root already requires.
 `internal/sanitize/oracle_test.go`, `internal/sanitize/bench_test.go`;
 `internal/sanitize/fuzz_test.go`.
 
+*Deviation, 2026-10-23 (Execution Record, Step 5; MADR A3):* also
+`internal/sanitize/sanitize_test.go` (its changed rows, and a row for each
+class of MADR A3.1); `safetext/clean.go`, `safetext/rules.go` and
+`safetext/safetext_test.go` (MADR A3.3: `KeepSGR` keeps nothing written
+with a C1); `termcap/json_test.go` and `termsvc/termsvc_test.go` (their
+assertions of the old output); and `termsvc/termsvc.go` (`strip`'s
+comment, which says invalid UTF-8 is removed).
+
 * **First, the benchmarks, on the unchanged implementation.**
   `bench_test.go` adds `BenchmarkLine`, `BenchmarkStyled` and
   `BenchmarkHasControl` over Step 4's five 4 KiB inputs.
@@ -475,6 +488,35 @@ imports its core and modules the root already requires.
   difference beyond that is a defect in Step 4's package, fixed there,
   unless `safetext` removes something the oracle kept, which is recorded as
   a deviation for the owner.
+
+  *Deviation, 2026-10-23 (MADR A3):* the equations above cannot all hold.
+  `HasControl`'s is wrong as written, since `v0.12.0` also counted invalid
+  UTF-8 as a control; and MADR A3.1's classes 1 to 5 differ by the
+  grammar. The check is restated as four exact properties. For every input
+  `x`:
+  * `HasControl(x) == oracleHasControl(x)`;
+  * `Line(Styled(x)) == Line(x)`;
+  * unless `lineDeparts(x)`, `Line(x) == oracleLine(f(x))`;
+  * unless `lineDeparts(x)` or not `plainest(x)`,
+    `Styled(x) == oracleStyled(f(x))`.
+
+  `lineDeparts` holds when `x` has a class 1 to 4 trigger:
+  * a C1 code point;
+  * a DCS, SOS, PM or APC introducer, after any C0 or DEL, followed later
+    by BEL or a byte of 0x80 or more;
+  * an OSC introducer, after any C0 or DEL, followed later by a byte of
+    0x80 or more (*the C0 and DEL added the same day, after the fuzzer
+    found the shape; Execution Record, Step 5*).
+
+  `plainest` holds when every ESC begins one of three forms:
+  * a CSI: a private marker first, if any, then digits, `;` and `:`, then
+    intermediates, then a final byte;
+  * an OSC of printable ASCII, ended by BEL or `ESC \`;
+  * a two-byte escape.
+
+  Outside `plainest` is class 5. Each clause cites its rule in the test.
+  `TestDepartures` in `sanitize_test.go` pins one row per class: the input,
+  the new output and `v0.12.0`'s.
 * **The existing tests** of `internal/sanitize` pass unchanged, except
   those that pin invalid UTF-8 being dropped, which change to U+FFFD; the
   record lists each.
@@ -487,6 +529,10 @@ imports its core and modules the root already requires.
 * **Mutations:** `Styled` drops `KeepSGR` (`FuzzAgainstV0120`'s seed
   corpus, and `sanitize_test.go`); `HasControl` is `IsClean` without the
   negation; `Line` uses `safetext.Text()`.
+  *Deviation, 2026-10-23 (MADR A3):* also, `KeepSGR` keeps an SGR
+  introduced by U+009B (`safetext`'s `TestKeepSGR`); `KeepSGR` keeps an
+  OSC 8 ended by U+009C (the same); and `lineDeparts` without its C1
+  clause (`FuzzAgainstV0120`'s seed corpus).
 
 ### Step 6: release `v0.13.0`
 
@@ -497,7 +543,11 @@ imports its core and modules the root already requires.
   * `docs/guides/migrating.md`, "Migrating to `v0.13.0`": *Added*
     (`safetext`, the eight glyph fields, `fuzzy`), *Changed* (the library's
     output shows invalid UTF-8 as U+FFFD, one per maximal subpart, where it
-    dropped it);
+    dropped it; *and, by the Step 5 deviation, MADR A3.1's classes on
+    malformed input: an encoded C1 read as its 7-bit form, BEL ending a
+    DCS, SOS, PM or APC, non-ASCII inside them, a character's 0x9C byte
+    not ending an OSC, and the styled path splitting malformed sequences
+    as the plain path does*);
   * `docs/glossary.md`: `Rules` and `Sanitizer` move from "Reserved" to
     "Built";
   * `README.md` Status; `docs/README.md` rows.
@@ -1437,3 +1487,191 @@ loop test); `command/registry.go` imports Bubble Tea
   each (243 files on macOS, 256 on the hosts, whose copies' index tracks
   the new files); `make apicheck` "against v0.12.0, 0 incompatible
   change(s)".
+* Committed by the owner.
+
+### Step 5: `internal/sanitize` wraps `safetext` (2026-10-23)
+
+* **Benchmarks, before,** on the unchanged implementation, with
+  `bench_test.go` added: `go test -run '^$' -bench . -benchmem -count=10
+  ./internal/sanitize`, Apple M1 Pro, the median of ten:
+
+  | 4 KiB input | `Line` | `Styled` | `HasControl` |
+  | :--- | ---: | ---: | ---: |
+  | clean ASCII | 1.94 µs, 0 allocs | 1.96 µs, 0 allocs | 1.93 µs, 0 allocs |
+  | clean CJK and emoji | 8.23 µs, 0 allocs | 8.44 µs, 0 allocs | 8.19 µs, 0 allocs |
+  | tool output | 38.20 µs, 9 allocs | 47.53 µs, 1 alloc | 37.85 µs, 9 allocs |
+  | styled | 18.08 µs, 7 allocs | 13.54 µs, 0 allocs | 17.75 µs, 7 allocs |
+  | hostile | 16.76 µs, 8 allocs | 32.56 µs, 1 alloc | 16.49 µs, 8 allocs |
+
+* **The oracle.** `oracle_test.go` was written by a script from
+  `git show v0.12.0:internal/sanitize/sanitize.go`, which renamed the ten
+  identifiers of `Line`, `Styled`, `HasControl` and their helpers in code
+  only, never in a comment or a string. `sanitize.go` had not changed since
+  the tag. Beyond the step's text, the package comment, `Truncate`,
+  `byRune` and `Token` are left out: the package keeps them, and a copy
+  would not compile beside them. The file's comment says so.
+* **Deviation (2026-10-23): the differential found six classes beyond
+  S2.**
+  * *Found.* With the wrapper in place, `internal/sanitize`'s tests failed
+    on four rows, and the tree's on three assertions in two other
+    packages:
+    * `sanitize_test.go:23`, "C1, as UTF-8": `Line("a\u0085\u009bb") =
+      "a", want "ab"`;
+    * `sanitize_test.go:24`, "invalid UTF-8": `"a�b�", want "ab"`;
+    * `sanitize_test.go:54`, "an 8-bit CSI": `Styled("a\x9b31mb") =
+      "a�31mb", want "a31mb"`;
+    * `sanitize_test.go:60`, "an nF escape dropped":
+      `Styled("000\x1b X0000000") = "0000000000", want "000"`;
+    * `termcap/json_test.go:96`: `ParseTmux` gave the version
+      `"3.4�"`;
+    * `termsvc/termsvc_test.go:239`: `strip left UTF-8 C1 controls:
+      "abcd"`;
+    * `termsvc/termsvc_test.go:249`: the link's text `"tet�"`, want
+      `"tet"`.
+
+    `FuzzAgainstV0120`'s seed `"a\xffb\xc3"` failed too:
+    `HasControl = true; v0.12.0 gives false`. That is the PLAN's equation
+    at fault, since `oracleHasControl(f(x))` is false where `v0.12.0`'s
+    own `HasControl(x)` is true. No golden file changed.
+  * *Classified* on a scratch copy of the tree, never the tree: 400,000
+    inputs from a hostile alphabet, from a fixed seed, each difference
+    shrunk to a minimal input. That gave 1,633 minimal inputs, in six
+    classes, MADR A3.1's table:
+
+    | # | Class | `Line` | `Styled` |
+    | :--- | :--- | ---: | ---: |
+    | 1 | C1 read as its 7-bit form | 289 | 406 |
+    | 2 | BEL ends a DCS, SOS, PM or APC | 304 | 47 |
+    | 3 | non-ASCII inside a DCS, SOS, PM or APC | 32 | 28 |
+    | 4 | a character's 0x9C byte does not end an OSC | 43 | 43 |
+    | 5 | `DecodeSequence`'s split of malformed input | 0 | 440 |
+    | 6 | a C1 SGR or OSC 8 kept, rewritten | 0 | 2 |
+
+    Each class 5 input's new `Styled` equals `v0.12.0`'s `Line`, 440 of
+    440. Apart from class 6's two, no difference puts a control
+    character in the output. `HasControl` compared with
+    `oracleHasControl(x)` differs on none of the inputs.
+  * *Resolutions offered,* each recommended first:
+    1. On the classes:
+       * (a) accept them as the grammar and restate the check;
+       * (b) a model oracle that rewrites each input before `v0.12.0`
+         sees it;
+       * (c) make `safetext` match `v0.12.0`, which would reverse
+         0009-MADR §2.
+    2. On class 6:
+       * (a) remove such a sequence whole;
+       * (b) keep it rewritten.
+    3. On the files outside the step:
+       * (a) all three in this step;
+       * (b) the tests now, and the comment in Step 9.
+  * *Chosen* by the owner, 2026-10-23: (a) for each. The MADR records it
+    as A3, and S5 carries a note. The step's notes above give the files
+    added, the restated check and the mutations added.
+  * *Before restating,* `Line(Styled(x)) == Line(x)` was tried on the
+    scratch copy over 400,000 inputs and held on all. The predicates were
+    tried over 2,000,000 inputs from two seeds and left no difference
+    outside them. The first form missed two shapes, each found there and
+    fixed:
+    * a C0 or DEL between ESC and a string's introducer, which the
+      grammar executes without leaving the escape;
+    * a private marker after a parameter.
+
+    The comparison covered about 40% of the inputs for `Line` and 27% for
+    `Styled`. The two exact properties hold on every input.
+* **Found while running the restated check, and fixed in the test.**
+  `FuzzAgainstV0120` found `"0…0\x1b\x1e]ל0"` after 2.0 million inputs.
+  `ESC RS ]` is an OSC, since the grammar executes the C0 without leaving
+  the escape, and `ל` (U+05DC) is `d7 9c`, so this is class 4. The OSC
+  clause had not skipped a C0 or DEL after ESC, as the string clause did.
+  Both now share `introduced`, and the input is a seed. The step's note
+  above now names the C0 and DEL in the OSC clause too, marked as added.
+  `safetext` was not at fault.
+* **The wrapper,** `sanitize.go`:
+  * `Line` is `safetext.Clean(s, safetext.Line())`;
+  * `Styled` is `safetext.Clean(s, styled)`, with
+    `styled = safetext.Rules{Flatten: true, KeepSGR: true}`;
+  * `HasControl` is `!safetext.IsClean(s, safetext.Line())`;
+  * `Truncate`, `byRune` and `Token` are unchanged, byte for byte;
+  * the package comment says that `safetext` does the cleaning and why
+    `Truncate` and `Token` stay; `Line`'s and `HasControl`'s say invalid
+    UTF-8 is U+FFFD;
+  * the helpers `dropped`, `isBreak`, `text`, `plain`, `styledClean`,
+    `kept` and `maxSGRParams` are gone; `x/ansi` stays for `Truncate`.
+* **`safetext`, for MADR A3.3:** `machine.fromC1` is set while a C1 code
+  point's 7-bit form is parsed. A CSI it opens is not a kept SGR, an OSC
+  it opens is not a kept OSC 8, and an OSC 8 it ends is removed.
+  `Rules.KeepSGR`'s documentation says so. Step 4's `TestKeepSGR` row
+  "8-bit SGR, written 7-bit" (`"\u009b31mx"` to `"\x1b[31mx"`) pinned
+  the behaviour A3.3 reverses; it is replaced by four rows: an SGR
+  U+009B introduces, a link U+009D introduces, a link U+009C ends, and a
+  7-bit link after a C1 SGR, which is kept.
+* **Tests changed,** each with a comment naming its rule:
+  * `sanitize_test.go`: "C1, as UTF-8" now holds U+0085 alone, and a new
+    row "U+009B is CSI" gives `"a"` (class 1); "invalid UTF-8" gives
+    `"a�b�"` (S2); "an 8-bit CSI" is now "a raw 0x9B byte",
+    `"a�31mb"` (S2); "an nF escape dropped" gives `"0000000000"`
+    (class 5); `TestDepartures` is new;
+  * `termcap/json_test.go`: `ParseTmux`'s version is `"3.4�"` (S2);
+  * `termsvc/termsvc_test.go`: `strip` of the encoded C1 controls is
+    `"abcd"` (class 1); the link's text is `"tet�"` (S2);
+  * `termsvc/termsvc.go`: `strip`'s comment says invalid UTF-8 shows as
+    U+FFFD.
+
+  No golden file changed. The tree's tests pass.
+* **Fuzz,** each on a scratch copy of the tree:
+  * `FuzzAgainstV0120`: 180 s, 11.3 million inputs, after the fix above,
+    with no failure;
+  * `FuzzClean`, since `clean.go` changed: 120 s, 20.5 million inputs,
+    with no failure.
+* **Benchmarks, after,** the same command and machine; the bar is the
+  "before" median times 1.10, with no more allocations:
+
+  | 4 KiB input | `Line` | `Styled` | `HasControl` |
+  | :--- | ---: | ---: | ---: |
+  | clean ASCII | 2.06 µs (1.06), 0 allocs | 2.10 µs (1.08), 0 allocs | 2.02 µs (1.04), 0 allocs |
+  | clean CJK and emoji | 8.82 µs (1.07), 0 allocs | 8.82 µs (1.04), 0 allocs | 8.62 µs (1.05), 0 allocs |
+  | tool output | 9.88 µs (0.26), 1 alloc | 10.90 µs (0.23), 1 alloc | 0.11 µs (0.00), 0 allocs |
+  | styled | 6.62 µs (0.37), 1 alloc | 5.81 µs (0.43), 0 allocs | 0.10 µs (0.01), 0 allocs |
+  | hostile | 14.86 µs (0.89), 1 alloc | 14.99 µs (0.46), 1 alloc | 0.18 µs (0.01), 0 allocs |
+
+  All 15 pass. `Styled` on clean ASCII is the nearest, at 1.08.
+* **Mutations,** through `python3 -m tools.verify mutate`, all killed:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | `Styled` drops `KeepSGR` | `TestStyled`: `SGR kept: Styled("\x1b[38;2;1;2;3;1mred\x1b[m") = "red", want …` |
+  | `Styled` drops `KeepSGR` | `FuzzAgainstV0120/seed#1`: `Styled(…) = "bold link"; v0.12.0 gives "\x1b[1mbold\x1b[m …"` |
+  | `HasControl` is `IsClean` without the negation | `TestTokenAndHasControl`: `HasControl("plain text") = true, want false` |
+  | `Line` uses `safetext.Text()` | `TestLine`: `line breaks and tabs, as one space: Line("a\r\n\t b\nc") = "a\n\t b\nc", want "a  b c"` |
+  | `KeepSGR` keeps an SGR U+009B introduces | `TestKeepSGR`: `Clean("\u009b31mx") = "\x1b[31mx", want "x"` |
+  | `KeepSGR` keeps an OSC 8 U+009C ends | `TestKeepSGR`: `Clean("\x1b]8;;https://e.org\u009cx") = "\x1b]8;;https://e.org\x1b\\x", want "x"` |
+  | `KeepSGR` keeps a link U+009D introduces | `TestKeepSGR`: `Clean("\u009d8;;https://e.org\ax") = "\x1b]8;;https://e.org\ax", want "x"` |
+  | `lineDeparts` without its C1 clause | `FuzzAgainstV0120/seed#26`: `Line("a\u0090q\u009cb") = "ab"; v0.12.0 gives "aqb"` |
+  | `lineDeparts` without its string clause | `FuzzAgainstV0120/seed#27`: `Line("a\x1bXs\ab") = "ab"; v0.12.0 gives "a"` |
+  | `lineDeparts` without its OSC clause | `FuzzAgainstV0120/seed#29`: `Line("a\x1b]0;Ü b") = "a"; v0.12.0 gives "a b"` |
+  | `plainest` always true | `FuzzAgainstV0120/seed#30`: `Styled("a\x1b[0?mb") = "ab"; v0.12.0 gives "a?mb"` |
+  | `HasControl` compared on `subparts(x)`, as the PLAN first wrote it | `FuzzAgainstV0120/seed#7`: `HasControl("a\xffb\xc3") = true; v0.12.0 gives false` |
+  | `Styled` without `Flatten` (`Line(Styled(x)) == Line(x)`) | `FuzzAgainstV0120/seed#4`: `Line(Styled("a\r\n\t b\nc")) = "a bc"; Line gives "a  b c"` |
+  | a `TestDepartures` row that no longer departs | `TestDepartures`: `class 2, BEL ends an SOS: v0.12.0's Line("a\x1bXs\ab") = "a", the row says "ab"` |
+  | `introduced` skips no C0 or DEL after ESC | `FuzzAgainstV0120/seed#32`: `Line("0\x1b\x1e]ל0") = "0"; v0.12.0 gives "00"` |
+
+  The step's three are the first four rows, the first run against both of
+  its named tests; the rest are the deviation's. Each clause of the
+  restated check is among them, so each new check was seen to fail.
+* **Lint:** `modernize` asked, on the first gate run, for
+  `slices.ContainsFunc` in `introduced`, which was applied.
+* **Gates,** `python3 -m tools.verify gates` over the step's 14 files (the
+  eleven Go files and the three records). The first run on macOS failed at
+  `modernize` alone (above); the remote runs were stopped and all three
+  rerun after the fix, nothing skipped: macOS
+  `gates: 19 passed, 0 failed, 0 skipped in 388s`; the Linux host
+  `… in 762s`; the Windows host `… in 2172s`. `release-check` is clean on
+  each (258 files on the hosts); `make apicheck` "against v0.12.0, 0
+  incompatible change(s)".
+* **Scans:** `python3 -m tools.verify scan` "clean (5 pattern(s))"; no raw
+  bidirectional, format or C1 character in any file of the step. The
+  markdownlint gate's configuration leaves MADR and PLAN files out, so it
+  checked `docs/README.md` only of the three records, as in earlier steps.
+  Copies of the two records under other names, linted with the same
+  rules, show only `*` list markers, which MADR requires, and hard tabs
+  in A2.2's Go block, which predates this step.

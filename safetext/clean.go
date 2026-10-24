@@ -181,6 +181,7 @@ type machine struct {
 	brk    bool // the last output was Flatten's space
 	cr     bool // a \r waits for the byte after it
 	stTail bool // an ESC ended a string, so a '\' after it is its ST
+	fromC1 bool // the bytes being parsed are a C1 code point's 7-bit form
 
 	strLen   int  // the bytes the current string holds
 	csiDirty bool // the current CSI cannot be a kept SGR
@@ -502,9 +503,12 @@ func char[T string | []byte](m *machine, r rune, raw T) {
 			m.removed(r)
 			return
 		}
-		// A C1 control is its 7-bit form (0009-MADR §2).
+		// A C1 control is its 7-bit form (0009-MADR §2), and KeepSGR
+		// keeps nothing it introduces or ends (0020-MADR A3.3).
+		m.fromC1 = true
 		m.ascii(0x1b)
 		m.ascii(byte(r - 0x40))
+		m.fromC1 = false
 		return
 	}
 	switch m.st {
@@ -659,9 +663,10 @@ func (m *machine) escapeByte(c byte) {
 		m.st = stEscInter
 	case c == '[':
 		m.begin(stCsiEntry)
+		m.csiDirty = m.fromC1
 	case c == ']':
 		m.begin(stOsc)
-		m.oscKeep = m.keepSGR
+		m.oscKeep = m.keepSGR && !m.fromC1
 	case c == 'P':
 		m.begin(stDcsEntry)
 	case c == 'X' || c == '^' || c == '_':
@@ -776,7 +781,7 @@ func (m *machine) content(n int, notASCII bool) bool {
 // oscFinish ends an OSC that may be a kept OSC 8, with its terminator.
 func (m *machine) oscFinish(term string) {
 	body := m.osc[:m.oscN]
-	if !m.oscKeep || !keepLink(body, m.schemes) {
+	if !m.oscKeep || m.fromC1 || !keepLink(body, m.schemes) {
 		if m.visible {
 			m.print(m.control)
 		}

@@ -89,8 +89,11 @@ func TestJSONWritesInvalidUTF8(t *testing.T) {
 		t.Errorf("Report = %v:\n%s", err, r.String())
 	}
 
+	// The invalid byte is one U+FFFD
+	// (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md
+	// D9 S2).
 	got := ParseTmux("3.4\xff\x1b[31m\tcsi-u\u202e\t1\tRGB,\x07clip\tfocus\n")
-	want := TmuxFacts{Known: true, Version: "3.4", ExtendedKeysFormat: "csi-u", Mouse: true,
+	want := TmuxFacts{Known: true, Version: "3.4\ufffd", ExtendedKeysFormat: "csi-u", Mouse: true,
 		TermFeatures: []string{"RGB", "clip"}, ClientFlags: []string{"focus"}}
 	if !tmuxEqual(got, want) {
 		t.Errorf("ParseTmux kept untrusted bytes: %+q", got)

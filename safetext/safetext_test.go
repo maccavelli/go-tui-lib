@@ -207,7 +207,11 @@ func TestKeepSGR(t *testing.T) {
 		{"an intermediate is not an SGR", keep, "\x1b[1 mx", "x"},
 		{"a control inside is not an SGR", keep, "\x1b[3\x011mx", "x"},
 		{"other CSI removed", keep, "\x1b[2Jx", "x"},
-		{"8-bit SGR, written 7-bit", keep, "\u009b31mx", "\x1b[31mx"},
+		// 0020-MADR A3.3: nothing a C1 code point introduces or ends is kept.
+		{"an SGR introduced by U+009B removed", keep, "\u009b31mx", "x"},
+		{"a link introduced by U+009D removed", keep, "\u009d8;;https://e.org\x07x", "x"},
+		{"a link ended by U+009C removed", keep, "\x1b]8;;https://e.org\u009cx", "x"},
+		{"a link ended by ESC \\ after a C1 SGR", keep, "\u009b1m\x1b]8;;https://e.org\x1b\\x", "\x1b]8;;https://e.org\x1b\\x"},
 		{"any link", keep, "\x1b]8;;file:///etc\x07x\x1b]8;;\x07", "\x1b]8;;file:///etc\x07x\x1b]8;;\x07"},
 		{"a link ended by ST", keep, "\x1b]8;id=1;https://e.org\x1b\\x\x1b]8;;\x1b\\", "\x1b]8;id=1;https://e.org\x1b\\x\x1b]8;;\x1b\\"},
 		{"a link not printable ASCII", keep, "\x1b]8;;https://é.org\x07x", "x"},

@@ -730,6 +730,9 @@ disagree.
   alphabet, which is not sanitising, and `Truncate` needs `x/ansi`. The
   28 calls keep their call sites. A later record may move them to
   `safetext` directly; this one does not, to keep the change small.
+  *A3.2 corrects "equal to their behaviour": equal on well-formed input;
+  on malformed input 0009-MADR §2's grammar applies, in five classes A3.1
+  names. A3.3 adds that `KeepSGR` keeps nothing written with a C1.*
 * **The performance bar** (gobble's proposed criteria, adopted):
   * clean input: `Clean` returns `s` itself, with no allocation;
   * input that needs cleaning: one pass and one allocation;
@@ -1445,6 +1448,57 @@ environment, as it is a disabled `Prober` today.
   stability policy these are kept.
 * A CLI that probes takes on raw mode and reading every reply. The
   engine's documentation says so, with the pitfalls of A2.1.
+
+### A3 (2026-10-23): what 0020-PLAN Step 5's differential found (corrects D9 S5; adds to D9's `KeepSGR`)
+
+*Status: accepted (2026-10-23).* At
+[0020-PLAN-charm-free-cores-glyphs-and-safetext.md](0020-PLAN-charm-free-cores-glyphs-and-safetext.md)
+Step 5, the differential against `v0.12.0` found differences beyond S2
+that the PLAN had not foreseen. The agent stopped with the evidence below,
+and the owner chose the recommended resolution of each of three questions
+that day. The third, the step's file list, is the PLAN's alone and is
+recorded there.
+
+**A3.1 Found.** `internal/sanitize`, wrapping `safetext` as S5 says, was
+compared with `v0.12.0`'s copy over 400,000 inputs generated from a
+hostile alphabet, each difference shrunk to a minimal input: 1,633 minimal
+inputs, every one in one of six classes.
+
+| # | Class | In | Why |
+| :--- | :--- | :--- | :--- |
+| 1 | A C1 code point, U+0080–U+009F encoded as UTF-8, is read as its 7-bit form: U+0090 opens a DCS, U+009B a CSI, U+009C is ST | `Line`, `Styled` | 0009-MADR §2; `v0.12.0` dropped the code point alone and printed what followed it |
+| 2 | BEL ends a DCS, SOS, PM or APC | both | §2; `x/ansi` keeps BEL as data, so `v0.12.0` hid the text after it |
+| 3 | A byte of 0x80 or more inside a DCS, SOS, PM or APC is part of it | both | §2; `x/ansi`'s table leaves the string at UTF-8 and prints the rest |
+| 4 | Inside an OSC, a character whose UTF-8 holds the byte 0x9C (`Ü` is `c3 9c`) does not end it | both | `safetext` decodes UTF-8 before the grammar, so a byte inside a character is not a C1 control; `x/ansi` reads the bytes one at a time and takes that 0x9C for ST |
+| 5 | A malformed sequence splits as the DEC parser splits it: a C0 right after ESC, an nF escape, a DCS holding a C0, a private marker after a parameter | `Styled` | `v0.12.0`'s `Styled` tokenised with `ansi.DecodeSequence`, which splits these otherwise; in all 440 such minimal inputs the new `Styled` equals `v0.12.0`'s own `Line` |
+| 6 | An SGR or OSC 8 introduced or ended by an encoded C1 was kept, rewritten in its 7-bit form (`"\u009bm"` became `"\x1b[m"`) | `Styled` | nothing decided it; A3.3 does |
+
+Classes 1, 3 and 4 and part of 5 remove more than `v0.12.0` did; class 2
+and parts of 1 and 5 remove less. Where the new output shows what
+`v0.12.0` hid, what it shows is text: no difference put a control
+character or an ESC in the output, but class 6's two. `HasControl` differs
+on no input when compared with `v0.12.0`'s on the input itself:
+`v0.12.0` counted invalid UTF-8 as a control too, since its `Line` dropped
+it.
+
+**A3.2 S5's rules equal the old behaviour on well-formed input (corrects
+S5).** S5 says the wrapper's rules are "equal to their behaviour". That
+holds where the input's sequences are well formed. On malformed input,
+classes 1 to 5 apply, by 0009-MADR §2's grammar, which D9 makes the one
+grammar; the owner accepted them as that grammar. So the library's visible
+output changes on malformed input as well as on invalid UTF-8, and the
+`v0.13.0` notes say so. D9's "The checks" stands as written: the
+differential compares every input on which the two are meant to agree,
+and names each class where they differ.
+
+**A3.3 `KeepSGR` keeps only what is written with 7-bit ESC (adds to D9).**
+A sequence introduced by an encoded C1 (U+009B, U+009D) or ended by one
+(U+009C) is removed whole under `KeepSGR`, as any sequence it does not
+keep is. Every sequence `KeepSGR` keeps is then the input's own bytes, as
+`v0.12.0`'s `Styled` documented ("a control sequence introduced by an
+8-bit C1 byte" is dropped). Keeping it rewritten in its 7-bit form, the
+other option, was as safe, but a kept sequence would then differ from what
+the program wrote.
 
 ## More Information
 

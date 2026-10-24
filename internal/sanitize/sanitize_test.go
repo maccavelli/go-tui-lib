@@ -20,8 +20,12 @@ func TestLine(t *testing.T) {
 		{"line breaks and tabs, as one space", "a\r\n\t b\nc", "a  b c"},
 		{"U+2028 and U+2029", "a\u2028b\u2029c", "a b c"},
 		{"C0 and DEL", "a\x00\x07\x08\x7fb", "ab"},
-		{"C1, as UTF-8", "a\u0085\u009bb", "ab"},
-		{"invalid UTF-8", "a\xffb\xc3", "ab"},
+		{"C1, as UTF-8", "a\u0085b", "ab"},
+		// A C1 code point is its 7-bit form, so U+009B opens a CSI, which
+		// b ends (0020-MADR A3.1, class 1).
+		{"U+009B is CSI", "a\u009bb", "a"},
+		// One U+FFFD for each maximal subpart (0020-MADR D9 S2).
+		{"invalid UTF-8", "a\xffb\xc3", "a\ufffdb\ufffd"},
 		{"Bidi_Control", "a\u202eb\u2066c\u061cd\u200ee", "abcde"},
 		{"U+200B (D2)", "a\u200bb", "ab"},
 		{"U+FEFF", "\ufeffab", "ab"},
@@ -51,13 +55,16 @@ func TestStyled(t *testing.T) {
 		{"a CSI cut short", "a\x1b[31", "a"},
 		{"controls in the text", "\x1b[1ma\x07\u202eb\x1b[m", "\x1b[1mab\x1b[m"},
 		{"tabs and breaks", "a\tb\r", "a b "},
-		{"an 8-bit CSI", "a\x9b31mb", "a31mb"},
+		// A raw 0x9B continues no character, so it is invalid UTF-8 and
+		// opens no sequence (0020-MADR D9 S2).
+		{"a raw 0x9B byte", "a\x9b31mb", "a\ufffd31mb"},
 		// D9 (docs/decisions/0014-PLAN-hardening.md Step 9): only SGR and
 		// OSC 8 are kept.
 		{"SGR with colons kept", "\x1b[4:3mu\x1b[0m", "\x1b[4:3mu\x1b[0m"},
-		// The decoder reads ESC SP X as a string sequence running to the
-		// end, and it is dropped whole.
-		{"an nF escape dropped", "000\x1b X0000000", "000"},
+		// The DEC parser reads ESC SP X as an nF escape, which is dropped,
+		// and the text after it stays, as Line keeps it
+		// (0020-MADR A3.1, class 5).
+		{"an nF escape dropped", "000\x1b X0000000", "0000000000"},
 		{"S7C1T dropped", "a\x1b Fb", "ab"},
 		{"DECALN dropped", "a\x1b#8b", "ab"},
 		{"S8C1T dropped", "a\x1b Gb", "ab"},
@@ -81,6 +88,39 @@ func TestStyled(t *testing.T) {
 	for _, in := range []string{"a\u200bb\u00adc", "\ufeffx\U000e0041y", "\u65e5\u202e\u672c"} {
 		if Styled(in) != Line(in) {
 			t.Errorf("Styled(%q) = %q, Line = %q", in, Styled(in), Line(in))
+		}
+	}
+}
+
+// TestDepartures pins one input for each class where Line and Styled
+// differ from v0.12.0's, the oracle, beyond U+FFFD
+// (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md
+// A3.1): what each gives now, and what v0.12.0 gave, so that a row that
+// stops departing fails too.
+func TestDepartures(t *testing.T) {
+	for _, c := range []struct {
+		class, in                string
+		line, styled             string
+		oracleLine, oracleStyled string
+	}{
+		{"1, U+0090 opens a DCS, which U+009C ends", "a\u0090q\u009cb", "ab", "ab", "aqb", "aqb"},
+		{"2, BEL ends an SOS", "a\x1bXs\x07b", "ab", "ab", "a", "a"},
+		{"3, non-ASCII inside an APC is part of it", "a\x1b_\u00e9\x1b\\b", "ab", "ab", "a\u00e9b", "ab"},
+		{"4, the 0x9C byte of U+00DC does not end an OSC", "a\x1b]0;\u00dc b", "a", "a", "a b", "a b"},
+		{"5, a private marker after a parameter", "a\x1b[0?mb", "ab", "ab", "ab", "a?mb"},
+		{"6, an SGR U+009B introduces is not kept (A3.3)", "a\u009b1mb", "ab", "ab", "a1mb", "a1mb"},
+	} {
+		if got := Line(c.in); got != c.line {
+			t.Errorf("class %s: Line(%q) = %q, want %q", c.class, c.in, got, c.line)
+		}
+		if got := Styled(c.in); got != c.styled {
+			t.Errorf("class %s: Styled(%q) = %q, want %q", c.class, c.in, got, c.styled)
+		}
+		if got := oracleLine(c.in); got != c.oracleLine {
+			t.Errorf("class %s: v0.12.0's Line(%q) = %q, the row says %q", c.class, c.in, got, c.oracleLine)
+		}
+		if got := oracleStyled(c.in); got != c.oracleStyled {
+			t.Errorf("class %s: v0.12.0's Styled(%q) = %q, the row says %q", c.class, c.in, got, c.oracleStyled)
 		}
 	}
 }
