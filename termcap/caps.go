@@ -8,7 +8,7 @@ import (
 
 	"github.com/charmbracelet/colorprofile"
 
-	"github.com/maccavelli/go-tui-lib/internal/enum"
+	"github.com/maccavelli/go-tui-lib/v2/internal/enum"
 )
 
 // Caps is what is known about the terminal. A field is added, never

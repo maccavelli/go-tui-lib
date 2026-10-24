@@ -3,9 +3,9 @@ package workspace_test
 import (
 	"testing"
 
-	"github.com/maccavelli/go-tui-lib/layout"
-	"github.com/maccavelli/go-tui-lib/theme"
-	"github.com/maccavelli/go-tui-lib/tuitest"
+	"github.com/maccavelli/go-tui-lib/v2/layout"
+	"github.com/maccavelli/go-tui-lib/v2/theme"
+	"github.com/maccavelli/go-tui-lib/v2/tuitest"
 )
 
 // TestAgentSessionGolden renders the agent session in the four arrangements

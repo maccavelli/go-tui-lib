@@ -12,8 +12,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/maccavelli/go-tui-lib/layout"
-	"github.com/maccavelli/go-tui-lib/tuitest"
+	"github.com/maccavelli/go-tui-lib/v2/layout"
+	"github.com/maccavelli/go-tui-lib/v2/tuitest"
 )
 
 // The family emoji joins three emoji with zero-width joiners; the heart is

@@ -7,7 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/colorprofile"
 
-	"github.com/maccavelli/go-tui-lib/internal/termevent/termeventtest"
+	"github.com/maccavelli/go-tui-lib/v2/internal/termevent/termeventtest"
 )
 
 func TestDA2IsSentBeforeDA1(t *testing.T) {

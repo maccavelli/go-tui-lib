@@ -15,7 +15,7 @@ Why they are built this way is in
 [0005-MADR](../decisions/0005-MADR-terminal-capabilities-and-services.md),
 with its amendments A1 to A5. The examples `ExampleProber` and
 `ExampleReport` compile with the package
-(`go doc -all github.com/maccavelli/go-tui-lib/termcap`).
+(`go doc -all github.com/maccavelli/go-tui-lib/v2/termcap`).
 
 ## Embed a prober
 

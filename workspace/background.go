@@ -3,7 +3,7 @@ package workspace
 import (
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/maccavelli/go-tui-lib/theme"
+	"github.com/maccavelli/go-tui-lib/v2/theme"
 )
 
 // SetBackground pins the background the theme is built for, or with

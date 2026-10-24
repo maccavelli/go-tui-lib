@@ -11,8 +11,8 @@ import (
 	"testing"
 	"testing/iotest"
 
-	"github.com/maccavelli/go-tui-lib/command"
-	"github.com/maccavelli/go-tui-lib/when"
+	"github.com/maccavelli/go-tui-lib/v2/command"
+	"github.com/maccavelli/go-tui-lib/v2/when"
 )
 
 // marker marks, in a test's file, the byte an error must point at.

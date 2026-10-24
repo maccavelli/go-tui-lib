@@ -12,7 +12,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/maccavelli/go-tui-lib/internal/sanitize"
+	"github.com/maccavelli/go-tui-lib/v2/internal/sanitize"
 )
 
 // item is a candidate with an identity, so ties can be told apart.

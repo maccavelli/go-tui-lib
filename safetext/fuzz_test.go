@@ -6,7 +6,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/maccavelli/go-tui-lib/safetext"
+	"github.com/maccavelli/go-tui-lib/v2/safetext"
 )
 
 // fuzzRules is each preset, and the tool-output combination of 0020-MADR

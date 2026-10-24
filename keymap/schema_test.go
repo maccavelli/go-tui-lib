@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/maccavelli/go-tui-lib/command"
+	"github.com/maccavelli/go-tui-lib/v2/command"
 )
 
 // keyRE is the schema's key pattern, as Go reads it.

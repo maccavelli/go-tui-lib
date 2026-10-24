@@ -1,4 +1,4 @@
-module github.com/maccavelli/go-tui-lib
+module github.com/maccavelli/go-tui-lib/v2
 
 go 1.27.2
 

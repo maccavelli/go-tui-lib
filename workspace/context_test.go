@@ -6,9 +6,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/maccavelli/go-tui-lib/layout"
-	"github.com/maccavelli/go-tui-lib/when"
-	"github.com/maccavelli/go-tui-lib/workspace"
+	"github.com/maccavelli/go-tui-lib/v2/layout"
+	"github.com/maccavelli/go-tui-lib/v2/when"
+	"github.com/maccavelli/go-tui-lib/v2/workspace"
 )
 
 // contexter is a focusable pane that publishes when keys.

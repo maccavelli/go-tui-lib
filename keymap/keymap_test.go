@@ -10,8 +10,8 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/maccavelli/go-tui-lib/command"
-	"github.com/maccavelli/go-tui-lib/when"
+	"github.com/maccavelli/go-tui-lib/v2/command"
+	"github.com/maccavelli/go-tui-lib/v2/when"
 )
 
 func seq(t testing.TB, s string) Sequence {

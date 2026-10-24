@@ -21,9 +21,10 @@ pattern, used by every program that needs it.
 - **The current release is `v1.13.0`.** It follows `v0.12.0`: it was
   tagged in place of `v0.13.0` and kept, and there is no `v0.13.0`
   ([0020-MADR](docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
-  A4). How later releases are numbered, and how a renamed name is retired
-  under `v1`, waits for that record's A4.1. Until then a renamed name keeps
-  working for one minor release:
+  A4). The next release is `v2.0.0`, at the module path
+  `github.com/maccavelli/go-tui-lib/v2`, which `main` already has (A4.1,
+  A4.2). Within a major version nothing is removed: a renamed name keeps
+  working, deprecated, until the next major version, and
   [the migration guide](docs/guides/migrating.md) lists them.
 - **Multi-pane workspaces, since `v0.1.0`.** `layout` arranges panes: a main
   pane with a sidebar on either side, a bottom pane, a footer, responsive

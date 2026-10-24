@@ -7,7 +7,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/colorprofile"
 
-	"github.com/maccavelli/go-tui-lib/glyph"
+	"github.com/maccavelli/go-tui-lib/v2/glyph"
 )
 
 // same reports whether a and b are the same colour, nil included.

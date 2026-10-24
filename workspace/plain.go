@@ -7,8 +7,8 @@ import (
 	"charm.land/bubbles/v2/help"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/maccavelli/go-tui-lib/internal/sanitize"
-	"github.com/maccavelli/go-tui-lib/layout"
+	"github.com/maccavelli/go-tui-lib/v2/internal/sanitize"
+	"github.com/maccavelli/go-tui-lib/v2/layout"
 )
 
 // A plain, linear rendering, for a pipe, a log or a screen reader, and help

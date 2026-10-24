@@ -1,7 +1,8 @@
 # Releasing
 
 This repository can hold more than one Go module: the root,
-`github.com/maccavelli/go-tui-lib`, and, when an adapter needs a dependency
+`github.com/maccavelli/go-tui-lib/v2` (up to `v1.13.0`,
+`github.com/maccavelli/go-tui-lib`), and, when an adapter needs a dependency
 the root must not carry, a nested module beside it, such as the planned
 `stream/glamourmd`. Each module is released on its own, with its own
 tags. Why it is built this way is in
@@ -47,7 +48,7 @@ echo "refs/heads/main $(git rev-parse HEAD) refs/heads/main $(git rev-parse orig
    mkdir -p <dir>
    (cd <dir> &&
      go mod init github.com/maccavelli/go-tui-lib/<dir> &&
-     GOWORK=off go get github.com/maccavelli/go-tui-lib@vX.Y.Z)
+     GOWORK=off go get github.com/maccavelli/go-tui-lib/v2@vX.Y.Z)
    go work use ./<dir>
    ```
 
@@ -86,6 +87,34 @@ An adapter that should build against the new root then moves its
 requirement, as step 2 of "Release a change that spans the root and an
 adapter" shows.
 
+## Release a new major version
+
+A change that removes or retypes an exported name is released only as a
+new major version, at a new module path. API rules 1 and 2 in AGENTS.md
+say so
+([0020-MADR](../decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
+A4.2). The Go Modules Reference, "Major version suffixes": "If the module
+is released at major version 2 or higher, the module path must end with a
+major version suffix like `/v2`."
+
+1. **The path moves first.** A PLAN step moves the module path to `/vN`,
+   in `go.mod` and every import, before any breaking change lands. Then no
+   `v(N-1)` tag can be made of a commit that carries one: the go command
+   refuses a version whose major does not match the module path.
+2. **The breaking steps list their changes** in `scripts/apicheck.allow`.
+   `make apicheck` compares the tree with the last `v(N-1)` tag, with that
+   tag's import paths moved to `/vN`, so only real changes show.
+3. **The release** is as "Release the root alone", tagged `vN.0.0`. Its
+   close-out removes the allow-list blocks.
+4. **The smoke test** runs
+   `go get github.com/maccavelli/go-tui-lib/vN@vN.0.0`.
+5. **An adapter** moves its requirement and its imports to `/vN` in its
+   own release, as "Release a change that spans the root and an adapter"
+   says.
+
+A `v(N-1)` user keeps that version. A fix for them would be released from
+a branch cut at its last tag.
+
 ## Release an adapter alone
 
 1. The adapter's `go.mod` already requires a published root tag.
@@ -120,7 +149,7 @@ that is already published.
 
    ```bash
    cd stream/glamourmd
-   GOWORK=off go get github.com/maccavelli/go-tui-lib@vX.Y.Z
+   GOWORK=off go get github.com/maccavelli/go-tui-lib/v2@vX.Y.Z
    GOWORK=off go mod tidy
    ```
 
@@ -188,7 +217,7 @@ module path records the module, not the `go.sum` entries of the packages
 the program imports, and without them `go build` fails with "missing
 go.sum entry".
 
-For the root, `go get github.com/maccavelli/go-tui-lib@vX.Y.Z` and import
+For the root, `go get github.com/maccavelli/go-tui-lib/v2@vX.Y.Z` and import
 one of its packages that has outside dependencies, such as `workspace`,
 instead. A package with none, such as `glyph`, builds even when those
 entries are missing, so it proves less. If `go get` cannot find a

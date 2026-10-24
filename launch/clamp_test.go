@@ -3,8 +3,8 @@ package launch_test
 import (
 	"testing"
 
-	"github.com/maccavelli/go-tui-lib/launch"
-	"github.com/maccavelli/go-tui-lib/launch/launchtest"
+	"github.com/maccavelli/go-tui-lib/v2/launch"
+	"github.com/maccavelli/go-tui-lib/v2/launch/launchtest"
 )
 
 // Decide clamps its size as workspace clamps a window

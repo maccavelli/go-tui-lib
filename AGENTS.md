@@ -5,7 +5,10 @@ this file. A repository-local `CLAUDE.md` / `.claude/rules/` / `.grok/rules/` /
 `.opencode/rules.md` wins only where it is more specific than this file.
 
 `go-tui-lib` is a shared Go library of terminal-UI code on the Charm v2 stack
-(`github.com/maccavelli/go-tui-lib`). It is a library only: no packaged
+(`github.com/maccavelli/go-tui-lib/v2`; `v1.13.0` was the last release at
+`github.com/maccavelli/go-tui-lib`,
+`docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md` A4).
+It is a library only: no packaged
 binary. Each capability lives in its own top-level directory, with the
 package named after the directory; there is no root package. Unexported
 helpers shared between packages live under `internal/`. Requires Go 1.27.2.
@@ -70,7 +73,7 @@ The repository holds more than one Go module
 
 | Module | Directory | Tags |
 | :--- | :--- | :--- |
-| `github.com/maccavelli/go-tui-lib` | `.` | `vX.Y.Z` |
+| `github.com/maccavelli/go-tui-lib/v2` | `.` | `vX.Y.Z`, from `v2.0.0` |
 | `github.com/maccavelli/go-tui-lib/stream/glamourmd` (planned) | `stream/glamourmd` | `stream/glamourmd/vX.Y.Z` |
 
 - **`go.work` lists every module** and is committed. It is for development
@@ -130,16 +133,24 @@ Every exported name follows these rules
 (`docs/decisions/0014-MADR-native-integration-api.md` W0). A record that
 needs an exception says so.
 
-1. **Deprecation.** A renamed function, type or constant keeps its old name
-   for one minor release, as a wrapper, a type alias or a constant marked
-   `// Deprecated: use X`, and is removed in the next minor release. A
-   renamed struct field keeps both fields for that release, and the code
-   reads the new field, falling back to the old. Release notes list every
-   deprecation and every removal.
+1. **Deprecation.** Within a major version nothing is removed or retyped.
+   A renamed function, type or constant keeps its old name, as a wrapper,
+   a type alias or a constant marked `// Deprecated: use X`, until the
+   next major version. A renamed struct field keeps both fields until
+   then, and the code reads the new field, falling back to the old. A
+   removal needs a major release and a record. Release notes list every
+   deprecation and every removal. Under `v0`, up to `v0.12.0`, a
+   deprecated name was removed in the next minor release
+   (`docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md`
+   A4.2).
 2. **The API diff gate.** `make apicheck` compares each module's exported
    API with its previous tag, and fails on an incompatible change that
    `scripts/apicheck.allow` does not list. The PLAN that makes such a
-   change lists it there, in a block naming the PLAN. The release's
+   change lists it there, in a block naming the PLAN. A block is allowed
+   only in a PLAN whose release changes the major version, so a minor
+   release has 0 incompatible changes. Across a major boundary the base's
+   own import paths are moved to the tree's module path before the two
+   are compared, so only real changes are reported. The release's
    close-out removes the block: once the new tag is the base, apidiff no
    longer reports the change, and a listed line it does not report fails
    as stale.

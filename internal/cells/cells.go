@@ -17,7 +17,7 @@ import (
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/maccavelli/go-tui-lib/layout"
+	"github.com/maccavelli/go-tui-lib/v2/layout"
 )
 
 // Frame is a reusable cell buffer with a width method. Its zero value is not

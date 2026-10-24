@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/maccavelli/go-tui-lib/command"
-	"github.com/maccavelli/go-tui-lib/when"
+	"github.com/maccavelli/go-tui-lib/v2/command"
+	"github.com/maccavelli/go-tui-lib/v2/when"
 )
 
 // LoadError is an error at one place in a keybindings file.

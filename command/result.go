@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/maccavelli/go-tui-lib/internal/enum"
+	"github.com/maccavelli/go-tui-lib/v2/internal/enum"
 )
 
 // Format is how WriteResult writes a result: as text or as JSON. Its text

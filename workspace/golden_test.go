@@ -6,9 +6,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/maccavelli/go-tui-lib/layout"
-	"github.com/maccavelli/go-tui-lib/theme"
-	"github.com/maccavelli/go-tui-lib/tuitest"
+	"github.com/maccavelli/go-tui-lib/v2/layout"
+	"github.com/maccavelli/go-tui-lib/v2/theme"
+	"github.com/maccavelli/go-tui-lib/v2/tuitest"
 )
 
 // caseTheme is the theme a golden case renders with.

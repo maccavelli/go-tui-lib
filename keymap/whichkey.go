@@ -5,9 +5,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/maccavelli/go-tui-lib/command"
-	"github.com/maccavelli/go-tui-lib/glyph"
-	"github.com/maccavelli/go-tui-lib/when"
+	"github.com/maccavelli/go-tui-lib/v2/command"
+	"github.com/maccavelli/go-tui-lib/v2/glyph"
+	"github.com/maccavelli/go-tui-lib/v2/when"
 )
 
 // ActiveKey is a key that can come next, for a which-key panel (MADR

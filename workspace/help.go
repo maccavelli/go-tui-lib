@@ -7,8 +7,8 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/maccavelli/go-tui-lib/command"
-	"github.com/maccavelli/go-tui-lib/keymap"
+	"github.com/maccavelli/go-tui-lib/v2/command"
+	"github.com/maccavelli/go-tui-lib/v2/keymap"
 )
 
 // Workspace is a help.KeyMap, so help.Model renders its bindings

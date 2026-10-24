@@ -114,7 +114,7 @@ def tree(d):
     Go block is the program's region."""
     fw = os.path.join(d, "testdata", "frameworks")
     write(os.path.join(fw, "go.mod.tmpl"),
-          "module example.com/frameworks\n\ngo 1.27.1\n\nreplace github.com/maccavelli/go-tui-lib => @ROOT@\n")
+          "module example.com/frameworks\n\ngo 1.27.1\n\nreplace github.com/maccavelli/go-tui-lib/v2 => @ROOT@\n")
     write(os.path.join(fw, "go.sum"), "")
     write(os.path.join(fw, "echo", "main.go"), MAIN)
     write(os.path.join(fw, "cases.txt"), "echo hello => 3 stdout hello\n")

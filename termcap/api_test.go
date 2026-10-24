@@ -27,7 +27,7 @@ func TestNoUltravioletInTheAPI(t *testing.T) {
 		t.Skip("type-checks from source")
 	}
 	imp := importer.ForCompiler(token.NewFileSet(), "source", nil)
-	for _, path := range []string{"github.com/maccavelli/go-tui-lib/termcap", "github.com/maccavelli/go-tui-lib/termsvc"} {
+	for _, path := range []string{"github.com/maccavelli/go-tui-lib/v2/termcap", "github.com/maccavelli/go-tui-lib/v2/termsvc"} {
 		pkg, err := imp.Import(path)
 		if err != nil {
 			t.Fatal(err)

@@ -11,9 +11,9 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/maccavelli/go-tui-lib/command"
-	"github.com/maccavelli/go-tui-lib/theme"
-	"github.com/maccavelli/go-tui-lib/tuitest"
+	"github.com/maccavelli/go-tui-lib/v2/command"
+	"github.com/maccavelli/go-tui-lib/v2/theme"
+	"github.com/maccavelli/go-tui-lib/v2/tuitest"
 )
 
 // fires reports whether the Dispatcher runs id for msg along p.

@@ -22,15 +22,15 @@ import (
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/maccavelli/go-tui-lib/command"
-	"github.com/maccavelli/go-tui-lib/glyph"
-	"github.com/maccavelli/go-tui-lib/launch"
-	"github.com/maccavelli/go-tui-lib/launch/launchtest"
-	"github.com/maccavelli/go-tui-lib/layout"
-	"github.com/maccavelli/go-tui-lib/termcap"
-	"github.com/maccavelli/go-tui-lib/theme"
-	"github.com/maccavelli/go-tui-lib/tuitest"
-	"github.com/maccavelli/go-tui-lib/workspace"
+	"github.com/maccavelli/go-tui-lib/v2/command"
+	"github.com/maccavelli/go-tui-lib/v2/glyph"
+	"github.com/maccavelli/go-tui-lib/v2/launch"
+	"github.com/maccavelli/go-tui-lib/v2/launch/launchtest"
+	"github.com/maccavelli/go-tui-lib/v2/layout"
+	"github.com/maccavelli/go-tui-lib/v2/termcap"
+	"github.com/maccavelli/go-tui-lib/v2/theme"
+	"github.com/maccavelli/go-tui-lib/v2/tuitest"
+	"github.com/maccavelli/go-tui-lib/v2/workspace"
 )
 
 // model is a program's model whose behaviour each test sets.

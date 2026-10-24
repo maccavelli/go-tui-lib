@@ -8,7 +8,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/maccavelli/go-tui-lib/internal/sanitize"
+	"github.com/maccavelli/go-tui-lib/v2/internal/sanitize"
 )
 
 // FuzzSanitizers: no character Line drops survives ParseActivity's vendor,

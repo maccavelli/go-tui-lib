@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/maccavelli/go-tui-lib/internal/enum"
+	"github.com/maccavelli/go-tui-lib/v2/internal/enum"
 )
 
 // Verdict is a gate's answer, with ACP's four permission option kinds.

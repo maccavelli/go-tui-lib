@@ -6,7 +6,7 @@ import (
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
 
-	"github.com/maccavelli/go-tui-lib/command"
+	"github.com/maccavelli/go-tui-lib/v2/command"
 )
 
 // Describer gives a command's title for help (MADR §7, amendment A4).

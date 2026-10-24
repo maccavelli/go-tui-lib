@@ -7,8 +7,8 @@ import (
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/maccavelli/go-tui-lib/glyph"
-	"github.com/maccavelli/go-tui-lib/theme"
+	"github.com/maccavelli/go-tui-lib/v2/glyph"
+	"github.com/maccavelli/go-tui-lib/v2/theme"
 )
 
 // The view cache's bound (docs/decisions/0014-PLAN-hardening.md Step 3,

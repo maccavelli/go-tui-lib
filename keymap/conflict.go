@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/maccavelli/go-tui-lib/command"
-	"github.com/maccavelli/go-tui-lib/internal/enum"
+	"github.com/maccavelli/go-tui-lib/v2/command"
+	"github.com/maccavelli/go-tui-lib/v2/internal/enum"
 )
 
 // ConflictKind is what is wrong with a binding (MADR §4, amendment A6).

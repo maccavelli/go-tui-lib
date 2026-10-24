@@ -13,9 +13,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/maccavelli/go-tui-lib/internal/sanitize"
-	"github.com/maccavelli/go-tui-lib/internal/teamsg"
-	"github.com/maccavelli/go-tui-lib/when"
+	"github.com/maccavelli/go-tui-lib/v2/internal/sanitize"
+	"github.com/maccavelli/go-tui-lib/v2/internal/teamsg"
+	"github.com/maccavelli/go-tui-lib/v2/when"
 )
 
 // The registry's errors, wrapped with detail; test them with errors.Is

@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/maccavelli/go-tui-lib/internal/enum"
+	"github.com/maccavelli/go-tui-lib/v2/internal/enum"
 )
 
 // SizeKind is how a child claims its split's length.

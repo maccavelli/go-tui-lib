@@ -5,7 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/maccavelli/go-tui-lib/command"
+	"github.com/maccavelli/go-tui-lib/v2/command"
 )
 
 // normCase is one key, built as its source gives it, and what Normalize

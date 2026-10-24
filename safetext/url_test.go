@@ -3,7 +3,7 @@ package safetext_test
 import (
 	"testing"
 
-	"github.com/maccavelli/go-tui-lib/safetext"
+	"github.com/maccavelli/go-tui-lib/v2/safetext"
 )
 
 // TestSafeURL: web and mail links pass; any other scheme, a URL holding a

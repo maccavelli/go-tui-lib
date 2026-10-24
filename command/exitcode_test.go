@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/maccavelli/go-tui-lib/command"
-	"github.com/maccavelli/go-tui-lib/launch"
+	"github.com/maccavelli/go-tui-lib/v2/command"
+	"github.com/maccavelli/go-tui-lib/v2/launch"
 )
 
 // TestExitCodes: each of command's errors carries its exit status

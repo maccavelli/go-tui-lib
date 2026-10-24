@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/maccavelli/go-tui-lib/when"
+	"github.com/maccavelli/go-tui-lib/v2/when"
 )
 
 func mapOf(keys ...string) when.Map {

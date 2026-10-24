@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/maccavelli/go-tui-lib/command"
-	"github.com/maccavelli/go-tui-lib/glyph"
-	"github.com/maccavelli/go-tui-lib/tuitest"
+	"github.com/maccavelli/go-tui-lib/v2/command"
+	"github.com/maccavelli/go-tui-lib/v2/glyph"
+	"github.com/maccavelli/go-tui-lib/v2/tuitest"
 )
 
 // labelled are the sequences the label golden files show: every modifier

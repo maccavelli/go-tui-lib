@@ -13,7 +13,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/maccavelli/go-tui-lib/command"
+	"github.com/maccavelli/go-tui-lib/v2/command"
 )
 
 // schemaDialect is the JSON Schema dialect Schema's document names.

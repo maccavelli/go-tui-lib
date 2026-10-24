@@ -10,8 +10,8 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/colorprofile"
 
-	"github.com/maccavelli/go-tui-lib/glyph"
-	"github.com/maccavelli/go-tui-lib/tuitest"
+	"github.com/maccavelli/go-tui-lib/v2/glyph"
+	"github.com/maccavelli/go-tui-lib/v2/tuitest"
 )
 
 // luminance is the WCAG relative luminance of c.

@@ -58,7 +58,10 @@ BLANK = re.compile(r"^[ \t]*$")
 GO_FENCE = re.compile(r"^```go[ \t\n\r\f\v]*$")
 END_FENCE = re.compile(r"^```[ \t\n\r\f\v]*$")
 END_MARKER = re.compile(r"^[ \t]*// guide:end$")
-REPLACE = re.compile(r"^replace github\.com/maccavelli/go-tui-lib => ")
+# The root's replace line, at any major version's path: the template names
+# the path it is written with (docs/decisions/0020-PLAN-charm-free-cores-glyphs-and-safetext.md
+# Step 6A).
+REPLACE = re.compile(r"^replace (github\.com/maccavelli/go-tui-lib(?:/v[0-9]+)?) => ")
 
 
 class Stop(Exception):
@@ -128,7 +131,7 @@ def update(go, root, src, work):
         indented(text)
         raise Stop(2)
     # go.mod goes back as the template: the replace line names @ROOT@ again.
-    lines = ["replace github.com/maccavelli/go-tui-lib => @ROOT@" if REPLACE.match(line) else line
+    lines = [f"replace {r.group(1)} => @ROOT@" if (r := REPLACE.match(line)) else line
              for line in lines_of(os.path.join(m, "go.mod"))]
     with open(os.path.join(src, "go.mod.tmpl"), "w", encoding="utf-8", newline="") as f:
         f.write("".join(line + "\n" for line in lines))

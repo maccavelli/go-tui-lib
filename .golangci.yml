@@ -128,7 +128,7 @@ linters:
               desc: "no ultraviolet in a Charm-free core (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md D11)"
             - pkg: github.com/charmbracelet/x/term
               desc: "no x/term in a Charm-free core (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md D11)"
-            - pkg: github.com/maccavelli/go-tui-lib/internal/teamsg
+            - pkg: github.com/maccavelli/go-tui-lib/v2/internal/teamsg
               desc: "internal/teamsg imports Bubble Tea: adapters only (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md D2, D11)"
     errcheck:
       check-type-assertions: true

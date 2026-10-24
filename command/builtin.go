@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/maccavelli/go-tui-lib/internal/teamsg"
+	"github.com/maccavelli/go-tui-lib/v2/internal/teamsg"
 )
 
 // The registry's own commands (docs/decisions/0006-MADR-command-registry.md

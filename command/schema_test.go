@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/maccavelli/go-tui-lib/tuitest"
+	"github.com/maccavelli/go-tui-lib/v2/tuitest"
 )
 
 type common struct {

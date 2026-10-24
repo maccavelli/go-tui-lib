@@ -4,7 +4,7 @@ import (
 	"flag"
 	"testing"
 
-	"github.com/maccavelli/go-tui-lib/tuitest"
+	"github.com/maccavelli/go-tui-lib/v2/tuitest"
 )
 
 // update is the consumer's own flag. In v0.1.0, tuitest registered -update in

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/maccavelli/go-tui-lib/safetext"
+	"github.com/maccavelli/go-tui-lib/v2/safetext"
 )
 
 // sized repeats unit as often as fits in 4 KiB, the inputs of gobble's

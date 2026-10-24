@@ -10,8 +10,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/maccavelli/go-tui-lib/internal/teamsg"
-	"github.com/maccavelli/go-tui-lib/when"
+	"github.com/maccavelli/go-tui-lib/v2/internal/teamsg"
+	"github.com/maccavelli/go-tui-lib/v2/when"
 )
 
 // Dispatch runs a request from a Bubble Tea program's Update. It finds the

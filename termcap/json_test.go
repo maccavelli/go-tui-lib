@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/maccavelli/go-tui-lib/tuitest"
+	"github.com/maccavelli/go-tui-lib/v2/tuitest"
 )
 
 // TestCapsJSONStable pins the JSON report as golden files, so a change of

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/maccavelli/go-tui-lib/internal/limits"
+	"github.com/maccavelli/go-tui-lib/v2/internal/limits"
 )
 
 // FuzzDecideEnv: Decide, over a fuzzed environment and configuration with

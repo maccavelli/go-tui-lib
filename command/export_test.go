@@ -14,8 +14,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/maccavelli/go-tui-lib/tuitest"
-	"github.com/maccavelli/go-tui-lib/when"
+	"github.com/maccavelli/go-tui-lib/v2/tuitest"
+	"github.com/maccavelli/go-tui-lib/v2/when"
 )
 
 // The field names of MCP 2026-07-28's schema.ts (fetched 2026-10-05,

@@ -4,8 +4,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/maccavelli/go-tui-lib/internal/enum"
-	"github.com/maccavelli/go-tui-lib/internal/sanitize"
+	"github.com/maccavelli/go-tui-lib/v2/internal/enum"
+	"github.com/maccavelli/go-tui-lib/v2/internal/sanitize"
 )
 
 // goosWindows is runtime.GOOS on Windows.

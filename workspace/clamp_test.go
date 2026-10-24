@@ -8,7 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/maccavelli/go-tui-lib/layout"
+	"github.com/maccavelli/go-tui-lib/v2/layout"
 )
 
 // The window clamp (docs/decisions/0014-PLAN-hardening.md Step 4, finding

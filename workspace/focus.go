@@ -3,7 +3,7 @@ package workspace
 import (
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/maccavelli/go-tui-lib/layout"
+	"github.com/maccavelli/go-tui-lib/v2/layout"
 )
 
 // PaneFocusMsg tells a pane, through its Update, that it now has the

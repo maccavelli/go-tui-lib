@@ -8,7 +8,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/maccavelli/go-tui-lib/safetext"
+	"github.com/maccavelli/go-tui-lib/v2/safetext"
 )
 
 // TestAgainstStrip is 0009-PLAN Step 2's differential: over generated

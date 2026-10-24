@@ -236,6 +236,57 @@ def case11(r, work):
     r.has("the warning reaches the output", "go: warning: a note from go")
 
 
+Q = "package q\n\n// T is named in p's signature.\ntype T struct{}\n"
+
+
+def p_using_q(path, with_g):
+    """Package p, whose F takes q.T from the module at path."""
+    g_func = "\n// G is removed by some cases.\nfunc G() {}\n" if with_g else ""
+    return f'package p\n\nimport "{path}/q"\n\n// F takes a q.T.\nfunc F(q.T) {{}}\n{g_func}'
+
+
+def moved(work, name, new_path, with_g):
+    """A repository at example.com/r, with p naming q.T, tagged v1.0.0, then
+    moved to new_path and committed."""
+    d = os.path.join(work, name)
+    repo(d)
+    write(os.path.join(d, "q", "q.go"), Q)
+    write(os.path.join(d, "p", "p.go"), p_using_q("example.com/r", True))
+    g(d, "add", "-A")
+    g(d, "commit", "-q", "-m", "q")
+    g(d, "tag", "v1.0.0")
+    write(os.path.join(d, "go.mod"), f"module {new_path}\n\ngo 1.27.1\n")
+    write(os.path.join(d, "p", "p.go"), p_using_q(new_path, with_g))
+    g(d, "add", "-A")
+    g(d, "commit", "-q", "-m", "move")
+    return d
+
+
+def cases_major(r, work):
+    # 12. A module moved to its next major version's path, with no API
+    #     change, is clean: the base's own import paths are moved to the
+    #     tree's before it is exported, so q.T is the same type on both
+    #     sides (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md
+    #     A4.2).
+    d = moved(work, "d", "example.com/r/v2", True)
+    check("a move to /v2 with no API change passes", 0, r.run(d))
+    r.has("the base's paths are moved", r"v1\.0\.0 is example\.com/r; its import paths moved to example\.com/r/v2")
+    r.has("it is compared with v1.0.0", "against v1.0.0, 0 incompatible")
+
+    # 13. The same move with G removed reports G, and only G.
+    e = moved(work, "e", "example.com/r/v2", False)
+    check("a move to /v2 with a removal fails", 1, r.run(e))
+    r.has("the removal is named", "p.G: removed")
+    r.has("only the removal is reported", "against v1.0.0, 1 incompatible")
+
+    # 14. A path that changes otherwise is not a major version's move, and
+    #     the base's paths are left as they are.
+    f = moved(work, "f", "example.com/other", True)
+    r.run(f)
+    check("a path changed otherwise moves nothing", None,
+          re.search("its import paths moved", r.out))
+
+
 def main():
     work = tempfile.mkdtemp()
     os.environ.pop("GOWORK", None)
@@ -258,6 +309,7 @@ def main():
         case("8-9. a nested module", cases_b, r, work)
         case("10. a failing apidiff", case10, r, work)
         case("11. a warning from go", case11, r, work)
+        case("12-14. a major version's path", cases_major, r, work)
     finally:
         shutil.rmtree(work, ignore_errors=True)
     print(f"go-apicheck_test: {passed} passed, {failed} failed")

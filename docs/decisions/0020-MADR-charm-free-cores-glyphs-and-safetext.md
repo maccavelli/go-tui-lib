@@ -1509,7 +1509,8 @@ the program wrote.
 ### A4 (2026-10-24): release 1 is `v1.13.0` (changes D12's numbering; opens A4.1)
 
 *Status: A4 accepted (2026-10-24); A4.1 answered (2026-10-24): release 2
-is `v2.0.0` at `/v2`; A4.2 proposed (2026-10-24), for the owner.*
+is `v2.0.0` at `/v2`; A4.2 accepted (2026-10-24): "committed, approved to
+proceed".*
 
 **Found.** At 0020-PLAN Step 6 the owner tagged `8be11e7`, the commit CI
 passed, as `v1.13.0`, not `v0.13.0`, and pushed it. Before the consumer
@@ -1569,7 +1570,7 @@ allows for a breaking change. D2 to D7's split ships as designed, and a
   what API rule 1 says under a major version. The next PLAN amendment
   proposes both, for the owner's approval.
 
-**A4.2 (proposed, 2026-10-24): how the move lands, and the rules under a
+**A4.2 (accepted, 2026-10-24): how the move lands, and the rules under a
 major version.**
 
 * **The move lands first,** as 0020-PLAN Step 6A, before any split. From

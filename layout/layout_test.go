@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/maccavelli/go-tui-lib/internal/limits"
-	"github.com/maccavelli/go-tui-lib/tuitest"
+	"github.com/maccavelli/go-tui-lib/v2/internal/limits"
+	"github.com/maccavelli/go-tui-lib/v2/tuitest"
 )
 
 func mustSolve(t *testing.T, root Node, w, h int, st State) Plan {

@@ -10,8 +10,8 @@ import (
 
 	"github.com/charmbracelet/colorprofile"
 
-	"github.com/maccavelli/go-tui-lib/glyph"
-	"github.com/maccavelli/go-tui-lib/termcap"
+	"github.com/maccavelli/go-tui-lib/v2/glyph"
+	"github.com/maccavelli/go-tui-lib/v2/termcap"
 )
 
 // ttyOpener is a controlling terminal for decideWith: it counts its opens, and

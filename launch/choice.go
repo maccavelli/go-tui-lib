@@ -1,6 +1,6 @@
 package launch
 
-import "github.com/maccavelli/go-tui-lib/internal/enum"
+import "github.com/maccavelli/go-tui-lib/v2/internal/enum"
 
 // pkgName is the package's name, as its enums' errors give it.
 const pkgName = "launch"

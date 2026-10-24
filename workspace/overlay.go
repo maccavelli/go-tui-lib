@@ -5,8 +5,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/maccavelli/go-tui-lib/internal/enum"
-	"github.com/maccavelli/go-tui-lib/layout"
+	"github.com/maccavelli/go-tui-lib/v2/internal/enum"
+	"github.com/maccavelli/go-tui-lib/v2/layout"
 )
 
 // AnchorKind is where an overlay is placed.

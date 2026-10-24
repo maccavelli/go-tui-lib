@@ -20,7 +20,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/maccavelli/go-tui-lib/safetext"
+	"github.com/maccavelli/go-tui-lib/v2/safetext"
 )
 
 // Line is one line of display text: escape sequences stripped, each run of

@@ -8,8 +8,8 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/maccavelli/go-tui-lib/glyph"
-	"github.com/maccavelli/go-tui-lib/safetext"
+	"github.com/maccavelli/go-tui-lib/v2/glyph"
+	"github.com/maccavelli/go-tui-lib/v2/safetext"
 )
 
 // clean runs Clean and, as a check on every case, the Sanitizer split at

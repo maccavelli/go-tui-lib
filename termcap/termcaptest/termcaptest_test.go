@@ -12,9 +12,9 @@ import (
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/maccavelli/go-tui-lib/layout"
-	"github.com/maccavelli/go-tui-lib/termcap"
-	"github.com/maccavelli/go-tui-lib/workspace"
+	"github.com/maccavelli/go-tui-lib/v2/layout"
+	"github.com/maccavelli/go-tui-lib/v2/termcap"
+	"github.com/maccavelli/go-tui-lib/v2/workspace"
 )
 
 // app is the smallest program that embeds a prober: it quits through the

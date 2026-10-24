@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/maccavelli/go-tui-lib/when"
+	"github.com/maccavelli/go-tui-lib/v2/when"
 )
 
 // benchRegistry holds n commands, every other one with a When.

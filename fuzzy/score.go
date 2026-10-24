@@ -1,6 +1,6 @@
 package fuzzy
 
-import "github.com/maccavelli/go-tui-lib/internal/enum"
+import "github.com/maccavelli/go-tui-lib/v2/internal/enum"
 
 // Grade is how a candidate matched; a lower grade is a better match. Its
 // text form is a stable lowercase token.

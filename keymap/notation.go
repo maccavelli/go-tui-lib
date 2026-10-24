@@ -22,7 +22,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/maccavelli/go-tui-lib/internal/enum"
+	"github.com/maccavelli/go-tui-lib/v2/internal/enum"
 )
 
 // pkgName is the package's name, as its enums' errors give it.

@@ -3,7 +3,7 @@ package termcap
 import (
 	"reflect"
 
-	"github.com/maccavelli/go-tui-lib/internal/enum"
+	"github.com/maccavelli/go-tui-lib/v2/internal/enum"
 )
 
 // Disposition is how a finding should be read.

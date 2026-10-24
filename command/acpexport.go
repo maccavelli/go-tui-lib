@@ -1,6 +1,6 @@
 package command
 
-import "github.com/maccavelli/go-tui-lib/when"
+import "github.com/maccavelli/go-tui-lib/v2/when"
 
 // ACPCommands is the registry's commands as an ACP agent's available
 // commands, for an available_commands_update: the commands an agent may

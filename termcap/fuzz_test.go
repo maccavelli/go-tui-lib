@@ -9,8 +9,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/maccavelli/go-tui-lib/internal/sanitize"
-	"github.com/maccavelli/go-tui-lib/internal/termevent/termeventtest"
+	"github.com/maccavelli/go-tui-lib/v2/internal/sanitize"
+	"github.com/maccavelli/go-tui-lib/v2/internal/termevent/termeventtest"
 )
 
 // Fuzz targets (docs/decisions/0014-PLAN-hardening.md Step 9, finding H9).

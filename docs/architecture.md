@@ -1,7 +1,10 @@
 # Architecture
 
 `go-tui-lib` is the repository of the Go module
-`github.com/maccavelli/go-tui-lib`: a library of terminal-UI packages on
+`github.com/maccavelli/go-tui-lib/v2`, whose releases up to `v1.13.0`
+were at `github.com/maccavelli/go-tui-lib`
+([0020-MADR](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
+A4): a library of terminal-UI packages on
 the Charm v2 stack, which a Go program stacks on its own command line
 to have a TUI beside it. It has no binary. A nested adapter module may sit
 beside it to carry a dependency the root must not; none is built (Modules,
@@ -345,7 +348,11 @@ docs/
   to `go.mod`, and judges apidiff's output against
   `scripts/apicheck.allow`. An unlisted incompatible change fails, and so
   does a listed one apidiff no longer reports. A module with no tag is
-  skipped.
+  skipped. When the tag's module path and the tree's differ only by a
+  major version's `/vN`, the tag's own import paths are moved to the
+  tree's before it is exported, so only real changes are reported
+  ([0020-MADR](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
+  A4.2).
 - **`make examples`** runs `scripts/go-examples.py`:
   - it copies `testdata/frameworks` into a temporary module, whose
     `go.mod` comes from `go.mod.tmpl` with a `replace` of the root;

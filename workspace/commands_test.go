@@ -11,12 +11,12 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/colorprofile"
 
-	"github.com/maccavelli/go-tui-lib/command"
-	"github.com/maccavelli/go-tui-lib/glyph"
-	"github.com/maccavelli/go-tui-lib/layout"
-	"github.com/maccavelli/go-tui-lib/theme"
-	"github.com/maccavelli/go-tui-lib/tuitest"
-	"github.com/maccavelli/go-tui-lib/workspace"
+	"github.com/maccavelli/go-tui-lib/v2/command"
+	"github.com/maccavelli/go-tui-lib/v2/glyph"
+	"github.com/maccavelli/go-tui-lib/v2/layout"
+	"github.com/maccavelli/go-tui-lib/v2/theme"
+	"github.com/maccavelli/go-tui-lib/v2/tuitest"
+	"github.com/maccavelli/go-tui-lib/v2/workspace"
 )
 
 // drain runs cmd and gives the workspace every message it yields, as a

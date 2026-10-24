@@ -9,10 +9,10 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/maccavelli/go-tui-lib/internal/enum"
-	"github.com/maccavelli/go-tui-lib/internal/sanitize"
-	"github.com/maccavelli/go-tui-lib/internal/teamsg"
-	"github.com/maccavelli/go-tui-lib/termcap"
+	"github.com/maccavelli/go-tui-lib/v2/internal/enum"
+	"github.com/maccavelli/go-tui-lib/v2/internal/sanitize"
+	"github.com/maccavelli/go-tui-lib/v2/internal/teamsg"
+	"github.com/maccavelli/go-tui-lib/v2/termcap"
 )
 
 // pkgName is the package's name, as its enums' errors give it.

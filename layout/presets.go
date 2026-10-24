@@ -1,6 +1,6 @@
 package layout
 
-import "github.com/maccavelli/go-tui-lib/internal/enum"
+import "github.com/maccavelli/go-tui-lib/v2/internal/enum"
 
 // Span is where a preset's bottom pane runs.
 type Span uint8

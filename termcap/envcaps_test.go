@@ -6,8 +6,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/maccavelli/go-tui-lib/termcap"
-	"github.com/maccavelli/go-tui-lib/termcap/termcaptest"
+	"github.com/maccavelli/go-tui-lib/v2/termcap"
+	"github.com/maccavelli/go-tui-lib/v2/termcap/termcaptest"
 )
 
 // EnvCaps (docs/decisions/0014-PLAN-component-native-forms.md Step 8).

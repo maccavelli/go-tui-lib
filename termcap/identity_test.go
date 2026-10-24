@@ -12,7 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/maccavelli/go-tui-lib/internal/termevent/termeventtest"
+	"github.com/maccavelli/go-tui-lib/v2/internal/termevent/termeventtest"
 )
 
 func TestFromEnvBrands(t *testing.T) {

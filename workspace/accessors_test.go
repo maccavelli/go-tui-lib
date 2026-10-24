@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/maccavelli/go-tui-lib/layout"
+	"github.com/maccavelli/go-tui-lib/v2/layout"
 )
 
 func TestPanesYieldsTheFocusRing(t *testing.T) {

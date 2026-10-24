@@ -1,8 +1,8 @@
 package workspace
 
 import (
-	"github.com/maccavelli/go-tui-lib/layout"
-	"github.com/maccavelli/go-tui-lib/when"
+	"github.com/maccavelli/go-tui-lib/v2/layout"
+	"github.com/maccavelli/go-tui-lib/v2/when"
 )
 
 // Contexter is a pane or overlay content that publishes when keys of its

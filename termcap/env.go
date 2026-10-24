@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/maccavelli/go-tui-lib/internal/sanitize"
+	"github.com/maccavelli/go-tui-lib/v2/internal/sanitize"
 )
 
 // Env is a program's environment, as KEY=value strings. It is converted from

@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/maccavelli/go-tui-lib/internal/sanitize"
+	"github.com/maccavelli/go-tui-lib/v2/internal/sanitize"
 )
 
 // TmuxFacts is what tmux says about itself, from one run of TmuxQuery.

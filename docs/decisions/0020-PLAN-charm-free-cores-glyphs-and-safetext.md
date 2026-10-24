@@ -93,7 +93,7 @@ acts on directly:
 | 4 | `safetext/` | the package (D9) |
 | 5 | `internal/sanitize/` | the wrapper (D9 S5), the `v0.12.0` oracle, the differential fuzz |
 | 6 | `README.md`, `docs/` | release `v0.13.0` (tagged `v1.13.0`, MADR A4) |
-| 6A | `go.mod`, the Go files, `.golangci.yml`, `scripts/go-apicheck.py`, `scripts/go-examples.py`, `testdata/frameworks/go.mod.tmpl`, `AGENTS.md`, `docs/` | the module path to `/v2` (MADR A4.1, A4.2; proposed) |
+| 6A | `go.mod`, the Go files, `.golangci.yml`, `scripts/go-apicheck.py`, `scripts/go-examples.py`, `testdata/frameworks/go.mod.tmpl`, `AGENTS.md`, `docs/` | the module path to `/v2` (MADR A4.1, A4.2) |
 | 7 | `termcap/`, `internal/conformance/` | the I/O-free probe engine and `ParseReply` (D4, A2) |
 | 8 | `termcap/termcaptea/`, `termcap/termcaptest/`, `termcap/` (tests moved), `internal/conformance/`, `docs/` | `termcaptea.Prober` over the engine, the differential test (D4, A2) |
 | 9 | `termsvc/`, `termsvc/termsvctea/`, `docs/` | the `termsvc` split (D5, A1.2) |
@@ -593,9 +593,9 @@ comment, which says invalid UTF-8 is removed).
 
 ### Step 6A: the module path moves to `/v2` (MADR A4.1, A4.2)
 
-*Proposed 2026-10-24, for the owner's approval. It is lettered, not
-numbered, so that Steps 7 to 13 and MADR A2's references to them keep
-their numbers.*
+*Proposed 2026-10-24, and approved by the owner that day ("committed,
+approved to proceed"). It is lettered, not numbered, so that Steps 7 to 13
+and MADR A2's references to them keep their numbers.*
 
 **Files:**
 * `go.mod`: `module github.com/maccavelli/go-tui-lib/v2`;
@@ -1958,3 +1958,95 @@ loop test); `command/registry.go` imports Bubble Tea
   confirms it green.
 * **Not done:** the issue comments are the owner's to post, as read above.
   The step's other items are done.
+* **CI on the tag** `v1.13.0` passed (2026-10-24), as did CI and Docs on
+  `main` at `8be11e7`. The owner committed the records of A4 and A4.1 as
+  `ea559a2`.
+* Committed by the owner.
+
+### Step 6A: the module path moves to `/v2` (2026-10-24)
+
+* **Approved** by the owner with MADR A4.2 ("committed, approved to
+  proceed"), and both marked so.
+* **The move,** by a script in the scratch directory, which checked each
+  file's count before writing: 298 mentions in 153 files.
+  * 149 Go files;
+  * `go.mod`, 1;
+  * `.golangci.yml`, 1, `charmfree`'s `internal/teamsg`;
+  * `testdata/frameworks/go.mod.tmpl`, 2, with the root's pseudo-version
+    now `v2.0.0-00010101000000-000000000000`, since a `/v2` path takes no
+    `v0` version;
+  * `scripts/go-examples_test.py`, 1.
+
+  `gofmt -l` then listed nothing, and the import blocks kept their order.
+  `GOWORK=off go list -m` prints `github.com/maccavelli/go-tui-lib/v2`.
+* **`scripts/go-examples.py`:** `REPLACE` now matches the root's
+  `replace` line at any major version's path, and `--update` writes back
+  the path it found. Run with `--update` on a scratch copy, it wrote the
+  template and `go.sum` unchanged, so the template's new form is what
+  `go mod tidy` gives.
+* **`scripts/go-apicheck.py`:**
+  * `module_path` reads the base's `go.mod`;
+  * `major_move` holds when two paths differ only by a `/vN` suffix;
+  * `move_imports` then moves the base's own import paths in its `.go`
+    files and `go.mod`, leaving any nested module alone, and the gate
+    says so: `apicheck: .: v1.13.0 is github.com/maccavelli/go-tui-lib;
+    its import paths moved to github.com/maccavelli/go-tui-lib/v2
+    (294)`;
+  * the docstring and `docs/architecture.md`'s Tooling describe it.
+* **`scripts/go-apicheck_test.py`,** cases 12 to 14, written first and
+  run against the unchanged script. That run gave
+  `go-apicheck_test: 23 passed, 6 failed`: cases 12 and 13 exited 2 with
+  `loading example.com/r/v2: found no packages for module example.com/r/v2`,
+  and case 14 passed. After the change: `29 passed, 0 failed`.
+* **Docs:**
+  * `AGENTS.md`: the module path; the modules table; API rule 1, nothing
+    removed within a major version; rule 2, an allow-list block only for
+    a release that changes the major version, and the boundary move;
+  * `docs/guides/releasing.md`: the root's path, its three `go get` lines,
+    and the new section "Release a new major version";
+  * `docs/architecture.md`: the path, and the gate's boundary move;
+  * the two guides' `go doc` lines;
+  * `README.md`'s Status: `main` is at `/v2` for `v2.0.0`, and rule 1.
+* **The scan** of tracked files outside `docs/decisions/` and
+  `docs/reports/` for the bare path finds 11 mentions, each meant:
+  * four say what the path was up to `v1.13.0` (`AGENTS.md`,
+    `docs/architecture.md`, `docs/guides/releasing.md`, and
+    `docs/guides/migrating.md`'s `@latest` line, still true of `v1`);
+  * six are a nested module's path (`stream/glamourmd`, `<dir>`);
+  * one is the new section's `/vN` template.
+
+  None is in code.
+* **Checks:**
+  * `go build`, `go vet` and `go test ./...` pass with `GOWORK=off`, and
+    `go test ./...` in workspace mode, all exit 0;
+  * `go mod tidy -diff` is clean;
+  * `make lint`: 0 issues for linux, darwin and windows;
+  * `make examples`: "46 case(s) run", "10 excerpt(s) checked", "clean";
+  * `go-examples_test`: 19 passed, 0 failed;
+  * `make apicheck`: "against v1.13.0, 0 incompatible change(s)",
+    "clean".
+* **Mutations,** through `python3 -m tools.verify mutate`:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | the API gate without the boundary move | `go-apicheck_test`: `FAIL a move to /v2 with no API change passes: want 0, got 2` |
+  | the boundary move applied whatever the paths | `go-apicheck_test`: `FAIL a path changed otherwise moves nothing` |
+  | one `.go` file left at the old path (`safetext/rules.go`) | `go test ./safetext/`: `FAIL github.com/maccavelli/go-tui-lib/v2/safetext [setup failed]` |
+  | the examples' `replace` line matched at the bare path only | `go-examples_test`: `FAIL --update keeps @ROOT@: want yes, got no` |
+
+  The fourth is beyond the step's list, for the `go-examples.py` change.
+  *Corrected, 2026-10-24:* the step expected `make apicheck` without the
+  boundary move to report every cross-package signature. On a full
+  scratch copy, tags included, it exits 2 instead: `exporting v1.13.0's
+  API failed: … found no packages for module
+  github.com/maccavelli/go-tui-lib/v2`, since the gate exports the base
+  under the tree's path. The noise lines appear only when the base is
+  exported under its own path, as in MADR A4.2's probe. Either way the
+  gate fails without the move.
+* **Gates,** `python3 -m tools.verify gates` over the step's 164 changed
+  files, nothing skipped: macOS
+  `gates: 19 passed, 0 failed, 0 skipped in 437s`; the Linux host
+  `… in 878s`; the Windows host `… in 1779s`. `release-check` is "258
+  file(s) clean" on each, with the API diff and examples gates.
+* **Nothing is tagged:** `v2.0.0` is Step 13's. Steps 7 to 12 build at
+  `/v2` and diff against `v1.13.0` through the boundary move.

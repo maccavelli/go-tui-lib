@@ -13,7 +13,13 @@ For each module scripts/go-modules.py lists, with GOWORK=off:
      module. A module with no such tag has never been released, and is
      skipped.
   2. apidiff exports the base's API, from `git archive <tag>`, and the
-     tree's, each in module mode.
+     tree's, each in module mode. When the base's module path and the
+     tree's differ only by a major version's /vN suffix, the base's own
+     import paths, in its .go files and go.mod, are first moved to the
+     tree's path, so that a type of one of the module's packages is the
+     same type on both sides and only real changes are reported
+     (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md
+     A4.2).
   3. apidiff compares the two, printing incompatible changes only. It exits
      0 even when it prints one, so its output is judged line by line
      against scripts/apicheck.allow: a line the file does not list fails,
@@ -129,6 +135,49 @@ def extract(tag, module, base):
         raise Stop(2)
 
 
+MODULE_LINE = re.compile(r"^module[ \t]+\"?([^\s\"]+)\"?", re.MULTILINE)
+MAJOR = re.compile(r"/v[0-9]+$")
+
+
+def module_path(gomod):
+    """The module path a go.mod file declares, or ""."""
+    try:
+        with open(gomod, encoding="utf-8") as f:
+            m = MODULE_LINE.search(f.read())
+    except OSError:
+        return ""
+    return m.group(1) if m else ""
+
+
+def major_move(old, new):
+    """Whether new is old at another major version: the two differ, and
+    are the same once a /vN suffix is taken from each."""
+    return old != new and old != "" and MAJOR.sub("", old) == MAJOR.sub("", new)
+
+
+def move_imports(directory, old, new):
+    """Replace the module path old with new in directory's .go files and
+    its go.mod, leaving any nested module alone; return how many."""
+    pattern = re.compile(re.escape(old) + r"(?![\w.\-])")
+    n = 0
+    for here, dirs, files in os.walk(directory):
+        if here != directory and "go.mod" in files:
+            dirs[:] = []
+            continue
+        for name in files:
+            if not (name.endswith(".go") or name == "go.mod"):
+                continue
+            path = os.path.join(here, name)
+            with open(path, encoding="utf-8", newline="") as f:
+                text = f.read()
+            text, k = pattern.subn(new, text)
+            if k:
+                with open(path, "w", encoding="utf-8", newline="") as f:
+                    f.write(text)
+                n += k
+    return n
+
+
 def check_module(m, go, apidiff, work, i, printed):
     prefix = "" if m == "." else f"{m}/"
     rc, tags = run(["git", "tag", "--merged", "HEAD", "--no-contains", "HEAD", "-l",
@@ -155,6 +204,10 @@ def check_module(m, go, apidiff, work, i, printed):
     base = os.path.join(work, f"base{i}")
     os.makedirs(base)
     extract(tag, m, base)
+    base_mod = module_path(os.path.join(base, m, "go.mod"))
+    if major_move(base_mod, mod):
+        n = move_imports(os.path.join(base, m), base_mod, mod)
+        out(f"apicheck: {m}: {tag} is {base_mod}; its import paths moved to {mod} ({n})")
     old_api, new_api = os.path.join(work, "old.api"), os.path.join(work, "new.api")
     for what, cwd, api in ((f"exporting {tag}'s API", os.path.join(base, m), old_api),
                            ("exporting the tree's API", m, new_api)):

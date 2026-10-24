@@ -8,10 +8,10 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/maccavelli/go-tui-lib/glyph"
-	"github.com/maccavelli/go-tui-lib/internal/cells"
-	"github.com/maccavelli/go-tui-lib/internal/sanitize"
-	"github.com/maccavelli/go-tui-lib/layout"
+	"github.com/maccavelli/go-tui-lib/v2/glyph"
+	"github.com/maccavelli/go-tui-lib/v2/internal/cells"
+	"github.com/maccavelli/go-tui-lib/v2/internal/sanitize"
+	"github.com/maccavelli/go-tui-lib/v2/layout"
 )
 
 // regionKind is what a region of the frame shows.

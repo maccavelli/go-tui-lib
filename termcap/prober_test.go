@@ -13,7 +13,7 @@ import (
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/maccavelli/go-tui-lib/internal/termevent/termeventtest"
+	"github.com/maccavelli/go-tui-lib/v2/internal/termevent/termeventtest"
 )
 
 // The batch, byte by byte, for a local terminal the heuristic allows.

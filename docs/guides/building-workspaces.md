@@ -13,7 +13,7 @@ and pop-ups over them. Two packages do the work:
 Why they are built this way is in
 [0002-MADR](../decisions/0002-MADR-multi-pane-workspace-layouts.md). A
 complete, runnable session is `ExampleWorkspace_agentSession`
-(`go doc -all github.com/maccavelli/go-tui-lib/workspace`).
+(`go doc -all github.com/maccavelli/go-tui-lib/v2/workspace`).
 
 ## The program owns the program
 

@@ -6,8 +6,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/maccavelli/go-tui-lib/launch"
-	"github.com/maccavelli/go-tui-lib/launch/launchtest"
+	"github.com/maccavelli/go-tui-lib/v2/launch"
+	"github.com/maccavelli/go-tui-lib/v2/launch/launchtest"
 )
 
 // picker is a program's model: it quits on q, and remembers the keys.

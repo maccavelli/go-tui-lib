@@ -8,9 +8,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/colorprofile"
 
-	"github.com/maccavelli/go-tui-lib/glyph"
-	"github.com/maccavelli/go-tui-lib/internal/enum"
-	"github.com/maccavelli/go-tui-lib/internal/limits"
+	"github.com/maccavelli/go-tui-lib/v2/glyph"
+	"github.com/maccavelli/go-tui-lib/v2/internal/enum"
+	"github.com/maccavelli/go-tui-lib/v2/internal/limits"
 )
 
 // Config is how a program lets the TUI reach the terminal.

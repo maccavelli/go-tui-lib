@@ -1,6 +1,6 @@
 package safetext
 
-import "github.com/maccavelli/go-tui-lib/glyph"
+import "github.com/maccavelli/go-tui-lib/v2/glyph"
 
 // DefaultMaxString is the most bytes an OSC, DCS, SOS, PM or APC string
 // may hold before it is abandoned, when Rules.MaxString is zero.

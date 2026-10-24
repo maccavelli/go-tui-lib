@@ -31,14 +31,14 @@ import (
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/maccavelli/go-tui-lib/command"
-	"github.com/maccavelli/go-tui-lib/glyph"
-	"github.com/maccavelli/go-tui-lib/internal/cells"
-	"github.com/maccavelli/go-tui-lib/internal/enum"
-	"github.com/maccavelli/go-tui-lib/internal/limits"
-	"github.com/maccavelli/go-tui-lib/keymap"
-	"github.com/maccavelli/go-tui-lib/layout"
-	"github.com/maccavelli/go-tui-lib/theme"
+	"github.com/maccavelli/go-tui-lib/v2/command"
+	"github.com/maccavelli/go-tui-lib/v2/glyph"
+	"github.com/maccavelli/go-tui-lib/v2/internal/cells"
+	"github.com/maccavelli/go-tui-lib/v2/internal/enum"
+	"github.com/maccavelli/go-tui-lib/v2/internal/limits"
+	"github.com/maccavelli/go-tui-lib/v2/keymap"
+	"github.com/maccavelli/go-tui-lib/v2/layout"
+	"github.com/maccavelli/go-tui-lib/v2/theme"
 )
 
 // pkgName is the package's name, as its enums' errors give it.

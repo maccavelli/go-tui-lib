@@ -12,7 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/colorprofile"
 
-	"github.com/maccavelli/go-tui-lib/command"
+	"github.com/maccavelli/go-tui-lib/v2/command"
 )
 
 // tm is a model whose behaviour each test sets.

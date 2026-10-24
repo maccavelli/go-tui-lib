@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/maccavelli/go-tui-lib/when"
+	"github.com/maccavelli/go-tui-lib/v2/when"
 )
 
 // The front matter keys that are read in more than one place.

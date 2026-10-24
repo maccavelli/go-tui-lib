@@ -3,7 +3,7 @@ package safetext
 import (
 	"strings"
 
-	"github.com/maccavelli/go-tui-lib/glyph"
+	"github.com/maccavelli/go-tui-lib/v2/glyph"
 )
 
 // Clean returns s as the rules let it reach a terminal. When nothing needs

@@ -6,7 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/maccavelli/go-tui-lib/internal/termevent"
+	"github.com/maccavelli/go-tui-lib/v2/internal/termevent"
 )
 
 // TestEveryEventDecodes checks that each constructor builds the event

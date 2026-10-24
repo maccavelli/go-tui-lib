@@ -3,8 +3,8 @@ package launch
 import (
 	"strings"
 
-	"github.com/maccavelli/go-tui-lib/glyph"
-	"github.com/maccavelli/go-tui-lib/termcap"
+	"github.com/maccavelli/go-tui-lib/v2/glyph"
+	"github.com/maccavelli/go-tui-lib/v2/termcap"
 )
 
 // tier is the glyph tier env's locale allows
