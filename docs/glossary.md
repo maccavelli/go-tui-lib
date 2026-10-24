@@ -63,7 +63,7 @@ stay `termcap`'s. `command`'s `Effect`, a follow-up a host runs, in
 `command.Result`, was reserved there too and is built for `v2.0.0`
 (0020-PLAN Step 10). So are `termkey`'s `KeyEvent`, `Mod`, `Decoder`,
 `Input` and `InputKind`: a decoded key, its modifiers, the byte decoder,
-what it yields and its kind (0020-PLAN Step 11).
+what it yields and its kind, for `v2.0.0` (0020-PLAN Step 11).
 Each has one meaning, as its package documents it. `Terminal` is in
 "Deliberate" above; `command.Decision`, `Verdict`'s old name, was removed
 in `v0.10.0`, and `Decision` is `launch`'s alone.

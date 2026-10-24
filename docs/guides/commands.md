@@ -160,8 +160,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
   and holds the value and the stack. Its text names the command only,
   since the value may hold a secret. Your TUI keeps running. A gate's
   panic refuses the request.
-- **`WatchContext(ctx)`** is `Watch` that gives up when `ctx` ends, so a
-  program that stops listening leaves no goroutine waiting.
+- **`commandtea.WatchContext(ctx, r)`** is `Watch` that gives up when
+  `ctx` ends, so a program that stops listening leaves no goroutine
+  waiting. The core's `r.Watch(ctx)` takes the context itself.
 - **Reads are lock-free.** `Lookup`, `Slash`, `All` and `Available` read
   one snapshot, and are safe from any goroutine.
 - **The registry's own commands,** registered by `NewRegistry`:

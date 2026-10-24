@@ -18,14 +18,14 @@ pattern, used by every program that needs it.
 
 ## Status
 
-- **The current release is `v1.13.0`.** It follows `v0.12.0`: it was
-  tagged in place of `v0.13.0` and kept, and there is no `v0.13.0`
+- **The current release is `v2.0.0`,** at the module path
+  `github.com/maccavelli/go-tui-lib/v2`
   ([0020-MADR](docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
-  A4). The next release is `v2.0.0`, at the module path
-  `github.com/maccavelli/go-tui-lib/v2`, which `main` already has (A4.1,
-  A4.2). Within a major version nothing is removed: a renamed name keeps
-  working, deprecated, until the next major version, and
-  [the migration guide](docs/guides/migrating.md) lists them.
+  A4.1). It follows `v1.13.0`, which a `v1` user keeps; `v1.13.0` follows
+  `v0.12.0`, tagged in place of `v0.13.0` (A4). Within a major version
+  nothing is removed: a renamed name keeps working, deprecated, until the
+  next major version, and [the migration guide](docs/guides/migrating.md)
+  lists each change.
 - **Multi-pane workspaces, since `v0.1.0`.** `layout` arranges panes: a main
   pane with a sidebar on either side, a bottom pane, a footer, responsive
   folds and saved state. `workspace` hosts them in a Bubble Tea program,
@@ -89,6 +89,14 @@ pattern, used by every program that needs it.
   module but `x/ansi`, so a line-mode CLI can use them
   ([0020-MADR](docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)).
   `glyph` gains status, heading, meter and control glyphs.
+- **Terminal capabilities, commands and keymaps without Bubble Tea, since
+  `v2.0.0`.** `termcap`'s probe is an engine that does no I/O, which a
+  line-mode CLI drives itself; `termsvc` returns its bytes; `command`'s
+  effects are plain functions; and `keymap` takes `termkey`'s keys, from
+  `termkey`'s decoder or Bubble Tea's. Each links no Charm module but
+  `x/ansi`, and its Bubble Tea forms are in `termcaptea`, `termsvctea`,
+  `commandtea` and `keymaptea`
+  ([the migration guide](docs/guides/migrating.md#migrating-to-v200)).
 - **The stack is Charm v2:** `charm.land/bubbletea/v2`,
   `charm.land/lipgloss/v2` and `charm.land/bubbles/v2`, with
   `github.com/charmbracelet/colorprofile` and

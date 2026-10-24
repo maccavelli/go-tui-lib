@@ -2927,3 +2927,178 @@ loop test); `command/registry.go` imports Bubble Tea
   over the change and the untracked files.
 * **Not done here:** the release and its migration notes, which are Step
   13's. Nothing is tagged.
+
+### Step 13: release `v2.0.0`, and the close-out (2026-10-24)
+
+* The owner committed Step 12 as `fe18870` and said to proceed
+  ("committed, proceed").
+* **The release is `v2.0.0`,** as Step 6A's "Under this step" changes
+  Step 13: the guide's section is "Migrating to `v2.0.0`", the smoke test
+  fetches `/v2@v2.0.0`, and `apicheck` compares with `v1.13.0` through the
+  boundary move. The step's heading still says `v0.14.0`, as written
+  before A4.1.
+* **The API, listed:** apidiff over `v1.13.0`, with its import paths moved
+  to `/v2` by `go-apicheck.py`'s own functions and compatible changes
+  included, gives 34 incompatible changes, exactly the four blocks of
+  `scripts/apicheck.allow` (Steps 7 and 8, 9, 10 and 12), and 65
+  additions: the packages `termkey`, `termcap/termcaptea`,
+  `termsvc/termsvctea`, `command/commandtea` and `keymap/keymaptea`, and
+  60 names in `command`, `keymap`, `termcap`, `termcaptest` and `termsvc`.
+* **Docs:**
+  * `docs/guides/migrating.md`: its opening states API rule 1 as A4.2 has
+    it; "Migrating to `v2.0.0`": the import path first, then D10's table,
+    22 rows covering the 34 changes (each read against `v1.13.0`'s source:
+    `Notifier.Update`'s `tea.Cmd` was always nil, and `Reply` held `Msg`
+    and `Raw`), *Changed* (the report's `schema_version` 2 and the
+    profile's tokens) and *Added*;
+  * `README.md`: the current release is `v2.0.0`, and a Status bullet for
+    the cores and their adapters;
+  * `docs/glossary.md`: `termkey`'s names, built for `v2.0.0`; the other
+    new names and `Prober`'s move were recorded by their steps;
+  * `docs/architecture.md`: read; Steps 7 to 12 left it with the twelve
+    cores, the four adapters and `termkey`, with their imports, and it
+    needs no change;
+  * the adapters' guides, read through: `terminal-capabilities.md` called
+    `termkey` "the planned decoder", now what a `Decoder` gives and when
+    not to `Flush`; `commands.md` named `WatchContext(ctx)` as a registry
+    method, now `commandtea.WatchContext(ctx, r)` beside the core's
+    `Watch(ctx)`; `keymaps.md` needed nothing;
+  * `docs/README.md`: this PLAN's row.
+* **No stale name outside the records:** a scan of every tracked Markdown
+  file, and the Go files under `testdata/`, for each removed or moved name
+  and for the module path without `/v2` finds only history (the old
+  releases' migration rows), the planned nested module's own path, and the
+  verification config's path.
+* **`make fuzz` and CI's fuzz step** find their targets themselves:
+  `go-fuzz.py -a -l ./...` lists `termkey`, so `FuzzDecode` runs in both,
+  beside `FuzzClean`, `FuzzAgainstV0120`, `FuzzParseReply` and
+  `FuzzProbe`.
+* **Release notes, `v2.0.0`,** for the owner's release:
+
+  > **`v2.0.0`** is a new major version, at the module path
+  > `github.com/maccavelli/go-tui-lib/v2`. A `v1` user keeps `v1.13.0`.
+  > Imports move to `/v2`; the packages keep their names.
+  >
+  > *Charm-free cores.* `termcap`, `termsvc`, `command` and `keymap` link
+  > no Charm module but `x/ansi`, so a line-mode CLI uses them without
+  > Bubble Tea, beside `fuzzy`, `glyph`, `layout`, `safetext`, `termkey`
+  > and `when`. A test holds every one to it on Linux, macOS and Windows.
+  > Their Bubble Tea forms move to sub-packages:
+  >
+  > * `termcap/termcaptea`: `Prober`, the probe's host in a Bubble Tea
+  >   program, `KeyboardEnhancements`, and the colour profile's
+  >   conversions (#2);
+  > * `termsvc/termsvctea`: `Notify`, `Copy`, `Open`, `Observe` and the
+  >   activity beacon as `tea.Cmd`s (#3);
+  > * `command/commandtea`: `Dispatch`, `Watch`, `RunLoop`, `Attach`,
+  >   `WithLoop`, and `Cmd` and `Effect` between `command.Effect` and
+  >   `tea.Cmd` (#4);
+  > * `keymap/keymaptea`: `Update`, `FromTea` and `ToTea`, `KeyBinding`,
+  >   `Help` and `BubblesKeys` (#5).
+  >
+  > *Added*
+  >
+  > * `termkey`: a terminal's keys, with Bubble Tea's codes and names, and
+  >   a `Decoder` from bytes to keys, pastes and the sequences it does not
+  >   decode, for a line-mode CLI.
+  > * `termcap.Probe`, the probe as an engine that does no I/O, with
+  >   `ParseReply`; `termsvc`'s `Prepare` and `PrepareCopy`;
+  >   `command.Effect`; `keymap`'s `Dispatcher.Key` and `Expire`, and
+  >   `Keymap.Shown`.
+  >
+  > *Changed*
+  >
+  > * `termcap.Report`'s JSON is `schema_version` 2, and writes the colour
+  >   profile by its token (`truecolor`).
+  >
+  > [The migration guide](docs/guides/migrating.md#migrating-to-v200) has
+  > the table of every moved and retyped name. Records:
+  > `0020-MADR-charm-free-cores-glyphs-and-safetext.md` (D2 to D7, D10,
+  > A1.2, A2, A4.1, A4.2).
+* **Issue comments,** drafted for the owner, to post once `v2.0.0` is
+  tagged and the consumer smoke test passes:
+  * **#2:** "`termcap` in `v2.0.0` links no Charm module but `x/ansi`. Its
+    probe is `termcap.Probe`, an engine that does no I/O: a CLI gives it
+    the environment, each reply (`termcap.ParseReply` reads a reply's
+    bytes) and the time, and drains its events, writing what it says to
+    write. `termcap/termcaptea.Prober` is the same probe hosted in a
+    Bubble Tea program, and a test holds the two to the same `Caps` for
+    every fake terminal. `Caps.Profile` is a `termcap.ColorProfile`."
+  * **#3:** "`termsvc` in `v2.0.0` links no Charm module but `x/ansi`.
+    `Notifier.Prepare(ctx, x)` returns a notification's bytes and a
+    `deliver` that calls a backend, if any, and `PrepareCopy` does the
+    same for a copy; `SetCaps` and `SetFocus` feed the notifier.
+    `termsvc/termsvctea` has the Bubble Tea commands: `Notify`, `Copy`,
+    `Open`, `Observe` and `ActivityBeacon`."
+  * **#4:** "`command` in `v2.0.0` links no Charm module but `x/ansi`. A
+    handler's follow-up, and what `Dispatch` and `Watch(ctx)` return, is a
+    `command.Effect`, a `func() any` that gives a message, nil, or an
+    `[]Effect` to run as one batch, which a line-mode CLI runs itself.
+    `command/commandtea` converts to and from `tea.Cmd`, and has
+    `Dispatch`, `Watch`, `WatchContext`, `RunLoop`, `Attach` and
+    `WithLoop` for a Bubble Tea program."
+  * **#5:** "`keymap` in `v2.0.0` links no Charm module but `x/ansi`. Its
+    keys are `termkey.KeyEvent`s, with Bubble Tea's codes, bit values and
+    names, and `termkey.Decoder` reads them from a terminal's bytes,
+    replies included, as one input with its bytes. The `Dispatcher` takes
+    keys through `Key`, and a pending sequence's `Outcome` says how long to
+    wait before its `Timeout` goes to `Expire`. `keymap/keymaptea` has
+    `Update`, `FromTea`, `ToTea`, `KeyBinding` and `Help`."
+* **The disclosure guard** over the seven commits ahead of `origin/main`
+  (`ea559a2` to `fe18870`, against `8be11e7`) passed, exit 0, with no
+  finding, and `main` is not behind `origin/main`. It runs again over this
+  step's commit before the push.
+* **The smoke tests, prepared and rehearsed.** Two programs and a script
+  in the scratch directory, run before the tag against the tree by a
+  `replace`, and after it from the proxy:
+  * *the line-mode program* reads `termcap.EnvCaps` and writes
+    `termcap.Report`; writes a `termsvc.Notifier`'s `Prepare` bytes and
+    calls `deliver`; parses `/say hello`, runs it and writes the result
+    with `command`; loads a `keybindings.json` with `keymap` and matches
+    ctrl+s through `Dispatcher.Key`; decodes a key, an arrow and a paste
+    with `termkey`; and runs a `termcap.Probe` to `ProbeDone` over Kitty's
+    replies, read through a `termkey.Decoder` in reads of seven bytes and
+    `ParseReply`, wanting 30 replies and `Caps.KittyKeyboard` `Supported`.
+    The replies are `termcaptest.Kitty()`'s to the probe's batch, recorded
+    once from the tree at `fe18870`, since `termcaptest` links Bubble Tea;
+  * *the Bubble Tea program* runs `keymaptea.Update`, a disabled
+    `termcaptea.Prober` to its `CapsMsg`, and a `workspace` whose ctrl+s
+    reaches `commandtea.Dispatch` and its `ResultMsg`, driven as a
+    program's `Update` drives them, with no terminal;
+  * *each* is vetted, built, run and checked by staticcheck; its closure
+    is judged by Step 2's `charm` rule on linux, darwin and windows.
+    *staticcheck:* the installed binary (2026.2.1) cannot read Go 1.27's
+    export data ("export data version 5 is greater than maximum supported
+    version 4"), so the script runs golangci-lint's staticcheck alone,
+    `golangci-lint run --default none --enable staticcheck`;
+  * *the rehearsal:* the line-mode program "smoke: PASS (report 1513
+    bytes, 2 writes, 30 replies, kitty keyboard supported)", 146, 144 and
+    148 packages with no Charm beyond `x/ansi`; the Bubble Tea program
+    "smoketui: PASS (terminal "xterm-kitty", "saved" from ctrl+s, the
+    pane got ["x"])"; the negative control, the line-mode program
+    importing `termcap/termcaptea`, holds `charm.land/bubbletea/v2`,
+    `colorprofile`, `ultraviolet` and `x/term` on all three; and judged
+    by the `charm` rule it fails, "smoke: FAIL, a Charm module beyond
+    x/ansi", as the rule must on such a program.
+* **Gates,** `python3 -m tools.verify gates` over the step's six files:
+  macOS `gates: 18 passed, 0 failed, 1 skipped in 523s`; the Linux host
+  `… 1 skipped in 751s`; the Windows host `… 1 skipped in 1806s`.
+  `release-check` is "309 file(s) clean" on each, with `apicheck`,
+  clean against `v1.13.0` with the four blocks, and the examples gate.
+  * *Skipped, 2026-10-24:* the `gofmt` gate, on each host, "no Go files":
+    the step's files hold none. `release-check` ran gofmt over every
+    tracked Go file, clean.
+* **Identifiers:** `python3 -m tools.verify scan`: `scan: clean (5 pattern(s))`.
+* **Not done yet, and the owner's:**
+  1. commit this part of the step;
+  2. the guard over the outgoing commits, which the agent runs again on
+     request;
+  3. the push of `main`, and CI green;
+  4. the annotated tag `v2.0.0` on that commit, pushed, and CI green on
+     the tag.
+
+  Then the agent runs the two consumer smoke tests and their negative
+  control, and the close-out: the allow-list's blocks removed and
+  `apicheck` clean against `v2.0.0`; the MADR's D12 and More Information
+  naming the two tags; this PLAN `complete`. The owner posts the issue
+  comments above.

@@ -216,8 +216,10 @@ What Bubble Tea does for a TUI, the CLI does itself:
   still unanswered then is unsupported.
 - **Read whole replies.** A reply can arrive split across reads, even
   inside a UTF-8 sequence. Join bytes into whole sequences before
-  `ParseReply`; with the planned `termkey` decoder, do not `Flush` while
-  `p.Awaiting()` is true
+  `ParseReply`. A `termkey.Decoder` does: it gives each reply as one
+  `termkey.InputUnknown`, whose `Raw` is the reply's bytes, and the keys
+  typed around it as keys. Do not call its `Flush` while `p.Awaiting()` is
+  true
   ([0020-MADR](../decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
   A2.4).
 - **`ParseReply` takes what terminals send:** 7-bit and 8-bit

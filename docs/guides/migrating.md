@@ -1,10 +1,99 @@
 # Migrating between releases
 
-A renamed name keeps working for one minor release, as a deprecated
-wrapper, alias or field, and is removed in the next
+Within a major version nothing is removed or retyped: a renamed name keeps
+working, as a deprecated wrapper, alias or field, until the next major
+version, and `staticcheck` reports each use of one as SA1019. A removal
+needs a major version, at a new module path
 ([AGENTS.md, API conventions](../../AGENTS.md#api-conventions), rule 1).
-`staticcheck` reports each use of one as SA1019, so a program can find
-them all before the removal.
+Up to `v0.12.0`, a deprecated name was removed in the next minor release.
+
+## Migrating to `v2.0.0`
+
+`v2.0.0` is a new major version, at the module path
+`github.com/maccavelli/go-tui-lib/v2`. A program on `v1.13.0` keeps it:
+`go get -u` never moves a `v1` user to `v2`. It splits `termcap`,
+`termsvc`, `command` and `keymap` into a core that links no Charm module
+but `x/ansi`, and a sub-package that holds the core's Bubble Tea forms
+([0020-MADR](../decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
+D2 to D7, A2, A4.1). It adds `termkey`, a terminal's keys and a decoder
+for them.
+
+### The import path
+
+Every import of the library moves to `/v2`:
+
+```go
+import "github.com/maccavelli/go-tui-lib/workspace"    // v1.13.0
+import "github.com/maccavelli/go-tui-lib/v2/workspace" // v2.0.0
+```
+
+```bash
+go get github.com/maccavelli/go-tui-lib/v2@v2.0.0
+```
+
+The packages keep their names, so the only change in a file is the import
+line, then the names below.
+
+### Moved and retyped
+
+Each name `v2.0.0` moves or retypes, with the change a caller makes. A
+Bubble Tea form now takes the core value it used to be a method of.
+
+| `v1.13.0` | `v2.0.0` | The change |
+| :--- | :--- | :--- |
+| `termcap.Prober`, `termcap.NewProber(opts...)` | `termcaptea.Prober`, `termcaptea.NewProber(opts...)` | import `termcap/termcaptea`; the options stay `termcap`'s, and the methods are the same |
+| `termcap.KeyboardFlags(caps)`, `KeyboardCaps.Enhancements` | `termcaptea.KeyboardEnhancements(caps)` | what goes in `View.KeyboardEnhancements`; a line-mode CLI reads `KeyboardCaps.Request` |
+| `termcap.Caps.Profile`, a `colorprofile.Profile` | a `termcap.ColorProfile` | `termcaptea.ToColorProfile(caps.Profile)` where a `colorprofile.Profile` is wanted, and `FromColorProfile` back |
+| `termcap.Reply{Msg, Raw}`, a Bubble Tea message or an undecoded reply's bytes | `termcap.Reply`, parsed: `Kind`, `Raw` and the reply's fields | a custom query's `Parse` reads the parsed fields; `termcap.ParseReply(raw)` reads a reply's bytes; `Reply` is no longer comparable |
+| `termcap.ReportSchemaVersion` 1 | 2 | see "Changed" |
+| `n.Notify(x)`, `n.NotifyContext(ctx, x)` | `termsvctea.Notify(n, x)`, `termsvctea.NotifyContext(ctx, n, x)` | import `termsvc/termsvctea`; a CLI writes `n.Prepare(ctx, x)`'s bytes and calls its `deliver` |
+| `n.Update(msg)`, whose `tea.Cmd` was always nil | `termsvctea.Observe(n, msg)`, which returns nothing | or `n.SetCaps(caps)` and `n.SetFocus(focused)` |
+| `termsvc.Copy(caps, text)`, `CopyContext(ctx, caps, text)` | `termsvctea.Copy(caps, text)`, `CopyContext(ctx, caps, text)` | a CLI uses `termsvc.PrepareCopy` or `CopySequence` |
+| `termsvc.ActivityBeacon()` | `termsvctea.ActivityBeacon()` | the package only |
+| `policy.Open(url)` | `termsvctea.Open(policy, url)` | still delivers `OpenURLMsg` |
+| `r.Dispatch(ctx, req)`, a `tea.Cmd` | `commandtea.Dispatch(ctx, r, req)` | the core's `r.Dispatch` returns a `command.Effect` |
+| `r.Watch()`, `r.WatchContext(ctx)` | `commandtea.Watch(r)`, `commandtea.WatchContext(ctx, r)` | the core's `r.Watch(ctx)` returns an `Effect` |
+| `r.Attach(p.Send)`, `command.WithLoop(p.Send)` | `commandtea.Attach(r, p.Send)`, `commandtea.WithLoop(p.Send)` | the core's take a `func(any)` |
+| `msg.Run()` of a `command.LoopMsg`, a `tea.Cmd` | `commandtea.RunLoop(msg)` | `msg.Run()` returns an `Effect` |
+| `command.Result.Cmd`, a `tea.Cmd` | a `command.Effect` | `Result{Cmd: commandtea.Effect(cmd)}` in a handler |
+| `d.Update(msg, path, ctx)` of a `keymap.Dispatcher` | `keymaptea.Update(d, msg, path, ctx)` | import `keymap/keymaptea`; the core's `d.Key(k, path, ctx)` and `d.Expire(t)` |
+| `keymap.Outcome.Replay`, `[]tea.KeyPressMsg` | `[]termkey.KeyEvent` | `tea.KeyPressMsg(keymaptea.ToTea(k))` for each |
+| `keymap.Settings.Tick` | removed | a test sets `Settings.Timeout`; `keymaptea.Update` starts `tea.Tick` |
+| `km.KeyBinding(id, path, d)`, `km.Help(path, d, ids...)` | `keymaptea.KeyBinding(km, id, path, d)`, `keymaptea.Help(km, path, d, ids...)` | `km.Shown(id, path)` is the bindings they show |
+| `stroke.BubblesKeys()` | `keymaptea.BubblesKeys(stroke)` | the package only |
+| `keymap.Normalize`, `Stroke.Matches`, `Dispatcher.Explain`, `Explanation.Raw` and `Normalized`, over a `tea.Key` | over a `termkey.KeyEvent` | `keymaptea.FromTea(k)` converts, field for field |
+| `keymap.Stroke.Mod`, a `tea.KeyMod` | a `termkey.Mod` | the same bit values; `termkey.Mod(m)` and `tea.KeyMod(s.Mod)` convert |
+
+### Changed
+
+- **`termcap.Report`'s JSON** has `"schema_version": 2`, and writes the
+  colour profile by its token, `truecolor`, `ansi256`, `ansi`, `ascii`,
+  `notty` or `unknown`, where `v1.13.0` wrote `TrueColor`, `ANSI256` and
+  the rest. The text report writes the same tokens. Reading `Caps` from
+  JSON takes either spelling.
+
+### Added
+
+- **`termkey`:** `KeyEvent`, `Mod`, the key codes with Bubble Tea's values
+  and names, and a `Decoder` from the bytes a terminal sends to keys,
+  pastes and the sequences it does not decode, for a line-mode CLI.
+- **`termcap`:** `Probe`, from `NewProbe`, the probe as an engine that
+  does no I/O, with `ProbeEvent`, `ProbeEventKind` and `ProbeHook`;
+  `ParseReply`, `ReplyKind` and `ModeSetting`; `ColorProfile`;
+  `WithoutModeQuery`; `KeyboardCaps.Request`.
+- **`termsvc`:** `Notifier.Prepare`, `SetCaps` and `SetFocus`;
+  `PrepareCopy`.
+- **`command`:** `Effect`.
+- **`keymap`:** `Dispatcher.Key` and `Expire`, `Outcome.Wait` and
+  `Timeout`, and `Keymap.Shown`.
+- **The adapters:** `termcap/termcaptea`, `termsvc/termsvctea`,
+  `command/commandtea` and `keymap/keymaptea`; and
+  `termcaptest.Terminal.Reply`.
+
+`command`, `fuzzy`, `glyph`, `keymap`, `layout`, `safetext`, `termcap`,
+`termkey`, `termsvc` and `when` link no Charm module but `x/ansi`, and a
+test holds them to it, so a line-mode CLI that uses only these builds
+without Bubble Tea, Lip Gloss or Bubbles.
 
 ## Migrating to `v1.13.0`
 
