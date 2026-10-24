@@ -4,9 +4,10 @@ import "github.com/charmbracelet/x/term"
 
 // Restorer undoes a terminal mode a program set outside Bubble Tea, such as
 // termcap's mode 2031: Restore returns the bytes that reset it, or "" when
-// there is nothing to undo. *termcap.Prober satisfies it. Run writes the
-// bytes to the stream the TUI drew on, on every outcome, after Bubble Tea
-// has shut down; resetting a mode that is already off is harmless.
+// there is nothing to undo. *termcaptea.Prober and *termcap.Probe satisfy
+// it. Run writes the bytes to the stream the TUI drew on, on every outcome,
+// after Bubble Tea has shut down; resetting a mode that is already off is
+// harmless.
 type Restorer interface {
 	Restore() string
 }

@@ -2,16 +2,17 @@ package termcap
 
 import (
 	"testing"
-
-	tea "charm.land/bubbletea/v2"
+	"time"
 )
 
 // The terminal's name, from its reply and from the environment, passes
 // through sanitize.Line (docs/decisions/0014-PLAN-hardening.md Step 2).
+// The Bubble Tea case, tea's own XTVERSION message, moved to termcaptea.
 
 func TestXTVersionSanitized(t *testing.T) {
-	p, _ := start(Env{"TERM=xterm-256color"}, WithoutHeuristic())
-	feed(p, tea.TerminalVersionMsg{Name: "evil\x1b[2J\u202eterm\n1.0\u200b"})
+	p := NewProbe(WithoutHeuristic())
+	p.Start(Env{"TERM=xterm-256color"}, time.Time{})
+	p.HandleReply(Reply{Kind: ReplyVersion, Text: "evil\x1b[2J\u202eterm\n1.0\u200b"}, time.Time{})
 	if got := p.Caps().Terminal; got != (Fact[string]{Value: "evilterm 1.0", Origin: Queried}) {
 		t.Errorf("Terminal = %+v", got)
 	}

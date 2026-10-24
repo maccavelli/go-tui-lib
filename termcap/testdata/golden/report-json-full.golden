@@ -1,5 +1,5 @@
   1|{
- 22|  "schema_version": 1,
+ 22|  "schema_version": 2,
  11|  "caps": {
  21|    "complete": true,
  22|    "timed_out": true,
@@ -98,7 +98,7 @@
   7|      0
   6|    ],
  28|    "background": "#1e1f29",
- 25|    "profile": "ANSI256",
+ 25|    "profile": "ansi256",
  28|    "foreground": "#cdd6f4",
  16|    "palette": [
  16|      "#00ff00",

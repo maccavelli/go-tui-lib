@@ -61,7 +61,7 @@ func TestReportValuesAndOrigins(t *testing.T) {
 		"kitty_graphics         unknown (heuristic)\n",
 		"dark                   yes (query)\n",
 		"background             #1e1f29\n",
-		"profile                ANSI256\n",
+		"profile                ansi256\n",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("report lacks %q:\n%s", want, out)

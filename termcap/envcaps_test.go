@@ -3,16 +3,16 @@ package termcap_test
 import (
 	"reflect"
 	"testing"
-
-	tea "charm.land/bubbletea/v2"
+	"time"
 
 	"github.com/maccavelli/go-tui-lib/v2/termcap"
 	"github.com/maccavelli/go-tui-lib/v2/termcap/termcaptest"
 )
 
-// EnvCaps (docs/decisions/0014-PLAN-component-native-forms.md Step 8).
+// EnvCaps (docs/decisions/0014-PLAN-component-native-forms.md Step 8). The
+// match with a disabled termcaptea.Prober moved to termcaptea with it.
 
-func TestEnvCapsMatchesDisabledProber(t *testing.T) {
+func TestEnvCapsMatchesDisabledProbe(t *testing.T) {
 	override := termcap.WithOverride(func(c *termcap.Caps) { c.Terminal.Set("forced", termcap.Override) })
 	optionSets := map[string][]termcap.Option{
 		"no options":              nil,
@@ -27,14 +27,14 @@ func TestEnvCapsMatchesDisabledProber(t *testing.T) {
 		env := termcap.Env(append(append([]string{}, pr.Env...), "LC_APP_THEME=dark"))
 		for _, goos := range []string{"linux", "darwin", "windows"} {
 			for name, opts := range optionSets {
-				p := termcap.NewProber(append(append([]termcap.Option{}, opts...), termcap.WithDisabled(), termcap.WithGOOS(goos))...)
-				p.Update(tea.EnvMsg(env))
+				p := termcap.NewProbe(append(append([]termcap.Option{}, opts...), termcap.WithDisabled(), termcap.WithGOOS(goos))...)
+				p.Start(env, time.Now())
 				want := p.Caps()
 				got := termcap.EnvCaps(env, goos, opts...)
 				if !reflect.DeepEqual(got, want) {
 					t.Errorf("%s, %s, %s:\n got %+v\nwant %+v", pr.Name, goos, name, got, want)
 				}
-				if got.Profile != 0 {
+				if got.Profile != termcap.ProfileUnknown {
 					t.Errorf("%s: Profile = %v, want unknown", pr.Name, got.Profile)
 				}
 			}

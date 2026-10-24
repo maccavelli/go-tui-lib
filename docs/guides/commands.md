@@ -766,7 +766,7 @@ fits `FromSource`.
   the TUI runs, so an agent's `Loop` command runs on the program's loop.
   It is detached on every outcome, and a `Loop` command run after that
   runs on its caller, at once.
-- **`launch.WithRestorer(p)`** with your `*termcap.Prober` writes its
+- **`launch.WithRestorer(p)`** with your `*termcaptea.Prober` writes its
   resets, such as mode 2031's, to the TUI's stream on every outcome, a
   crash included, so the CLI mode's input gets no colour-scheme reports.
 - **`launch.OnStart(f)`** calls `f` with the `*tea.Program` before it

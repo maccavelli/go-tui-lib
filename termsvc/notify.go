@@ -220,12 +220,13 @@ const (
 )
 
 // Notifier sends notifications that suit the terminal. A program passes it
-// every message, as it does a termcap.Prober, so it learns the terminal's
-// capabilities and focus.
+// every message, as it does a termcaptea.Prober, so it learns the
+// terminal's capabilities and focus.
 //
 // A program's own command line, which runs no Bubble Tea program, never
 // sees focus: it passes WithPolicy(Always), gives the notifier
-// termcap.EnvCaps through Update(termcap.CapsMsg{Caps: …}), and writes
+// termcap.EnvCaps, or a termcap.Probe's Caps, through
+// Update(termcap.CapsMsg{Caps: …}), and writes
 // Sequence's bytes to the terminal itself
 // (docs/decisions/0014-MADR-native-integration-api.md W2).
 type Notifier struct {

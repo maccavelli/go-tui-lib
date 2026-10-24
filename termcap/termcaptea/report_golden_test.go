@@ -1,4 +1,4 @@
-package termcap_test
+package termcaptea_test
 
 import (
 	"strconv"
@@ -9,12 +9,13 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/maccavelli/go-tui-lib/v2/termcap"
+	"github.com/maccavelli/go-tui-lib/v2/termcap/termcaptea"
 	"github.com/maccavelli/go-tui-lib/v2/termcap/termcaptest"
 	"github.com/maccavelli/go-tui-lib/v2/tuitest"
 )
 
 // app embeds a prober, and quits through its Quit.
-type app struct{ p *termcap.Prober }
+type app struct{ p *termcaptea.Prober }
 
 func (a app) Init() tea.Cmd { return a.p.Init() }
 
@@ -42,7 +43,7 @@ func TestReportGolden(t *testing.T) {
 		termcaptest.DA1Only(), termcaptest.Silent(), termcaptest.AppleTerminalSSH(), termcaptest.JetBrains(),
 	} {
 		// The identity is read for one OS, so the files match on every host.
-		c := termcaptest.Run(t, app{termcap.NewProber(pin, termcap.WithGOOS("linux"), termcap.WithTimeout(100*time.Millisecond))}, p)
+		c := termcaptest.Run(t, app{termcaptea.NewProber(pin, termcap.WithGOOS("linux"), termcap.WithTimeout(100*time.Millisecond))}, p)
 		name := "report-" + strings.ReplaceAll(p.Name, " ", "-")
 		for _, w := range []int{80, 120} {
 			var b strings.Builder

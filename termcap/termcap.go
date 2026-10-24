@@ -4,11 +4,18 @@
 // A Caps is a set of facts. Each is a Fact: a value and its Origin, so a
 // report can say why the program believes it. A fact is replaced only by one
 // of equal or stronger origin, and an override always wins. The environment
-// comes from tea.EnvMsg as an Env, never from the process: under wish it is
-// the SSH session's.
+// comes from the program as an Env, tea.EnvMsg in a Bubble Tea program,
+// never from the process: under wish it is the SSH session's.
 //
-// A Prober learns the facts from one batch of queries that ends with DA1,
-// and delivers them as a CapsMsg.
+// A Probe learns the facts from one batch of queries that ends with DA1.
+// It does no I/O: its host writes the queries it asks for, reads the
+// replies, ParseReply turns each into a Reply, and the probe takes it.
+// termcap/termcaptea is the host for a Bubble Tea program, and delivers the
+// facts as a CapsMsg; a line-mode CLI drives the Probe from its own
+// raw-mode input, as Probe's documentation says. termcap links no Charm
+// module but x/ansi
+// (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md D4,
+// A2).
 //
 // Stability: stable. Exported names change only through the deprecation
 // policy in AGENTS.md, "API conventions".
@@ -22,6 +29,13 @@ import (
 
 // pkgName is the package's name, as its enums' errors give it.
 const pkgName = "termcap"
+
+// The tokens several of termcap's enums share, each written once.
+const (
+	tokenUnknown     = "unknown"
+	tokenNone        = "none"
+	tokenColorScheme = "color-scheme"
+)
 
 // ErrUnknownName is wrapped by the error for a name termcap does not know:
 // from each enum's UnmarshalText, and from Caps.UnmarshalJSON for a colour
@@ -44,7 +58,7 @@ const (
 
 var supportNames = enum.Names[Support]{
 	Pkg: pkgName, Type: "Support", Unknown: ErrUnknownName,
-	Tokens: []string{"unknown", "unsupported", "supported"},
+	Tokens: []string{tokenUnknown, "unsupported", "supported"},
 }
 
 // String is the support's name, as the report and JSON print it.
@@ -66,7 +80,7 @@ const (
 	// Heuristic is a guess from what else is known, such as a terminal's
 	// name.
 	Heuristic
-	// Environment is an environment variable, from tea.EnvMsg.
+	// Environment is an environment variable, from the program's Env.
 	Environment
 	// Queried is the terminal's reply to a query, or its silence before
 	// the probe's sentinel answered.
@@ -129,7 +143,7 @@ const (
 
 var muxNames = enum.Names[Mux]{
 	Pkg: pkgName, Type: "Mux", Unknown: ErrUnknownName,
-	Tokens: []string{"none", "tmux", "screen", "zellij"},
+	Tokens: []string{tokenNone, "tmux", "screen", "zellij"},
 }
 
 // String is the multiplexer's name, as the report and JSON print it.

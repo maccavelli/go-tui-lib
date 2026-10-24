@@ -18,7 +18,7 @@
  73|sixel                  unknown (not-queried: no reply before the timeout)
  73|dark                   unknown (not-queried: no reply before the timeout)
  24|background             -
- 27|profile                ANSI
+ 27|profile                ansi
  36|brand                  unknown (env)
  36|env_brand              unknown (env)
  33|editor                 none (env)

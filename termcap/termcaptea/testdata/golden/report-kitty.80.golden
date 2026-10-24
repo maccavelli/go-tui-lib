@@ -16,7 +16,7 @@
  42|sixel                  unsupported (query)
  34|dark                   yes (query)
  30|background             #1e1e2e
- 32|profile                TrueColor
+ 32|profile                truecolor
  36|brand                  kitty (query)
  34|env_brand              kitty (env)
  33|editor                 none (env)
@@ -24,7 +24,8 @@
  31|legacy_console         no (env)
  24|tmux                   -
  30|foreground             #cdd6f4
-119|palette                #00ff80;#11ee80;#22dd80;#33cc80;#44bb80;#55aa80;#669980;#778880;#887780;#996680;#aa5580;#bb4480;
- 54|                       #cc3380;#dd2280;#ee1180;#ff0080
+ 79|palette                #00ff80;#11ee80;#22dd80;#33cc80;#44bb80;#55aa80;#669980;
+ 79|                       #778880;#887780;#996680;#aa5580;#bb4480;#cc3380;#dd2280;
+ 38|                       #ee1180;#ff0080
  26|palette_known          yes
  32|secondary_attributes   1;4000;39

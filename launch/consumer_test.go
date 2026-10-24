@@ -27,7 +27,7 @@ import (
 	"github.com/maccavelli/go-tui-lib/v2/launch"
 	"github.com/maccavelli/go-tui-lib/v2/launch/launchtest"
 	"github.com/maccavelli/go-tui-lib/v2/layout"
-	"github.com/maccavelli/go-tui-lib/v2/termcap"
+	"github.com/maccavelli/go-tui-lib/v2/termcap/termcaptea"
 	"github.com/maccavelli/go-tui-lib/v2/theme"
 	"github.com/maccavelli/go-tui-lib/v2/tuitest"
 	"github.com/maccavelli/go-tui-lib/v2/workspace"
@@ -369,7 +369,7 @@ func TestRunRegistryDetached(t *testing.T) {
 }
 
 func TestRunRestorerAfterCrash(t *testing.T) {
-	p := termcap.NewProber()
+	p := termcaptea.NewProber()
 	p.Update(tea.ColorProfileMsg{Profile: colorprofile.TrueColor})
 	p.Update(tea.EnvMsg{"TERM=xterm-kitty"})
 	p.Update(tea.ModeReportMsg{Mode: ansi.ModeLightDark, Value: ansi.ModeReset})

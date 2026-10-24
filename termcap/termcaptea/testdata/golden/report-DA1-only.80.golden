@@ -3,20 +3,22 @@
  43|terminal               xterm-256color (env)
  33|mux                    none (env)
  31|remote                 no (env)
- 29|attributes             65;1;9
+ 24|attributes             1
  42|kitty_keyboard         unsupported (query)
  24|keyboard_flags         0
- 42|sync_output            unsupported (query)
- 42|grapheme_width         unsupported (query)
+ 80|sync_output            unknown (not-queried: tea asks only outside SSH and Apple
+ 64|                       Terminal, and not every terminal answers)
+ 80|grapheme_width         unknown (not-queried: tea asks only outside SSH and Apple
+ 64|                       Terminal, and not every terminal answers)
  42|color_scheme_reports   unsupported (query)
  42|in_band_resize         unsupported (query)
- 40|focus_events           supported (query)
+ 42|focus_events           unsupported (query)
  42|desktop_notify         unsupported (query)
  42|kitty_graphics         unsupported (query)
  42|sixel                  unsupported (query)
- 33|dark                   no (query)
- 30|background             #ffffff
- 30|profile                ANSI256
+ 44|dark                   unknown (not-queried)
+ 24|background             -
+ 27|profile                ansi
  36|brand                  unknown (env)
  36|env_brand              unknown (env)
  33|editor                 none (env)
@@ -26,7 +28,7 @@
  24|foreground             -
  24|palette                -
  25|palette_known          no
- 31|secondary_attributes   41;388;0
+ 24|secondary_attributes   -
   0|
   8|findings
  78|recommendation         keyboard.kitty-unsupported: The terminal did not answer

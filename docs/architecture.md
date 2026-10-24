@@ -35,7 +35,8 @@ below).
  when          availability expressions   → internal/enum
  internal/cells  the reused frame buffer  → layout; ultraviolet, x/ansi
  termsvc       terminal services          → termcap, internal/enum, internal/sanitize, internal/teamsg; bubbletea, x/ansi
- termcap       capabilities, the probe    → internal/termevent, internal/enum, internal/sanitize, internal/teamsg; bubbletea, x/ansi, colorprofile
+ termcap       capabilities, the probe    → internal/enum, internal/sanitize; x/ansi
+ termcap/termcaptea   the probe in tea   → termcap, internal/termevent, internal/teamsg; bubbletea, x/ansi, colorprofile
  termcap/termcaptest  fake terminals      → termcap; bubbletea, x/ansi, colorprofile (tests)
  internal/termevent   pass-through events → ultraviolet
  internal/termevent/termeventtest  those events for tests → ultraviolet, bubbletea
@@ -69,8 +70,9 @@ below).
 | `internal/cells` | `Frame`: a reused cell buffer that draws strings into rectangles with a chosen width method |
 | `internal/sanitize` | `Line` for one line of plain text and `Styled` for a pane's view, which keeps SGR and OSC 8 only, and `HasControl`: calls of `safetext` under rules equal to their behaviour on well-formed input (0020-MADR D9 S5, A3); `Truncate`, never wider than asked; `Token` |
 | `internal/limits` | `MaxSide`, `MaxCells` and `Clamp`, the window clamp `workspace` and `launch` share |
-| `termcap` | `Prober`, from `NewProber` (one batch of queries ended by DA1, a deadline, tea's own replies observed, mode 2031 and its reset, `IsReplyFragment`); `EnvCaps`, the environment's facts with no program; `Caps` of `Fact`s with origin and reason, as JSON (v2); `ErrUnknownName`; `Env`, whose lookups ignore case on Windows; `FromEnv` and `Identity`; the keyboard, link and notification views; `TmuxQuery`; `Report` and `Findings` |
-| `termcap/termcaptest` | `Terminal`, a scripted fake terminal, with `SetRunTimeout`; `Profile` and seven profiles; `Run` |
+| `termcap` | `Probe`, from `NewProbe`: an I/O-free engine (one batch of queries ended by DA1, a deadline the host times, mode 2031 and its reset), driven by `Start`, `HandleReply`, `HandleTimeout` and `HandleHook`, and drained through `NextEvent`'s `ProbeEvent`s; `ParseReply`, a reply's bytes as a `Reply` of a `ReplyKind`, colours read by XParseColor's grammar at 16 bits; `ColorProfile`; `WithoutModeQuery`; `EnvCaps`, the environment's facts with no program; `Caps` of `Fact`s with origin and reason, as JSON (v2); `ErrUnknownName`; `Env`, whose lookups ignore case on Windows; `FromEnv` and `Identity`; the keyboard, link and notification views; `TmuxQuery`; `Report` and `Findings` |
+| `termcap/termcaptea` | `Prober`, from `NewProber`: the `Probe`'s host in a Bubble Tea program (the batch on the first `tea.EnvMsg`, the deadline from `Init`, tea's own replies turned into `Reply`s, `CapsMsg` after tea's colour profile, `IsReplyFragment`); `KeyboardEnhancements`; `FromColorProfile` and `ToColorProfile` |
+| `termcap/termcaptest` | `Terminal`, a scripted fake terminal, with `SetRunTimeout` and `Reply`; `Profile` and seven profiles; `Run` |
 | `termsvc` | `Notifier` (OSC 99, 777, 9 or the bell; focus policies; `WithNotifyFilter`; a `Backend` or `BackendFunc`; `NotifyResultMsg`; `Sequence`, its bytes for a CLI; `NotifyContext` and `WithBackendTimeout`); `Copy`, `CopyContext`, `CopySequence` and `CopiedMsg`, with a `Clipboard` or `ClipboardFunc`; `Link`, `LinkDisplay`, `LinkPolicy`; prompt marks; `Wrap`; `SanitizeTitle`; the activity beacon; `Pointer`; `ProgressSupported` |
 | `internal/termevent` | `Decode`: the ultraviolet events tea passes through untranslated, as plain values |
 | `internal/termevent/termeventtest` | those events built for tests outside `internal/termevent` |
@@ -78,7 +80,7 @@ below).
 
 - **`layout` has no Charm import,** so its solver can serve any front end.
 - **The Charm-free cores** are `fuzzy`, `glyph`, `internal/enum`,
-  `internal/sanitize`, `layout`, `safetext` and `when`: none links a Charm
+  `internal/sanitize`, `layout`, `safetext`, `termcap` and `when`: none links a Charm
   module but `x/ansi`, so a line-mode CLI can use them without Bubble Tea
   ([0020-MADR](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
   D1, D11). `internal/conformance` checks their whole import closure, and
@@ -116,7 +118,10 @@ below).
   `internal/termevent/termeventtest`, under the second, builds its events
   for other packages' tests.
 - **`termcap` learns, and `termsvc` acts.** The probe reads the
-  environment from `tea.EnvMsg` only, never from the process; neither
+  environment from the `Env` its host passes, `tea.EnvMsg` under
+  `termcaptea`, never from the process; it does no I/O, and its host
+  writes what it asks for ([0020-MADR](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
+  A2). Neither
   package starts a process, and commands such as `TmuxQuery` are returned
   for the program to run
   ([0005-MADR](decisions/0005-MADR-terminal-capabilities-and-services.md)).
@@ -200,6 +205,7 @@ tools/verify/               python3 -m tools.verify: a step's gates, its
 glyph/ theme/ layout/ workspace/ tuitest/ termcap/ termsvc/
 when/ command/ fuzzy/       the packages; goldens under testdata/golden/
 safetext/                   where a package renders
+termcap/termcaptea/         the probe's Bubble Tea host
 termcap/termcaptest/        fake terminals for tests
 launch/                     start the TUI from a program's own CLI
 launch/launchtest/          fake streams for a program's tests

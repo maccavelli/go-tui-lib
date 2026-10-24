@@ -49,7 +49,7 @@ var (
 	}{
 		{"command.Option", "*command.Command", "command.WithDanger(command.UI)"},
 		{"command.RegistryOption", "*command.Registry", "command.WithMaxArgBytes(1)"},
-		{"termcap.Option", "*termcap.Prober", "termcap.WithGOOS(\"linux\")"},
+		{"termcap.Option", "*termcap.Probe", "termcap.WithGOOS(\"linux\")"},
 		{"termsvc.NotifyOption", "*termsvc.Notifier", "termsvc.WithProtocol(termsvc.Bell)"},
 		{"workspace.Option", "*workspace.Workspace", "workspace.WithoutMouse()"},
 		{"workspace.WrapOption[bubble]", "*workspace.Model[bubble]", "workspace.OnSize[bubble](nil)"},

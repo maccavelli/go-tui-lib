@@ -1,11 +1,16 @@
 # Terminal capabilities and services
 
-For a Bubble Tea v2 program that wants to know what its terminal can do,
-over SSH and inside tmux as well as locally, and to send notifications,
-clipboard writes and links that suit it. Three packages do the work:
+For a program that wants to know what its terminal can do, over SSH and
+inside tmux as well as locally, and to send notifications, clipboard
+writes and links that suit it: a Bubble Tea v2 program, or a line-mode
+CLI. These packages do the work:
 
 - `termcap` learns the terminal's capabilities from one batch of queries
-  that ends with DA1, and reports each fact with where it came from.
+  that ends with DA1, and reports each fact with where it came from. Its
+  `Probe` does no I/O, and `termcap` links no Charm module but `x/ansi`,
+  so a line-mode CLI drives it itself.
+- `termcap/termcaptea` is the `Probe`'s host in a Bubble Tea program: its
+  `Prober` sits beside your model.
 - `termsvc` turns those facts into commands and strings: notifications, the
   clipboard, links, prompt marks, titles and the activity beacon.
 - `termcap/termcaptest` runs your program against scripted fake terminals,
@@ -13,25 +18,29 @@ clipboard writes and links that suit it. Three packages do the work:
 
 Why they are built this way is in
 [0005-MADR](../decisions/0005-MADR-terminal-capabilities-and-services.md),
-with its amendments A1 to A5. The examples `ExampleProber` and
-`ExampleReport` compile with the package
+with its amendments A1 to A5; the split into a core and its Bubble Tea
+host is
+[0020-MADR](../decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
+D4 and A2. The examples `ExampleProbe` and `ExampleReport` compile with
+`termcap`, and `ExampleProber` with `termcaptea`
 (`go doc -all github.com/maccavelli/go-tui-lib/v2/termcap`).
 
 ## Embed a prober
 
-A `Prober` is not a `tea.Model`. Your model keeps one, returns its `Init`
-from your `Init`, passes it every message, and quits through it:
+A `termcaptea.Prober` is not a `tea.Model`. Your model keeps one, returns
+its `Init` from your `Init`, passes it every message, and quits through
+it:
 
 ```go
 type model struct {
-    probe *termcap.Prober
+    probe *termcaptea.Prober
     ws    *workspace.Workspace
     caps  termcap.Caps
 }
 
 func newModel() *model {
     return &model{
-        probe: termcap.NewProber(),
+        probe: termcaptea.NewProber(),
         // The prober asks for the background; the workspace must not ask too.
         ws: workspace.New(root, panes, workspace.WithoutBackgroundQuery()),
     }
@@ -59,8 +68,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 - **The prober never hides a message.** Every reply still reaches your
   model and the workspace.
 - **It never re-asks what tea asks.** Tea queries modes 2026 and 2027 and
-  XTGETTCAP itself, and acts on the answers; the prober reads tea's
-  messages instead.
+  XTGETTCAP itself, and acts on the answers; the prober builds its probe
+  with `termcap.WithoutModeQuery(2026, 2027)`, and reads tea's messages
+  instead.
 - **One background query.** The prober writes the OSC 11 query in its
   batch, before DA1. A workspace beside it asks too unless it is built with
   `workspace.WithoutBackgroundQuery()`; with both, the query goes out
@@ -101,8 +111,8 @@ override is never replaced. Read the views rather than the brand:
 
 | View | Says |
 | :--- | :--- |
-| `KeyboardFlags(caps)` | what to put in `View.KeyboardEnhancements`: event types only where the terminal reports them cleanly |
-| `caps.Keyboard()` | the Kitty fact, those enhancements, the flags the terminal accepted, and whether a binding may wait for a release |
+| `termcaptea.KeyboardEnhancements(caps)` | what to put in `View.KeyboardEnhancements`: event types only where the terminal reports them cleanly |
+| `caps.Keyboard()` | the Kitty fact, the flags to ask for (`Request`: 2, event types, or 0), the flags the terminal accepted, and whether a binding may wait for a release |
 | `caps.Links()` | whether OSC 8 links work |
 | `caps.Notifications()` | OSC 99, OSC 777, OSC 9 and focus reports |
 | `caps.ReleasesReported()` | whether key releases arrive |
@@ -121,11 +131,12 @@ features; turning the protocol off belongs to a later record (MADR A4).
 | `WithOverride(f)` | sets facts you know better; set them with origin `Override` |
 | `WithoutColorSchemeUpdates()` | never subscribes to mode 2031 |
 | `WithoutBackgroundRequest()` | never asks for the background |
-| `WithDisabled()` | sends nothing; the first `tea.EnvMsg` delivers the environment's facts |
+| `WithDisabled()` | sends nothing; the probe ends at once with the environment's facts, which a `Prober` delivers on the first `tea.EnvMsg` |
 | `WithAppearanceEnv(name)` | reads light or dark from `LC_` + `name`, which a default sshd forwards, and from `name`, which wins when both are set |
 | `WithAppearanceHook(f)` | asks the desktop, through your function |
 | `WithConsoleHost(f)` | asks Windows whether this is the classic console |
 | `WithGOOS(goos)` | reads the identity for another OS: a test, or a wish server |
+| `WithoutModeQuery(modes...)` | leaves those DECRQM queries out of the batch: the host asks for them, and passes their reports in |
 
 Under JetBrains the prober sends nothing at all, and inside Neovim's, Vim's
 or Emacs's terminal it skips the gated queries; each fact says why. A
@@ -158,6 +169,65 @@ caps := termcap.EnvCaps(termcap.Env(os.Environ()), runtime.GOOS,
 can probe. Pass the prober to `launch.WithRestorer` as well: its resets,
 such as mode 2031's, are then written on every outcome, a crash included
 ([Start the TUI from your CLI](commands.md#start-the-tui-from-your-cli)).
+
+## Probe from a line-mode CLI
+
+A program that runs no Bubble Tea drives a `termcap.Probe` itself. The
+probe does no I/O, reads no clock and starts no goroutine: you give it
+the environment, each reply and the time, and drain the events it
+returns until `ProbeNoEvent`.
+
+```go
+p := termcap.NewProbe()
+p.Start(termcap.Env(os.Environ()), time.Now())
+for done := false; !done; {
+    for e := p.NextEvent(); e.Kind != termcap.ProbeNoEvent; e = p.NextEvent() {
+        switch e.Kind {
+        case termcap.ProbeWrite:
+            io.WriteString(tty, e.Data)
+        case termcap.ProbeRunHook:
+            v, ok := e.Run() // a hook you set, which may start a process
+            p.HandleHook(e.Hook, v, ok)
+        case termcap.ProbeDone:
+            caps, done = e.Caps, true
+        } // and ignore a kind you do not know
+    }
+    if done {
+        break
+    }
+    deadline, _ := p.Timeout()
+    raw, ok := readReply(tty, deadline) // your raw-mode reader: one whole reply
+    if !ok {
+        p.HandleTimeout(time.Now())
+        continue
+    }
+    p.HandleReply(termcap.ParseReply(raw), time.Now())
+}
+defer io.WriteString(tty, p.Restore()) // mode 2031's reset, or ""
+```
+
+What Bubble Tea does for a TUI, the CLI does itself:
+
+- **Probe only from raw mode, and never without input.** A reply nobody
+  reads reaches the user's input line, so read every reply the batch
+  asks for. DA1 comes last; its answer ends the probe, and each query
+  still unanswered then is unsupported.
+- **Read whole replies.** A reply can arrive split across reads, even
+  inside a UTF-8 sequence. Join bytes into whole sequences before
+  `ParseReply`; with the planned `termkey` decoder, do not `Flush` while
+  `p.Awaiting()` is true
+  ([0020-MADR](../decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
+  A2.4).
+- **`ParseReply` takes what terminals send:** 7-bit and 8-bit
+  introducers, and strings ended by BEL, ST, 0x9C, or old urxvt's bare
+  ESC. Apple Terminal ends an OSC reply with BEL whatever the query used.
+- **The probe asks DECRQM 2026 and 2027 itself,** under Bubble Tea's own
+  rule: not over SSH, and not in Apple Terminal.
+- **Write `Restore()` before you exit,** or pass
+  `WithoutColorSchemeUpdates()`, as a TUI must.
+- **Multiplexers.** tmux answers DA1 itself and passes a query outward
+  only through its passthrough; GNU screen answers DA1 before the outer
+  terminal's replies arrive, so its facts are thin.
 
 ## Drop split replies
 
@@ -264,7 +334,8 @@ return m, n.Notify(termsvc.Notification{Title: "Done", Body: "3 files changed"})
 
 `termcap.Report` writes one ASCII line per fact, then the findings: what
 each reason token means and what would change it. Pass it the writer you
-choose; `WithReportJSON()` writes JSON with a `schema_version`.
+choose; `WithReportJSON()` writes JSON with a `schema_version`, 2 since
+`v2.0.0`, which writes the colour profile by its token (`truecolor`).
 
 ```go
 func doctor(w io.Writer, caps termcap.Caps) error {
@@ -291,8 +362,9 @@ environment, and `WithGOOS` pins the OS a prober reads it for.
 ## What the library never does
 
 - **It never reads the process environment.** The environment comes from
-  `tea.EnvMsg`, which under wish is the SSH session's.
+  `tea.EnvMsg`, which under wish is the SSH session's, or from the `Env` a
+  CLI passes to `Start`.
 - **It never starts a process.** `TmuxQuery`, `TmuxLoadBuffer` and
   `ImageReadCommands` return commands for you to run.
 - **It never writes to the terminal itself.** Every sequence leaves as a
-  `tea.Cmd` or a string you place.
+  `tea.Cmd`, a `ProbeWrite` event, or a string you place.

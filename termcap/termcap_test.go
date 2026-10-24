@@ -6,8 +6,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-
-	"github.com/charmbracelet/colorprofile"
 )
 
 func TestOriginOrder(t *testing.T) {
@@ -160,7 +158,7 @@ func full() Caps {
 		Sixel:               q(Supported),
 		Dark:                Fact[bool]{Value: true, Origin: Queried},
 		Background:          color.RGBA{R: 0x1e, G: 0x1f, B: 0x29, A: 0xff},
-		Profile:             colorprofile.ANSI256,
+		Profile:             ProfileANSI256,
 		Brand:               Fact[Brand]{Value: BrandWezTerm, Origin: Queried},
 		EnvBrand:            Fact[Brand]{Value: BrandUnknown, Origin: Environment, Reason: ReasonUnknownTerminal},
 		Editor:              Fact[Editor]{Value: EditorNeovim, Origin: Environment},
@@ -198,7 +196,7 @@ func TestCapsJSONRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`"origin":"query"`, `"value":"supported"`, `"mux":{"value":"tmux","origin":"env"}`, `"background":"#1e1f29"`, `"profile":"ANSI256"`} {
+	for _, want := range []string{`"origin":"query"`, `"value":"supported"`, `"mux":{"value":"tmux","origin":"env"}`, `"background":"#1e1f29"`, `"profile":"ansi256"`} {
 		if !strings.Contains(string(b), want) {
 			t.Errorf("JSON lacks %s:\n%s", want, b)
 		}

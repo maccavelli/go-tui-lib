@@ -34,7 +34,8 @@ const tmuxFormat = "#{version}\t#{extended-keys-format}\t#{mouse}\t#{client_term
 
 // TmuxQuery is the argv of one tmux command that prints what ParseTmux
 // reads. The library never runs it: the program does, inside the tmux the
-// environment names, and passes the facts to Prober.SetTmux
+// environment names, and passes the facts to Probe.SetTmux, or
+// termcaptea's Prober.SetTmux
 // (docs/decisions/0005-MADR-terminal-capabilities-and-services.md A1).
 func TmuxQuery() []string { return []string{"tmux", "display-message", "-p", tmuxFormat} }
 

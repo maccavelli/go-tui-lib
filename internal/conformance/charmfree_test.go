@@ -22,6 +22,7 @@ var cores = []string{
 	"internal/sanitize",
 	"layout",
 	"safetext",
+	"termcap",
 	"when",
 }
 

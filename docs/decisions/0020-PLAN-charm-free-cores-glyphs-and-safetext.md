@@ -1,6 +1,6 @@
 ---
 status: in-progress
-date: 2026-10-23
+date: 2026-10-24
 associated-madr: "0020-MADR-charm-free-cores-glyphs-and-safetext.md"
 ---
 # Implement Charm-free cores of `termcap`, `termsvc`, `command` and `keymap`, the `termkey` decoder, the status and meter glyphs, and `safetext`
@@ -34,6 +34,13 @@ for its answer before Step 7 starts. *Later on 2026-10-24:* A4.1 is
 answered, `v2.0.0` at `/v2`. Step 6A, proposed with MADR A4.2, moves the
 path and says how Steps 7 to 13 read under it; where they say `v0.14.0`,
 read `v2.0.0`.
+
+*Deviation, 2026-10-24, Step 7:* Step 7 as written removes `Prober` from
+`termcap` a step before `termcaptea` exists, so `termcap`'s tests,
+`termcaptest`'s and `launch`'s could not compile between the two steps.
+The owner chose to run Steps 7 and 8 as one step and one commit; the
+Execution Record's "Steps 7 and 8" entry has the evidence, and the facts
+table and Step 8's files carry notes.
 
 ## Goal
 
@@ -74,7 +81,7 @@ acts on directly:
 | Bubble Tea v2.0.10 sends DECRQM 2026 and 2027 itself, only where `shouldQuerySynchronizedOutput` allows (`tea.go:980-994`, `:1118-1123`) | 7, 8 |
 | `x/ansi` v0.11.8 exports `DecodeSequence(b, state, p)` and a `Parser` with `Params`, `Command` and `Data` (`parser_decode.go:70`, `parser.go:85-121`); its OSC query constants end with BEL (`background.go:120`, `:147`) | 7 |
 | `termcaptest.Terminal` answers each query with raw reply bytes (`termcaptest.go:394-509`), through the unexported `answer` | 8 |
-| Outside `termcap`, only `termcap/termcaptest/termcaptest.go` uses `Prober`; `termsvc/notify.go` names `Prober` and `EnvCaps` in its documentation; `launch` uses only `termcap.Env` | 8 |
+| Outside `termcap`, only `termcap/termcaptest/termcaptest.go` uses `Prober`; `termsvc/notify.go` names `Prober` and `EnvCaps` in its documentation; `launch` uses only `termcap.Env`. *Corrected 2026-10-24, and so already at `63c68d6`: `termcaptest.go` names `Prober` only in its documentation; `termcaptest_test.go:31` and `launch/consumer_test.go:372` call `NewProber`; `launch/restore.go:7` and `docs/guides/commands.md:769` name `*termcap.Prober`* | 8 |
 | `Notifier.NotifyContext` checks the policy and numbers on the caller's goroutine, and calls a backend inside its command (`notify.go:279-300`); `CopyContext` writes OSC 52 through `tea.SetClipboard` (`clipboard.go:130-155`) | 8 |
 | `Registry.Dispatch` runs a `Loop` command at once and an `Async` one inside its command, then batches `Result.Cmd`, `ResultMsg` and, for a `Prompt` or `Forward`, `PromptMsg` (`dispatch.go:24-40`, `:244-250`) | 9 |
 | `Result{Cmd: …}` is set at nine sites in `workspace/commands.go` and once in `command/builtin.go:57`; `launch/run.go:98` calls `Attach(p.Send)` | 9 |
@@ -95,7 +102,7 @@ acts on directly:
 | 6 | `README.md`, `docs/` | release `v0.13.0` (tagged `v1.13.0`, MADR A4) |
 | 6A | `go.mod`, the Go files, `.golangci.yml`, `scripts/go-apicheck.py`, `scripts/go-examples.py`, `testdata/frameworks/go.mod.tmpl`, `AGENTS.md`, `docs/` | the module path to `/v2` (MADR A4.1, A4.2) |
 | 7 | `termcap/`, `internal/conformance/` | the I/O-free probe engine and `ParseReply` (D4, A2) |
-| 8 | `termcap/termcaptea/`, `termcap/termcaptest/`, `termcap/` (tests moved), `internal/conformance/`, `docs/` | `termcaptea.Prober` over the engine, the differential test (D4, A2) |
+| 8 | `termcap/termcaptea/`, `termcap/termcaptest/`, `termcap/` (tests moved), `internal/conformance/`, `launch/consumer_test.go`, `launch/restore.go`, `docs/` | `termcaptea.Prober` over the engine, the differential test (D4, A2); with Step 7, one step (2026-10-24) |
 | 9 | `termsvc/`, `termsvc/termsvctea/`, `docs/` | the `termsvc` split (D5, A1.2) |
 | 10 | `command/`, `command/commandtea/`, `workspace/commands.go`, `launch/run.go`, their tests, `docs/` | the `command` split (D6, A1.2) |
 | 11 | `termkey/`, `internal/termevent/termkey_test.go` | the key type and decoder (D7, A1.2) |
@@ -673,6 +680,11 @@ were written with, since they are history.
 
 *Starts only once MADR A2 is accepted.*
 
+*Deviation, 2026-10-24:* Steps 7 and 8 run as one step, with one commit,
+one set of gates and one `apicheck.allow` block, whose comment names
+"0020-PLAN Steps 7 and 8". Each step's tests and mutations stay as
+written, and Rule 1's "each step compiles" holds at the end of the pair.
+
 **Moves and changes** (with Step 8's, the `apicheck.allow` block's whole
 list for `termcap`):
 
@@ -857,7 +869,12 @@ OSC (`TestParseReply`); `#3a7` is scaled, not taken as the high bits
 `termcap/termcaptest/termcaptest.go`; the `termcap` tests that move;
 `internal/conformance/options_test.go`; `termsvc/notify.go` (its
 documentation); `docs/guides/terminal-capabilities.md`;
-`docs/architecture.md`; `docs/glossary.md`.
+`docs/architecture.md`; `docs/glossary.md`. *Added 2026-10-24, by the
+corrected fact:* `termcap/termcaptest/termcaptest_test.go` and
+`launch/consumer_test.go` (each `termcap.NewProber` to
+`termcaptea.NewProber`, and the profile compared as a `ColorProfile`);
+`launch/restore.go` and `docs/guides/commands.md` (the documentation's
+`*termcap.Prober` to `*termcaptea.Prober`).
 
 * **`Prober`,** with today's exported surface: `NewProber(o
   ...termcap.Option) *Prober`, `Init`, `Update`, `Quit`, `Restore`,
@@ -909,6 +926,13 @@ documentation); `docs/guides/terminal-capabilities.md`;
   colours Bubble Tea's decoded messages carry; the core's 16-bit values
   are pinned by `TestXParseColor`. `TestProbeTranscripts` of Step 7 is
   rewritten to use `Terminal.Reply`.
+  *Deviation, 2026-10-24:* the TUI run's `KeyboardFlags` depends on
+  whether Bubble Tea's first-render push of flag 1 reaches the terminal
+  before the probe's `CSI ? u`, so the core is driven instead with the
+  replies a fresh `Terminal` gives, through `Reply`, to the sequences the
+  TUI run wrote, in its order (`Terminal.Sequences`). `Reply` keeps the
+  flag stack as `answer` does. Every field but `Profile` is compared,
+  `KeyboardFlags` included.
 * **`TestColorProfileRoundTrip`:** for every `colorprofile` value from
   `Unknown` to `TrueColor`, `ToColorProfile(FromColorProfile(p)) == p`, and
   the token equals `strings.ToLower(p.String())`.
@@ -2050,3 +2074,273 @@ loop test); `command/registry.go` imports Bubble Tea
   file(s) clean" on each, with the API diff and examples gates.
 * **Nothing is tagged:** `v2.0.0` is Step 13's. Steps 7 to 12 build at
   `/v2` and diff against `v1.13.0` through the boundary move.
+
+### Steps 7 and 8: the probe engine and `termcaptea` (2026-10-24)
+
+* The owner committed Step 6A as `f97a2e4` and said to proceed
+  ("committed, proceed").
+* **The facts, re-read before Step 7** (Prerequisites): `termcap` and
+  `internal/termevent` changed after `63c68d6` only in import lines (Step
+  5's `json_test.go` rows, and Step 6A's path), one for one, so every line
+  the facts table cites still holds (`prober.go:51`, `:252-326`,
+  `:336-356`, `:369`, `:442-450`, `:527-538`, `:556-585`, `:737-770`;
+  `envcaps.go:16-22`). `go.mod` still requires Bubble Tea v2.0.10,
+  `x/ansi` v0.11.8 and `colorprofile` v0.4.3. One row was wrong, and was
+  already wrong at `63c68d6`; it is corrected in the table.
+* **Deviation, 2026-10-24.**
+  * *Found:* Step 7 removes `Prober`, `NewProber` and `KeyboardFlags` from
+    `termcap`, gives `Option` the method `apply(*Probe)`, drops
+    `Reply.Msg` and retypes `Caps.Profile`, but `termcaptea` only exists
+    from Step 8. Between the two steps these would not compile:
+    `termcap`'s `prober_test.go`, `discipline_test.go`,
+    `example_test.go`, `identity_test.go`, `envcaps_test.go`,
+    `report_golden_test.go` and `fuzz_test.go` (Step 8 moves them);
+    `termcap/termcaptest/termcaptest_test.go:31` (`termcap.NewProber`),
+    and its `:88`, which compares `Profile` with a
+    `colorprofile.Profile`; and `launch/consumer_test.go:372`
+    (`TestRunRestorerAfterCrash`). Rule 1 forbids a step that leaves
+    `main` so. `launch/restore.go:7` and `docs/guides/commands.md:769`
+    also name `*termcap.Prober`. These four files were in neither step's
+    list.
+  * *Resolutions offered:* (a) Step 7 rewrites `termcap.Prober` in place
+    as a driver over the engine, and Step 8 moves it; (b) Steps 7 and 8
+    as one step and one commit.
+  * *Chosen:* (b), "Steps 7 and 8 as one". One commit, one set of gates,
+    one `apicheck.allow` block named "0020-PLAN Steps 7 and 8"; both
+    steps' tests and mutations as written; the four files added to Step
+    8's.
+  * The MADR is not amended: no decision changes, and the wrong fact is
+    the PLAN's only.
+* **Deviation, 2026-10-24, the differential.**
+  * *Found:* `TestCoreAndAdapterAgree` as written compares every field but
+    `Profile`, but the TUI run's `KeyboardFlags` is not deterministic.
+    Bubble Tea v2.0.10's first render pushes Kitty flag 1
+    (`cursed_renderer.go:425-430`, `:896`), and whether that reaches the
+    fake terminal before the probe's `CSI ? u` decides the reply, 0 or 1.
+    `termcap/report_golden_test.go:36-39` already pins the flags for that
+    reason. Driven through `Terminal.Reply`, the core always sees 0.
+  * *Resolutions offered:* (a) drive the core with the replies a fresh
+    `Terminal` gives, through `Reply`, to the sequences the TUI run wrote,
+    in its order; (b) pin `KeyboardFlags` with `WithOverride` in both paths.
+  * *Chosen:* (a), "Replay the TUI's queries". `Terminal.Reply` keeps the
+    Kitty flag stack as `answer` does; every field but `Profile` is
+    compared, `KeyboardFlags` included. The core's own batch is covered by
+    `TestProbeBatch` and `TestProbeTranscripts`.
+* **`termcap`, the engine (Step 7).**
+  * New: `reply.go` (`Reply`, `ReplyKind`, `ModeSetting`, `ParseReply`),
+    `xcolor.go` (the `XParseColor` reader), `probe.go` (`Probe`,
+    `ProbeEvent`, `ProbeEventKind`, `ProbeHook`, `CapsMsg`,
+    `ColorSchemeMsg`, `DefaultTimeout`), `options.go` (every option, on
+    `*Probe`, and `WithoutModeQuery`), `queries.go` (`Query`, the batch,
+    its parsers over `Reply`, and `gatedAllowed`), `colorprofile.go`.
+  * Changed: `caps.go` (`Profile ColorProfile`, written by token, read by
+    token or colorprofile's spelling), `views.go` (`KeyboardCaps.Request`;
+    `Enhancements` and `KeyboardFlags` gone), `report.go`
+    (`ReportSchemaVersion = 2`), `envcaps.go` (a disabled `Probe`),
+    `termcap.go` and `tmux.go` (documentation, and three shared token
+    constants for `goconst`), `identity.go` (those constants).
+  * `prober.go` is deleted; its Bubble Tea half is `termcaptea`'s.
+  * `GOWORK=off go list -deps ./termcap`, for linux, darwin and windows,
+    lists no Charm package but `x/ansi` and `x/ansi/parser`.
+  * Choices made in execution, within A2:
+    * `Probe` exports no timeout, and A2.2's API is kept, so
+      `termcaptea.Prober.Init` learns the deadline by starting a scratch
+      `Probe` of the same options at `Init`'s time and reading its
+      `Timeout`; a disabled one has none, so `Init` is `nil`.
+    * `ProbeDone`'s `Caps` is `Caps()` when `NextEvent` returns it, so a
+      hook answered while the host drains is in it.
+    * The probe's own DECRQM 2026 and 2027 read no silence into a missing
+      reply, as tea's do not: `TestEachProfile` pins `SyncOutput`
+      not-queried for `DA1Only`, and the report's text says "not every
+      terminal answers".
+    * `HandleReply` reads a report of mode 2026 or 2027, or of a mode
+      `WithoutModeQuery` names, whoever asked; a report of another mode
+      counts only for a query the batch sent, as today.
+    * `isDark` is ultraviolet's `isDarkColor` (`decoder.go:1781`), the
+      HSL lightness of the 8-bit channels under 0.5, written as
+      `max + min < 255`; `TestDarkMatchesBubbleTea` holds it to tea's.
+    * `x/ansi` v0.11.8's parser drops the last parameter when its buffer
+      is exactly full (found by `TestParseReply`'s 32-parameter row), so
+      the buffer holds 33 and a reply of more than 32 is refused before
+      decoding, below the panic.
+    * BEL ends a DCS or APC as it ends an OSC; `x/ansi` reads it as data,
+      and `ParseReply` trims it.
+    * An OSC 4 index is read with `strconv.Atoi`, leading zeros and all,
+      as `parsePalette` read it; a stricter first draft failed the moved
+      `TestPaletteAndForeground`.
+  * Behaviour that differs from `v1.13.0`'s prober, each at an edge:
+    * a deadline that fires before `tea.EnvMsg` no longer ends the probe
+      with no environment; the tick is armed again for the deadline once
+      the environment arrives, and ends it then;
+    * a DSR 997 that arrives between DA1 and tea's colour profile now
+      sends `ColorSchemeMsg`, before the held `CapsMsg`; it was dropped;
+    * the follow-up OSC 11 after a DSR 997 is the probe's bytes through
+      `tea.Raw`, not `tea.RequestBackgroundColor`: the same query;
+    * a `tea.ModeReportMsg` of an ANSI mode, and any message that is not
+      a reply, is not offered to a `Query`'s `Parse`, which reads a
+      `Reply` with no `Msg`;
+    * a colour of OSC 4 is a `color.RGBA64` at the reply's precision
+      (A2.4); OSC 10 and 11 keep tea's colours in a TUI.
+* **`termcaptea` (Step 8):** `doc.go`, `prober.go` (`Prober`, today's
+  surface, over a `Probe` built with `WithoutModeQuery(2026, 2027)`),
+  `convert.go`, `keyboard.go` (`KeyboardEnhancements`), `profile.go`
+  (`FromColorProfile`, `ToColorProfile`). Each drain is one `tea.Sequence`
+  of the probe's writes and messages in order, beside its hooks and any
+  tick.
+* **Outside `termcap`:** `termcaptest.Terminal.Reply`, under the
+  terminal's lock, and its documentation; `termcaptest_test.go` on
+  `termcaptea`, comparing `Profile` through `FromColorProfile`, with the
+  new `TestTerminalReply`; `launch/consumer_test.go:372` and
+  `launch/restore.go`; `termsvc/notify.go`'s documentation;
+  `internal/conformance`'s `cores`, `enums` and the `termcap.Option` case
+  on `*termcap.Probe`; `.golangci.yml`'s `charmfree` with
+  `**/termcap/*.go`; `scripts/apicheck.allow`'s block.
+* **Tests moved, by Rule 7.** Every name below runs in `termcaptea`, with
+  `termcap.` qualifiers; the changes beyond those are listed.
+  * `prober_test.go`, but `TestGatedAllowed`, which stays with the
+    engine in `termcap/probe_test.go`. A local `fixed` helper;
+    `backgroundRequests` also counts a write of the OSC 11 query alone,
+    which is how the prober now writes the follow-up (the batch, which
+    holds it among others, is not one).
+  * `discipline_test.go`, but `TestAlacrittyVersionFromDA2`, which stays
+    and reads `Keyboard().Request`. `queryFacts`, unexported, is the list
+    of its seven facts; "nothing awaited" answers each query the batch
+    sent, where it set an unexported flag; `Profile` is compared as a
+    `ColorProfile`.
+  * From `identity_test.go`: `TestWithGOOS`, `TestAppearanceChain`,
+    `TestHooksAreNotCalledWhenNotSet` (on `hookMsg`), `TestConsoleHost`,
+    `TestPaletteAndForeground` (the palette wanted as `RGBA64`, A2.4; its
+    refusals stay in `termcap` as `TestPaletteRefusals`, through
+    `ParseReply`) and `TestBrandFromXTVersion`. `TestKeyboardFlags` stays
+    as `TestKeyboardRequest`; `TestParseTmux` sets the facts on a
+    `Probe`; `TestParseXColor` gives way to `TestXParseColor`.
+  * `FuzzProberReplies`, from `fuzz_test.go`.
+  * `TestXTVersionSanitized`'s tea message; `termcap` keeps the
+    environment's cases and reads a `ReplyVersion`.
+  * The `Prober` half of the `EnvCaps` match, as
+    `TestEnvCapsMatchesDisabledProber`; `termcap` keeps the facts, as
+    `TestEnvCapsMatchesDisabledProbe`.
+  * `ExampleProber`, with `KeyboardEnhancements`; `termcap` gains
+    `ExampleProbe`, a CLI's drive loop with written-out replies.
+  * `report_golden_test.go` and its 16 text goldens, moved from
+    `termcap/testdata/golden` to `termcap/termcaptea/testdata/golden`.
+* **Core test files that link Bubble Tea after the step (Rule 7):** no
+  `termcap` test imports it. `termcap/envcaps_test.go` and
+  `termcap/transcripts_test.go`, both `termcap_test`, import
+  `termcaptest`, which links it, for its profiles and `Terminal.Reply`;
+  `TestProbeTranscripts` drives the core with no program.
+* **New tests:** `TestParseReply`, `TestReplyKindsAndSettings`,
+  `TestXParseColor`, `TestProbeBatch`, `TestProbeReadsHostModes`,
+  `TestProbeTimeout`, `TestProbeSentinel`, `TestProbeDuplicateDA1`,
+  `TestProbeHooks`, `TestProbeNoEvent`, `TestProbeColorScheme`,
+  `TestProbeBackground`, `TestProbeReplyTooLong`, `TestProbeJetBrains`,
+  `TestProbeAwaiting`, `TestQuerySynchronizedOutput`,
+  `TestProbeTranscripts`, `TestPaletteRefusals`, `TestColorProfileTokens`,
+  `TestCapsJSONReadsOldProfile`, `TestReportSchemaVersion`, `ExampleProbe`,
+  `FuzzParseReply`, `FuzzProbe`; in `termcaptea`,
+  `TestCoreAndAdapterAgree`, `TestDarkMatchesBubbleTea`,
+  `TestKeyboardEnhancements`, `TestColorProfileRoundTrip`; and
+  `termcaptest`'s `TestTerminalReply`. `TestProbeTranscripts` uses
+  `Terminal.Reply` at once: the steps run as one, so the copied
+  transcript of Step 7 had no step to live in.
+* **Golden files,** each read:
+  * the 16 text reports, moved, differ from `HEAD`'s only in the
+    profile's line, 32 lines in all, as `TrueColor` → `truecolor`,
+    `ANSI256` → `ansi256` and `ANSI` → `ansi`;
+  * `report-json-full.golden` and `report-json-zero.golden`:
+    `"schema_version": 1` → `2`, and in the full one `"profile":
+    "ANSI256"` → `"ansi256"`. Nothing else moved.
+  * `report_test.go`'s and `termcap_test.go`'s wanted profile, and
+    `TestCapsJSONRoundTrip`'s, change the same way.
+* **Checks:**
+  * `GOWORK=off go build ./...`, `go vet ./...`, `go test ./...`, and
+    `go test ./...` in workspace mode: exit 0;
+  * `TestCoreAndAdapterAgree` and `TestReportGolden`, `-count=30`: ok;
+  * `golangci-lint` over the changed packages, for linux, darwin and
+    windows: `0 issues`; the first run found `goconst` on the shared
+    tokens, a `gosec` G115 on the checked DECRPM conversion (now a
+    `nolint` with its reason) and `staticcheck` ST1018 on raw format
+    characters the writing tool had decoded from `\u` escapes in the two
+    `TestXTVersionSanitized` files, written back as escapes and compared
+    with `HEAD`'s strings;
+  * `make examples`: "46 case(s) run", "10 excerpt(s) checked", "clean";
+  * `make apicheck`: "against v1.13.0, 8 incompatible change(s)",
+    "clean", with the block;
+  * `python3 -m tools.verify names` over the eight new type names:
+    "8 planned name(s), clean";
+  * `markdownlint-cli2` over the changed guides and indexes: "0 issues".
+* **Mutations,** through `python3 -m tools.verify mutate`, each on a
+  fresh copy: 41, all killed by the test named (`mutate: 41 killed, 0
+  survived, 0 errors`, on the tree as handed off). Rows 7.x and 8.x are
+  the PLAN's lists; 7.5b to 7.10, 8.6, 8.7 and c.1 to c.21 are added, so
+  that every new or changed test is seen failing (Rule 5).
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | 7.1 the sentinel leaves unanswered queries unknown (TestProbeTranscripts, DA1 only) | `transcripts_test.go:114: xterm: DesktopNotify = {Value:unknown Origin:not-queried Reason:}, want {Value:unsupported Origin:query Reason:}` |
+  | 7.2 ParseReply refuses a BEL-terminated OSC (TestParseReply) | `reply_test.go:99: OSC 11, BEL: ParseReply("\x1b]11;rgb:1e1e/1e1e/2e2e\a") = {Kind:unknown Raw:\x1b]11;rgb:1e1e/1e1e/2e2e\x07 Params:[] Mode:0 Setting:not…` |
+  | 7.3 #3a7 is scaled, not taken as the high bits (TestXParseColor) | `xcolor_test.go:26: xParseColor("#3a7") = {13107 43690 30583 65535}, true; want #3000a0007000` |
+  | 7.4 HandleTimeout ignores the deadline (TestProbeTimeout), replacing a mutation that did not compile | `probe_test.go:156: before the deadline: [{Kind:done Data: Hook:none Run:<nil> Caps:{Complete:false TimedOut:true Terminal:{Value:xterm-kitty Origin…` |
+  | 7.5 ProbeDone is queued twice on a second DA1 (TestProbeDuplicateDA1) | `probe_test.go:221: first DA1 [{Kind:done Data: Hook:none Run:<nil> Caps:{Complete:true TimedOut:false Terminal:{Value:xterm-kitty Origin:env Reason…` |
+  | 7.5b the same, seen by FuzzProbe's seeds | `fuzz_test.go:135: ProbeDone 2 times` |
+  | 7.6 WithoutModeQuery is ignored (TestProbeBatch) | `probe_test.go:119: local, without 2026 and 2027: first event [{Kind:write Data:\x1b[?u\x1b[?2031$p\x1b[?2048$p\x1b[?1004$p\x1b[?996n\x1b]11;?\x07\x1b[>c\x1b[>q\x1b]99;i=termcap:…` |
+  | 7.7 the console hook is queued on Linux (TestProbeHooks) | `probe_test.go:237: Linux: [{Kind:write Data:\x1b[?u\x1b[?2031$p\x1b[?2048$p\x1b[?1004$p\x1b[?996n\x1b]11;?\x07\x1b[>c\x1b[>q\x1b]99;i=termcap:p=?;\x07\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;A…` |
+  | 7.8 ParseReply reads Pm 5 as a setting (TestParseReply) | `reply_test.go:99: DECRPM Pm 5: ParseReply("\x1b[?1004;5$y") = {Kind:mode Raw:\x1b[?1004;5$y Params:[] Mode:1004 Setting:ModeSetting(5) OSC:0 Index:0 C…` |
+  | 7.8b the same, seen by FuzzParseReply's seeds | `fuzz_test.go:46: ParseReply("\x1b[?2031;5$y") is DECRPM with Pm 5` |
+  | 7.9 termcap/probe.go imports Bubble Tea (TestCoresAreCharmFree) | `charmfree_test.go:170: termcap (GOOS=linux) links charm.land/bubbletea/v2: termcap → charm.land/bubbletea/v2` |
+  | 7.9b the same, refused by depguard's charmfree | `termcap/probe.go:9:2: import 'charm.land/bubbletea/v2' is not allowed from list 'charmfree' … (depguard)` |
+  | 7.10 ParseReply's colour is nil (FuzzParseReply's seeds) | `fuzz_test.go:43: ParseReply("\x1b]11;rgb:1e1e/1e1e/2e2e\x1b\\") is a colour with none` |
+  | 8.1 convert.go drops tea.ModeReportMsg (TestCoreAndAdapterAgree) | `agree_test.go:87: kitty: the core and the Prober disagree:` |
+  | 8.2 the adapter does not pass WithoutModeQuery(2026, 2027) (TestBatchNeverAsksWhatTeaAsks) | `prober_test.go:171: [TERM=xterm-kitty]: the batch asks "\x1b[?2026$p", which tea asks and acts on` |
+  | 8.3 CapsMsg is sent before ColorProfileMsg (TestCapsMsgWaitsForTheColourProfile) | `discipline_test.go:232: 1 CapsMsg before the colour profile` |
+  | 8.4 IsReplyFragment ignores Awaiting (TestIsReplyFragment) | `discipline_test.go:192: a fragment before the batch was sent` |
+  | 8.5 KeyboardEnhancements ignores Request where Kitty is supported (TestKeyboardEnhancements), replacing a mutation that did not compile | `keyboard_test.go:45: terminal.leaks-releases: {ReportEventTypes:true ReportAlternateKeys:false ReportAllKeysAsEscapeCodes:false ReportAssociatedTex…` |
+  | 8.6 Terminal.Reply forgets the Kitty flag stack (TestTerminalReply), replacing one the differential could not see | `termcaptest_test.go:271: step 3: Reply("\x1b[?u") = "\x1b[?0u", want "\x1b[?1u"` |
+  | 8.7 the core's dark rule is max+min under 256, not 255 (TestDarkMatchesBubbleTea) | `agree_test.go:104: {255 0 0 255}: dark true, tea says false` |
+  | c.1 two ColorProfile tokens swapped (TestColorProfileTokens) | `colorprofile_test.go:16: tokens unknown,notty,ascii,ansi256,ansi,truecolor` |
+  | c.2 the same, seen by termcaptea's TestColorProfileRoundTrip | `profile_test.go:22: ANSI: token "ansi256", want "ansi"` |
+  | c.3 the old spellings are not read (TestCapsJSONReadsOldProfile) | `colorprofile_test.go:30: "Unknown": unknown, json: cannot unmarshal JSON object into Go termcap.Caps: termcap: unknown colour profile "Unknown"; wa…` |
+  | c.4 ReportSchemaVersion stays 1 (TestReportSchemaVersion) | `colorprofile_test.go:46: ReportSchemaVersion = 1, want 2` |
+  | c.5 a fresh probe has an event (TestProbeNoEvent) | `probe_test.go:267: a fresh probe: {Kind:write Data: Hook:none Run:<nil> Caps:{Complete:false TimedOut:false Terminal:{Value: Origin:not-queried Rea…` |
+  | c.6 no background query follows a DSR 997 (TestProbeColorScheme) | `probe_test.go:288: options 0: [{Kind:color-scheme Data: Hook:none Run:<nil> Caps:{Complete:false TimedOut:false Terminal:{Value: Origin:not-queried…` |
+  | c.7 OSC 11 reads dark backwards (TestProbeBackground) | `probe_test.go:318: "\x1b]11;rgb:ff/00/00\a": Background {65535 0 0 65535}, Dark {Value:true Origin:query Reason:}; want dark false` |
+  | c.8 a long 8-bit OSC is not matched to its query (TestProbeReplyTooLong) | `probe_test.go:334: an 8-bit OSC over 1 KiB: {Value:unknown Origin:not-queried Reason:}` |
+  | c.9 JetBrains is probed (TestProbeJetBrains) | `probe_test.go:350: JetBrains: [{Kind:write Data:\x1b[?u\x1b[?2031$p\x1b[?2048$p\x1b[?1004$p\x1b[?996n\x1b]11;?\x07\x1b[>c\x1b[>q\x1b]99;i=termcap:p=?;\x07\x1b_Gi=31,s=1,v=1,a=q,t=d,f=…` |
+  | c.10 Awaiting stays true once the batch went out (TestProbeAwaiting) | `probe_test.go:374: awaiting with every query answered` |
+  | c.11 Bubble Tea's rule loses its Windows Terminal clause (TestQuerySynchronizedOutput) | `probe_test.go:418: [TERM=xterm-256color SSH_TTY=x WT_SESSION=x]: false, want true` |
+  | c.12 a host's own modes are not read (TestProbeReadsHostModes) | `probe_test.go:136: SyncOutput {Value:supported Origin:query Reason:}, GraphemeWidth {Value:unsupported Origin:query Reason:}, ColorSchemeReports {V…` |
+  | c.13 a reply after the sentinel is not read (TestProbeSentinel) | `probe_test.go:203: DesktopNotify = {Value:unsupported Origin:query Reason:} after a late reply, want supported` |
+  | c.14 the palette takes an index past 15 (TestPaletteRefusals) | `--- FAIL: TestPaletteRefusals: panic: runtime error: index out of range [16] with length 16` |
+  | c.15 Request asks for disambiguation, not event types (TestKeyboardRequest) | `identity_test.go:166: kitty: Request 1, reason ""; want 2, ""` |
+  | c.16 Alacritty 0.14 counts as newer (TestAlacrittyVersionFromDA2) | `discipline_test.go:24: DA2 [0 1400 1]: event types true, want false` |
+  | c.17 the batch leaves DA2 out (ExampleProbe) | `--- FAIL: ExampleProbe: its output differs from the Output comment` |
+  | c.18 XTVERSION's name is not cleaned (termcap's TestXTVersionSanitized) | `sanitize_test.go:17: Terminal = {Value:evil\x1b[2J\u202eterm …}: the reply kept its controls` |
+  | c.19 the same, seen by termcaptea's TestXTVersionSanitized | `sanitize_test.go:19: Terminal = {Value:evil\x1b[2J\u202eterm …}: the message kept its controls` |
+  | c.20 EnvCaps drops the caller's options (TestEnvCapsMatchesDisabledProbe) | `envcaps_test.go:35: kitty, linux, appearance and override:` |
+  | c.21 the same, seen by termcaptea's TestEnvCapsMatchesDisabledProber | `envcaps_test.go:38: kitty, linux, appearance and override:` |
+
+  The first run had 20 (7.x and 8.x): 17 killed by their test, two killed
+  only by a build failure, so replaced, and one survivor, so replaced:
+  * 7.4 as first written left `deadline` unused, and did not compile;
+  * 8.5 as first written left `ansi` unused, and did not compile;
+  * 8.6 as first written, `Terminal.Reply` forgetting the Kitty flag
+    stack, survived `TestCoreAndAdapterAgree -count=5`: in those runs tea's
+    push reached the terminal after the probe's query, so the replay saw
+    no difference. `TestTerminalReply` now pins the stack, and kills it.
+* **`go fix`.** The first macOS gates run failed `modernize`: Go 1.27's
+  `go fix` writes the batch's literals with promoted fields, `{Name: …}`
+  for `{Query: Query{Name: …}}`, the form `prober.go` had. `go fix
+  ./termcap/` applied it to `queries.go` alone; `go fix -diff ./...` is
+  then empty for linux, darwin and windows, and the gates and the
+  mutations above ran on that tree. The Linux and Windows runs begun
+  before the fix were stopped and run again.
+* **Gates,** `python3 -m tools.verify gates` over the step's 76 present
+  files, nothing skipped: macOS `gates: 19 passed, 0 failed, 0 skipped in
+  407s`; the Linux host `gates: 19 passed, 0 failed, 0 skipped in 925s`;
+  the Windows host `gates: 19 passed, 0 failed, 0 skipped in 2074s`. `release-check` is "255 file(s) clean"
+  on macOS and "282 file(s) clean" on Linux, with the API diff and
+  examples gates.
+* **Identifiers:** `python3 -m tools.verify scan`: `scan: clean (5
+  pattern(s))`.
+* **Not done here:** the release and its migration notes, which are Step
+  13's. Nothing is tagged.

@@ -33,8 +33,11 @@ func WithReportWidth(w int) ReportOption { return func(r *reportConfig) { r.widt
 func WithReportJSON() ReportOption { return func(r *reportConfig) { r.json = true } }
 
 // ReportSchemaVersion is the JSON report's schema_version. It changes only
-// when a field is removed or retyped; a field added leaves it.
-const ReportSchemaVersion = 1
+// when a field is removed or retyped; a field added leaves it. Version 2
+// writes the profile by its token, "truecolor", where version 1 wrote
+// colorprofile's "TrueColor"
+// (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md D4).
+const ReportSchemaVersion = 2
 
 // reportJSON is the JSON report.
 type reportJSON struct {

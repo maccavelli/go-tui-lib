@@ -1,9 +1,9 @@
  26|complete               yes
  25|timed_out              no
- 39|terminal               tmux 3.4 (query)
- 35|mux                    tmux (query)
+ 43|terminal               xterm-256color (env)
+ 33|mux                    none (env)
  31|remote                 no (env)
- 26|attributes             1;2
+ 29|attributes             65;1;9
  42|kitty_keyboard         unsupported (query)
  24|keyboard_flags         0
  42|sync_output            unsupported (query)
@@ -11,12 +11,12 @@
  42|color_scheme_reports   unsupported (query)
  42|in_band_resize         unsupported (query)
  40|focus_events           supported (query)
- 40|desktop_notify         supported (query)
- 40|kitty_graphics         supported (query)
+ 42|desktop_notify         unsupported (query)
+ 42|kitty_graphics         unsupported (query)
  42|sixel                  unsupported (query)
- 34|dark                   yes (query)
- 30|background             #1e1e2e
- 32|profile                TrueColor
+ 33|dark                   no (query)
+ 30|background             #ffffff
+ 30|profile                ansi256
  36|brand                  unknown (env)
  36|env_brand              unknown (env)
  33|editor                 none (env)
@@ -26,7 +26,7 @@
  24|foreground             -
  24|palette                -
  25|palette_known          no
- 29|secondary_attributes   84;0;0
+ 31|secondary_attributes   41;388;0
   0|
   8|findings
  78|recommendation         keyboard.kitty-unsupported: The terminal did not answer

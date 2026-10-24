@@ -7,3 +7,15 @@
 # removes its entries: once the next tag is the base, apidiff no longer
 # prints them, and scripts/go-apicheck.py fails on them as stale
 # (docs/decisions/0014-PLAN-api-policy-gates.md Step 4).
+
+# docs/decisions/0020-PLAN-charm-free-cores-glyphs-and-safetext.md Steps 7 and 8:
+# termcap's probe as an I/O-free core, its Bubble Tea host in termcaptea
+# (0020-MADR D4, A2). Released in v2.0.0, a major version (A4.2).
+.	- ./termcap.Caps.Profile: changed from github.com/charmbracelet/colorprofile.Profile to ColorProfile
+.	- ./termcap.KeyboardCaps.Enhancements: removed
+.	- ./termcap.KeyboardFlags: removed
+.	- ./termcap.NewProber: removed
+.	- ./termcap.Prober: removed
+.	- ./termcap.Reply.Msg: removed
+.	- ./termcap.Reply: old is comparable, new is not
+.	- ./termcap.ReportSchemaVersion: value changed from 1 to 2

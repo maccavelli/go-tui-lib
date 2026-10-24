@@ -4,18 +4,22 @@ import (
 	"slices"
 	"strings"
 
-	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 )
 
 // KeyboardCaps is the keyboard, as a program should use it.
 type KeyboardCaps struct {
 	Kitty Fact[Support] // the Kitty keyboard protocol, with the reason no enhancement is asked for
-	// Enhancements is what KeyboardFlags returns: what to put in
-	// View.KeyboardEnhancements.
-	Enhancements tea.KeyboardEnhancements
-	Accepted     int  // the flags the terminal last reported accepting
-	Releases     bool // ReleasesReported
+	// Request is the Kitty keyboard flags to ask for beyond
+	// disambiguation: 2, event types, only where the terminal reports them
+	// cleanly, else 0. A line-mode CLI pushes CSI > (1|Request) u, unless
+	// Kitty.Reason says the terminal would rather have none; a Bubble Tea
+	// program puts termcaptea.KeyboardEnhancements in its View, and tea
+	// always asks for disambiguation itself
+	// (docs/decisions/0005-MADR-terminal-capabilities-and-services.md A4).
+	Request  int
+	Accepted int  // the flags the terminal last reported accepting
+	Releases bool // ReleasesReported
 }
 
 // Keyboard is the keyboard view of c.
@@ -23,19 +27,12 @@ func (c Caps) Keyboard() KeyboardCaps {
 	k := KeyboardCaps{Kitty: c.KittyKeyboard, Accepted: c.KeyboardFlags, Releases: c.ReleasesReported()}
 	reason := keyboardReason(c)
 	if reason == "" {
-		k.Enhancements.ReportEventTypes = true
+		k.Request = ansi.KittyReportEventTypes
 	} else if k.Kitty.Reason == "" {
 		k.Kitty.Reason = reason
 	}
 	return k
 }
-
-// KeyboardFlags is what a program should put in View.KeyboardEnhancements:
-// event types only where the terminal reports them cleanly. Tea always
-// asks for disambiguation as well, which a program cannot turn off through
-// the View (docs/decisions/0005-MADR-terminal-capabilities-and-services.md
-// A4); Keyboard's reason says when the terminal would rather have none.
-func KeyboardFlags(c Caps) tea.KeyboardEnhancements { return c.Keyboard().Enhancements }
 
 // ReleasesReported reports whether the terminal accepted key-release
 // reports, so a binding may wait for a release.

@@ -18,7 +18,7 @@
  42|sixel                  unsupported (query)
  44|dark                   unknown (not-queried)
  24|background             -
- 27|profile                ANSI
+ 27|profile                ansi
  36|brand                  unknown (env)
  36|env_brand              unknown (env)
  33|editor                 none (env)

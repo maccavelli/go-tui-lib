@@ -43,7 +43,7 @@ const (
 var brandNames = enum.Names[Brand]{
 	Pkg: pkgName, Type: "Brand", Unknown: ErrUnknownName,
 	Tokens: []string{
-		"unknown", "apple-terminal", "iterm2", "kitty", "ghostty", "wezterm", "alacritty", "foot",
+		tokenUnknown, "apple-terminal", "iterm2", "kitty", "ghostty", "wezterm", "alacritty", "foot",
 		"rio", "contour", "vte", "konsole", "terminator", "windows-terminal", "vscode", "cursor",
 		"windsurf", "zed", "jetbrains", "warp", "mintty", "xterm",
 	},
@@ -72,7 +72,7 @@ const (
 
 var editorNames = enum.Names[Editor]{
 	Pkg: pkgName, Type: "Editor", Unknown: ErrUnknownName,
-	Tokens: []string{"none", "neovim", "vim", "emacs"},
+	Tokens: []string{tokenNone, "neovim", "vim", "emacs"},
 }
 
 // String is the editor's name, as the report and JSON print it.

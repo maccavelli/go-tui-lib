@@ -4,66 +4,40 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
-	tea "charm.land/bubbletea/v2"
-
-	"github.com/maccavelli/go-tui-lib/v2/layout"
 	"github.com/maccavelli/go-tui-lib/v2/termcap"
-	"github.com/maccavelli/go-tui-lib/v2/workspace"
 )
 
-// program embeds a prober beside a workspace. The workspace's own
-// background query is turned off, so the prober's, behind its gates, is
-// the only one (docs/decisions/0005-MADR-terminal-capabilities-and-services.md
-// A2, Q8).
-type program struct {
-	probe *termcap.Prober
-	ws    *workspace.Workspace
-	caps  termcap.Caps
-}
-
-func (p *program) Init() tea.Cmd { return tea.Batch(p.probe.Init(), p.ws.Init()) }
-
-func (p *program) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	cmds := []tea.Cmd{p.probe.Update(msg), p.ws.Update(msg)}
-	switch m := msg.(type) {
-	case termcap.CapsMsg:
-		p.caps = m.Caps
-	case tea.KeyPressMsg:
-		if m.String() == "ctrl+c" {
-			// Quit through the prober, which resets mode 2031 first.
-			return p, tea.Batch(append(cmds, p.probe.Quit())...)
+// A line-mode CLI drives a Probe itself: it writes what the probe asks
+// for, reads each reply whole from its raw-mode input, parses it, and
+// drains the events again. Here the terminal's replies are written out:
+// DA2, then DA1, the sentinel, which ends the probe.
+func ExampleProbe() {
+	p := termcap.NewProbe(termcap.WithGOOS("linux"))
+	now := time.Now()
+	p.Start(termcap.Env{"TERM=xterm-256color", "SSH_TTY=/dev/pts/1"}, now)
+	replies := []string{"\x1b[>1;95;0c", "\x1b[?1;2c"}
+	for {
+		e := p.NextEvent()
+		switch e.Kind {
+		case termcap.ProbeNoEvent:
+			if len(replies) == 0 {
+				return
+			}
+			// A real CLI reads the next reply here, and calls
+			// HandleTimeout once Timeout's deadline has passed.
+			p.HandleReply(termcap.ParseReply(replies[0]), now)
+			replies = replies[1:]
+		case termcap.ProbeWrite:
+			fmt.Printf("write %q\n", e.Data) // to the terminal, in a real CLI
+		case termcap.ProbeDone:
+			fmt.Println("brand:", e.Caps.Brand.Value, "complete:", e.Caps.Complete)
 		}
 	}
-	return p, tea.Batch(cmds...)
-}
-
-func (p *program) View() tea.View {
-	v := p.ws.View()
-	v.KeyboardEnhancements = termcap.KeyboardFlags(p.caps)
-	v.ReportFocus = true // for termsvc's notifications
-	return v
-}
-
-type pane struct{}
-
-func (pane) Update(tea.Msg) (workspace.Pane, tea.Cmd) { return pane{}, nil }
-func (pane) View(int, int) string                     { return "" }
-
-// A program keeps a Prober beside its workspace, and quits through it.
-// Split replies are dropped before they reach the program as keys.
-func ExampleProber() {
-	probe := termcap.NewProber()
-	ws := workspace.New(layout.Pane{ID: "main"}, map[layout.PaneID]workspace.Pane{"main": pane{}},
-		workspace.WithoutBackgroundQuery())
-	prog := tea.NewProgram(&program{probe: probe, ws: ws},
-		tea.WithFilter(func(_ tea.Model, msg tea.Msg) tea.Msg {
-			if probe.IsReplyFragment(msg) {
-				return nil
-			}
-			return msg
-		}))
-	_ = prog // prog.Run() in a real program
+	// Output:
+	// write "\x1b[?u\x1b[?2031$p\x1b[?2048$p\x1b[?1004$p\x1b[?996n\x1b]11;?\a\x1b[>c\x1b[c"
+	// brand: apple-terminal complete: true
 }
 
 // A doctor command writes the report to the writer it is given; a

@@ -14,13 +14,14 @@ import (
 
 	"github.com/maccavelli/go-tui-lib/v2/layout"
 	"github.com/maccavelli/go-tui-lib/v2/termcap"
+	"github.com/maccavelli/go-tui-lib/v2/termcap/termcaptea"
 	"github.com/maccavelli/go-tui-lib/v2/workspace"
 )
 
 // app is the smallest program that embeds a prober: it quits through the
 // prober's Quit on StopMsg, as every program must.
 type app struct {
-	p         *termcap.Prober
+	p         *termcaptea.Prober
 	plainQuit bool // quit with tea.Quit, skipping the restore: only a mutation does this
 	schemes   []termcap.ColorSchemeMsg
 	waitFor   int // ColorSchemeMsg to see before quitting
@@ -28,7 +29,7 @@ type app struct {
 	quitting  bool // Quit was returned; it is returned once
 }
 
-func newApp(o ...termcap.Option) *app { return &app{p: termcap.NewProber(o...)} }
+func newApp(o ...termcap.Option) *app { return &app{p: termcaptea.NewProber(o...)} }
 
 func (a *app) Init() tea.Cmd { return a.p.Init() }
 
@@ -85,7 +86,7 @@ func TestEachProfile(t *testing.T) {
 		if !got.Complete || got.TimedOut {
 			t.Errorf("%s: Complete %v, TimedOut %v; want the sentinel", c.p.Name, got.Complete, got.TimedOut)
 		}
-		if got.Terminal.Value != c.terminal || got.Mux.Value != c.mux || got.Profile != c.profile {
+		if got.Terminal.Value != c.terminal || got.Mux.Value != c.mux || got.Profile != termcaptea.FromColorProfile(c.profile) {
 			t.Errorf("%s: Terminal %+v, Mux %+v, Profile %v; want %q, %v, %v", c.p.Name, got.Terminal, got.Mux, got.Profile, c.terminal, c.mux, c.profile)
 		}
 		if c.p.Background != nil && got.Dark.Value != c.dark {
@@ -246,6 +247,32 @@ func TestSeqLen(t *testing.T) {
 		if got := seqLen(s); got != want {
 			t.Errorf("seqLen(%q) = %d, want %d", s, got, want)
 		}
+	}
+}
+
+// TestTerminalReply: Reply answers one sequence as Run's terminal does,
+// following the Kitty flags pushed and popped, so a replay of a program's
+// Sequences gets the program's replies.
+func TestTerminalReply(t *testing.T) {
+	term := NewTerminal(Kitty())
+	for i, c := range []struct{ seq, want string }{
+		{ansi.RequestPrimaryDeviceAttributes, "\x1b[?62;22c"},
+		{ansi.RequestKittyKeyboard, "\x1b[?0u"},
+		{"\x1b[>1u", ""},
+		{ansi.RequestKittyKeyboard, "\x1b[?1u"},
+		{"\x1b[>3u", ""},
+		{ansi.RequestKittyKeyboard, "\x1b[?3u"},
+		{"\x1b[<u", ""},
+		{ansi.RequestKittyKeyboard, "\x1b[?1u"},
+		{"\x1b[?25l", ""},
+		{"\x1b]11;?\x07", "\x1b]11;rgb:1e1e/1e1e/2e2e\x1b\\"},
+	} {
+		if got := term.Reply(c.seq); got != c.want {
+			t.Errorf("step %d: Reply(%q) = %q, want %q", i, c.seq, got, c.want)
+		}
+	}
+	if got := NewTerminal(DA1Only()).Reply(ansi.RequestKittyKeyboard); got != "" {
+		t.Errorf("a terminal without the protocol answered %q", got)
 	}
 }
 

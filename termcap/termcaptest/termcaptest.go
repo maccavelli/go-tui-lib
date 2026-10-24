@@ -1,12 +1,13 @@
 // Package termcaptest runs a Bubble Tea program against a scripted fake
-// terminal, so a program that embeds a termcap.Prober can be tested
+// terminal, so a program that embeds a termcaptea.Prober can be tested
 // without a real one (docs/decisions/0005-MADR-terminal-capabilities-and-services.md
 // Confirmation).
 //
 // A Terminal sits between a tea.Program's output and its input. It reads
 // every escape sequence the program writes, and answers the queries its
 // Profile answers, in the order they were asked, as a terminal does. It
-// never touches a real terminal.
+// never touches a real terminal. Reply gives the same answers to a test
+// that drives a termcap.Probe itself.
 //
 // Stability: stable. Exported names change only through the deprecation
 // policy in AGENTS.md, "API conventions".
@@ -161,8 +162,8 @@ func Silent() Profile {
 }
 
 // StopMsg is sent to the program once it has received its termcap.CapsMsg.
-// The model must quit on it, through its prober's Quit, so that the
-// terminal sees every mode restored.
+// The model must quit on it, through its termcaptea.Prober's Quit, so that
+// the terminal sees every mode restored.
 type StopMsg struct{}
 
 // DefaultRunTimeout bounds each wait in Run, for the CapsMsg and for the
@@ -283,6 +284,18 @@ func (t *Terminal) Run(tb testing.TB, model tea.Model) termcap.Caps {
 // Send writes seq to the program's input, as the terminal would, after
 // every reply already queued.
 func (t *Terminal) Send(seq string) { t.input <- seq }
+
+// Reply is the terminal's answer to one escape sequence, query, or "" when
+// it gives none: the bytes Run's program would read. It follows the Kitty
+// keyboard flags pushed and popped, as the terminal does while Run runs,
+// so a test that replays a program's Sequences through a fresh Terminal
+// gets the replies the program got. It is for a test that drives a
+// termcap.Probe directly, through termcap.ParseReply, with no program.
+func (t *Terminal) Reply(query string) string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.answer(&t.profile, query)
+}
 
 // Output is everything the program wrote.
 func (t *Terminal) Output() string {

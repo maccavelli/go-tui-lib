@@ -4,15 +4,12 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"image/color"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
-	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
-
-	"github.com/maccavelli/go-tui-lib/v2/internal/termevent/termeventtest"
 )
 
 func TestFromEnvBrands(t *testing.T) {
@@ -102,20 +99,6 @@ func TestFromEnvOtherFacts(t *testing.T) {
 	}
 }
 
-func TestWithGOOS(t *testing.T) {
-	win, _ := start(Env{"TERM=xterm-256color"}, WithGOOS("windows"))
-	lin, _ := start(Env{"TERM=xterm-256color"}, WithGOOS("linux"))
-	if b := win.Caps().Brand.Value; b != BrandWindowsTerminal {
-		t.Errorf("WithGOOS(windows): brand %v, want windows-terminal", b)
-	}
-	if b := lin.Caps().Brand.Value; b != BrandUnknown {
-		t.Errorf("WithGOOS(linux): brand %v, want unknown", b)
-	}
-	if !win.Caps().LegacyConsole.Value || lin.Caps().LegacyConsole.Value {
-		t.Error("WithGOOS did not reach the legacy-console fact")
-	}
-}
-
 func TestLegacyConsole(t *testing.T) {
 	cases := []struct {
 		env  Env
@@ -151,7 +134,7 @@ func keyboard(brand Brand, platform Platform, mux Mux, k Support, tmux TmuxFacts
 	return c.Keyboard()
 }
 
-func TestKeyboardFlags(t *testing.T) {
+func TestKeyboardRequest(t *testing.T) {
 	csiU := TmuxFacts{Known: true, Version: "3.4", ExtendedKeysFormat: "csi-u"}
 	cases := []struct {
 		name     string
@@ -175,18 +158,13 @@ func TestKeyboardFlags(t *testing.T) {
 		{"no Kitty protocol", keyboard(BrandKitty, PlatformNative, NoMux, Unsupported, TmuxFacts{}), false, ReasonKittyUnsupported},
 	}
 	for _, c := range cases {
-		if c.k.Enhancements.ReportEventTypes != c.releases || c.k.Kitty.Reason != c.reason {
-			t.Errorf("%s: event types %v, reason %q; want %v, %q", c.name, c.k.Enhancements.ReportEventTypes, c.k.Kitty.Reason, c.releases, c.reason)
+		want := 0
+		if c.releases {
+			want = ansi.KittyReportEventTypes
 		}
-		if c.k.Enhancements.ReportAlternateKeys || c.k.Enhancements.ReportAllKeysAsEscapeCodes || c.k.Enhancements.ReportAssociatedText {
-			t.Errorf("%s: asks for more than event types: %+v", c.name, c.k.Enhancements)
+		if c.k.Request != want || c.k.Kitty.Reason != c.reason {
+			t.Errorf("%s: Request %d, reason %q; want %d, %q", c.name, c.k.Request, c.k.Kitty.Reason, want, c.reason)
 		}
-	}
-	var c Caps
-	c.KittyKeyboard.Set(Supported, Queried)
-	c.Brand.Set(BrandKitty, Queried)
-	if KeyboardFlags(c) != c.Keyboard().Enhancements {
-		t.Error("KeyboardFlags differs from Keyboard().Enhancements")
 	}
 }
 
@@ -220,68 +198,6 @@ func TestColorFGBG(t *testing.T) {
 	}
 }
 
-func TestAppearanceChain(t *testing.T) {
-	type step struct {
-		name string
-		env  Env
-		hook *bool
-		msg  tea.Msg
-		want Fact[bool]
-	}
-	yes, no := true, false
-	fgbgDark := Env{"TERM=xterm-kitty", "COLORFGBG=15;0"}
-	steps := []step{
-		{"COLORFGBG", fgbgDark, nil, nil, Fact[bool]{Value: true, Origin: Heuristic, Reason: ReasonColorFGBGGuess}},
-		{"the desktop hook outranks COLORFGBG", fgbgDark, &no, nil, Fact[bool]{Value: false, Origin: Heuristic, Reason: ReasonDesktopAppearance}},
-		{"the program's variable outranks both", append(Env{"APP_LOOK=dark"}, fgbgDark...), &no, nil, Fact[bool]{Value: true, Origin: Environment}},
-		{"its LC_ form crosses SSH", append(Env{"LC_APP_LOOK=Light"}, fgbgDark...), &yes, nil, Fact[bool]{Value: false, Origin: Environment}},
-		{"a reply outranks the variable", append(Env{"APP_LOOK=dark"}, fgbgDark...), nil, termeventtest.LightColorScheme(), Fact[bool]{Value: false, Origin: Queried}},
-	}
-	for _, s := range steps {
-		o := []Option{WithAppearanceEnv("APP_LOOK")}
-		if s.hook != nil {
-			dark := *s.hook
-			o = append(o, WithAppearanceHook(func() (bool, bool) { return dark, true }))
-		}
-		// The hook runs as a command; tea feeds its answer back.
-		p, msgs := start(s.env, o...)
-		feed(p, msgs...)
-		if s.msg != nil {
-			feed(p, s.msg)
-		}
-		if got := p.Caps().Dark; got != s.want {
-			t.Errorf("%s: Dark %+v, want %+v", s.name, got, s.want)
-		}
-	}
-	over, _ := start(Env{"APP_LOOK=dark"}, WithAppearanceEnv("APP_LOOK"),
-		WithOverride(func(c *Caps) { c.Dark.Set(false, Override) }))
-	feed(over, termeventtest.DarkColorScheme())
-	if got := over.Caps().Dark; got != (Fact[bool]{Value: false, Origin: Override}) {
-		t.Errorf("override: Dark %+v", got)
-	}
-}
-
-func TestHooksAreNotCalledWhenNotSet(t *testing.T) {
-	p, msgs := start(local)
-	for _, m := range msgs {
-		switch m.(type) {
-		case appearanceMsg, consoleMsg:
-			t.Fatalf("a hook ran with none set: %T", m)
-		}
-	}
-	_ = p
-}
-
-func TestConsoleHost(t *testing.T) {
-	p := NewProber(WithGOOS("windows"), WithConsoleHost(func() (bool, bool) { return false, true }))
-	feed(p, feed(p, tea.EnvMsg(Env{}))...)
-	if got := p.Caps().LegacyConsole; got != (Fact[bool]{Value: false, Origin: Queried}) {
-		t.Errorf("console host said ConPTY: %+v", got)
-	}
-	q := NewProber(WithGOOS("linux"), WithConsoleHost(func() (bool, bool) { t.Error("console host asked off Windows"); return true, true }))
-	feed(q, feed(q, tea.EnvMsg(Env{}))...)
-}
-
 func TestParseTmux(t *testing.T) {
 	got := ParseTmux("3.4\tcsi-u\t1\tRGB,clipboard,extkeys\tfocus,control-mode\n")
 	want := TmuxFacts{Known: true, Version: "3.4", ExtendedKeysFormat: "csi-u", Mouse: true,
@@ -298,7 +214,8 @@ func TestParseTmux(t *testing.T) {
 	if q := TmuxQuery(); q[0] != "tmux" || q[1] != "display-message" || q[2] != "-p" || strings.Count(q[3], "\t") != 4 {
 		t.Errorf("TmuxQuery = %q", q)
 	}
-	p, _ := start(Env{"TMUX=x", "TERM=xterm-kitty"})
+	p := NewProbe()
+	p.Start(Env{"TMUX=x", "TERM=xterm-kitty"}, time.Time{})
 	p.SetTmux(want)
 	if !tmuxEqual(p.Caps().Tmux, want) {
 		t.Errorf("SetTmux: %+v", p.Caps().Tmux)
@@ -391,57 +308,14 @@ func TestNotifications(t *testing.T) {
 	}
 }
 
-func TestPaletteAndForeground(t *testing.T) {
-	p, _ := start(local)
-	feed(p, tea.ForegroundColorMsg{Color: color.RGBA{R: 1, G: 2, B: 3, A: 0xff}})
-	for i := range 15 {
-		feed(p, termeventtest.UnknownOsc("\x1b]4;"+itoa(i)+";rgb:ffff/0000/8080\x1b\\"))
-	}
-	if c := p.Caps(); c.PaletteKnown || c.Palette[15] != nil {
-		t.Fatalf("PaletteKnown after 15 of 16 replies: %v", c.PaletteKnown)
-	}
-	feed(p, termeventtest.UnknownOsc("\x1b]4;15;#102030\x07"))
-	c := p.Caps()
-	if !c.PaletteKnown {
-		t.Fatal("PaletteKnown false after all 16 replies")
-	}
-	if c.Palette[0] != (color.RGBA{R: 0xff, G: 0, B: 0x80, A: 0xff}) || c.Palette[15] != (color.RGBA{R: 0x10, G: 0x20, B: 0x30, A: 0xff}) {
-		t.Errorf("palette %v %v", c.Palette[0], c.Palette[15])
-	}
-	if c.Foreground != (color.RGBA{R: 1, G: 2, B: 3, A: 0xff}) {
-		t.Errorf("foreground %v", c.Foreground)
-	}
+// TestPaletteRefusals: an OSC 4 reply out of the palette's range, or
+// whose index or colour does not read, sets no colour.
+func TestPaletteRefusals(t *testing.T) {
 	for _, bad := range []string{"\x1b]4;16;rgb:0/0/0\x07", "\x1b]4;x;rgb:0/0/0\x07", "\x1b]4;1;hsl:1/2/3\x07", "\x1b]4;1;rgb:12345/0/0\x07"} {
 		var caps Caps
-		if parsePalette(Reply{Raw: bad}, &caps) {
+		if parsePalette(ParseReply(bad), &caps) {
 			t.Errorf("parsed %q", bad)
 		}
-	}
-}
-
-func itoa(i int) string { return string(rune('0'+i/10)) + string(rune('0'+i%10)) }
-
-func TestParseXColor(t *testing.T) {
-	cases := map[string]color.RGBA{
-		"rgb:f/0/8":          {R: 0xff, G: 0, B: 0x88, A: 0xff},
-		"rgb:ff/00/80":       {R: 0xff, G: 0, B: 0x80, A: 0xff},
-		"rgb:fff/000/800":    {R: 0xff, G: 0, B: 0x7f, A: 0xff},
-		"rgb:ffff/0000/8080": {R: 0xff, G: 0, B: 0x80, A: 0xff},
-		"#1e1e2e":            {R: 0x1e, G: 0x1e, B: 0x2e, A: 0xff},
-	}
-	for s, want := range cases {
-		if got, ok := parseXColor(s); !ok || got != want {
-			t.Errorf("parseXColor(%q) = %v, %v; want %v", s, got, ok, want)
-		}
-	}
-}
-
-func TestBrandFromXTVersion(t *testing.T) {
-	p, _ := start(Env{"TERM=xterm-256color", "SSH_TTY=x"}, WithoutHeuristic())
-	feed(p, tea.TerminalVersionMsg{Name: "WezTerm 20240203-110809-5046fc22"})
-	c := p.Caps()
-	if c.Brand != (Fact[Brand]{Value: BrandWezTerm, Origin: Queried}) || c.EnvBrand.Value != BrandUnknown {
-		t.Errorf("Brand %+v, EnvBrand %+v", c.Brand, c.EnvBrand)
 	}
 }
 

@@ -18,7 +18,7 @@
  79|sixel                  unknown (not-queried: terminal.jetbrains-paints-queries)
  44|dark                   unknown (not-queried)
  24|background             -
- 32|profile                TrueColor
+ 32|profile                truecolor
  38|brand                  jetbrains (env)
  38|env_brand              jetbrains (env)
  33|editor                 none (env)

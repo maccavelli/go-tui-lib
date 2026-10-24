@@ -37,14 +37,7 @@ later record does not reuse it for something else.
 | Name | Means | Belongs to |
 | :--- | :--- | :--- |
 | `KeyEvent`, `Mod`, `Decoder`, `Input`, `InputKind` | a decoded key, its modifiers, the byte decoder, what it yields and its kind | `termkey` |
-| `ColorProfile` | the colour profile, in `Caps` | `termcap` |
-| `Probe`, `ProbeEvent`, `ProbeEventKind`, `ProbeHook` | the I/O-free probe engine, an event it returns and its kind, a program hook it asks the host to run | `termcap` |
-| `ReplyKind`, `ModeSetting` | what a `Reply` is; a DECRPM setting | `termcap` |
 | `Effect` | a follow-up a host runs, in `command.Result` | `command` |
-
-`Prober` moves from `termcap` to `termcap/termcaptea` in that record's
-release 2, whose version its A4.1 decides, with
-one meaning; `Query` and `Reply` stay `termcap`'s.
 
 ## Built from those records
 
@@ -63,7 +56,14 @@ streaming cleaner, were reserved by
 [0020-MADR](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
 A1.3 and are built in `v1.13.0`
 ([0020-PLAN](decisions/0020-PLAN-charm-free-cores-glyphs-and-safetext.md)
-Step 4).
+Step 4). `termcap`'s `ColorProfile`, the colour profile in `Caps`;
+`Probe`, `ProbeEvent`, `ProbeEventKind` and `ProbeHook`, the I/O-free
+probe engine, an event it returns and its kind, and a program hook it
+asks its host to run; and `ReplyKind` and `ModeSetting`, what a `Reply`
+is and a DECRPM setting, were reserved by its A2.2 and are built for
+`v2.0.0` (0020-PLAN Steps 7 and 8). `Prober` moved from `termcap` to
+`termcap/termcaptea` there, with its one meaning; `Query` and `Reply`
+stay `termcap`'s.
 Each has one meaning, as its package documents it. `Terminal` is in
 "Deliberate" above; `command.Decision`, `Verdict`'s old name, was removed
 in `v0.10.0`, and `Decision` is `launch`'s alone.

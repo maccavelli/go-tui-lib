@@ -6,100 +6,148 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-
-	tea "charm.land/bubbletea/v2"
+	"time"
 
 	"github.com/maccavelli/go-tui-lib/v2/internal/sanitize"
-	"github.com/maccavelli/go-tui-lib/v2/internal/termevent/termeventtest"
 )
 
 // Fuzz targets (docs/decisions/0014-PLAN-hardening.md Step 9, finding H9).
 // The seeds are the existing tests' inputs and the replies termcaptest's
 // profiles give (termcaptest.go, answerCSI and answerString), written out
-// here: termcaptest imports this package.
+// here: termcaptest imports this package. The Prober's target,
+// FuzzProberReplies, moved to termcaptea with it.
 
-// replyKinds is how many kinds of reply replyMsg builds.
-const replyKinds = 10
-
-// replyMsg is the reply of kind k, carrying s.
-func replyMsg(k byte, s string) tea.Msg {
-	switch k % replyKinds {
-	case 0:
-		return termeventtest.UnknownOsc(s)
-	case 1:
-		return termeventtest.UnknownCsi(s)
-	case 2:
-		return termeventtest.UnknownDcs(s)
-	case 3:
-		return termeventtest.UnknownApc(s)
-	case 4:
-		return termeventtest.Unknown(s)
-	case 5:
-		return tea.TerminalVersionMsg{Name: s}
-	case 6:
-		return termeventtest.DeviceAttributes(attrs(s)...)
-	case 7:
-		return termeventtest.SecondaryDeviceAttributes(attrs(s)...)
-	case 8:
-		return termeventtest.KittyGraphics(s)
-	}
-	return termeventtest.DarkColorScheme()
+// replySeeds are replies of every kind and terminator, and the ones that
+// must stay unknown.
+var replySeeds = []string{
+	"\x1b[?62;22c", "\x1b[?c", "\x1b[>1;4000;39c", "\x1bP>|kitty(0.39.1)\x1b\\", "\x1bP>|x\a",
+	"\x1b[?2026;2$y", "\x1b[?2031;5$y", "\x1b]11;rgb:1e1e/1e1e/2e2e\x1b\\", "\x1b]10;#cdd6f4\a",
+	"\x1b]4;15;rgb:ff/00/80\x9c", "\x1b]11;rgb:0/0/0\x1b", "\x9d11;rgb:f/f/f\a", "\x9b?1u",
+	"\x1b[?997;1n", "\x1b_Gi=31;OK\x1b\\", "\x9fGi=31;EINVAL\x9c", "\x90>|v\x9c",
+	"\x1b]99;i=termcap:p=?;a=focus\x1b\\", "\x1b]11;?\a", "\x1b[" + strings.Repeat("1;", 40) + "c",
+	"\x1b]4;1;" + strings.Repeat("f", 1100) + "\a", "", "x", "\x1b", "\x1b]11;rgb:0/0/0\x18",
 }
 
-// attrs is s's bytes as device attributes.
-func attrs(s string) []int {
-	out := make([]int, len(s))
-	for i := range len(s) {
-		out[i] = int(s[i])
+// FuzzParseReply: ParseReply never panics; Raw is always the input; a
+// ReplyColor holds a colour; and a ReplyMode's Setting is DECRPM's 0 to 4.
+func FuzzParseReply(f *testing.F) {
+	for _, s := range replySeeds {
+		f.Add(s)
 	}
-	return out
-}
-
-// FuzzProberReplies: a prober that has seen its environment takes any
-// replies without a panic; a query is never given a raw reply over
-// maxReply; and Caps.Terminal holds nothing Line would change. The replies
-// are payload's parts, split at NUL, each of the kind kinds names in turn.
-func FuzzProberReplies(f *testing.F) {
-	for _, c := range []struct {
-		kinds   []byte
-		payload string
-	}{
-		{[]byte{0}, "\x1b]99;i=termcap:p=?;a=focus,report:o=always,unfocused,invisible:u=0,1,2\x1b\\"},
-		{[]byte{0}, osc99Reply(1025)},
-		{[]byte{0}, osc99Reply(1024)},
-		{[]byte{5}, "kitty(0.39.1)"},
-		{[]byte{5}, "tmux 3.4"},
-		{[]byte{5}, "evil\x1b]0;title\x07\u202e"},
-		{[]byte{6}, "\x01\x02"},
-		{[]byte{7, 6}, "\x01\x5f\x00\x00\x01\x02"},
-		{[]byte{8}, "OK"},
-		{[]byte{1}, "\x1b[?997;1n"},
-		{[]byte{1}, "\x1b[?2026;2$y"},
-		{[]byte{1}, "\x1b[?" + strings.Repeat("1", 1030) + "n"},
-		{[]byte{2}, "\x1bP>|kitty(0.39.1)\x1b\\"},
-		{[]byte{0, 9, 6}, "\x1b]11;rgb:0000/0000/0000\x1b\\\x00\x00>\x16"},
-		{[]byte{4}, "\x1b]4;1;"},
-	} {
-		f.Add(c.kinds, c.payload)
-	}
-	f.Fuzz(func(t *testing.T, kinds []byte, payload string) {
-		over := 0
-		q := Query{Name: "fuzz", Seq: fixed("\x1b[?5n"), Parse: func(r Reply, _ *Caps) bool {
-			if len(r.Raw) > maxReply {
-				over = len(r.Raw)
-			}
-			return false
-		}}
-		p, _ := start(local, WithQuery(q))
-		for i, part := range strings.Split(payload, "\x00") {
-			k := byte(0)
-			if len(kinds) > 0 {
-				k = kinds[i%len(kinds)]
-			}
-			feed(p, replyMsg(k, part))
+	f.Fuzz(func(t *testing.T, raw string) {
+		r := ParseReply(raw)
+		if r.Raw != raw {
+			t.Fatalf("ParseReply(%q).Raw = %q", raw, r.Raw)
 		}
-		if over > 0 {
-			t.Fatalf("a query was given a raw reply of %d bytes, over %d", over, maxReply)
+		if r.Kind == ReplyColor && r.Color == nil {
+			t.Fatalf("ParseReply(%q) is a colour with none", raw)
+		}
+		if r.Kind == ReplyMode && r.Setting > ModePermanentlyReset {
+			t.Fatalf("ParseReply(%q) is DECRPM with Pm %d", raw, r.Setting)
+		}
+		if r.Kind != ReplyUnknown && len(raw) > maxReply {
+			t.Fatalf("ParseReply read a reply of %d bytes as %v", len(raw), r.Kind)
+		}
+	})
+}
+
+// probeEnvs are the environments FuzzProbe starts a probe in.
+var probeEnvs = []Env{
+	{"TERM=xterm-kitty"}, {"TERM=xterm-256color", "SSH_TTY=x"}, {"TERM=tmux-256color", "TMUX=x"},
+	{"TERMINAL_EMULATOR=JetBrains-JediTerm"}, {"TERM=xterm-kitty", "NVIM=x"}, {},
+}
+
+// probeOp is one step of a FuzzProbe script.
+type probeOp struct {
+	kind byte // 0 start, 1 reply, 2 timeout, 3 hook
+	arg  byte
+	raw  string
+}
+
+// script reads data as FuzzProbe's operations: each starts with its kind
+// and one argument byte; a reply's argument is its length, and its bytes
+// follow.
+func script(data []byte) []probeOp {
+	var ops []probeOp
+	for len(data) >= 2 {
+		op := probeOp{kind: data[0] % 4, arg: data[1]}
+		data = data[2:]
+		if op.kind == 1 {
+			n := min(int(op.arg), len(data))
+			op.raw, data = string(data[:n]), data[n:]
+		}
+		ops = append(ops, op)
+	}
+	return ops
+}
+
+// seedScript writes ops as script reads them.
+func seedScript(ops ...probeOp) []byte {
+	var b []byte
+	for _, op := range ops {
+		if op.kind == 1 {
+			op.arg = byte(len(op.raw))
+		}
+		b = append(append(b, op.kind, op.arg), op.raw...)
+	}
+	return b
+}
+
+// FuzzProbe: a probe driven by any script of starts, replies, timeouts
+// and hook answers, with time only rising, never panics; ends at most once;
+// gives no deadline once ended; and holds only facts whose origin is one
+// of Origin's.
+func FuzzProbe(f *testing.F) {
+	f.Add(seedScript(probeOp{kind: 0}, probeOp{kind: 1, raw: "\x1b[?1u"}, probeOp{kind: 1, raw: "\x1b[?62;4c"}))
+	f.Add(seedScript(probeOp{kind: 0, arg: 1}, probeOp{kind: 1, raw: "\x1b[>1;95;0c"}, probeOp{kind: 1, raw: "\x1b[?1;2c"}))
+	f.Add(seedScript(probeOp{kind: 0, arg: 2}, probeOp{kind: 2, arg: 250}, probeOp{kind: 1, raw: "\x1b[?997;2n"}))
+	f.Add(seedScript(probeOp{kind: 0}, probeOp{kind: 3, arg: 0x0d}, probeOp{kind: 1, raw: "\x1b[?2031;2$y"},
+		probeOp{kind: 1, raw: "\x1b[?62c"}, probeOp{kind: 1, raw: "\x1b[?997;1n"}))
+	f.Add(seedScript(probeOp{kind: 0, arg: 3}, probeOp{kind: 1, raw: "\x1b]11;rgb:0/0/0\a"}))
+	f.Add(seedScript(probeOp{kind: 0}, probeOp{kind: 1, raw: "\x1b[?62c"}, probeOp{kind: 1, raw: "\x1b[?62c"}, probeOp{kind: 2, arg: 255}))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		p := NewProbe(WithGOOS("windows"), WithTimeout(time.Second),
+			WithAppearanceHook(func() (bool, bool) { return true, true }),
+			WithConsoleHost(func() (bool, bool) { return false, true }))
+		now := time.Unix(0, 0)
+		done := 0
+		drain := func() {
+			for e := p.NextEvent(); e.Kind != ProbeNoEvent; e = p.NextEvent() {
+				if e.Kind == ProbeDone {
+					done++
+				}
+			}
+		}
+		for _, op := range script(data) {
+			now = now.Add(time.Duration(op.arg) * 10 * time.Millisecond)
+			switch op.kind {
+			case 0:
+				p.Start(probeEnvs[int(op.arg)%len(probeEnvs)], now)
+			case 1:
+				p.HandleReply(ParseReply(op.raw), now)
+			case 2:
+				p.HandleTimeout(now)
+			case 3:
+				p.HandleHook(ProbeHook(op.arg%3), op.arg&4 != 0, op.arg&8 != 0)
+			}
+			drain()
+			if done > 1 {
+				t.Fatalf("ProbeDone %d times", done)
+			}
+			if _, ok := p.Timeout(); ok && done > 0 {
+				t.Fatal("a deadline after ProbeDone")
+			}
+		}
+		v := reflect.ValueOf(p.Caps())
+		for i := range v.NumField() {
+			if v.Field(i).Kind() != reflect.Struct {
+				continue
+			}
+			if f := v.Field(i).FieldByName("Origin"); f.IsValid() {
+				if o, ok := f.Interface().(Origin); ok && o > Override {
+					t.Fatalf("%s has origin %d", v.Type().Field(i).Name, o)
+				}
+			}
 		}
 		if v := p.Caps().Terminal.Value; sanitize.Line(v) != v {
 			t.Fatalf("Caps.Terminal is %q, which Line changes", v)
@@ -154,6 +202,9 @@ func FuzzEnumText(f *testing.F) {
 		func() textEnum { return new(Support) }, func() textEnum { return new(Origin) },
 		func() textEnum { return new(Mux) }, func() textEnum { return new(Brand) },
 		func() textEnum { return new(Editor) }, func() textEnum { return new(Platform) },
+		func() textEnum { return new(ColorProfile) }, func() textEnum { return new(ReplyKind) },
+		func() textEnum { return new(ModeSetting) }, func() textEnum { return new(ProbeEventKind) },
+		func() textEnum { return new(ProbeHook) },
 		func() textEnum { return new(Disposition) },
 	}
 	f.Fuzz(func(t *testing.T, b []byte) {
