@@ -3,10 +3,15 @@
 // (docs/decisions/0007-MADR-keymap-engine.md).
 //
 // A Stroke is one key, as a binding names it, and a Sequence is one stroke,
-// a chord or a leader sequence. The canonical notation is Bubble Tea's own
-// Keystroke() form, "ctrl+alt+shift+a"; VS Code's spelling parses too, and
-// each spelling round-trips. A release or repeat stroke ends in ":release"
-// or ":repeat" (amendment A5).
+// a chord or a leader sequence. The canonical notation is termkey's
+// Keystroke() form, which is Bubble Tea's, "ctrl+alt+shift+a"; VS Code's
+// spelling parses too, and each spelling round-trips. A release or repeat
+// stroke ends in ":release" or ":repeat" (amendment A5).
+//
+// The package links no Bubble Tea: a Dispatcher takes termkey's keys, and
+// says how long a pending sequence waits. Its Bubble Tea forms, the
+// dispatcher's Update, help and key.Binding, are in keymap/keymaptea
+// (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md D7).
 //
 // Stability: stable. Exported names change only through the deprecation
 // policy in AGENTS.md, "API conventions".
@@ -20,9 +25,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/maccavelli/go-tui-lib/v2/internal/enum"
+	"github.com/maccavelli/go-tui-lib/v2/termkey"
 )
 
 // pkgName is the package's name, as its enums' errors give it.
@@ -62,10 +66,10 @@ func (e *Event) UnmarshalText(b []byte) error { return eventNames.Unmarshal(b, e
 
 // Stroke is one key, as a binding names it.
 type Stroke struct {
-	Mod   tea.KeyMod // ctrl, alt, shift, meta, hyper, super; never a lock key
-	Code  rune       // a tea key constant (tea.KeyEnter), or a lower-case rune
-	Scan  bool       // match the US-layout position (BaseCode), as VS Code's [KeyA]
-	Event Event      // Press (the default), Release, or Repeat
+	Mod   termkey.Mod // ctrl, alt, shift, meta, hyper, super; never a lock key
+	Code  rune        // a tea key constant (termkey.KeyEnter), or a lower-case rune
+	Scan  bool        // match the US-layout position (BaseCode), as VS Code's [KeyA]
+	Event Event       // Press (the default), Release, or Repeat
 }
 
 // Sequence is one stroke, a chord, or a leader sequence; at most MaxStrokes.
@@ -79,26 +83,26 @@ const MaxStrokes = 4
 var ErrNotation = errors.New("keymap: bad key notation")
 
 // locks are the lock modifiers: state, not a chord.
-const locks = tea.ModCapsLock | tea.ModNumLock | tea.ModScrollLock
+const locks = termkey.ModCapsLock | termkey.ModNumLock | termkey.ModScrollLock
 
 // modifiers, in Keystroke() order, with their canonical names, and VS
 // Code's where it differs.
 var modifiers = []struct {
-	mod           tea.KeyMod
+	mod           termkey.Mod
 	canon, vscode string
 }{
-	{tea.ModCtrl, "ctrl", ""},
-	{tea.ModAlt, "alt", ""},
-	{tea.ModShift, "shift", ""},
-	{tea.ModMeta, "meta", ""},
-	{tea.ModHyper, "hyper", ""},
-	{tea.ModSuper, nameSuper, "cmd"},
+	{termkey.ModCtrl, "ctrl", ""},
+	{termkey.ModAlt, "alt", ""},
+	{termkey.ModShift, "shift", ""},
+	{termkey.ModMeta, "meta", ""},
+	{termkey.ModHyper, "hyper", ""},
+	{termkey.ModSuper, nameSuper, "cmd"},
 }
 
 // modifierNames are the names a modifier is read from, lower case: each
 // canonical name, and each of modAliases, VS Code's "cmd" among them.
-var modifierNames = func() map[string]tea.KeyMod {
-	names := map[string]tea.KeyMod{}
+var modifierNames = func() map[string]termkey.Mod {
+	names := map[string]termkey.Mod{}
 	for _, m := range modifiers {
 		names[m.canon] = m.mod
 	}
@@ -111,33 +115,33 @@ var modifierNames = func() map[string]tea.KeyMod {
 // lockNames are the lock modifiers' names, refused as modifiers.
 var lockNames = map[string]bool{"capslock": true, "numlock": true, "scrolllock": true}
 
-// namedKeys are the keys Bubble Tea names, the main keys before the keypad's,
-// so that a name parses to the main key. Each name is Bubble Tea's own,
-// from Keystroke(): this package copies no name.
+// namedKeys are the keys termkey names, the main keys before the keypad's,
+// so that a name parses to the main key. Each name is termkey's own, from
+// Keystroke(), which is Bubble Tea's: this package copies no name.
 var namedKeys = []rune{
-	tea.KeyBackspace, tea.KeyTab, tea.KeyEnter, tea.KeyEscape, tea.KeySpace,
-	tea.KeyUp, tea.KeyDown, tea.KeyRight, tea.KeyLeft, tea.KeyBegin, tea.KeyFind,
-	tea.KeyInsert, tea.KeyDelete, tea.KeySelect, tea.KeyPgUp, tea.KeyPgDown, tea.KeyHome, tea.KeyEnd,
-	tea.KeyF1, tea.KeyF2, tea.KeyF3, tea.KeyF4, tea.KeyF5, tea.KeyF6, tea.KeyF7, tea.KeyF8, tea.KeyF9,
-	tea.KeyF10, tea.KeyF11, tea.KeyF12, tea.KeyF13, tea.KeyF14, tea.KeyF15, tea.KeyF16, tea.KeyF17,
-	tea.KeyF18, tea.KeyF19, tea.KeyF20, tea.KeyF21, tea.KeyF22, tea.KeyF23, tea.KeyF24, tea.KeyF25,
-	tea.KeyF26, tea.KeyF27, tea.KeyF28, tea.KeyF29, tea.KeyF30, tea.KeyF31, tea.KeyF32, tea.KeyF33,
-	tea.KeyF34, tea.KeyF35, tea.KeyF36, tea.KeyF37, tea.KeyF38, tea.KeyF39, tea.KeyF40, tea.KeyF41,
-	tea.KeyF42, tea.KeyF43, tea.KeyF44, tea.KeyF45, tea.KeyF46, tea.KeyF47, tea.KeyF48, tea.KeyF49,
-	tea.KeyF50, tea.KeyF51, tea.KeyF52, tea.KeyF53, tea.KeyF54, tea.KeyF55, tea.KeyF56, tea.KeyF57,
-	tea.KeyF58, tea.KeyF59, tea.KeyF60, tea.KeyF61, tea.KeyF62, tea.KeyF63,
-	tea.KeyCapsLock, tea.KeyScrollLock, tea.KeyNumLock, tea.KeyPrintScreen, tea.KeyPause, tea.KeyMenu,
-	tea.KeyMediaPlay, tea.KeyMediaPause, tea.KeyMediaPlayPause, tea.KeyMediaReverse, tea.KeyMediaStop,
-	tea.KeyMediaFastForward, tea.KeyMediaRewind, tea.KeyMediaNext, tea.KeyMediaPrev, tea.KeyMediaRecord,
-	tea.KeyLowerVol, tea.KeyRaiseVol, tea.KeyMute,
-	tea.KeyLeftShift, tea.KeyLeftAlt, tea.KeyLeftCtrl, tea.KeyLeftSuper, tea.KeyLeftHyper, tea.KeyLeftMeta,
-	tea.KeyRightShift, tea.KeyRightAlt, tea.KeyRightCtrl, tea.KeyRightSuper, tea.KeyRightHyper,
-	tea.KeyRightMeta, tea.KeyIsoLevel3Shift, tea.KeyIsoLevel5Shift,
-	tea.KeyKpEnter, tea.KeyKpEqual, tea.KeyKpMultiply, tea.KeyKpPlus, tea.KeyKpComma, tea.KeyKpMinus,
-	tea.KeyKpDecimal, tea.KeyKpDivide, tea.KeyKp0, tea.KeyKp1, tea.KeyKp2, tea.KeyKp3, tea.KeyKp4,
-	tea.KeyKp5, tea.KeyKp6, tea.KeyKp7, tea.KeyKp8, tea.KeyKp9, tea.KeyKpSep, tea.KeyKpUp, tea.KeyKpDown,
-	tea.KeyKpLeft, tea.KeyKpRight, tea.KeyKpPgUp, tea.KeyKpPgDown, tea.KeyKpHome, tea.KeyKpEnd,
-	tea.KeyKpInsert, tea.KeyKpDelete, tea.KeyKpBegin,
+	termkey.KeyBackspace, termkey.KeyTab, termkey.KeyEnter, termkey.KeyEscape, termkey.KeySpace,
+	termkey.KeyUp, termkey.KeyDown, termkey.KeyRight, termkey.KeyLeft, termkey.KeyBegin, termkey.KeyFind,
+	termkey.KeyInsert, termkey.KeyDelete, termkey.KeySelect, termkey.KeyPgUp, termkey.KeyPgDown, termkey.KeyHome, termkey.KeyEnd,
+	termkey.KeyF1, termkey.KeyF2, termkey.KeyF3, termkey.KeyF4, termkey.KeyF5, termkey.KeyF6, termkey.KeyF7, termkey.KeyF8, termkey.KeyF9,
+	termkey.KeyF10, termkey.KeyF11, termkey.KeyF12, termkey.KeyF13, termkey.KeyF14, termkey.KeyF15, termkey.KeyF16, termkey.KeyF17,
+	termkey.KeyF18, termkey.KeyF19, termkey.KeyF20, termkey.KeyF21, termkey.KeyF22, termkey.KeyF23, termkey.KeyF24, termkey.KeyF25,
+	termkey.KeyF26, termkey.KeyF27, termkey.KeyF28, termkey.KeyF29, termkey.KeyF30, termkey.KeyF31, termkey.KeyF32, termkey.KeyF33,
+	termkey.KeyF34, termkey.KeyF35, termkey.KeyF36, termkey.KeyF37, termkey.KeyF38, termkey.KeyF39, termkey.KeyF40, termkey.KeyF41,
+	termkey.KeyF42, termkey.KeyF43, termkey.KeyF44, termkey.KeyF45, termkey.KeyF46, termkey.KeyF47, termkey.KeyF48, termkey.KeyF49,
+	termkey.KeyF50, termkey.KeyF51, termkey.KeyF52, termkey.KeyF53, termkey.KeyF54, termkey.KeyF55, termkey.KeyF56, termkey.KeyF57,
+	termkey.KeyF58, termkey.KeyF59, termkey.KeyF60, termkey.KeyF61, termkey.KeyF62, termkey.KeyF63,
+	termkey.KeyCapsLock, termkey.KeyScrollLock, termkey.KeyNumLock, termkey.KeyPrintScreen, termkey.KeyPause, termkey.KeyMenu,
+	termkey.KeyMediaPlay, termkey.KeyMediaPause, termkey.KeyMediaPlayPause, termkey.KeyMediaReverse, termkey.KeyMediaStop,
+	termkey.KeyMediaFastForward, termkey.KeyMediaRewind, termkey.KeyMediaNext, termkey.KeyMediaPrev, termkey.KeyMediaRecord,
+	termkey.KeyLowerVol, termkey.KeyRaiseVol, termkey.KeyMute,
+	termkey.KeyLeftShift, termkey.KeyLeftAlt, termkey.KeyLeftCtrl, termkey.KeyLeftSuper, termkey.KeyLeftHyper, termkey.KeyLeftMeta,
+	termkey.KeyRightShift, termkey.KeyRightAlt, termkey.KeyRightCtrl, termkey.KeyRightSuper, termkey.KeyRightHyper,
+	termkey.KeyRightMeta, termkey.KeyIsoLevel3Shift, termkey.KeyIsoLevel5Shift,
+	termkey.KeyKpEnter, termkey.KeyKpEqual, termkey.KeyKpMultiply, termkey.KeyKpPlus, termkey.KeyKpComma, termkey.KeyKpMinus,
+	termkey.KeyKpDecimal, termkey.KeyKpDivide, termkey.KeyKp0, termkey.KeyKp1, termkey.KeyKp2, termkey.KeyKp3, termkey.KeyKp4,
+	termkey.KeyKp5, termkey.KeyKp6, termkey.KeyKp7, termkey.KeyKp8, termkey.KeyKp9, termkey.KeyKpSep, termkey.KeyKpUp, termkey.KeyKpDown,
+	termkey.KeyKpLeft, termkey.KeyKpRight, termkey.KeyKpPgUp, termkey.KeyKpPgDown, termkey.KeyKpHome, termkey.KeyKpEnd,
+	termkey.KeyKpInsert, termkey.KeyKpDelete, termkey.KeyKpBegin,
 }
 
 // codeNames is each named key's name, and nameCodes each name's first
@@ -147,7 +151,7 @@ var codeNames, nameCodes = keyNames()
 func keyNames() (map[rune]string, map[string]rune) {
 	names, codes := map[rune]string{}, map[string]rune{}
 	for _, c := range namedKeys {
-		n := tea.Key{Code: c}.Keystroke()
+		n := termkey.KeyEvent{Code: c}.Keystroke()
 		names[c] = n
 		if _, ok := codes[n]; !ok && utf8.RuneCountInString(n) > 1 {
 			codes[n] = c
@@ -256,7 +260,7 @@ func ParseStroke(s string) (Stroke, error) {
 		}
 		if lo := unicode.ToLower(r); lo != r && unicode.IsUpper(r) {
 			r = lo
-			st.Mod |= tea.ModShift
+			st.Mod |= termkey.ModShift
 		}
 		st.Code = r
 	default:
@@ -311,7 +315,7 @@ func ParseSequence(s string, leader Sequence) (Sequence, error) {
 	return q, nil
 }
 
-// keyName is a key's name as Bubble Tea prints it: its name, or the rune;
+// keyName is a key's name as termkey prints it: its name, or the rune;
 // and the leader placeholder's, "<leader>".
 func keyName(c rune) string {
 	if n, ok := codeNames[c]; ok {
@@ -385,25 +389,25 @@ func (s Stroke) printable() bool {
 	return !s.Scan && !named && unicode.IsPrint(s.Code)
 }
 
-// Matches reports whether k is this stroke's key. It ignores the message's
+// Matches reports whether k is this stroke's key. It ignores the key's
 // lock modifiers, and a letter caps lock made upper case. A stroke matches
 // when:
-//   - the modifiers are equal, and Bubble Tea prints both keys with one
+//   - the modifiers are equal, and termkey prints both keys with one
 //     name, so the keypad's Enter matches enter (amendment A5);
-//   - for a printable stroke without shift, the message's Text is the
+//   - for a printable stroke without shift, the key's Text is the
 //     stroke's rune and its modifiers, less shift, are equal;
-//   - for a Scan stroke, the message's BaseCode, or Code when there is no
+//   - for a Scan stroke, the key's BaseCode, or Code when there is no
 //     BaseCode, is the stroke's key.
 //
-// A Repeat stroke matches only a repeated key. Whether the message is a
-// press or a release is the message's type, which Matches does not see.
-func (s Stroke) Matches(k tea.Key) bool {
+// A Repeat stroke matches only a repeated key. Matches does not look at
+// whether the key is a press or a release; the Dispatcher does.
+func (s Stroke) Matches(k termkey.KeyEvent) bool {
 	if s.Code == keyLeader || s.Event == Repeat && !k.IsRepeat {
 		return false
 	}
 	mod := k.Mod &^ locks
 	code := k.Code
-	if k.Mod.Contains(tea.ModCapsLock) && unicode.IsLetter(code) {
+	if k.Mod.Contains(termkey.ModCapsLock) && unicode.IsLetter(code) {
 		code = unicode.ToLower(code)
 	}
 	if s.Scan {
@@ -416,35 +420,6 @@ func (s Stroke) Matches(k tea.Key) bool {
 	if mod == s.Mod && keyName(code) == keyName(s.Code) {
 		return true
 	}
-	return s.printable() && !s.Mod.Contains(tea.ModShift) &&
-		k.Text == string(s.Code) && mod&^tea.ModShift == s.Mod
-}
-
-// BubblesKeys is every k.String() this stroke can produce, for a
-// key.Binding: its Keystroke() form, and for a printable stroke with no
-// modifier but shift, the text the key types. Three keys are beyond it,
-// since bubbles compares a key's String(), its typed text: a caps-lock
-// letter, which bubbles cannot tell from shift; a shifted symbol written as
-// shift and its key, whose text is the layout's (write the symbol, "?");
-// and a Scan stroke, which names a position, not the text typed.
-func (s Stroke) BubblesKeys() []string {
-	key := keyName(s.Code)
-	if s.Scan {
-		key = string(s.Code)
-	}
-	plain := Stroke{Mod: s.Mod}
-	keys := []string{plain.write(func(canon, _ string) string { return canon }, key)}
-	if s.printable() && s.Mod&^tea.ModShift == 0 {
-		text := string(s.Code)
-		if s.Mod.Contains(tea.ModShift) {
-			if !unicode.IsLetter(s.Code) {
-				return keys
-			}
-			text = string(unicode.ToUpper(s.Code))
-		}
-		if text != keys[0] {
-			keys = append(keys, text)
-		}
-	}
-	return keys
+	return s.printable() && !s.Mod.Contains(termkey.ModShift) &&
+		k.Text == string(s.Code) && mod&^termkey.ModShift == s.Mod
 }

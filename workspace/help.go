@@ -9,6 +9,7 @@ import (
 
 	"github.com/maccavelli/go-tui-lib/v2/command"
 	"github.com/maccavelli/go-tui-lib/v2/keymap"
+	"github.com/maccavelli/go-tui-lib/v2/keymap/keymaptea"
 )
 
 // Workspace is a help.KeyMap, so help.Model renders its bindings
@@ -30,7 +31,7 @@ func (w *Workspace) helpBinding(id command.ID) key.Binding {
 	if !slices.Contains(p, scopeOverlay) {
 		p = append(p, scopeOverlay)
 	}
-	return w.km.KeyBinding(id, p, keymap.DescriberFunc(func(id command.ID) (string, bool) {
+	return keymaptea.KeyBinding(w.km, id, p, keymap.DescriberFunc(func(id command.ID) (string, bool) {
 		d, ok := helpDescs[id]
 		return d, ok
 	}))

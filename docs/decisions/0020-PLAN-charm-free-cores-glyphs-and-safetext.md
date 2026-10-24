@@ -1212,7 +1212,10 @@ loop test); `command/registry.go` imports Bubble Tea
   `termkey`'s names; `facts.go`'s `ctrlQ` and `ctrlI` use `termkey.ModCtrl`.
 * `keymap.go`: `Shown` exports `shown`'s result as `[]Binding`, the
   entries' embedded `Binding`s, in the same order.
-* `help.go` leaves the package. `.golangci.yml`: `charmfree` gains
+* `help.go` leaves the package, ~~whole~~ but for `Describer`,
+  `DescriberFunc` and `FromRegistry`, which hold no Bubbles and which
+  `keymaptea.Help` takes: they stay, in `describer.go` (a fact of
+  2026-10-24, in the execution record). `.golangci.yml`: `charmfree` gains
   `**/keymap/*.go`; `cores` gains `keymap`.
 
 **`keymap/keymaptea`:**
@@ -2780,3 +2783,147 @@ loop test); `command/registry.go` imports Bubble Tea
   `internal/enum` only, holds today (`go list -deps` above), but the gates
   check only that the closure has no Charm module but `x/ansi`: nothing
   refuses an `x/ansi` import in `termkey`. Nothing is tagged.
+
+### Step 12: `keymap` and `keymaptea` (2026-10-24)
+
+* The owner committed Step 11 as `16de0a7` and said to proceed
+  ("committed, proceed").
+* **A fact, recorded and not stopped for: `help.go`.** The step has
+  `help.go` leave the package, but it also holds `Describer`,
+  `DescriberFunc` and `FromRegistry`, which hold no Bubbles and which
+  `keymaptea.Help` and `KeyBinding` take. They stay, in
+  `keymap/describer.go`; `title`, `KeyBinding`, `Help` and the help map
+  move. The step carries the note.
+* **`keymap`, the core:**
+  * `matcher.go`: `Outcome` gains `Wait` and `Timeout`, and `Replay` is a
+    `[]termkey.KeyEvent`; `Update` is now `Key`, which reads a release
+    from `k.Release`, and `Expire`, its `TimeoutMsg` case; `tick` is
+    `wait`, which sets `Wait` (the keymap's timeout, one second when
+    unset) and `Timeout`.
+  * `notation.go`, `normalize.go`, `label.go`, `facts.go`, `whichkey.go`:
+    `termkey` in place of `tea` throughout, by a scratch script and then
+    read; `Stroke.Mod` is a `termkey.Mod`; the name tables read
+    `termkey`'s `Keystroke`, which is Bubble Tea's; `Normalize` keeps
+    `Release` in its AltGr branch, which builds a new key; `Explain` reads
+    a release as `Key` does. `Stroke.BubblesKeys` leaves for `keymaptea`.
+    The package comment says it links no Bubble Tea, and where its forms
+    are.
+  * `keymap.go`: `Settings.Tick` goes; `Shown(id, p) []Binding` gives
+    copies of the bindings help shows, primary first. The unexported
+    `shown` is now `shownEntries`: revive's `confusing-naming` refuses two
+    methods that differ only in case.
+  * `GOWORK=off go list -deps ./keymap`, for linux, darwin and windows: no
+    module outside the repository's but `x/ansi` and its own
+    dependencies.
+* **`keymap/keymaptea`:** `Update` (a `tea.KeyPressMsg` to `Key`, a
+  `tea.KeyReleaseMsg` to `Key` as a release, a `keymap.TimeoutMsg` to
+  `Expire`, any other message a zero `Outcome`; a waiting `Outcome`'s
+  command is `tea.Tick(o.Wait, …)` bringing back its `Timeout`),
+  `FromTea` and `ToTea` (the six fields of `tea.Key`, field for field),
+  and `KeyBinding`, `Help` and `BubblesKeys`, today's code over
+  `k.Shown`. Two parts needed the core's internals, and read its exported
+  API instead: `Help` with no ids lists each scope's commands as
+  `k.Rules()` read backward, which is the order the core's scopes hold;
+  `BubblesKeys` tells a named key by `Stroke{Code: c}.String()` differing
+  from the rune. Its unexported `keyBinding` is `bindingFor`, for the same
+  revive rule.
+* **Tests, by Rule 7.** The dispatcher's tests stay in `keymap` with the
+  code they test: their only use of Bubble Tea was its messages and
+  `Settings.Tick`, so a test `host` type drives the `Dispatcher` as a
+  program's loop does (a key to `Key`, a `TimeoutMsg` to `Expire`, a
+  pending sequence's `Wait` recorded and its timer a function giving its
+  `Timeout`), so most of the tests' calls read as before; a call on a
+  bare `Dispatcher` is now `Key`, and `active` takes the host's
+  `Dispatcher`. The PLAN's
+  mutations name "the moved chord test" and "the moved stale-timer test":
+  those are `TestSequencesComplete` and `TestStaleTimeout`, in the core,
+  and `keymaptea`'s `TestUpdate` sees the first too. Moved to
+  `keymaptea`: `help_test.go`, the Bubble Tea cases (`keyCases`,
+  `TestMatches`, now through `FromTea`, and `TestBubblesInterop`),
+  `TestRealTimer`, the `tea.WindowSizeMsg` case, and the 16 help goldens,
+  byte for byte equal to `HEAD`'s. `TestDescriber`'s checks of
+  `FromRegistry` alone stay in the core as `TestFromRegistry`.
+* **New tests:** in `keymaptea`, `TestTeaConversion` (all 147 `Key`
+  constants of Bubble Tea v2.0.10's `key.go`, `KeyReturn` and `KeyEsc`
+  among them, and the nine modifiers of its `mod.go`, listed by a script
+  that read those files, each converting both ways unchanged and named
+  alike; a table of keys with text, shifted and base codes; and
+  `tea.Key`'s field count, 6), `TestUpdate` and `TestReplayIsLossless`; in
+  `keymap`, `TestShown`, and `TestNormalize`'s released twin of each case.
+* **The notation does not change:** `notation_test.go`'s `ParseStroke`
+  and `String` cases, `vscode_test.go` (untouched) and the label goldens
+  under `keymap/testdata/golden` (untouched) all pass.
+* **Callers:** `workspace/bindings.go:222` (the step's `:221`) calls
+  `keymaptea.Update` and replays `tea.KeyPressMsg(keymaptea.ToTea(r))`;
+  `workspace/help.go:34`, `keymaptea.KeyBinding`;
+  `workspace/bindings_test.go`'s `chordKeymap` sets a nanosecond
+  `Timeout` and drops its `tick`; `docs/guides/keymaps.md` (`Normalize`'s
+  key, a section "Without Bubble Tea", `keymaptea.KeyBinding` and `Help`,
+  `Shown`, `Explain`'s key); and, beyond the step's list,
+  `docs/guides/migrating.md:79`, which named `KeyBinding` as a keymap
+  method.
+* **Docs:** `docs/architecture.md` (the dependency graph, the `keymap`
+  and `keymaptea` rows, the cores, the imports, the tree) and the index.
+  `.golangci.yml`'s `charmfree` gains `**/keymap/*.go`, and `cores`
+  gains `keymap`.
+* **Checks:**
+  * `gofmt -l .` empty; `GOWORK=off go vet ./...`: exit 0; `go test ./...`
+    with `GOWORK=off` and in workspace mode: every package ok;
+  * `make lint`: `go fix -diff` empty and golangci-lint `0 issues` for
+    linux, darwin and windows, after the two `confusing-naming` findings;
+  * `make apicheck`: "against v1.13.0, 34 incompatible change(s)",
+    "clean", with a block named "0020-PLAN Step 12" of twelve lines, each
+    a change the step's "Moves and changes" lists;
+  * `markdownlint-cli2` over the changed guides, `architecture.md` and the
+    index: "0 issues".
+* **Mutations,** each on a fresh copy, 27, every one killed by the test
+  named. Rows 12.1 to 12.6 are the step's list; the rest see each new,
+  moved or changed test, and each caller, fail (Rule 5):
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | 12.1 FromTea drops BaseCode (TestTeaConversion) | `keymaptea_test.go:215: tea.Key{Text:"Ф", Mod:1, Code:1092, ShiftedCode:1060, BaseCode:97, IsRepeat:false}: FromTea gives termkey.KeyEvent{Code:1092…` |
+  | 12.2 Key sets no Wait for a prefix (TestSequencesComplete) | `matcher_test.go:98: ctrl+k ctrl+c, stroke 0: {Command: Args:null Handled:true Replay:[] Wait:0s Timeout:{gen:1}}, cmd false, pending "ctrl+k"; want…` |
+  | 12.2b the same, seen by keymaptea's TestUpdate | `keymaptea_test.go:245: g: {Command: Args:null Handled:true Replay:[] Wait:0s Timeout:{gen:1}}, a command false; want it pending, with the keymap's …` |
+  | 12.2c the same, seen by workspace's TestChord | `bindings_test.go:198: no timer from the prefix: []` |
+  | 12.3 Expire ignores the generation (TestStaleTimeout) | `matcher_test.go:153: the first stroke's timer: {Command: Args:null Handled:true Replay:[a b] Wait:0s Timeout:{gen:0}}, pending ""; want nothing done` |
+  | 12.4 Shown returns its bindings in reverse (TestShown) | `describer_test.go:48: Shown(save) = [{ctrl+s save null  global false program layer} {ctrl+x s save null  global false program layer}]; want ctrl+x …` |
+  | 12.4b the same, seen by keymaptea's TestKeyBindingChord | `help_test.go:103: two sequences: keys ["ctrl+s" "ctrl+x s"], help "ctrl+s"; Bindings [ctrl+x s ctrl+s]` |
+  | 12.5 Normalize maps ctrl+5 to ctrl+5 (TestNormalize) | `normalize_test.go:103: modifyOtherKeys ctrl+5 (parseXTermModifyOtherKeys, :1190-1196): Normalize = ctrl+5, false; want ctrl+]` |
+  | 12.6 keymap/notation.go imports Bubble Tea (TestCoresAreCharmFree) | `charmfree_test.go:174: keymap (GOOS=linux) links charm.land/bubbletea/v2: keymap → charm.land/bubbletea/v2` |
+  | 12.6b the same, refused by depguard's charmfree | `keymap/notation.go:28:2: import 'charm.land/bubbletea/v2' is not allowed from list 'charmfree' … (depguard)` |
+  | 12.7 FromRegistry describes a command with no title (TestFromRegistry) | `describer_test.go:27: FromRegistry describes app.untitled: ""` |
+  | 12.8 Shown hands out the keymap's own bindings (TestShown) | `describer_test.go:55: changing what Shown returned changed the keymap: z s` |
+  | 12.9 Update reads a release as a press (TestUpdate) | `keymaptea_test.go:241: space released: {Command: Args:null Handled:false Replay:[] Wait:0s Timeout:{gen:0}}; want talk` |
+  | 12.10 Update drops a TimeoutMsg (TestUpdate) | `keymaptea_test.go:253: the timeout: {Command: Args:null Handled:false Replay:[] Wait:0s Timeout:{gen:0}}; want g replayed` |
+  | 12.11 the tick ignores Wait (TestUpdate) | `keymaptea_test.go:250: the timer gave keymap.TimeoutMsg{gen:0x1} after 1s; want the Outcome's Timeout after 250ms` |
+  | 12.12 the default wait is two seconds (keymaptea's TestRealTimer) | `keymaptea_test.go:270: the timer fired after 2s, want one second` |
+  | 12.12b the same, seen by keymap's TestPrefixTimeout | `matcher_test.go:142: with no Timeout, the timers are [2s], want one second` |
+  | 12.13 ToTea drops Text (TestTeaConversion) | `keymaptea_test.go:215: tea.Key{Text:"a", Mod:0, Code:97, ShiftedCode:0, BaseCode:0, IsRepeat:false}: FromTea gives termkey.KeyEvent{Code:97, Mod:0x…` |
+  | 12.13b ToTea drops ShiftedCode (TestReplayIsLossless) | `keymaptea_test.go:299: the replay is []tea.KeyPressMsg{tea.KeyPressMsg{Text:"ф", Mod:0, Code:1092, ShiftedCode:0, BaseCode:97, IsRepeat:false}, tea…` |
+  | 12.14 the field count reads a type of 7 fields (TestTeaConversion) | `keymaptea_test.go:221: tea.Key has 7 fields; FromTea and ToTea copy 6` |
+  | 12.15 BubblesKeys leaves out the typed text (TestBubblesInterop) | `keys_test.go:105: legacy upper-case A: key.Matches("A", ["shift+a"]) = false, want true` |
+  | 12.15b the same, seen by TestKeyBindingMatches | `help_test.go:43: legacy upper-case A: key.Matches("shift+a"'s KeyBinding ["shift+a"]) = false, want true` |
+  | 12.16 Help with no ids reads the rules forward (TestHelpColumns) | `help_test.go:212: the full help of every command is "ctrl+s,ctrl+x n \| alt+.,alt+z \| ctrl+q,?"; want "ctrl+x n,ctrl+s \| alt+z,alt+. \| ?,ctrl+q"` |
+  | 12.17 FromTea drops Text (keymaptea's TestMatches) | `keys_test.go:86: Kitty shift+/ typing ? (parseKittyKeyboard, :1512-1513: Text is the shifted key): "?".Matches = false, want true` |
+  | 12.18 Normalize drops a release under AltGr (TestNormalize) | `normalize_test.go:108: Windows AltGr+q typing @ (parseWin32InputKeyEvent, :2025-2028 left ctrl and right alt; :2034-2045 Text), released: Normalize…` |
+  | 12.19b workspace replays a key's code alone (TestChord), replacing 12.19, which left `r` unused and did not compile | `bindings_test.go:202: after the timeout the pane got [x]; want ctrl+x` |
+  | 12.20 workspace's help binding leaves the overlay scope off (workspace's tests) | `chrome_test.go:53: full help columns [[{[ctrl+s] {ctrl+s save} false}] [{[alt+.] {alt+. next pane} false} {[alt+,] {alt+, previous pane} false} {[a…` |
+
+  The first run had 27, all killed, but 12.19 by a build failure (the
+  mutation left `r` unused), so it was replaced by 12.19b. 12.13 and
+  12.13b printed both keys alike, since `%+v` formats a key by its
+  `String`; the tests' messages now print the fields (`%#v`), and those
+  rows, with 12.1, are from a rerun. 12.6b's depguard line was read from
+  its kept copy.
+* **Gates,** `python3 -m tools.verify gates` over the step's 47 files
+  (18 more are deletions), nothing skipped: macOS `gates: 19 passed, 0 failed, 0 skipped in 429s`; the Linux host
+  `gates: 19 passed, 0 failed, 0 skipped in 840s`; the Windows host
+  `gates: 19 passed, 0 failed, 0 skipped in 1827s`. `release-check` is
+  "301 file(s) clean" on macOS, which lists tracked files and so not the
+  step's eight new Go files, and "309 file(s) clean" on Linux and
+  Windows, whose copies hold them, with the API diff and examples gates.
+* **Identifiers:** `python3 -m tools.verify scan`: `scan: clean (5 pattern(s))`,
+  over the change and the untracked files.
+* **Not done here:** the release and its migration notes, which are Step
+  13's. Nothing is tagged.

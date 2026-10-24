@@ -3,11 +3,11 @@ package keymap
 import (
 	"slices"
 
-	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/maccavelli/go-tui-lib/v2/internal/enum"
 	"github.com/maccavelli/go-tui-lib/v2/termcap"
+	"github.com/maccavelli/go-tui-lib/v2/termkey"
 )
 
 // KeyFacts are what the terminal and its host deliver, beyond the Kitty
@@ -85,8 +85,8 @@ func FactsFrom(c termcap.Caps) KeyFacts {
 
 // The strokes a host may take.
 var (
-	ctrlQ = Stroke{Code: 'q', Mod: tea.ModCtrl}
-	ctrlI = Stroke{Code: 'i', Mod: tea.ModCtrl}
+	ctrlQ = Stroke{Code: 'q', Mod: termkey.ModCtrl}
+	ctrlI = Stroke{Code: 'i', Mod: termkey.ModCtrl}
 )
 
 // keyFacts is the facts a sequence's strokes need, and those that bar it:

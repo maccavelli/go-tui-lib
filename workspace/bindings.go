@@ -11,6 +11,7 @@ import (
 	"github.com/maccavelli/go-tui-lib/v2/command"
 	"github.com/maccavelli/go-tui-lib/v2/command/commandtea"
 	"github.com/maccavelli/go-tui-lib/v2/keymap"
+	"github.com/maccavelli/go-tui-lib/v2/keymap/keymaptea"
 	"github.com/maccavelli/go-tui-lib/v2/when"
 )
 
@@ -219,10 +220,10 @@ func (w *Workspace) own() map[command.ID]command.Command {
 func (w *Workspace) key(msg tea.Msg) (cmd tea.Cmd, ok bool) {
 	_, release := msg.(tea.KeyReleaseMsg)
 	ctx := w.WhenContext()
-	o, tick := w.disp.Update(msg, w.KeyPath(), ctx)
+	o, tick := keymaptea.Update(w.disp, msg, w.KeyPath(), ctx)
 	cmds := []tea.Cmd{tick}
 	for _, r := range o.Replay {
-		cmds = append(cmds, w.deliver(r))
+		cmds = append(cmds, w.deliver(tea.KeyPressMsg(keymaptea.ToTea(r))))
 	}
 	switch {
 	case o.Command != "":

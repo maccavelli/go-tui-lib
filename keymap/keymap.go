@@ -10,8 +10,6 @@ import (
 	"slices"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/maccavelli/go-tui-lib/v2/command"
 	"github.com/maccavelli/go-tui-lib/v2/internal/enum"
 	"github.com/maccavelli/go-tui-lib/v2/when"
@@ -159,9 +157,6 @@ type Settings struct {
 	// Normalize's AltGr; "" means runtime.GOOS. A program serving a remote
 	// client sets the client's.
 	GOOS string
-	// Tick starts the pending sequence's timer; nil means tea.Tick. It is
-	// a clock for tests, not a hook (amendment A4, item 5).
-	Tick func(time.Duration, func(time.Time) tea.Msg) tea.Cmd
 }
 
 // Resolved is the binding a sequence resolves to.
@@ -534,7 +529,7 @@ func (k *Keymap) Lookup(p Path, ctx when.Context, q Sequence) (r Resolved, ok bo
 // inner scope whose keys start it or start with it.
 func (k *Keymap) Bindings(id command.ID, p Path) []Sequence {
 	var out []Sequence
-	for _, e := range k.shown(id, p) {
+	for _, e := range k.shownEntries(id, p) {
 		out = append(out, e.Keys)
 	}
 	return out
@@ -585,8 +580,19 @@ func (k *Keymap) blocked(e *entry, ctx when.Context, inner Path, before []*entry
 	return false
 }
 
-// shown is the entries Bindings gives the sequences of.
-func (k *Keymap) shown(id command.ID, p Path) []*entry {
+// Shown is the bindings Bindings gives the sequences of, for id along a
+// path, the primary first: the bindings help shows, as keymaptea's Help
+// and KeyBinding do (0020-MADR A1.2). Each is a copy.
+func (k *Keymap) Shown(id command.ID, p Path) []Binding {
+	var out []Binding
+	for _, e := range k.shownEntries(id, p) {
+		out = append(out, cloneBinding(e.Binding))
+	}
+	return out
+}
+
+// shownEntries is the entries Bindings gives the sequences of.
+func (k *Keymap) shownEntries(id command.ID, p Path) []*entry {
 	var out []*entry
 	for i, scope := range slices.Backward(p) {
 		for j, e := range k.scopes[scope] {

@@ -29,8 +29,9 @@ below).
 ```text
  launch        start the TUI from a CLI   → command, glyph, termcap, internal/enum, internal/limits; bubbletea, colorprofile, x/term
  launch/launchtest  fake streams for tests → launch, termcap (tests)
- workspace     Bubble Tea pane host       → layout, theme, glyph, keymap, internal/cells, internal/enum, internal/limits, internal/sanitize, command, when; bubbletea, bubbles/key, bubbles/help, colorprofile, x/ansi
- keymap        keys to command IDs        → command, when, glyph, termcap, internal/enum; bubbletea, bubbles/key, bubbles/help, x/ansi
+ workspace     Bubble Tea pane host       → layout, theme, glyph, keymap, keymap/keymaptea, internal/cells, internal/enum, internal/limits, internal/sanitize, command, when; bubbletea, bubbles/key, bubbles/help, colorprofile, x/ansi
+ keymap        keys to command IDs        → command, when, glyph, termcap, termkey, internal/enum; x/ansi
+ keymap/keymaptea    keys in tea        → keymap, termkey, command, when; bubbletea, bubbles/key, bubbles/help
  command       the command registry       → when, internal/enum, internal/sanitize
  command/commandtea   commands in tea    → command; bubbletea
  when          availability expressions   → internal/enum
@@ -70,7 +71,8 @@ below).
 | `theme` | `Palette` for dark, light and unknown backgrounds; `LightDarkColor` and `ProfileColor`; `Styles`; `New(profile, background, glyphs)` with `WithPalette` and `WithPaletteFor`; `FromDark`; `Border(style)`; text forms for `Background` and `BorderStyle` |
 | `layout` | `Rect`, `Size` (fixed, percent, ratio, fill; min, max, shrink order), `Node` (`Pane`, `Split`, `Responsive`, or a custom node), `Solve` → `Plan`; `State` (JSON); the sidebar presets and their `With…` options |
 | `workspace` | `Pane` and its optional interfaces, `PlainViewer` among them; `Workspace` (routing, focus, chrome, resize, zoom, hide, overlays, cursor, `View`, `RenderPlain`, `help.KeyMap` and `Help`, the width method, a following theme with `WithGlyphs`, `WithProfile`, `WithBackground` and `GlyphThemeBuilder`, `WithSize`, clamped to `MaxSide` and `MaxCells`, `SetBackground`, `Panes`, `PaneAs`, `WhenContext`); `Wrap`; its keys through a keymap: `DefaultRules`, `WithBindings`, `SetBindings`, `KeyPath`, `KeyContexter`, `PushMode` and `RequestMsg`; `Bindings` and `Theme`, for a pane to show a key and draw alike; `CommandConsumer` and `CommandMsg`, for a pane or overlay that runs some commands itself; `Close`, an overlay's request to close; `Commands` and the context keys, `FocusedPaneKey()` to `HeightKey()` |
-| `keymap` | the notation: `Stroke`, `Sequence`, `ParseStroke`, `ParseSequence`, `Event`, `Normalize`, `Label`, `ParseAliases`, `DisplayAliases` and `CopyStrokes`; `Keymap`, from `New(Settings, defaults, layers…)`, with `Rebuild`, `Lookup`, `Bindings`, `Reachable`, `Shortcut`, `Conflicts` and `Rules`; `Binding`, `Default` and `Alternative`, `Layer`, `Location`, `Path`; `BindingConflict` and `ConflictKind`; `Features`, `FeaturesFrom`, `KeyFacts` and `FactsFrom`; `Dispatcher` (`Update`, `SetKeymap`, `Pending`, `ActiveKeys`, `Explain`) with `Outcome` and `TimeoutMsg`; `LoadVSCode`, `LoadError`, `ExportVSCode` and `Schema`; `KeyBinding`, `Help`, `Describer`, `DescriberFunc` and `FromRegistry` |
+| `keymap` | the notation: `Stroke`, `Sequence`, `ParseStroke`, `ParseSequence`, `Event`, `Normalize`, `Label`, `ParseAliases`, `DisplayAliases` and `CopyStrokes`; `Keymap`, from `New(Settings, defaults, layers…)`, with `Rebuild`, `Lookup`, `Bindings`, `Reachable`, `Shortcut`, `Conflicts` and `Rules`; `Binding`, `Default` and `Alternative`, `Layer`, `Location`, `Path`; `BindingConflict` and `ConflictKind`; `Features`, `FeaturesFrom`, `KeyFacts` and `FactsFrom`; `Shown`, the bindings help shows; `Dispatcher` (`Key` and `Expire`, over `termkey` keys; `SetKeymap`, `Pending`, `ActiveKeys`, `Explain`) with `Outcome`, whose `Wait` and `Timeout` a host times, and `TimeoutMsg`; `LoadVSCode`, `LoadError`, `ExportVSCode` and `Schema`; `Describer`, `DescriberFunc` and `FromRegistry` |
+| `keymap/keymaptea` | `Update`, the `Dispatcher` driven by tea's key messages with `tea.Tick` for a pending sequence; `FromTea` and `ToTea`, between `tea.Key` and `termkey.KeyEvent`, field for field; `KeyBinding`, `Help` and `BubblesKeys`, for bubbles |
 | `internal/cells` | `Frame`: a reused cell buffer that draws strings into rectangles with a chosen width method |
 | `internal/sanitize` | `Line` for one line of plain text and `Styled` for a pane's view, which keeps SGR and OSC 8 only, and `HasControl`: calls of `safetext` under rules equal to their behaviour on well-formed input (0020-MADR D9 S5, A3); `Truncate`, never wider than asked; `Token` |
 | `internal/limits` | `MaxSide`, `MaxCells` and `Clamp`, the window clamp `workspace` and `launch` share |
@@ -86,8 +88,8 @@ below).
 
 - **`layout` has no Charm import,** so its solver can serve any front end.
 - **The Charm-free cores** are `command`, `fuzzy`, `glyph`,
-  `internal/enum`, `internal/sanitize`, `layout`, `safetext`, `termcap`,
-  `termkey`, `termsvc` and `when`: none links a Charm
+  `internal/enum`, `internal/sanitize`, `keymap`, `layout`, `safetext`,
+  `termcap`, `termkey`, `termsvc` and `when`: none links a Charm
   module but `x/ansi`, so a line-mode CLI can use them without Bubble Tea
   ([0020-MADR](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
   D1, D11). `internal/conformance` checks their whole import closure, and
@@ -100,7 +102,8 @@ below).
   `workspace` ([0006-MADR](decisions/0006-MADR-command-registry.md)
   §1). `keymap` imports `command`, `when`, `glyph` and `termcap`'s facts;
   `workspace` imports `keymap`, which never imports `workspace` or
-  `layout` ([0007-MADR](decisions/0007-MADR-keymap-engine.md) §1).
+  `layout` ([0007-MADR](decisions/0007-MADR-keymap-engine.md) §1). `keymap` imports
+  `termkey` and no Bubble Tea; `keymap/keymaptea` holds its Bubble Tea forms.
 - **The registry reads lock-free.** Each write publishes a new immutable
   snapshot behind an `atomic.Pointer`; `Lookup`, `Available` and the
   exports read one, from any goroutine. A `Loop` command runs on the
@@ -219,6 +222,7 @@ termcap/termcaptea/         the probe's Bubble Tea host
 termcap/termcaptest/        fake terminals for tests
 termsvc/termsvctea/         termsvc's Bubble Tea commands
 command/commandtea/         command's Bubble Tea forms
+keymap/keymaptea/           keymap's Bubble Tea forms: Update, help, key.Binding
 launch/                     start the TUI from a program's own CLI
 launch/launchtest/          fake streams for a program's tests
 internal/enum/              enum names and text forms

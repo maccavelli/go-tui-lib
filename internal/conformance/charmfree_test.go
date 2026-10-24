@@ -21,6 +21,7 @@ var cores = []string{
 	"glyph",
 	"internal/enum",
 	"internal/sanitize",
+	"keymap",
 	"layout",
 	"safetext",
 	"termcap",

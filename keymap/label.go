@@ -4,10 +4,9 @@ import (
 	"maps"
 	"strings"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/maccavelli/go-tui-lib/v2/command"
 	"github.com/maccavelli/go-tui-lib/v2/glyph"
+	"github.com/maccavelli/go-tui-lib/v2/termkey"
 )
 
 // keyAliases and modAliases are the names ParseStroke reads on input only,
@@ -43,9 +42,9 @@ func DisplayAliases() map[string]string { return maps.Clone(displayAliases) }
 // keymap binds none of them, and ctrl+c stays the program's.
 func CopyStrokes() []Stroke {
 	return []Stroke{
-		{Code: 'c', Mod: tea.ModCtrl},
-		{Code: 'c', Mod: tea.ModSuper},
-		{Code: 'c', Mod: tea.ModCtrl | tea.ModShift},
+		{Code: 'c', Mod: termkey.ModCtrl},
+		{Code: 'c', Mod: termkey.ModSuper},
+		{Code: 'c', Mod: termkey.ModCtrl | termkey.ModShift},
 	}
 }
 
@@ -66,8 +65,8 @@ func (s Stroke) Label(goos string, g glyph.Set) string {
 	if s.Code == keyLeader {
 		return leaderName
 	}
-	mac := map[tea.KeyMod]string{
-		tea.ModCtrl: g.Keys.Control, tea.ModAlt: g.Keys.Option, tea.ModShift: g.Keys.Shift, tea.ModSuper: g.Keys.Command,
+	mac := map[termkey.Mod]string{
+		termkey.ModCtrl: g.Keys.Control, termkey.ModAlt: g.Keys.Option, termkey.ModShift: g.Keys.Shift, termkey.ModSuper: g.Keys.Command,
 	}
 	var b strings.Builder
 	for _, m := range modifiers {
@@ -91,13 +90,13 @@ func (s Stroke) Label(goos string, g glyph.Set) string {
 func (s Stroke) keyLabel(g glyph.Set) string {
 	if !s.Scan {
 		switch s.Code {
-		case tea.KeyUp:
+		case termkey.KeyUp:
 			return g.Keys.Up
-		case tea.KeyDown:
+		case termkey.KeyDown:
 			return g.Keys.Down
-		case tea.KeyLeft:
+		case termkey.KeyLeft:
 			return g.Keys.Left
-		case tea.KeyRight:
+		case termkey.KeyRight:
 			return g.Keys.Right
 		}
 	}

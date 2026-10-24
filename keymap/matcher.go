@@ -6,24 +6,28 @@ import (
 	"slices"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/maccavelli/go-tui-lib/v2/command"
+	"github.com/maccavelli/go-tui-lib/v2/termkey"
 	"github.com/maccavelli/go-tui-lib/v2/when"
 )
 
-// Outcome is what the dispatcher made of a message.
+// Outcome is what the dispatcher made of a key or a timeout.
 type Outcome struct {
 	Command command.ID     // the command a sequence completed; "" when none
 	Args    jsontext.Value // its binding's args
-	// Handled reports that the message was the dispatcher's: a key that
-	// matched or started or extended a sequence, or a TimeoutMsg. A key
-	// that is not handled goes to the focused pane.
+	// Handled reports that the key or the timeout was the dispatcher's: a
+	// key that matched or started or extended a sequence, or a TimeoutMsg.
+	// A key that is not handled goes to the focused pane.
 	Handled bool
 	// Replay is the keys of a sequence that ended without a match, the
 	// leader left out, as they arrived: they go to the focused pane,
-	// before the message when it is not handled.
-	Replay []tea.KeyPressMsg
+	// before the key when it is not handled.
+	Replay []termkey.KeyEvent
+	// Wait, when positive, is how long the sequence the key left pending
+	// waits: the host hands Timeout to Expire once Wait has passed, as
+	// keymaptea's tea.Tick does (0020-MADR A1.2).
+	Wait    time.Duration
+	Timeout TimeoutMsg
 }
 
 // TimeoutMsg ends a pending sequence when its timer fires. Only the timer
@@ -32,9 +36,10 @@ type TimeoutMsg struct{ gen uint64 }
 
 // Dispatcher matches keys against a keymap along a focus path: one key
 // binding, chords, and leader sequences, with a timeout (MADR §6). It is
-// a state machine driven by Update, with no goroutine: its one timer is
-// the command Update returns, which Bubble Tea runs. It is not safe for
-// concurrent use; the program's Update calls it.
+// a state machine driven by Key and Expire, with no goroutine and no
+// clock: a pending sequence's Outcome says how long to wait, and the host
+// times it. It is not safe for concurrent use; the program's event loop
+// calls it.
 type Dispatcher struct {
 	k       *Keymap
 	path    Path       // the path the pending sequence started on
@@ -46,21 +51,21 @@ type Dispatcher struct {
 // keyEvent is a key, pressed or released: as it arrived, and as Normalize
 // reads it.
 type keyEvent struct {
-	key     tea.Key // normalised, for matching
-	raw     tea.Key // as it arrived, for Replay
+	key     termkey.KeyEvent // normalised, for matching
+	raw     termkey.KeyEvent // as it arrived, for Replay
 	release bool
 	text    bool // AltGr text, which no binding matches
 }
 
 // event is k as the dispatcher matches it.
-func (d *Dispatcher) event(k tea.Key, release bool) keyEvent {
+func (d *Dispatcher) event(k termkey.KeyEvent) keyEvent {
 	var f Features
 	goos := runtime.GOOS
 	if d.k != nil {
 		f, goos = d.k.settings.Features, d.k.goos()
 	}
 	n, _ := Normalize(k, f, goos)
-	return keyEvent{key: n, raw: k, release: release, text: isAltGr(k, goos)}
+	return keyEvent{key: n, raw: k, release: k.Release, text: isAltGr(k, goos)}
 }
 
 // NewDispatcher is a dispatcher over k. A nil k matches nothing.
@@ -82,13 +87,13 @@ func (d *Dispatcher) cancel() {
 	d.gen++
 }
 
-// Update takes a message, the focus path and the when values. A key is
-// read through Normalize, with the keymap's features and Settings.GOOS,
-// and AltGr text on Windows matches no binding, so it reaches the pane.
-// Then:
+// Key takes a key, pressed or, with k.Release, released; the focus path;
+// and the when values. The key is read through Normalize, with the
+// keymap's features and Settings.GOOS, and AltGr text on Windows matches
+// no binding, so it reaches the pane. Then:
 //   - a key that completes a binding gives its command;
 //   - a key that starts or extends a longer binding is Handled, and gives a
-//     timer command, whose TimeoutMsg ends the sequence;
+//     Wait and a Timeout, which the host hands to Expire after Wait;
 //   - a key that ends a sequence without a match gives the sequence's keys
 //     in Replay, the leader left out, and is then taken afresh;
 //   - a release is matched only by a Release stroke, and one that matches
@@ -99,30 +104,13 @@ func (d *Dispatcher) cancel() {
 //     is Handled, and a backspace no binding takes removes its last
 //     stroke, unless Settings.EscReplays or BackspaceReplays is set
 //     (amendment A10).
-//
-// Any other message gives a zero Outcome.
-func (d *Dispatcher) Update(msg tea.Msg, p Path, ctx when.Context) (Outcome, tea.Cmd) {
-	var ev keyEvent
-	switch m := msg.(type) {
-	case TimeoutMsg:
-		if m.gen != d.gen || len(d.keys) == 0 {
-			return Outcome{Handled: true}, nil
-		}
-		replay := d.replay()
-		d.cancel()
-		return Outcome{Handled: true, Replay: replay}, nil
-	case tea.KeyPressMsg:
-		ev = d.event(m.Key(), false)
-	case tea.KeyReleaseMsg:
-		ev = d.event(m.Key(), true)
-	default:
-		return Outcome{}, nil
-	}
+func (d *Dispatcher) Key(k termkey.KeyEvent, p Path, ctx when.Context) Outcome {
+	ev := d.event(k)
 	if len(d.keys) > 0 && !slices.Equal(d.path, p) {
 		d.cancel()
 	}
 	if d.k == nil {
-		return Outcome{}, nil
+		return Outcome{}
 	}
 	if len(d.keys) == 0 {
 		return d.fresh(p, ctx, ev)
@@ -132,28 +120,41 @@ func (d *Dispatcher) Update(msg tea.Msg, p Path, ctx when.Context) (Outcome, tea
 	switch {
 	case full != nil:
 		d.cancel()
-		return Outcome{Command: full.Command, Args: full.Args, Handled: true}, nil
+		return Outcome{Command: full.Command, Args: full.Args, Handled: true}
 	case longer != nil:
 		d.keys, d.strokes = keys, longer.Keys[:len(keys)]
-		return Outcome{Handled: true}, d.tick()
+		return d.wait(Outcome{Handled: true})
 	case ev.release:
-		return Outcome{}, nil
-	case plain(ev, tea.KeyEscape) && !d.k.settings.EscReplays:
+		return Outcome{}
+	case plain(ev, termkey.KeyEscape) && !d.k.settings.EscReplays:
 		d.cancel()
-		return Outcome{Handled: true}, nil
-	case plain(ev, tea.KeyBackspace) && !d.k.settings.BackspaceReplays:
+		return Outcome{Handled: true}
+	case plain(ev, termkey.KeyBackspace) && !d.k.settings.BackspaceReplays:
 		d.keys, d.strokes = slices.Clone(d.keys[:len(d.keys)-1]), slices.Clone(d.strokes[:len(d.strokes)-1])
 		if len(d.keys) == 0 {
 			d.cancel()
-			return Outcome{Handled: true}, nil
+			return Outcome{Handled: true}
 		}
-		return Outcome{Handled: true}, d.tick()
+		return d.wait(Outcome{Handled: true})
 	}
 	replay := d.replay()
 	d.cancel()
-	out, cmd := d.fresh(p, ctx, ev)
+	out := d.fresh(p, ctx, ev)
 	out.Replay = replay
-	return out, cmd
+	return out
+}
+
+// Expire takes a pending sequence's Timeout once its Wait has passed. The
+// latest stroke's ends the sequence and gives its keys in Replay, the
+// leader left out; an older one, or one whose sequence ended, does
+// nothing. Either is Handled.
+func (d *Dispatcher) Expire(m TimeoutMsg) Outcome {
+	if m.gen != d.gen || len(d.keys) == 0 {
+		return Outcome{Handled: true}
+	}
+	replay := d.replay()
+	d.cancel()
+	return Outcome{Handled: true, Replay: replay}
 }
 
 // plain reports whether ev is the key code pressed with no modifier but a
@@ -163,42 +164,39 @@ func plain(ev keyEvent, code rune) bool {
 }
 
 // fresh takes a key with nothing pending.
-func (d *Dispatcher) fresh(p Path, ctx when.Context, ev keyEvent) (Outcome, tea.Cmd) {
+func (d *Dispatcher) fresh(p Path, ctx when.Context, ev keyEvent) Outcome {
 	full, longer := d.k.decide(p, ctx, []keyEvent{ev})
 	switch {
 	case full != nil:
-		return Outcome{Command: full.Command, Args: full.Args, Handled: true}, nil
+		return Outcome{Command: full.Command, Args: full.Args, Handled: true}
 	case longer != nil:
 		d.path, d.keys, d.strokes = slices.Clone(p), []keyEvent{ev}, longer.Keys[:1]
-		return Outcome{Handled: true}, d.tick()
+		return d.wait(Outcome{Handled: true})
 	}
-	return Outcome{}, nil
+	return Outcome{}
 }
 
-// tick bumps the generation and starts the timer for it.
-func (d *Dispatcher) tick() tea.Cmd {
+// wait bumps the generation and gives o the keymap's timeout and the
+// Timeout for it.
+func (d *Dispatcher) wait(o Outcome) Outcome {
 	d.gen++
-	gen := d.gen
-	timeout, tick := d.k.settings.Timeout, d.k.settings.Tick
-	if timeout <= 0 {
-		timeout = time.Second
+	o.Wait, o.Timeout = d.k.settings.Timeout, TimeoutMsg{gen: d.gen}
+	if o.Wait <= 0 {
+		o.Wait = time.Second
 	}
-	if tick == nil {
-		tick = tea.Tick
-	}
-	return tick(timeout, func(time.Time) tea.Msg { return TimeoutMsg{gen: gen} })
+	return o
 }
 
 // replay is the pending keys, less the leader's and any release.
-func (d *Dispatcher) replay() []tea.KeyPressMsg {
+func (d *Dispatcher) replay() []termkey.KeyEvent {
 	skip := 0
 	if l := d.k.leader; len(l) > 0 && hasPrefix(d.strokes, l) {
 		skip = len(l)
 	}
-	var out []tea.KeyPressMsg
+	var out []termkey.KeyEvent
 	for _, ev := range d.keys[skip:] {
 		if !ev.release {
-			out = append(out, tea.KeyPressMsg(ev.raw))
+			out = append(out, ev.raw)
 		}
 	}
 	return out

@@ -4,53 +4,70 @@ import (
 	"fmt"
 	"slices"
 	"testing"
-	"testing/synctest"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/maccavelli/go-tui-lib/v2/command"
+	"github.com/maccavelli/go-tui-lib/v2/termkey"
+	"github.com/maccavelli/go-tui-lib/v2/when"
 )
 
-// clock records each timer the dispatcher starts; a timer's command
-// returns its TimeoutMsg at once.
-type clock struct{ timers []time.Duration }
-
-func (c *clock) tick(d time.Duration, fn func(time.Time) tea.Msg) tea.Cmd {
-	c.timers = append(c.timers, d)
-	return func() tea.Msg { return fn(time.Time{}) }
+// host drives a Dispatcher as a program's loop does: a key goes to Key and
+// a TimeoutMsg to Expire, and anything else does nothing. A pending
+// sequence's Wait is recorded in timers, and its timer is a function that
+// gives its Timeout at once.
+type host struct {
+	*Dispatcher
+	timers []time.Duration
 }
 
-// press and release are the messages for a stroke's key.
-func press(t *testing.T, s string) tea.KeyPressMsg {
+// Update is what the host does with msg, and the timer it starts, if any.
+func (h *host) Update(msg any, p Path, ctx when.Context) (Outcome, func() any) {
+	var o Outcome
+	switch m := msg.(type) {
+	case termkey.KeyEvent:
+		o = h.Key(m, p, ctx)
+	case TimeoutMsg:
+		o = h.Expire(m)
+	default:
+		return Outcome{}, nil
+	}
+	if o.Wait <= 0 {
+		return o, nil
+	}
+	h.timers = append(h.timers, o.Wait)
+	return o, func() any { return o.Timeout }
+}
+
+// press and release are a stroke's key, pressed and released.
+func press(t *testing.T, s string) termkey.KeyEvent {
 	t.Helper()
 	st := mustStroke(t, s)
-	return tea.KeyPressMsg{Code: st.Code, Mod: st.Mod}
+	return termkey.KeyEvent{Code: st.Code, Mod: st.Mod}
 }
 
-func release(t *testing.T, s string) tea.KeyReleaseMsg {
+func release(t *testing.T, s string) termkey.KeyEvent {
 	t.Helper()
-	return tea.KeyReleaseMsg(press(t, s))
+	k := press(t, s)
+	k.Release = true
+	return k
 }
 
 // replayed is the keys of a Replay, as strokes.
 func replayed(o Outcome) string {
 	var out []string
 	for _, k := range o.Replay {
-		out = append(out, k.Key().Keystroke())
+		out = append(out, k.Keystroke())
 	}
 	return fmt.Sprint(out)
 }
 
 var global = Path{command.Global}
 
-func dispatcher(t *testing.T, s Settings, bs ...Binding) (*Dispatcher, *clock) {
+// dispatcher is a host over a keymap of bs; it is its own clock.
+func dispatcher(t *testing.T, s Settings, bs ...Binding) (*host, *host) {
 	t.Helper()
-	c := &clock{}
-	if s.Tick == nil {
-		s.Tick = c.tick
-	}
-	return NewDispatcher(mustNew(t, s, nil, bs)), c
+	h := &host{Dispatcher: NewDispatcher(mustNew(t, s, nil, bs))}
+	return h, h
 }
 
 // TestSequencesComplete: a one-stroke binding, a chord, a leader sequence
@@ -92,9 +109,9 @@ func TestSequencesComplete(t *testing.T) {
 	}
 }
 
-// TestPrefixTimeout: a prefix starts a timer of Settings.Timeout, one second
-// by default; its TimeoutMsg ends the sequence and gives back its keys,
-// the leader left out.
+// TestPrefixTimeout: a prefix waits Settings.Timeout, one second by
+// default; its Timeout, given to Expire, ends the sequence and gives back
+// its keys, the leader left out.
 func TestPrefixTimeout(t *testing.T) {
 	d, c := dispatcher(t, Settings{Leader: "ctrl+x", Timeout: 250 * time.Millisecond},
 		bind(t, ProgramLayer, command.Global, "g g", "top"),
@@ -103,7 +120,7 @@ func TestPrefixTimeout(t *testing.T) {
 	for _, tc := range []struct{ keys, replay string }{
 		{"g", "[g]"}, {"ctrl+x", "[]"}, {"ctrl+x g", "[g]"},
 	} {
-		var cmd tea.Cmd
+		var cmd func() any
 		for _, s := range seq(t, tc.keys) {
 			_, cmd = d.Update(press(t, s.String()), global, nil)
 		}
@@ -195,7 +212,7 @@ func TestRelease(t *testing.T) {
 		bind(t, ProgramLayer, command.Global, "ctrl+x f", "find"),
 	)
 	for _, c := range []struct {
-		msg  tea.Msg
+		msg  any
 		want command.ID
 	}{
 		{press(t, "space"), ""}, {release(t, "space"), "talk"}, {press(t, "a"), "cmd.a"}, {release(t, "a"), ""},
@@ -241,10 +258,7 @@ func TestUnmatched(t *testing.T) {
 				c.second, out, replayed(out), d.Pending(), c.want, c.handled)
 		}
 	}
-	if out, cmd := d.Update(tea.WindowSizeMsg{Width: 80}, global, nil); out.Handled || cmd != nil {
-		t.Errorf("a WindowSizeMsg: %+v", out)
-	}
-	if out, _ := NewDispatcher(nil).Update(press(t, "g"), global, nil); out.Handled {
+	if out := NewDispatcher(nil).Key(press(t, "g"), global, nil); out.Handled {
 		t.Errorf("a dispatcher with no keymap handled g: %+v", out)
 	}
 }
@@ -269,24 +283,7 @@ func TestDispatchScopeDecides(t *testing.T) {
 		t.Errorf("g on the global path: %+v", out)
 	}
 	d.Update(press(t, "ctrl+k"), global, nil)
-	if out, _ := d.Update(tea.KeyPressMsg{Code: tea.KeyKpEnter}, global, nil); out.Command != "run" {
+	if out, _ := d.Update(termkey.KeyEvent{Code: termkey.KeyKpEnter}, global, nil); out.Command != "run" {
 		t.Errorf("ctrl+k, keypad enter: %+v; want run", out)
 	}
-}
-
-// TestRealTimer: the default timer is tea.Tick, and its TimeoutMsg comes
-// after one second, on synctest's fake clock.
-func TestRealTimer(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		d := NewDispatcher(mustNew(t, Settings{}, nil, []Binding{bind(t, ProgramLayer, command.Global, "g g", "top")}))
-		_, cmd := d.Update(press(t, "g"), global, nil)
-		start := time.Now()
-		msg := cmd()
-		if waited := time.Since(start); waited != time.Second {
-			t.Errorf("the timer fired after %v, want one second", waited)
-		}
-		if out, _ := d.Update(msg, global, nil); replayed(out) != "[g]" {
-			t.Errorf("the real timer's message: %+v; want g replayed", out)
-		}
-	})
 }

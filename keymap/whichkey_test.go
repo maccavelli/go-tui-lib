@@ -5,10 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/maccavelli/go-tui-lib/v2/command"
 	"github.com/maccavelli/go-tui-lib/v2/glyph"
+	"github.com/maccavelli/go-tui-lib/v2/termkey"
 	"github.com/maccavelli/go-tui-lib/v2/when"
 )
 
@@ -49,15 +48,15 @@ func active(d *Dispatcher, p Path, ctx when.Context) string {
 func TestActiveKeys(t *testing.T) {
 	p := Path{command.Global, "pane:a"}
 	d, _ := dispatcher(t, Settings{}, whichKeys(t)...)
-	if got, want := active(d, p, nil), "ctrl+x… g… ctrl+q:quit"; got != want {
+	if got, want := active(d.Dispatcher, p, nil), "ctrl+x… g… ctrl+q:quit"; got != want {
 		t.Errorf("first strokes: %q; want %q", got, want)
 	}
 	d.Update(press(t, "ctrl+x"), p, nil)
 	before := d.Pending()
-	if got, want := active(d, p, nil), "s:pane.save k… n:new"; got != want {
+	if got, want := active(d.Dispatcher, p, nil), "s:pane.save k… n:new"; got != want {
 		t.Errorf("after ctrl+x: %q; want %q", got, want)
 	}
-	if got, want := active(d, p, when.Map{"x": when.BoolValue(true)}), "z:zoom s:pane.save k… n:new"; got != want {
+	if got, want := active(d.Dispatcher, p, when.Map{"x": when.BoolValue(true)}), "z:zoom s:pane.save k… n:new"; got != want {
 		t.Errorf("after ctrl+x, with x: %q; want %q", got, want)
 	}
 	if got := d.ActiveKeys(p, nil, "darwin", glyph.Unicode()); len(got) == 0 || got[0].Label != "s" || got[0].Stroke.String() != "s" {
@@ -66,7 +65,7 @@ func TestActiveKeys(t *testing.T) {
 	if !slices.Equal(d.Pending(), before) {
 		t.Errorf("ActiveKeys changed the pending sequence: %v, was %v", d.Pending(), before)
 	}
-	if got, want := active(d, Path{command.Global}, nil), "ctrl+x… g:outer.g ctrl+q:quit"; got != want {
+	if got, want := active(d.Dispatcher, Path{command.Global}, nil), "ctrl+x… g:outer.g ctrl+q:quit"; got != want {
 		t.Errorf("on another path, which a key would cancel: %q; want %q", got, want)
 	}
 	first, _ := d.Update(press(t, "s"), p, nil)
@@ -177,7 +176,7 @@ func TestExplain(t *testing.T) {
 		{"ctrl+k", global, "user.k", "global.k"},
 		{"ctrl+j", pane, "pane.jy pane.jx", "global.j"},
 	} {
-		k := tea.Key(press(t, c.key))
+		k := press(t, c.key)
 		x := d.Explain(k, c.p, nil)
 		if x.Raw != k || x.Changed || x.Stroke.String() != c.key ||
 			names(x.Matches) != c.matches || names(x.Shadowed) != c.shadowed {
@@ -190,20 +189,20 @@ func TestExplain(t *testing.T) {
 		bind(t, ProgramLayer, command.Global, "h", "help"),
 		bind(t, ProgramLayer, command.Global, "h j", "jump"),
 	})
-	if x := NewDispatcher(pk).Explain(tea.Key(press(t, "h")), global, nil); names(x.Matches) != "help jump" {
+	if x := NewDispatcher(pk).Explain(press(t, "h"), global, nil); names(x.Matches) != "help jump" {
 		t.Errorf("h, of a Prefix pair: %+v; want help first", x)
 	}
-	x := d.Explain(tea.Key{Code: '5', Mod: tea.ModCtrl}, global, nil)
+	x := d.Explain(termkey.KeyEvent{Code: '5', Mod: termkey.ModCtrl}, global, nil)
 	if !x.Changed || x.Normalized.Code != ']' || x.Stroke.String() != "ctrl+]" || names(x.Matches) != "bracket" {
 		t.Errorf("legacy ctrl+5: %+v; want ctrl+], bracket", x)
 	}
-	altGr := tea.Key{Code: '@', BaseCode: 'q', Text: "@", Mod: tea.ModCtrl | tea.ModAlt}
+	altGr := termkey.KeyEvent{Code: '@', BaseCode: 'q', Text: "@", Mod: termkey.ModCtrl | termkey.ModAlt}
 	if x := d.Explain(altGr, global, nil); x.Matches != nil || !x.Changed || x.Stroke.String() != "@" {
 		t.Errorf("AltGr on Windows: %+v; want text, meeting nothing", x)
 	}
-	d.Update(press(t, "ctrl+x"), global, nil)
+	d.Key(press(t, "ctrl+x"), global, nil)
 	before := d.Pending()
-	if x := d.Explain(tea.Key{Code: 's'}, global, nil); names(x.Matches) != "save" {
+	if x := d.Explain(termkey.KeyEvent{Code: 's'}, global, nil); names(x.Matches) != "save" {
 		t.Errorf("s after ctrl+x: %+v; want save", x)
 	}
 	if !slices.Equal(d.Pending(), before) {

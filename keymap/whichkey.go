@@ -3,10 +3,9 @@ package keymap
 import (
 	"slices"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/maccavelli/go-tui-lib/v2/command"
 	"github.com/maccavelli/go-tui-lib/v2/glyph"
+	"github.com/maccavelli/go-tui-lib/v2/termkey"
 	"github.com/maccavelli/go-tui-lib/v2/when"
 )
 
@@ -21,7 +20,7 @@ type ActiveKey struct {
 
 // ActiveKeys is the keys that can come next along a path with ctx: after
 // the pending sequence, or, with nothing pending on that path, the first
-// strokes. Each comes once, decided as Update decides it: by the
+// strokes. Each comes once, decided as Key decides it: by the
 // innermost scope with a binding whose when holds and whose keys go on
 // with it, where a binding the key completes wins over one it continues.
 // They come innermost scope first, in resolution order. Labels are
@@ -62,7 +61,7 @@ func (d *Dispatcher) ActiveKeys(p Path, ctx when.Context, goos string, g glyph.S
 	return out
 }
 
-// pendingOn is the pending keys, when they were typed on p; Update would
+// pendingOn is the pending keys, when they were typed on p; Key would
 // cancel them on another path.
 func (d *Dispatcher) pendingOn(p Path) []keyEvent {
 	if len(d.keys) == 0 || !slices.Equal(d.path, p) {
@@ -75,8 +74,8 @@ func (d *Dispatcher) pendingOn(p Path) []keyEvent {
 // the key as it arrived and as Normalize reads it, and the bindings it
 // meets after the pending sequence.
 type Explanation struct {
-	Raw        tea.Key
-	Normalized tea.Key
+	Raw        termkey.KeyEvent
+	Normalized termkey.KeyEvent
 	Changed    bool   // Normalize changed the key
 	Stroke     Stroke // the normalised key, as a stroke
 	// Matches is the deciding scope's bindings whose when holds and which
@@ -90,10 +89,10 @@ type Explanation struct {
 }
 
 // Explain is what k would do as the next key along a path with ctx, after
-// the pending sequence when it was typed on that path, as Update reads
+// the pending sequence when it was typed on that path, as Key reads
 // it. Explain does not change the dispatcher.
-func (d *Dispatcher) Explain(k tea.Key, p Path, ctx when.Context) Explanation {
-	ev := d.event(k, false)
+func (d *Dispatcher) Explain(k termkey.KeyEvent, p Path, ctx when.Context) Explanation {
+	ev := d.event(k)
 	x := Explanation{
 		Raw: k, Normalized: ev.key, Changed: ev.key != k,
 		Stroke: Stroke{Code: ev.key.Code, Mod: ev.key.Mod &^ locks},

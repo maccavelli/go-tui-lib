@@ -76,7 +76,7 @@ change.
 
 | Removed | Use |
 | :--- | :--- |
-| `workspace.KeyMap` and its `Bindings` | a keymap: `keymap.New` with `workspace.DefaultRules()` as its defaults, and its `Bindings` or `KeyBinding` |
+| `workspace.KeyMap` and its `Bindings` | a keymap: `keymap.New` with `workspace.DefaultRules()` as its defaults, and its `Bindings`, or `keymaptea.KeyBinding` from `v2.0.0` |
 | `workspace.DefaultKeyMap` | `workspace.DefaultRules()`, the same keys |
 | `workspace.WithKeyMap` | `workspace.WithBindings`, and `SetBindings` for a rebuilt keymap |
 

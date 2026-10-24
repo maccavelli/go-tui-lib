@@ -162,25 +162,37 @@ case tea.KeyboardEnhancementsMsg:
 ```
 
 On a legacy terminal, keys are read as the bindings name them before they
-match (`keymap.Normalize`): `ctrl+5` is `ctrl+]`, and on Windows an AltGr
-key is the text it types, for the pane, never a binding.
-`Settings.GOOS` is the system the keys come from, the program's own by
-default.
+match (`keymap.Normalize`, which takes a `termkey.KeyEvent`): `ctrl+5` is
+`ctrl+]`, and on Windows an AltGr key is the text it types, for the pane,
+never a binding. `Settings.GOOS` is the system the keys come from, the
+program's own by default.
+
+## Without Bubble Tea
+
+`keymap` links no Bubble Tea. Its `Dispatcher` takes `termkey` keys, from
+`termkey.Decoder` or converted with `keymaptea.FromTea`, through `Key`. A
+key that leaves a sequence pending gives an `Outcome` with a `Wait` and a
+`Timeout`: the host hands the `Timeout` to `Expire` once `Wait` has passed.
+In a Bubble Tea program, `keymaptea.Update(d, msg, path, ctx)` does both,
+with `tea.Tick` for the wait, and `keymaptea.ToTea` turns a replayed key
+back into the `tea.KeyPressMsg` it came in as.
 
 ## Help and hints
 
 - **The workspace's help** reads the keymap: a rebound or removed key
   shows as it is.
-- **`km.KeyBinding(id, path, describer)`** is a bubbles `key.Binding` for
-  your own component, and `km.Help(path, describer, ids...)` a
-  `help.KeyMap`. `keymap.FromRegistry(r)` gives the commands' titles.
+- **`keymaptea.KeyBinding(km, id, path, describer)`** is a bubbles
+  `key.Binding` for your own component, and
+  `keymaptea.Help(km, path, describer, ids...)` a `help.KeyMap`.
+  `keymap.FromRegistry(r)` gives the commands' titles, and
+  `km.Shown(id, path)` the bindings help shows.
 - **`km.Shortcut(id, path, goos, glyphs)`** is the label of a command's
   key, such as `⌃s` on macOS or `ctrl+s` elsewhere, or `""` when nothing
   binds it, so a footer drops a hint rather than showing a stale one.
 - **`keymap.NewDispatcher(km).Explain(key, path, ctx)`** tells what a
-  key does: the key as it arrived and as it is read, the binding that
-  wins, and the ones it hides. It is the data for a "keys debug"
-  command.
+  `termkey.KeyEvent` does: the key as it arrived and as it is read, the
+  binding that wins, and the ones it hides. It is the data for a "keys
+  debug" command.
 
 ## Moving from `workspace.KeyMap`
 

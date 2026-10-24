@@ -112,6 +112,7 @@ linters:
             - "**/glyph/*.go"
             - "**/internal/enum/*.go"
             - "**/internal/sanitize/*.go"
+            - "**/keymap/*.go"
             - "**/layout/*.go"
             - "**/safetext/*.go"
             - "**/termcap/*.go"

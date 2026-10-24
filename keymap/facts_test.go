@@ -118,7 +118,7 @@ func TestReleaseRule(t *testing.T) {
 // help and the shortcut follow.
 func TestRebuildFacts(t *testing.T) {
 	k := mustNew(t, Settings{Facts: AltEnter}, []Default{newline(t)})
-	key := func(k *Keymap) string { return k.Help(global, nil, "newline").ShortHelp()[0].Help().Key }
+	key := func(k *Keymap) string { return k.Shown("newline", global)[0].Keys.String() }
 	if got := key(k); got != "alt+enter" {
 		t.Errorf("the help shows %q; want alt+enter", got)
 	}

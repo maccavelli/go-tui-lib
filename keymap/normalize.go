@@ -4,7 +4,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	tea "charm.land/bubbletea/v2"
+	"github.com/maccavelli/go-tui-lib/v2/termkey"
 )
 
 // Normalize is k as the bindings name it, and whether that changed it
@@ -30,35 +30,35 @@ import (
 // Ultraviolet, Bubble Tea's decoder, already reads most C0 bytes as ctrl
 // and a letter, and BS as ctrl+h; these rules hold for a key from any
 // source.
-func Normalize(k tea.Key, f Features, goos string) (tea.Key, bool) {
+func Normalize(k termkey.KeyEvent, f Features, goos string) (termkey.KeyEvent, bool) {
 	if isAltGr(k, goos) {
 		r, _ := utf8.DecodeRuneInString(k.Text)
-		n := tea.Key{Code: r, Text: k.Text, Mod: k.Mod & locks, BaseCode: k.BaseCode, IsRepeat: k.IsRepeat}
+		n := termkey.KeyEvent{Code: r, Text: k.Text, Mod: k.Mod & locks, BaseCode: k.BaseCode, IsRepeat: k.IsRepeat, Release: k.Release}
 		return n, n != k
 	}
 	n := k
-	if n.Mod.Contains(tea.ModSuper) {
-		n.Mod &^= tea.ModMeta | tea.ModHyper
+	if n.Mod.Contains(termkey.ModSuper) {
+		n.Mod &^= termkey.ModMeta | termkey.ModHyper
 	}
 	if f&Disambiguate == 0 {
 		mods := n.Mod &^ locks
 		switch c := n.Code; {
 		case c == 0x08:
-			n.Code = tea.KeyBackspace
+			n.Code = termkey.KeyBackspace
 		case mods != 0:
-		case c >= 0x01 && c <= 0x1a && c != tea.KeyTab && c != tea.KeyEnter:
-			n.Code, n.Mod, n.Text = c+0x60, n.Mod|tea.ModCtrl, ""
+		case c >= 0x01 && c <= 0x1a && c != termkey.KeyTab && c != termkey.KeyEnter:
+			n.Code, n.Mod, n.Text = c+0x60, n.Mod|termkey.ModCtrl, ""
 		case c >= 0x1c && c <= 0x1f:
-			n.Code, n.Mod, n.Text = c+0x40, n.Mod|tea.ModCtrl, ""
+			n.Code, n.Mod, n.Text = c+0x40, n.Mod|termkey.ModCtrl, ""
 		case c == 0 && n.BaseCode == 0 && n.Text == "":
 			// A Windows console key with no code carries its rune in
 			// BaseCode, and is not NUL.
-			n.Code, n.Mod = tea.KeySpace, n.Mod|tea.ModCtrl
+			n.Code, n.Mod = termkey.KeySpace, n.Mod|termkey.ModCtrl
 		}
-		if mods = n.Mod &^ locks; mods.Contains(tea.ModCtrl) {
+		if mods = n.Mod &^ locks; mods.Contains(termkey.ModCtrl) {
 			switch c := n.Code; {
-			case c < unicode.MaxRune && unicode.IsUpper(c) && !mods.Contains(tea.ModShift):
-				n.Code, n.Mod = unicode.ToLower(c), n.Mod|tea.ModShift
+			case c < unicode.MaxRune && unicode.IsUpper(c) && !mods.Contains(termkey.ModShift):
+				n.Code, n.Mod = unicode.ToLower(c), n.Mod|termkey.ModShift
 			case c == '5':
 				n.Code = ']'
 			case c == '4':
@@ -71,8 +71,8 @@ func Normalize(k tea.Key, f Features, goos string) (tea.Key, bool) {
 
 // isAltGr reports whether k is AltGr on Windows: ctrl and alt, with text
 // that is printable.
-func isAltGr(k tea.Key, goos string) bool {
-	if goos != "windows" || !k.Mod.Contains(tea.ModCtrl|tea.ModAlt) || k.Text == "" {
+func isAltGr(k termkey.KeyEvent, goos string) bool {
+	if goos != "windows" || !k.Mod.Contains(termkey.ModCtrl|termkey.ModAlt) || k.Text == "" {
 		return false
 	}
 	for _, r := range k.Text {

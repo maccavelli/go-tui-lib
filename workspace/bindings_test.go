@@ -168,14 +168,11 @@ func TestRebind(t *testing.T) {
 	}
 }
 
-// chordKeymap binds the program's ctrl+x n, with a timer that fires at
-// once.
+// chordKeymap binds the program's ctrl+x n, with a timeout of a
+// nanosecond, so that its tea.Tick fires at once.
 func chordKeymap(t *testing.T) *keymap.Keymap {
-	tick := func(_ time.Duration, fn func(time.Time) tea.Msg) tea.Cmd {
-		return func() tea.Msg { return fn(time.Time{}) }
-	}
 	prog := keymap.Binding{Keys: mustSeq(t, "ctrl+x n"), Command: "app.new", Location: keymap.Location{Layer: keymap.ProgramLayer}}
-	return mustKeymap(t, keymap.Settings{Tick: tick}, []keymap.Binding{prog})
+	return mustKeymap(t, keymap.Settings{Timeout: time.Nanosecond}, []keymap.Binding{prog})
 }
 
 func mustSeq(t *testing.T, s string) keymap.Sequence {
