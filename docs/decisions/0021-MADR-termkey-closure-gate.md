@@ -105,7 +105,7 @@ hole.
   `glyph` and `internal/enum`). It is not this record's: N4 lets a later
   record, or an amendment here, add it.
 
-  *A1, 2026-10-25, proposed: `safetext` joins `narrow`.*
+  *A1, 2026-10-25, accepted: `safetext` joins `narrow`.*
 
 ### Consequences
 
@@ -175,9 +175,12 @@ The PLAN sees each check fail on a scratch copy:
 
 ## Amendments
 
-### A1 (2026-10-25): `safetext` joins `narrow` (proposed)
+### A1 (2026-10-25): `safetext` joins `narrow`
 
-*Status: proposed. It changes N5; N1 to N4 stand.*
+*Status: accepted, 2026-10-25, by the owner: "committed, accept
+recommendations, proceed". A1.2's allow list is D9's, `glyph` and
+`internal/enum`; A1.3 leaves `when` out of `narrow`. It changes N5; N1
+to N4 stand.*
 
 **Found,** at `a7245d5`, after N1 to N4 were built
 (0021-PLAN Step 2):

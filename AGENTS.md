@@ -32,11 +32,12 @@ else (`docs/decisions/0005-MADR-terminal-capabilities-and-services.md`
 version Bubble Tea selects, and only `launch` may import it: the depguard
 rule `xterm` refuses it everywhere else
 (`docs/decisions/0013-MADR-cli-integration-helpers.md` §11). `termkey`
-imports the standard library and `internal/enum` and nothing else: the
-depguard rule `termkeystd` refuses any other import, and
-`internal/conformance`'s `TestNarrowClosures` checks its closure
-(`docs/decisions/0021-MADR-termkey-closure-gate.md`). Any other
-module needs its own MADR.
+imports the standard library and `internal/enum`, and `safetext` the
+standard library, `glyph` and `internal/enum`, and nothing else: the
+depguard rules `termkeystd` and `safetextstd` refuse any other import,
+and `internal/conformance`'s `TestNarrowClosures` checks their closures
+(`docs/decisions/0021-MADR-termkey-closure-gate.md` N1 to N4, A1). Any
+other module needs its own MADR.
 
 Never import the Charm v1 paths `github.com/charmbracelet/bubbletea`,
 `github.com/charmbracelet/lipgloss` or `github.com/charmbracelet/bubbles`;

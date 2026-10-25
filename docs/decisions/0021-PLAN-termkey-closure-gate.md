@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: complete
 date: 2026-10-25
 associated-madr: "0021-MADR-termkey-closure-gate.md"
 ---
@@ -167,7 +167,9 @@ scan; the record.
 
 ### Step 3: `safetext` joins `narrow` (0021-MADR A1)
 
-*Proposed 2026-10-25, with A1. Steps 1 and 2 are complete.*
+*Proposed 2026-10-25, with A1, and approved by the owner that day
+("committed, accept recommendations, proceed"): A1.2's allow list is
+D9's, and `when` stays out (A1.3). Steps 1 and 2 are complete.*
 
 **Facts** (read 2026-10-25, at `a7245d5`):
 
@@ -200,8 +202,7 @@ scan; the record.
               - github.com/maccavelli/go-tui-lib/v2/internal/enum
   ```
 
-  (A1.2's recommended list. If the owner picks 0009-MADR §1's, the
-  `internal/enum` line goes, and the step's records say so.)
+  (A1.2's recommended list, which the owner chose.)
 * `AGENTS.md`, "Dependencies": the `termkey` sentence becomes one on both:
   "`termkey` imports the standard library and `internal/enum`, and
   `safetext` the standard library, `glyph` and `internal/enum`, and
@@ -213,9 +214,8 @@ scan; the record.
   `safetext`; the Tooling bullet says "`termkey` and `safetext` today";
   the "Imports point downward" bullet says `when` imports the standard
   library and `internal/enum`, with 0006-MADR's sentence recorded as
-  overtaken by 0014-MADR W0 (A1.3, its recommended option; if the owner
-  picks the other, `when` gets an entry and a `whenstd` rule as `safetext`
-  does, and the mutations a `when` pair of 1 and 3).
+  overtaken by 0014-MADR W0 (A1.3, its recommended option, which the
+  owner chose).
 * `docs/README.md`: the rows.
 
 **Checks:**
@@ -342,3 +342,57 @@ gate alone misses:
   name.
 * **The PLAN is `complete`:** each item of Verification is met, as
   above. The owner commits the step.
+
+### Step 3: `safetext` joins `narrow` (2026-10-25)
+
+* The owner committed A1 and Step 3's text as `71cd2d4`, and approved
+  them with both recommended options: "committed, accept
+  recommendations, proceed". A1 is `accepted`; this PLAN is
+  `in-progress`.
+* **`internal/conformance/charmfree_test.go`:** `narrow` gains
+  `{core: "safetext", allow: []string{"glyph", "internal/enum"}, record:
+  "0020-MADR D9, 0021-MADR A1"}`, and its comment names `safetextstd`.
+* **`.golangci.yml`:** `safetextstd`, after `termkeystd`, with D9's allow
+  list (A1.2).
+* **`AGENTS.md`,** "Dependencies": one sentence on both rules.
+  **`docs/architecture.md`:** the depguard bullet names both rules and
+  packages; the Tooling bullet says "`termkey` and `safetext` today"; the
+  "Imports point downward" bullet says that `when` imports the standard
+  library and `internal/enum`, and that 0006-MADR's "only the standard
+  library" predates 0014-MADR W0's enum tables (A1.3). **`docs/README.md`:**
+  the rows.
+* **Checks:**
+  * `GOWORK=off go test -count=1 -v -run 'TestNarrow|TestCoresAreCharmFree'
+    ./internal/conformance/`: `PASS` for `TestCoresAreCharmFree` and
+    `TestNarrowClosures` on linux, darwin and windows, and for
+    `TestNarrowChains`;
+  * `make lint`: `0 issues.` for linux, darwin and windows;
+  * `markdownlint-cli2` over `AGENTS.md`, `architecture.md` and the index:
+    "0 issues".
+* **Mutations,** each on a fresh copy: seven that a check must kill, all
+  killed by the check named, and two let through, as the step plans. The
+  step's 1 to 8 are 21.11 to 21.16 here, numbered on from Step 2's:
+
+  | Mutation | Seen by |
+  | :--- | :--- |
+  | 21.11 safetext imports x/ansi (TestNarrowClosures) | `charmfree_test.go:258: safetext (GOOS=linux) links github.com/charmbracelet/x/ansi, which 0020-MADR D9, 0021-MADR A1 does not allow: safetext → github.com/charmbracelet/x…` |
+  | 21.11p the same: TestCoresAreCharmFree passes, the gap A1 closes | `SURVIVED (exit 0)` |
+  | 21.12 the same, refused by depguard's safetextstd, and by no other rule | `safetext/escape.go:6:2: import 'github.com/charmbracelet/x/ansi' is not allowed from list 'safetextstd' (depguard)`, the one depguard issue |
+  | 21.13 glyph imports x/ansi (TestNarrowClosures, for safetext) | `charmfree_test.go:258: safetext (GOOS=linux) links github.com/charmbracelet/x/ansi, which 0020-MADR D9, 0021-MADR A1 does not allow: safetext → glyph → github.com/charmbr…` |
+  | 21.13p the same: golangci-lint over safetext passes, why the closure test is needed | `0 issues.`, `SURVIVED (exit 0)` |
+  | 21.14 safetext imports termkey (TestNarrowClosures) | `charmfree_test.go:258: safetext (GOOS=linux) links github.com/maccavelli/go-tui-lib/v2/termkey, which 0020-MADR D9, 0021-MADR A1 does not allow: safetext → termkey` |
+  | 21.14b the same, refused by depguard's safetextstd | `safetext/escape.go:6:2: import 'github.com/maccavelli/go-tui-lib/v2/termkey' is not allowed from list 'safetextstd' (depguard)` |
+  | 21.15 safetext's allowance loses internal/enum (TestNarrowClosures) | `charmfree_test.go:258: safetext (GOOS=linux) links github.com/maccavelli/go-tui-lib/v2/internal/enum, which 0020-MADR D9, 0021-MADR A1 does not allow: safetext → glyph → …` |
+  | 21.16 safetext's allowance adds termkey (TestNarrowClosures) | `charmfree_test.go:264: narrow allows termkey for safetext, which its closure does not hold (GOOS=linux)` |
+
+  The depguard lines of 21.12 and 21.14b were read from their kept
+  copies; each also reports its mutation's own `unused` placeholder.
+* **Gates,** `python3 -m tools.verify gates` over the step's seven files,
+  nothing skipped: macOS `gates: 19 passed, 0 failed, 0 skipped in 405s`; the Linux host
+  `gates: 19 passed, 0 failed, 0 skipped in 842s`; the Windows host
+  `gates: 19 passed, 0 failed, 0 skipped in 1817s`. `release-check` is
+  "309 file(s) clean" on each, with `apicheck` (no incompatible change)
+  and the examples gate.
+* **Identifiers:** `python3 -m tools.verify scan`: `scan: clean (5 pattern(s))`.
+* **The PLAN is `complete`:** each item of Verification is met, Step 3's
+  among them. The owner commits the step.

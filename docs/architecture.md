@@ -94,8 +94,11 @@ below).
   ([0020-MADR](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
   D1, D11). `internal/conformance` checks their whole import closure, and
   depguard's `charmfree` rule their own imports (Tooling).
-- **Imports point downward.** `when` imports only the standard library,
-  so the keymap and any front end can use it. `command` imports `when`,
+- **Imports point downward.** `when` imports the standard library and
+  `internal/enum` alone, so the keymap and any front end can use it
+  ([0006-MADR](decisions/0006-MADR-command-registry.md)'s "only the
+  standard library" predates the enum tables of
+  [0014-MADR](decisions/0014-MADR-native-integration-api.md) W0). `command` imports `when`,
   and no Bubble Tea; `command/commandtea` holds its Bubble Tea forms.
   `workspace` imports
   both to publish its commands and context keys; `command` never imports
@@ -289,10 +292,12 @@ docs/
   checks what they link through other packages
   ([0020-MADR](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
   D11).
-- **Kept to the standard library and `internal/enum` by `depguard`'s
-  `termkeystd`:** `termkey`, in its non-test files, as `internal/conformance`
-  checks its whole closure
-  ([0021-MADR](decisions/0021-MADR-termkey-closure-gate.md)).
+- **Kept to what their records allow by `depguard`'s `termkeystd` and
+  `safetextstd`:** `termkey` to the standard library and `internal/enum`,
+  and `safetext` to the standard library, `glyph` and `internal/enum`, in
+  their non-test files, as `internal/conformance` checks their whole
+  closures ([0021-MADR](decisions/0021-MADR-termkey-closure-gate.md) N3,
+  A1).
 
 ## Tooling
 
@@ -344,7 +349,7 @@ docs/
     `windows`, and fails on any Charm module but `x/ansi`, naming the
     shortest import chain to it; `cores` names the packages.
   - `TestNarrowClosures` does the same for each core whose record
-    allows less, `termkey` today, and fails on any package outside
+    allows less, `termkey` and `safetext` today, and fails on any package outside
     the standard library, the core and what `narrow` allows it, on an
     entry `cores` does not list, and on an allowance its closure no
     longer holds ([0021-MADR](decisions/0021-MADR-termkey-closure-gate.md)).

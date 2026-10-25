@@ -194,9 +194,11 @@ type narrowCore struct {
 // narrow is every core with a narrower rule
 // (docs/decisions/0021-MADR-termkey-closure-gate.md N1). A core joins by
 // the record that states its rule, with a depguard rule beside it that
-// allows the same, as termkeystd does termkey's (N4).
+// allows the same, as termkeystd does termkey's (N4) and safetextstd
+// safetext's (A1).
 var narrow = []narrowCore{
 	{core: "termkey", allow: []string{"internal/enum"}, record: "0020-MADR D7, 0021-MADR N1"},
+	{core: "safetext", allow: []string{"glyph", "internal/enum"}, record: "0020-MADR D9, 0021-MADR A1"},
 }
 
 // strayFrom reports, for g, whether a package is one a narrow core may not
