@@ -29,6 +29,7 @@ below).
 ```text
  launch        start the TUI from a CLI   → command, glyph, termcap, internal/enum, internal/limits; bubbletea, colorprofile, x/term
  launch/launchtest  fake streams for tests → launch, termcap (tests)
+ palette       the command palette        → workspace, command, command/commandtea, keymap, fuzzy, layout, when, internal/enum, internal/sanitize; bubbletea, bubbles/textinput, lipgloss, x/ansi
  workspace     Bubble Tea pane host       → layout, theme, glyph, keymap, keymap/keymaptea, internal/cells, internal/enum, internal/limits, internal/sanitize, command, when; bubbletea, bubbles/key, bubbles/help, colorprofile, x/ansi
  keymap        keys to command IDs        → command, when, glyph, termcap, termkey, internal/enum; x/ansi
  keymap/keymaptea    keys in tea        → keymap, termkey, command, when; bubbletea, bubbles/key, bubbles/help
@@ -66,11 +67,12 @@ below).
 | `safetext` | `Rules` and the presets `Text`, `Strict`, `Line`, `Command` and `StatusLine`; `Clean`, `IsClean`; `Sanitizer`, a streaming `io.Writer` with `Close`; `SafeURL` and `URLs`: ECMA-48 with the DEC parser's recovery, C1 code points read as their 7-bit forms, invalid UTF-8 as one U+FFFD per maximal subpart, and the Bidi_Control set removed unless kept ([0020-MADR](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md) D9, A3) |
 | `launch` | `Choice` and `Flags` (`--mode`, `--tui`, bound natively in each framework); `Streams`, `StreamSource`, `FromSource`; `Config`, `Decide` → `Decision` with `Target`s and a `Reason` token; `Run[M]` with `WithRegistry`, `WithRestorer`, `OnStart`, `WithProgramOptions`, `WithFilter`; `ErrNotStarted`, `ErrCrashed`; `Frame`; `ExitCode`, `ExitError`; `Restorer` |
 | `launch/launchtest` | `Terminal` (a fake terminal stream with a size and typed keys), `Pipe`, `Streams`, `Env` |
+| `palette` | `Picker`, from `NewPicker(ws)` with `WithLimit`, `WithGrouping`, `WithPlaceholder`, `WithLogger`, `WithGOOS`, `WithRecents` and `WithoutInput`: an overlay pane that streams hits from its providers off the event loop, ranks them with `fuzzy`, asks for a hit's arguments, and runs it on the loop; `Register`, `Open` with `WithID`, `WithAnchor` and `WithSize`, `OpenCommand`, `DefaultRules`, `SetQuery` and `SelectedMsg`; `Provider` and its optional `Discoverer`, `Starter`, `Stopper`, `Prefixed` and `Debouncer`; `Search`, `Hit`, `Availability`, `Grouping`; the providers `FromRegistry`, `Static` with `Item`, `Panes`, `Files` with `FileOption`, `Walker`, `WalkerFunc`, `FSWalker`, `PathFilter` and `PathFilterFunc`, and `Recents`; `Frecency`, with `FrecencyOption`, its JSON form and `ErrRecentsVersion` |
 | `internal/enum` | `Names`, an enum's tokens, on `uint8` or `int`, and `Bits`, a bit set's, on `uint8` or `uint16`, for an enum's `String`, `MarshalText` and `UnmarshalText`; `Name`, `Marshal` and `Unmarshal` over a bare table |
 | `internal/teamsg` | `Cmd`, the `tea.Cmd` that delivers one message |
 | `theme` | `Palette` for dark, light and unknown backgrounds; `LightDarkColor` and `ProfileColor`; `Styles`; `New(profile, background, glyphs)` with `WithPalette` and `WithPaletteFor`; `FromDark`; `Border(style)`; text forms for `Background` and `BorderStyle` |
 | `layout` | `Rect`, `Size` (fixed, percent, ratio, fill; min, max, shrink order), `Node` (`Pane`, `Split`, `Responsive`, or a custom node), `Solve` → `Plan`; `State` (JSON); the sidebar presets and their `With…` options |
-| `workspace` | `Pane` and its optional interfaces, `PlainViewer` among them; `Workspace` (routing, focus, chrome, resize, zoom, hide, overlays, cursor, `View`, `RenderPlain`, `help.KeyMap` and `Help`, the width method, a following theme with `WithGlyphs`, `WithProfile`, `WithBackground` and `GlyphThemeBuilder`, `WithSize`, clamped to `MaxSide` and `MaxCells`, `SetBackground`, `Panes`, `PaneAs`, `WhenContext`); `Wrap`; its keys through a keymap: `DefaultRules`, `WithBindings`, `SetBindings`, `KeyPath`, `KeyContexter`, `PushMode` and `RequestMsg`; `Bindings` and `Theme`, for a pane to show a key and draw alike; `CommandConsumer` and `CommandMsg`, for a pane or overlay that runs some commands itself; `Close`, an overlay's request to close; `Commands` and the context keys, `FocusedPaneKey()` to `HeightKey()` |
+| `workspace` | `Pane` and its optional interfaces, `PlainViewer` among them; `Workspace` (routing, focus, chrome, resize, zoom, hide, overlays, cursor, `View`, `RenderPlain`, `help.KeyMap` and `Help`, the width method, a following theme with `WithGlyphs`, `WithProfile`, `WithBackground` and `GlyphThemeBuilder`, `WithSize`, clamped to `MaxSide` and `MaxCells`, `SetBackground`, `Panes`, `PaneAs`, `WhenContext`); `Wrap`; its keys through a keymap: `DefaultRules`, `WithBindings`, `SetBindings`, `KeyPath`, `KeyContexter`, `PushMode` and `RequestMsg`; `Bindings` and `Theme`, for a pane to show a key and draw alike; `CommandConsumer` and `CommandMsg`, for a pane or overlay that runs some commands itself; `Close`, an overlay's request to close, and `OverlayClosedMsg`, what an overlay is sent when it closes; `Commands` and the context keys, `FocusedPaneKey()` to `HeightKey()` |
 | `keymap` | the notation: `Stroke`, `Sequence`, `ParseStroke`, `ParseSequence`, `Event`, `Normalize`, `Label`, `ParseAliases`, `DisplayAliases` and `CopyStrokes`; `Keymap`, from `New(Settings, defaults, layers…)`, with `Rebuild`, `Lookup`, `Bindings`, `Reachable`, `Shortcut`, `Conflicts` and `Rules`; `Binding`, `Default` and `Alternative`, `Layer`, `Location`, `Path`; `BindingConflict` and `ConflictKind`; `Features`, `FeaturesFrom`, `KeyFacts` and `FactsFrom`; `Shown`, the bindings help shows; `Dispatcher` (`Key` and `Expire`, over `termkey` keys; `SetKeymap`, `Pending`, `ActiveKeys`, `Explain`) with `Outcome`, whose `Wait` and `Timeout` a host times, and `TimeoutMsg`; `LoadVSCode`, `LoadError`, `ExportVSCode` and `Schema`; `Describer`, `DescriberFunc` and `FromRegistry` |
 | `keymap/keymaptea` | `Update`, the `Dispatcher` driven by tea's key messages with `tea.Tick` for a pending sequence; `FromTea` and `ToTea`, between `tea.Key` and `termkey.KeyEvent`, field for field; `KeyBinding`, `Help` and `BubblesKeys`, for bubbles |
 | `internal/cells` | `Frame`: a reused cell buffer that draws strings into rectangles with a chosen width method |
@@ -107,6 +109,9 @@ below).
   `workspace` imports `keymap`, which never imports `workspace` or
   `layout` ([0007-MADR](decisions/0007-MADR-keymap-engine.md) §1). `keymap` imports
   `termkey` and no Bubble Tea; `keymap/keymaptea` holds its Bubble Tea forms.
+  `palette` imports `workspace`, `command` and `fuzzy`, and nothing
+  imports `palette` ([0008-MADR](decisions/0008-MADR-command-palette.md)
+  §1).
 - **The registry reads lock-free.** Each write publishes a new immutable
   snapshot behind an `atomic.Pointer`; `Lookup`, `Available` and the
   exports read one, from any goroutine. A `Loop` command runs on the
@@ -227,6 +232,8 @@ termsvc/termsvctea/         termsvc's Bubble Tea commands
 command/commandtea/         command's Bubble Tea forms
 keymap/keymaptea/           keymap's Bubble Tea forms: Update, help, key.Binding
 launch/                     start the TUI from a program's own CLI
+palette/                    the command palette and its providers; goldens
+                            under testdata/golden/
 launch/launchtest/          fake streams for a program's tests
 internal/enum/              enum names and text forms
 internal/teamsg/            the one-message command
@@ -454,13 +461,12 @@ docs/
 ## What is not here
 
 - **Standard panes** (log tail, metrics view, scrolling text and
-  Markdown), **overlay widgets** (dialog, picker, palette, toast), a
-  help-footer pane beyond `workspace`'s `help.KeyMap`, and **`updatetea`.**
-  Each is its own record.
-- **The command palette**
-  ([0008-MADR](decisions/0008-MADR-command-palette.md)), which lists the
-  registry's commands, and a which-key panel over `keymap`'s
-  `ActiveKeys`.
+  Markdown), **overlay widgets** (dialog, toast), a help-footer pane
+  beyond `workspace`'s `help.KeyMap`, and **`updatetea`.** Each is its own
+  record. The command palette is `palette`, above.
+- **A which-key panel** over `keymap`'s `ActiveKeys`, and **a line-mode
+  picker** for a CLI without Bubble Tea, which may build on `fuzzy`
+  (issue #8).
 - **Terminal modes and inline scrollback** (`termmode`, `inline`): mode
   plans, teardown, restore bytes and the Windows console helpers, and the
   per-terminal scrollback strategy. Each is a later record; until then tea

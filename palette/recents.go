@@ -33,15 +33,19 @@ const (
 	maxRecentID     = 1024
 )
 
-// recentWeight is what one use adds to a typed query's hit, within its
-// grade: two matched characters' worth, as the matcher scores them.
-const recentWeight = 32
+// maxRecentBoost bounds what the recents add to a typed query's hit: one
+// consecutive-match bonus, the bound fuzzy's RankContext keeps, so that a
+// recent hit wins a near-tie within its grade and never passes a clearly
+// better match (0008-MADR §2). Each use adds 1, as its score decays.
+const maxRecentBoost = 4
 
-// recentFirst lifts a recent hit above every hit discovered for an empty
-// query; maxBoost keeps the sum an int on any platform.
+// For an empty query, recentFirst lifts a recent hit above every hit
+// discovered, and the recents are ordered among themselves by their
+// scores, in thousandths; maxOrder keeps the sum an int on any platform.
 const (
 	recentFirst = 1 << 29
-	maxBoost    = 1 << 28
+	orderScale  = 1000
+	maxOrder    = 1 << 28
 )
 
 // ErrRecentsVersion is returned by ReadFrom for recents of a version this
@@ -237,13 +241,18 @@ func (f *Frecency) ReadFrom(r io.Reader) (int64, error) {
 	return n, nil
 }
 
-// boost is what score adds to a hit's value.
-func boost(score float64) int { return int(min(math.Round(score*recentWeight), maxBoost)) }
+// boost is what score adds to a typed query's hit: the score, rounded, and
+// at most maxRecentBoost.
+func boost(score float64) int { return int(math.Round(min(score, maxRecentBoost))) }
+
+// order is a recent hit's place among the recents for an empty query.
+func order(score float64) int { return int(min(math.Round(score*orderScale), maxOrder)) }
 
 // Recents wraps inner so that its recently and often used hits come first
-// for an empty query, and rank higher within their grade for a typed one,
-// by their scores in f (0008-MADR §5): a recent hit never passes a better
-// grade. The program records the hits a picker runs in the same store,
+// for an empty query, the most used first, and win a near-tie within their
+// grade for a typed one, by their scores in f (0008-MADR §2, §5): a recent
+// hit gains at most one consecutive-match bonus, so it never passes a
+// clearly better match, nor a better grade. The program records the hits a picker runs in the same store,
 // with WithRecents. Recents has inner's name, prefix, debounce, start and
 // stop; it discovers nothing when inner does not.
 func Recents(f *Frecency, inner Provider) Provider { return &recents{f: f, inner: inner} }
@@ -309,7 +318,7 @@ func (r *recents) Discover(ctx context.Context, yield func(Hit) bool) error {
 	}
 	return d.Discover(ctx, func(h Hit) bool {
 		if sc := r.score(h.ID); sc > 0 {
-			h.Score = fuzzy.Score{Grade: fuzzy.Exact, Value: recentFirst + boost(sc)}
+			h.Score = fuzzy.Score{Grade: fuzzy.Exact, Value: recentFirst + order(sc)}
 		}
 		return yield(h)
 	})

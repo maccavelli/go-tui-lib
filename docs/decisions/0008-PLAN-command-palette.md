@@ -1334,10 +1334,12 @@ Three deviations, D1 to D3, below.
   6. `esc` clears a value, and on an empty one closes the picker,
      running nothing; there is no step back to an earlier parameter.
   7. A completion pop-up never opens the stage: its hit is the pane's.
-  8. `Recents` adds 32 to a typed query's hit for each use, two matched
-     characters' worth, and lifts a recent hit above every hit discovered
+  8. ~~`Recents` adds 32 to a typed query's hit for each use, two matched
+     characters' worth,~~ and lifts a recent hit above every hit discovered
      for an empty query; it has `inner`'s name, prefix, debounce, start,
-     stop and the opening hook.
+     stop and the opening hook. *2026-10-25, Step 9's deviation D1:* the 32
+     broke MADR §2's bound, and was not within the MADR; a typed query's
+     boost is now 1 a use, at most 4.
   9. `Record` keeps no empty ID or one over 1024 bytes; `WriteTo` writes
      the best scored first, with the stored scores and times, in UTC;
      `ReadFrom` also refuses an empty or repeated ID and a score not above
@@ -1425,3 +1427,151 @@ Three deviations, D1 to D3, below.
     is clean.
 * **Not done here, by the PLAN:** the guide, the examples, the docs tree,
   the release `v2.1.0` and the close-out are Step 9's.
+
+### Step 9: documentation, the release and the close-out
+
+*2026-10-25.* The owner approved this step ("committed, proceed"), after
+Step 8's `d0815db`. One deviation, D1, below.
+
+#### Deviation D1, 2026-10-25: `Recents`' boost broke MADR §2's bound
+
+* **Found,** before any of this step's files, while reading `fuzzy`'s API
+  for `ExampleMatcher_Rank`: MADR §2 bounds a recency boost by "one
+  consecutive-match bonus, so recency breaks near-ties without overturning
+  a better match", and `fuzzy/rank.go` keeps it (`maxBoost =
+  bonusConsecutive`, 4). Step 8's `palette/recents.go` (`d0815db`) added
+  32 a use to a typed query's hit, up to `1 << 28`, so a hit used a few
+  times passed a clearly better match of its grade; the grades held. Step
+  8's choice 8 called it within the MADR, and `TestRecents` checked only
+  that a boost raised a value within its grade.
+* **Resolutions offered:** bound the boost as §2 says (recommended); or
+  amend the MADR, as A7, to let the palette's recents outrank a better
+  match of the same grade.
+* **Chosen by the owner,** 2026-10-25: "Bound it as §2 says
+  (Recommended)". No decision changes: the code now does what §2 decided.
+  Step 8's choice 8 is annotated. This step's scope gains
+  `palette/recents.go` and `palette/recents_test.go`.
+* **Done:** `boost` is a use's score, rounded, at most `maxRecentBoost`,
+  4, fuzzy's bound; for an empty query the recents are ordered among
+  themselves by `order`, their scores in thousandths, still above every
+  other hit. `TestRecents` adds a fixture of one grade, "tm": "Tab
+  manager" 57, "Text mode" 56, "Terminal mode" 52. Two uses of "Text
+  mode" win the near-tie; fifty of "Terminal mode" do not pass the lead
+  of five. Mutations on scratch copies, 3 killed of 3:
+  * the bound removed, as Step 8 had it: `tm with recents: [term text
+    tab]; want text tab term`;
+  * no boost for a typed query: `light: {Grade:subsequence Value:16}
+    boosted, {Grade:subsequence Value:16} plain`;
+  * the recents' order for an empty query ignoring their scores: `an
+    empty query lists [dark light high sepia]`.
+
+#### Up to the push
+
+* **The API, listed:** apidiff, at the Makefile's pin, over `v2.0.0` with
+  compatible changes included, gives two additions and nothing else:
+  "./workspace.OverlayClosedMsg: added" and "package
+  github.com/maccavelli/go-tui-lib/v2/palette: added". `make apicheck`:
+  "against v2.0.0, 0 incompatible change(s)"; `scripts/apicheck.allow`
+  is empty. The one change in behaviour is A6's: an overlay's pane is sent
+  `OverlayClosedMsg` when it closes.
+* **The guide,** `docs/guides/command-palette.md`: opening the palette,
+  with `DefaultRules` beside `workspace.DefaultRules` in one keymap and
+  `OpenCommand` in the registry; the built-in providers and `Availability`;
+  prefixes and `?`; writing a provider, with its optional capabilities and
+  what closing does; the argument stage; persisting the recents with
+  `WriteTo` and `ReadFrom`, which the program opens and writes; the file
+  provider over the program's `fs.FS`; completion pop-ups, their ID and
+  `overlay:` bindings; what `CommandConsumer` lets any pane do; and
+  ranking. Its claims were read against the code: `FSWalker` skips a
+  skipped directory's whole tree; anything that is not the workspace's own
+  message reaches every pane and open overlay
+  (`(*Workspace).Update`'s documentation), so every open picker takes a
+  `SetQuery`, and the guide names `SendOverlay` for one.
+* **Examples,** compiled and run by `go test`: `ExamplePicker`
+  (`palette/example_test.go`), a picker over three themes, typed into,
+  moved and accepted, its output the drawn rows and the theme run; and
+  `ExampleMatcher_Rank` (`fuzzy/example_test.go`), six paths ranked for
+  "main", one of each grade and one left out.
+* **The docs tree:**
+  * `docs/architecture.md`: `palette` in the package list with its
+    imports, from `go list`, and in the table; `OverlayClosedMsg` in
+    `workspace`'s row; "Imports point downward" gains `palette`; the
+    directory list gains `palette/`; "What is not here" no longer lists
+    the palette, and keeps a which-key panel and issue #8's line-mode
+    picker;
+  * `docs/guides/building-workspaces.md`: `CommandConsumer` among the
+    optional interfaces; `Theme()`, `WidthMethod()` and `Bindings()`
+    for a pane that draws as the workspace does; how a matched command is
+    offered before it becomes a `RequestMsg`; `Close` and
+    `OverlayClosedMsg` under "Overlays";
+  * `docs/glossary.md`: 0008 is built, `fuzzy` in `v1.13.0` and `palette`
+    in `v2.1.0`; A5.2's rename of `Input` to `Search`. Steps 6 to 8
+    entered the palette's names;
+  * `docs/guides/migrating.md`: "Migrating to `v2.1.0`", with *Changed*
+    and *Added*;
+  * `README.md`: the current release is `v2.1.0`, a Status bullet for the
+    palette, and an "I want to" row; `docs/README.md`: seven "I want to"
+    rows for the guide, in place of "see the planned command palette".
+* **Checks on the docs:** `markdownlint` "0 issues"; `python3
+  scripts/go-examples.py --check-guide` "10 excerpt(s) checked", clean;
+  a scratch link check over the seven documents edited found every file
+  and anchor but one false hit, Go code in a code block, after it was seen
+  to report a planted bad anchor; a scan of the tracked Markdown and Go
+  files outside the records for the palette as planned and its old names
+  finds only the glossary's history of the renames.
+* **Release notes, `v2.1.0`,** for the owner's release:
+
+  > **`v2.1.0`** adds the command palette, and removes or retypes
+  > nothing: a program on `v2.0.0` builds unchanged.
+  >
+  > *Added*
+  >
+  > * `palette`: find and run anything from one overlay of a workspace.
+  >   Providers search off the event loop and stream their hits back,
+  >   ranked by `fuzzy`. Built in: the registry's commands (`>`), with
+  >   their keys and danger, run through the registry with
+  >   `command.OriginPalette`; the panes; files from an `fs.FS` the
+  >   program gives (`@`); and a program's own items. A command's
+  >   arguments are asked for in the overlay before it runs. `Frecency`
+  >   and `Recents` put recently used items first, kept between runs as
+  >   versioned JSON. A picker `WithoutInput` is an editor's `@` or `/`
+  >   completion pop-up. Its keys are commands in the program's one
+  >   keymap, `palette.DefaultRules()`, run in the order they were
+  >   pressed.
+  > * `workspace.OverlayClosedMsg`.
+  >
+  > *Changed*
+  >
+  > * An overlay's pane is sent `workspace.OverlayClosedMsg` whenever the
+  >   workspace closes it.
+  >
+  > [The command palette guide](docs/guides/command-palette.md) and
+  > [the migration guide](docs/guides/migrating.md#migrating-to-v210).
+  > Records: `0008-MADR-command-palette.md` (§1 to §8, A1 to A6).
+* **The disclosure guard** over the 11 commits ahead of `origin/main`
+  (`02a7879` to `d0815db`, against `2ecc8bb`) passed, exit 0, with no
+  finding, and `main` is not behind `origin/main`. It runs again over this
+  step's commit before the push.
+* **Gates:** `python3 -m tools.verify gates` over the step's 4 Go files
+  and 8 documents.
+  * The first run failed `modernize` on every host, and passed every
+    other gate: `go fix` wanted `strings.SplitSeq` for the
+    `strings.Split` loop in `ExamplePicker`. macOS: 18 passed, 1 failed,
+    in 966 s; `release-check` "329 file(s) clean in 1 module(s)", the
+    tracked files, with `apicheck` against `v2.0.0`. `remote linux` and
+    `remote windows`: 17 passed, 1 failed, 1 skipped (`gofmt`, which is
+    given no files there), in 908 s and 1933 s; `release-check` "331
+    file(s) clean", the step's three new files included. On each, `race`,
+    `shuffle`, `lc-all-c`, the cross vets, `vuln`, `shellcheck`,
+    `markdownlint`, `actionlint`, the five script tests (29, 19, 27, 23
+    and 17 passed) and the tools' 67 tests passed.
+  * After the change: `make modernize` passes on macOS, and `gates --only
+    modernize` through `remote linux` and `remote windows`, "1 passed";
+    `make lint` reports "0 issues" for `GOOS=linux`, `darwin` and
+    `windows`; gofmt is clean; both examples pass.
+  * The identifier scan of the change and the untracked files is clean.
+* **Not done yet, the owner's and then the close-out's:** this step's
+  commit; the guard over it; the push; CI green on `main`; the annotated
+  tag `v2.1.0` and CI green on it; the consumer smoke test, with a
+  negative control; and this PLAN `complete`, with its `docs/README.md`
+  row.

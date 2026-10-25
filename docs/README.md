@@ -115,7 +115,14 @@ it was when they were written
 | show a command's key in a footer or a hint, and drop it when unbound | [guides/keymaps.md](guides/keymaps.md#help-and-hints) |
 | move off `workspace.KeyMap` | [guides/keymaps.md](guides/keymaps.md#moving-from-workspacekeymap) |
 | know why the keymap is built this way | [0007-MADR](decisions/0007-MADR-keymap-engine.md) |
-| see the planned command palette and fuzzy matcher | [0008-MADR](decisions/0008-MADR-command-palette.md) |
+| open a command palette over my commands, panes, files or my own items | [guides/command-palette.md](guides/command-palette.md#open-the-palette) |
+| write a palette provider, with a prefix or a debounce | [guides/command-palette.md](guides/command-palette.md#write-a-provider) |
+| ask for a command's arguments in the palette before it runs | [guides/command-palette.md](guides/command-palette.md#arguments) |
+| put recently used items first, and keep them between runs | [guides/command-palette.md](guides/command-palette.md#recents) |
+| drive an editor's `@` or `/` completion pop-up | [guides/command-palette.md](guides/command-palette.md#completion-pop-ups) |
+| run some matched commands in my own pane, in key order | [guides/command-palette.md](guides/command-palette.md#any-pane-can-consume-a-command) |
+| rank candidates by fuzzy match, without Bubble Tea | `fuzzy`, and `ExampleMatcher_Rank` in `fuzzy/example_test.go` |
+| know why the command palette and fuzzy matcher are built this way | [0008-MADR](decisions/0008-MADR-command-palette.md) |
 | see how streamed Markdown, frames and untrusted text will be handled | [0009-MADR](decisions/0009-MADR-streaming-content-engine.md) |
 | know why terminal capabilities are detected this way | [0005-MADR](decisions/0005-MADR-terminal-capabilities-and-services.md) |
 | learn what the terminal supports, over SSH and inside tmux | [guides/terminal-capabilities.md](guides/terminal-capabilities.md) |

@@ -18,10 +18,10 @@ pattern, used by every program that needs it.
 
 ## Status
 
-- **The current release is `v2.0.0`,** at the module path
+- **The current release is `v2.1.0`,** at the module path
   `github.com/maccavelli/go-tui-lib/v2`
   ([0020-MADR](docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
-  A4.1). It follows `v1.13.0`, which a `v1` user keeps; `v1.13.0` follows
+  A4.1). `v2.0.0` follows `v1.13.0`, which a `v1` user keeps; `v1.13.0` follows
   `v0.12.0`, tagged in place of `v0.13.0` (A4). Within a major version
   nothing is removed: a renamed name keeps working, deprecated, until the
   next major version, and [the migration guide](docs/guides/migrating.md)
@@ -97,6 +97,15 @@ pattern, used by every program that needs it.
   `x/ansi`, and its Bubble Tea forms are in `termcaptea`, `termsvctea`,
   `commandtea` and `keymaptea`
   ([the migration guide](docs/guides/migrating.md#migrating-to-v200)).
+- **The command palette, since `v2.1.0`.** `palette` finds and runs
+  anything from one overlay: the registry's commands, with their keys and
+  danger, the panes, files from an `fs.FS` the program gives, and a
+  program's own items, through providers that search off the event loop.
+  It asks for a command's arguments before it runs it, puts recently used
+  items first, and drives an editor's `@` and `/` completion pop-ups. Its
+  keys are commands in the program's one keymap, run in the order they
+  were pressed
+  ([the command palette guide](docs/guides/command-palette.md)).
 - **The stack is Charm v2:** `charm.land/bubbletea/v2`,
   `charm.land/lipgloss/v2` and `charm.land/bubbles/v2`, with
   `github.com/charmbracelet/colorprofile` and
@@ -123,6 +132,7 @@ repository as it is now.
 | build a main pane with a sidebar, a bottom pane and a footer | [the workspace guide](docs/guides/building-workspaces.md) |
 | learn what the terminal supports, and send notifications, copies and links | [the terminal capabilities guide](docs/guides/terminal-capabilities.md) |
 | define commands once, for keys, slash lines, agents and your own CLI | [the commands guide](docs/guides/commands.md) |
+| find and run anything from a command palette, or complete `@` and `/` in an editor | [the command palette guide](docs/guides/command-palette.md) |
 | start the TUI from my CLI with `--tui`, and fall back when it cannot run | [Start the TUI from your CLI](docs/guides/commands.md#start-the-tui-from-your-cli) |
 | know which Charm version to use, and what may be imported | [AGENTS.md, Dependencies](AGENTS.md#dependencies) |
 | know the rules every TUI package follows | [AGENTS.md, TUI conventions](AGENTS.md#tui-conventions) |

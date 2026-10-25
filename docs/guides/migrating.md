@@ -7,6 +7,37 @@ needs a major version, at a new module path
 ([AGENTS.md, API conventions](../../AGENTS.md#api-conventions), rule 1).
 Up to `v0.12.0`, a deprecated name was removed in the next minor release.
 
+## Migrating to `v2.1.0`
+
+`v2.1.0` adds a package and a message, and removes or retypes nothing:
+`make apicheck` against `v2.0.0` reports 0 incompatible changes
+([0008-PLAN-command-palette](../decisions/0008-PLAN-command-palette.md)
+Steps 5 to 9). A program on `v2.0.0` needs no change to build:
+
+```bash
+go get github.com/maccavelli/go-tui-lib/v2@v2.1.0
+```
+
+### Changed
+
+- **An overlay's pane is told when it closes.** Whenever the workspace
+  removes an overlay, by `Pop`, `Close`, the `esc` binding or a `Push`
+  that replaces its ID, the pane is sent `workspace.OverlayClosedMsg`
+  through its `Update`, after `PaneBlurMsg` if it had the keyboard, and its
+  command is batched with the closing's. A pane that ignores messages it
+  does not know sees no difference.
+
+### Added
+
+- **`palette`,** the command palette
+  ([the command palette guide](command-palette.md)): `Picker`, from
+  `NewPicker`, with `Register`, `Open`, `OpenCommand` and `DefaultRules`;
+  the providers `FromRegistry`, `Static`, `Panes`, `Files` and `Recents`;
+  `Provider` and its optional capabilities; the argument stage over
+  `command.Params`; `Frecency`, the recents store, with its JSON form; and
+  completion pop-ups, `WithoutInput`, `SetQuery` and `SelectedMsg`.
+- **`workspace.OverlayClosedMsg`,** above.
+
 ## Migrating to `v2.0.0`
 
 `v2.0.0` is a new major version, at the module path

@@ -103,10 +103,11 @@ of its own.
 
 ## Names the planned records must not take
 
-[0008-MADR](decisions/0008-MADR-command-palette.md) and
-[0009-MADR](decisions/0009-MADR-streaming-content-engine.md) are accepted
-but unbuilt, and [0007-MADR](decisions/0007-MADR-keymap-engine.md) is
-built, in `v0.11.0`. Their amendments of 2026-10-09 (0007 A3, 0008 A2, 0009 A4,
+[0009-MADR](decisions/0009-MADR-streaming-content-engine.md) is accepted
+but unbuilt; [0007-MADR](decisions/0007-MADR-keymap-engine.md) is built,
+in `v0.11.0`, and [0008-MADR](decisions/0008-MADR-command-palette.md),
+`fuzzy` in `v1.13.0` and `palette` in `v2.1.0`. Their amendments of
+2026-10-09 (0007 A3, 0008 A2, 0009 A4,
 from [0014-PLAN-canonicalization.md](decisions/0014-PLAN-canonicalization.md)
 Step 2) renamed every type that collided with one above, or with another
 planned one: `keymap.Context`, `Origin`, `Conflict`, `Rule`, `Result`,
@@ -119,7 +120,9 @@ command provider `Commands(reg)` is `FromRegistry(reg)`, so that
 `Commands` keeps meaning a package's own command list, as
 `workspace.Commands` does; and the completion option `AsCompletion()` is
 `WithoutInput()`. No `palette` type is `RegistryOption`, which `command`
-exports.
+exports. Its amendment of 2026-10-25 (A5.2) renamed A2's `Input`, what a
+provider is asked, to `Search`, since `termkey.Input` is exported in
+`v2.0.0`.
 
 One planned pair is deliberate: `Renderer`, the interface in `stream`,
 and the type in `stream/glamourmd` that implements it. It is added to

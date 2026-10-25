@@ -111,6 +111,24 @@ func TestRecents(t *testing.T) {
 			t.Fatalf("se: %v; want sepia first, by its better grade", got)
 		}
 
+		// Within one grade, boundary for "tm": "Tab manager" scores 57, "Text
+		// mode" 56 and "Terminal mode" 52. Two uses win the near-tie; fifty
+		// do not pass a lead of five, more than one consecutive-match bonus
+		// (0008-MADR §2).
+		modes := []Item{{ID: "tab", Text: "Tab manager"}, {ID: "text", Text: "Text mode"}, {ID: "term", Text: "Terminal mode"}}
+		plainModes := found(t, Static("modes", modes), "tm", when.Map{})
+		if got := ids(plainModes); strings.Join(got, " ") != "tab text term" || scoreOf(plainModes, "tab").Value-scoreOf(plainModes, "term").Value <= maxRecentBoost {
+			t.Fatalf("the fixture: tm ranks %v, %+v", got, plainModes)
+		}
+		f.Record("text")
+		f.Record("text")
+		for range 50 {
+			f.Record("term")
+		}
+		if got := ids(found(t, Recents(f, Static("modes", modes)), "tm", when.Map{})); strings.Join(got, " ") != "text tab term" {
+			t.Fatalf("tm with recents: %v; want text tab term, the near-tie won and the clear lead kept", got)
+		}
+
 		reg, _ := gated(t)
 		cmds := Recents(f, FromRegistry(reg))
 		if cmds.(Prefixed).Prefix() != ">" {

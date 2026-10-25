@@ -141,6 +141,7 @@ changes. Optional interfaces add the rest:
 | `KeyMapper` | the pane's bindings, for a help footer |
 | `Changer` | `Changed() bool`, false to reuse the last view |
 | `EscConsumer` | for an overlay that handles `esc` itself |
+| `CommandConsumer` | `ConsumesCommand(id)`, for a pane or overlay that runs some matched commands itself |
 
 Messages reach panes like this:
 
@@ -173,6 +174,14 @@ if log, ok := ws.PaneAs[*logPane]("logs"); ok {
 
 `ws.Panes()` walks the panes focus moves through, in that order, and
 `ws.Plan().All()` walks every placed pane with its rectangle.
+
+A pane that draws as the workspace does reads `ws.Theme()`, which follows
+the terminal's profile and background, and `ws.WidthMethod()`; one that
+shows a command's key asks the keymap the workspace uses,
+`ws.Bindings().Shortcut(id, ws.KeyPath(), goos, glyphs)`, so a key the user
+rebound shows as it is. Read them when the pane draws, not once: the
+theme is rebuilt when the terminal reports its profile or background, and
+`SetBindings` replaces the keymap.
 
 ## Focus
 
@@ -273,7 +282,15 @@ n}`, `workspace.resize.direction` with `{"direction": "left"}`, and the
 rest. The workspace runs its own; any other command a key matches comes
 back to your `Update` as a `RequestMsg`, for your registry. A key no
 binding takes goes to the focused pane, or the top modal overlay, and an
-overlay that is an `EscConsumer` gets esc first. `WithKeyMap`, deprecated
+overlay that is an `EscConsumer` gets esc first.
+
+A matched command that is not the workspace's own is offered first to
+whoever has the keyboard: the top modal overlay alone, when one is open;
+else the open overlays, top first, then the focused pane. The first that
+is a `CommandConsumer` and takes the ID is sent `workspace.CommandMsg` at
+once, in `Update`, so its commands run in the order their keys were
+pressed, as the [command palette](command-palette.md)'s moves do. A
+command nobody takes is the `RequestMsg` above. `WithKeyMap`, deprecated
 in `v0.11.0`, is gone in `v0.12.0`: see
 [moving from `workspace.KeyMap`](keymaps.md#moving-from-workspacekeymap).
 
@@ -337,7 +354,12 @@ focus, so `Update` returns it rather than dropping it.
   overlay may share a pane's ID. Pushing an ID that is already open
   replaces that overlay, on top. `ws.SendOverlay(id, msg)` reaches an open
   overlay only; `ws.Send(id, msg)` tries a pane first, then an overlay.
-- **Closing.** `esc` or `ws.Pop()` closes it.
+- **Closing.** `esc` or `ws.Pop()` closes the top overlay. An overlay
+  closes itself by returning a command that sends `workspace.Close(id)`,
+  since calling `Pop` from its own `Update` would remove the overlay the
+  workspace is updating. However it closes, by these, or by a `Push` that
+  replaces its ID, its pane is sent `workspace.OverlayClosedMsg`, after
+  `PaneBlurMsg` if it had the keyboard, so it can cancel what it started.
 
 ## Text width
 
