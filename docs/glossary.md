@@ -95,6 +95,8 @@ of its own.
 | `CommandConsumer`, `CommandMsg` | a pane or overlay that runs some matched commands itself, and the matched command it is sent ([0008-MADR](decisions/0008-MADR-command-palette.md) A3 item 1) | `workspace` |
 | `OverlayClosedMsg` | what an overlay's pane is sent when the workspace closes it, by any means ([0008-MADR](decisions/0008-MADR-command-palette.md) A6) | `workspace` |
 | `Picker`, `OverlayOption` | the palette's overlay pane, and how one opening places it ([0008-MADR](decisions/0008-MADR-command-palette.md) §7, A2, A3) | `palette` |
+| `Item`, `SelectedMsg` | one entry of a fixed provider, and a hit the user accepted ([0008-MADR](decisions/0008-MADR-command-palette.md) §5, §6, A3 item 6) | `palette` |
+| `Walker`, `WalkerFunc`, `PathFilter`, `PathFilterFunc`, `FileOption` | what yields the file provider's paths, what leaves paths out of a walk, their adapters, and the file provider's options ([0008-MADR](decisions/0008-MADR-command-palette.md) §5, A2, A3 item 7) | `palette` |
 | `Provider`, `Discoverer`, `Starter`, `Stopper`, `Prefixed`, `Debouncer` | a source of palette hits, and its optional capabilities: hits for an empty query, work before its first search, a release when the picker closes, a prefix it owns, a wait after a keystroke ([0008-MADR](decisions/0008-MADR-command-palette.md) §4, A2) | `palette` |
 | `Search`, `Hit`, `Availability`, `Grouping` | what a provider is asked, one result, where a provider searches, how the hits are ordered ([0008-MADR](decisions/0008-MADR-command-palette.md) §4, A2, A3, A5.2) | `palette` |
 

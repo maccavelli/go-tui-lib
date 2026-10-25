@@ -433,7 +433,10 @@ goroutine and stops its used providers. Its mutations gain: a replacing
     the best; sets `Command`, `Danger` and `Params`; its `Run` calls
     ~~`Dispatch`~~ `commandtea.Dispatch(ctx, reg, req)` (A5.1) with
     `Origin: command.OriginPalette`;
-  * `Recents`, `Static` with `Item`, `Panes(w)`;
+  * ~~`Recents`,~~ `Static` with `Item`, `Panes(w)`; *2026-10-25
+    (Step 7 deviation D1, the owner's choice "Move Recents to Step 8
+    (Recommended)"):* `Recents(f *Frecency, inner Provider)` takes Step
+    8's `Frecency`, so it moves to Step 8 with its tests;
   * `Files(walk, opts...)` with `FileOption` (`WithIndexAbove`,
     `WithMaxFiles`), `Walker`, `WalkerFunc`, `FSWalker`, `PathFilter`,
     `PathFilterFunc`;
@@ -445,7 +448,14 @@ goroutine and stops its used providers. Its mutations gain: a replacing
     carries `Danger` and `Params`;
   * running a command hit sends a `ResultMsg` whose request has
     `OriginPalette`; a `Prompt` command's `PromptMsg` reaches the program;
-    a `Destructive` command goes through the registry's gate;
+    a `Destructive` command goes through the registry's gate; *2026-10-25
+    (Step 7 deviation D2, the owner's choice "Test the registry decides
+    (Recommended)"):* the registry's policy asks its gate before a
+    destructive command only from the agent or the command line
+    (`command/gate.go:78-89`, 0006-MADR A4), so the test shows the
+    registry deciding: the hit reaches `Dispatch` with `OriginPalette`
+    and runs unasked, while the same command requested by the agent is put
+    to the gate;
   * `Files` over an `fstest.MapFS` uses the index above its threshold and
     a full scan below it, honours `PathFilter`, ranks by crush's tiers,
     and stops at `WithMaxFiles` with its row;
@@ -466,7 +476,10 @@ goroutine and stops its used providers. Its mutations gain: a replacing
 * MADR §6 with A3 items 5, 7 and 10: the argument stage from
   `command.Params`; `Frecency`, `NewFrecency`, `FrecencyOption`
   (`WithHalfLife`, `WithMaxEntries`), `Record`, `Score`, `WriteTo`,
-  `ReadFrom`, and `ErrRecentsVersion`.
+  `ReadFrom`, and `ErrRecentsVersion`. *2026-10-25 (Step 7 deviation
+  D1):* and `Recents(f *Frecency, inner Provider)` (MADR §5), moved here
+  from Step 7, with `WithRecents`; its tests: an empty query lists the
+  recent hits first, and a typed one boosts them within their grade.
 * **Tests:**
   * a command with string, integer, boolean and enum parameters is
     prompted in order; `Required` and `Default` hold; a bad integer, and
@@ -1074,3 +1087,186 @@ D1, below.
   completion mode, `SetQuery`, `SelectedMsg` and the
   `overlay:completion` bindings are Step 7's. Step 7's non-modal pop-up
   ends its session on `OverlayClosedMsg` too.
+
+### Step 7: built-in providers and completion mode
+
+*2026-10-25.* The owner approved this step ("committed all, proceed").
+Three deviations, D1 to D3, below.
+
+#### Deviation D1, 2026-10-25: `Recents` takes Step 8's `Frecency`
+
+* **Found,** before any code of this step: Step 7 lists
+  `Recents(f *Frecency, inner Provider)` (MADR §5), and `Frecency`,
+  `NewFrecency` and `WithRecents` are Step 8's (MADR §6, A3 item 10), so
+  `Recents` could not be written here.
+* **Resolutions offered:** move `Recents` to Step 8 with its tests
+  (recommended); or pull `Frecency` into Step 7.
+* **Chosen by the owner,** 2026-10-25: "Move Recents to Step 8
+  (Recommended)". Steps 7 and 8 are annotated; no decision changes.
+
+#### Deviation D2, 2026-10-25: the registry asks its gate only for the agent and the shell
+
+* **Found,** when `TestRegistryRun` first ran: the test this step lists,
+  "a `Destructive` command goes through the registry's gate", expected the
+  gate to be asked. The registry's policy asks it before a destructive
+  command only from the agent or the command line
+  (`command/gate.go:78-89`, 0006-MADR A4); from the palette, as from a
+  key, a person is at the keyboard, and it runs unasked. The test item was
+  written against a wrong expectation; the code is as 0006 decided.
+* **Resolutions offered:** test that the registry decides: the hit
+  reaches `Dispatch` with `OriginPalette` and runs unasked, while the same
+  command from the agent is put to the gate (recommended); or change the
+  registry's policy to ask from the palette, which changes 0006-MADR A4
+  and needs its own amendment.
+* **Chosen by the owner,** 2026-10-25: "Test the registry decides
+  (Recommended)". The test item is annotated; no decision changes.
+
+#### Deviation D3, 2026-10-25: one Windows test run failed, and did not fail again
+
+* **Found,** in the step's last gates: on `remote windows`, `lc-all-c`
+  (`go test -count=1 ./...` with `LC_ALL=C`) exited 1 after 173 s, where
+  every other run of it took 98 to 100 s. The gate quotes only its
+  output's last lines, which name every package from `layout` on as `ok`
+  and end `FAIL`; the failing package sorts before `layout`, so it is not
+  `palette`, the one package this step changes. The host removes the
+  gates' outputs after a run, so the full output was gone. It was run
+  again three times with its output kept: alone, and twice after `race`
+  and `shuffle` as in the failed run. All three passed, as did `race` and
+  `shuffle` each time.
+* **Resolutions offered:** record the failure as unreproduced and make the
+  tooling name the test when one fails (recommended): amend
+  `0018-PLAN-python-verification-tools.md` so that a failing test gate
+  also quotes its `--- FAIL`, `FAIL` and `panic` lines; or run
+  `go test -count=20` with `LC_ALL=C` on Windows over the packages before
+  `layout` until it fails or the 20 runs pass. Passing the step on a green
+  rerun was not offered.
+* **Chosen by the owner,** 2026-10-25: "Record it, fix the tool
+  (Recommended)". The tooling change is 0018's, under its own approval;
+  until it lands the cause is open. No decision of this pair changes.
+
+#### What was built
+
+* `palette/registry.go`: `FromRegistry(reg)`, the provider "commands",
+  under the prefix `>`. A command `Available` on `SurfacePalette`, under
+  the when values at open, matches by its title, "Category: Title", its
+  slash name or an alias, keeping the best score, and is drawn as
+  "Category: Title". Its hit carries the command's ID, `Command`,
+  `Danger`, description and `command.Params`; its `Run` calls
+  `commandtea.Dispatch` with `Origin: command.OriginPalette` and the when
+  values it was found under. An empty query lists every such command.
+* `palette/static.go`: `Static(name, items)` and `Item` (`ID`, `Text`,
+  `Help`, `Hint`, `Run func() tea.Cmd`); an empty query lists the items in
+  their order.
+* `palette/panes.go`: `Panes(w)`, the provider "panes": the focus ring's
+  panes by title, then the hidden; accepting one focuses it, and a hidden
+  one is shown first.
+* `palette/files.go`: `Files(walk, opts...)`, the provider "files", under
+  `@`, with a 30 ms debounce; `Walker`, `WalkerFunc`, `FSWalker(fsys,
+  skip)`, `PathFilter`, `PathFilterFunc`; `FileOption` with
+  `WithIndexAbove` (`DefaultIndexAbove`, 5000) and `WithMaxFiles`
+  (`DefaultMaxFiles`, 200 000). `Start` walks once per opening, stopping
+  at the limit, and builds a `fuzzy.Index` above the threshold; a search
+  ranks a path by crush's tiers on its last element, as grades: the
+  element or its stem equal to the query (`exact`), the element starting
+  with it (`prefix`), a whole element of the path equal to it
+  (`boundary`), the rest (`subsequence`), each by the matcher's value. A
+  stopped walk adds one muted row saying so.
+* `palette/picker.go`, `palette/options.go`, `palette/keys.go` and
+  `palette/view.go`: `WithoutInput()`, `SetQuery(q) tea.Msg`,
+  `SelectedMsg{ID, Hit}`, and `DefaultRules`' `overlay:completion`
+  bindings. A picker `WithoutInput` opens non-modal, as `completion`
+  under the focused pane's cursor, 48 × 10, with no input row; esc closes
+  it.
+* `palette/doc.go` describes the built-in providers and completion mode.
+* **Choices made within MADR §5, §6 and A3.** None changes a decision:
+  1. The built-in providers read what they need on the event loop when
+     the picker opens, through an unexported hook `Open` calls before any
+     search: `FromRegistry` the when values, which `Discover` is not
+     given, and `Panes` the workspace, which only the loop may read.
+  2. Every accept sends `SelectedMsg`, a picker's beside the hit's `Run`
+     (MADR §6); a completion pop-up's runs nothing, so the pane uses the
+     hit (A3 item 6).
+  3. The providers' names are "commands", "panes" and "files"; their hit
+     IDs are the command's ID, `pane:<id>` and `file:<path>`. A path hit
+     has no `Run`: `SelectedMsg` carries it.
+  4. A command whose schema does not compile has no `Params` here; Step
+     8's argument stage asks `command.Params` again, and reports it.
+  5. `FSWalker` passes over a directory it cannot read, and fails only
+     when the root cannot be read.
+  6. `DefaultIndexAbove` and `DefaultMaxFiles` are exported, as
+     `DefaultLimit` is.
+* **Tests** (`palette/providers_test.go`): `TestFromRegistry` (alias,
+  slash name and "Category: Title" matches, the best kept; a command whose
+  when fails at open, and one offered on keys alone, left out; `Danger`
+  and `Params` carried); `TestRegistryRun` (a `ResultMsg` with
+  `OriginPalette` and the when values; a prompt's `PromptMsg`; the
+  registry's policy deciding, D2); `TestRegistryDiscover` (`>` lists what
+  `Available` gives at open); `TestStatic`; `TestPanes` (focus, and a
+  hidden pane shown and focused); `TestFiles` (`PathFilter`, the tiers,
+  the index above the threshold and the full scan below with the same best
+  hits, `WithMaxFiles` and its row); `TestFilesInPicker` (`@`, the
+  debounce); `TestCompletion` (non-modal; other keys reach the focused
+  editor; no input row; `SetQuery`; down, enter and tab in
+  `overlay:completion`; `SelectedMsg`, nothing run, closed; the editor's
+  own enter shadowed only while it is open; esc closes);
+  `TestSelectedMsg`. Every Step 6 test passes; their harness in
+  `palette/picker_test.go` gains `newProgOn`, a workspace of the test's
+  own layout, and their bodies are unchanged. `go test -race -count=50
+  ./palette/` is clean.
+* **Mutations,** through `python3 -m tools.verify mutate` on scratch
+  copies, 22 killed of 22, the PLAN's five first:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | `FromRegistry` ignores `when` | `TestFromRegistry`: `format: [edit.only]; want none` |
+  | `FromRegistry` dispatches with `OriginKey` | `TestRegistryRun`: the `ResultMsg`'s request has `Origin:key` |
+  | `FSWalker` ignores the `PathFilter` | `TestFiles`: walked `vendor/x/main.go` and `node_modules/pkg/index.js` |
+  | completion mode is modal | `TestCompletion`: "the completion pop-up is modal" |
+  | `WithMaxFiles` is ignored | `TestFiles`: `WithMaxFiles(2) walked 7, stopped false` |
+  | the index is never built | `TestFiles`: `above 3: false` |
+  | a base name or stem equal to the query is not exact | `TestFiles`: `main.go graded prefix, true; want exact` |
+  | a whole path element is not a tier | `TestFiles`: `internal/main/run.go graded subsequence, true; want boundary` |
+  | `FromRegistry` matches the title alone | `TestFromRegistry`: `o: …` best `Grade:prefix`, want exact by its alias |
+  | `FromRegistry`'s `Discover` ignores when and surfaces | `TestRegistryDiscover`: `> lists [… "edit.only" … "key.only" …]` |
+  | `Open` does not tell the providers it opened | `TestRegistryDiscover`: `> lists []`; `TestPanes`: `the panes are []` |
+  | a completion pop-up runs its hit | `TestCompletion`: `enter: ran ["b1"]` |
+  | `SetQuery` is ignored | `TestCompletion`: `SetQuery(c): rows ["a1" "b1" "c1" "d1"]` |
+  | accepting sends no `SelectedMsg` | `TestCompletion`: `enter sent []`; `TestSelectedMsg`: `SelectedMsg []` |
+  | `overlay:completion` lacks `down` | `TestCompletion`: `down: selection 0; want 1` |
+  | a hidden pane is focused without being shown | `TestPanes`: `focus "side", hidden [logs]` |
+  | `Static`'s empty query reverses its order | `TestStatic`: `["High contrast" "Light theme" "Dark theme"]` |
+  | a stopped walk adds no limit row | `TestFiles`: `past the limit: []` |
+  | `Files` owns no prefix | `TestFilesInPicker`: `@main: rows []` |
+  | `Files` has no debounce | `TestFilesInPicker`: `before the debounce ends: rows ["main.go" "cmd/main.go" …]` |
+  | a completion pop-up draws an input row | `TestCompletion`: `the pop-up's first line is ">  …"; want its first row, with no input` |
+  | `Panes` leaves out the hidden panes | `TestPanes`: `the panes are ["Session" "Metrics"]` |
+
+* **Names:** `python3 -m tools.verify names` over `Item`, `Walker`,
+  `WalkerFunc`, `PathFilter`, `PathFilterFunc`, `FileOption` and
+  `SelectedMsg`: "7 planned name(s), clean". `docs/glossary.md` gains
+  their rows.
+* **Gates:** `python3 -m tools.verify gates` over the step's 11 Go files
+  and 3 records.
+  * macOS: 19 passed, 0 failed: `gofmt`, `modernize`, the cross vets for
+    freebsd/amd64, openbsd/amd64 and linux/386, `race`, `shuffle`,
+    `lc-all-c`, `vuln` ("No vulnerabilities found"), `release-check`
+    ("319 file(s) clean in 1 module(s)", the tracked files), `shellcheck`,
+    `markdownlint` ("0 issues"), `actionlint`, the five script tests
+    (29, 19, 27, 23 and 17 passed, 0 failed) and the tools' 62 tests. The
+    run before it failed `modernize`: `go fix` wanted `strings.Cut` for a
+    `strings.Split(…)[0]` in `TestCompletion`; it was changed, mutation
+    7.21 was run again and killed, and `make modernize` is clean.
+  * `remote linux`: 18 passed, 0 failed, 1 skipped (`gofmt`, which is
+    given no files there); `release-check` "324 file(s) clean in 1
+    module(s)", the step's untracked files included.
+  * `remote windows`: 17 passed, 1 failed (`lc-all-c`), 1 skipped
+    (`gofmt`); `release-check` "324 file(s) clean". The failure did not
+    come back in three reruns with their output kept (D3).
+  * `make lint` reports "0 issues" for `GOOS=linux`, `darwin` and
+    `windows`, after the `errcheck`, shadow, `gocritic` and `gofmt`
+    findings in this step's files were fixed. The identifier scan of the
+    change and the untracked files is clean.
+* **Not done here, by the PLAN:** `Recents`, with `Frecency` and
+  `WithRecents`, is Step 8's (D1); so is the argument stage, so a command
+  hit's `Run` is given `nil` arguments, and one with a required argument
+  is refused by the registry until then.
