@@ -1,6 +1,6 @@
 ---
-status: complete
-date: 2026-10-14
+status: in-progress
+date: 2026-10-25
 associated-madr: "0018-MADR-python-verification-tools.md"
 ---
 # Implement the Python verification tools
@@ -31,6 +31,7 @@ gates have run through it on all three hosts.
 | 5 | `tools/verify/scan.py`, `tools/verify/names.py`, their tests | `scan` and `names` |
 | 6 | `.github/workflows/ci.yml`, `docs/` | the checks in CI; the docs; the close-out |
 | 7 (A2) | `tools/verify/gates.py`, its tests, `docs/decisions/0008-PLAN-command-palette.md` | flushed and timed output; the default list without repeats |
+| 8 (A3) | `tools/verify/gates.py`, its tests, `docs/decisions/0018-*`, `docs/decisions/0008-PLAN-command-palette.md`, `docs/README.md` | a failing gate quotes its failure lines |
 
 The standard library only; nothing is added to `go.mod`, and no Python
 package is installed.
@@ -226,6 +227,44 @@ same day ("approved"); this PLAN is `in-progress` until Step 7 is done.*
   hosts, each gate timed, and the Windows run's lines arrive as its gates
   end; the record gives each host's total and its slowest gates.
 * **Checks:** `tools-tests`, `markdownlint` and `scan`.
+
+### Step 8 (A3): a failing gate names what failed
+
+*Added 2026-10-25, for MADR amendment A3, from
+[0008-PLAN-command-palette.md](0008-PLAN-command-palette.md) Step 7's
+deviation D3, which the owner approved the same day ("proceed"); this
+PLAN is `in-progress` until Step 8 is done.*
+
+* **`gates.py`:**
+  * `FAIL_LINES`, A3 item 1's patterns, and `FAIL_QUOTE = 40`;
+  * `_run_one`, for a failing gate: the failure lines not in the tail, at
+    most `FAIL_QUOTE` of them, then `… N more failure lines` when there
+    are more, then the last `TAIL` lines; a passing gate's quoting is
+    unchanged;
+  * the module's docstring says so.
+* **Tests** (`tools/verify/tests/test_gates.py`):
+  * a failing gate that prints a `--- FAIL`, a test's message and its
+    `FAIL` line early, then 30 `ok` lines, quotes those three lines, in
+    their order, before its last 15 lines;
+  * a failure line inside the tail is quoted once;
+  * 50 failure lines give 40, then `… 10 more failure lines`, then the
+    tail;
+  * a `panic:` line is quoted;
+  * a passing gate whose output holds a `--- FAIL` line, as a test of the
+    tools prints, quotes only its `quote` lines.
+* **Mutations:** the failure lines are not quoted; `^\s*--- FAIL` is
+  dropped from `FAIL_LINES`; the limit is ignored; a passing gate quotes
+  its failure lines; a failure line in the tail is quoted twice.
+* **Acceptance,** on a scratch clone of the tree, never the tree itself:
+  a test planted to fail in a package that sorts early (`command`), run
+  through `gates --only lc-all-c` on macOS and through `remote windows`
+  from the clone; each run's output names the failing test and its
+  package, ahead of the `ok` lines that follow it.
+* **Records:** A3 `accepted`; this PLAN `complete` again once CI is green
+  on the pushed tree; `docs/README.md`'s rows; a dated note under
+  0008-PLAN Step 7's D3 that the gate now names a failing test.
+* **Checks:** `tools-tests`, under Python 3.12 too; `markdownlint`;
+  `scan`.
 
 ## Verification
 
@@ -597,3 +636,54 @@ it ("approved", then "proceed").
   pushed tree", is met.
 * This PLAN is `complete`, and its `docs/README.md` row says so. The tools
   it built ran every step of 0020-PLAN and 0021-PLAN on three hosts.
+
+### Step 8 (A3): a failing gate names what failed
+
+*2026-10-25.* The owner approved A3 and this step the day they were
+written ("proceed"); A3 is `accepted`, and this PLAN `in-progress` until
+the step is pushed and CI is green.
+
+* **`gates.py`:** `FAIL_LINES`, A3 item 1's five patterns, and
+  `FAIL_QUOTE = 40`. `_run_one` gives a failing gate's output to
+  `_failed`, which quotes the failure lines before the last `TAIL` lines,
+  at most `FAIL_QUOTE`, with `… N more failure lines` past them, then the
+  tail. A passing gate quotes by its `quote` patterns, as before. The
+  module's docstring says so.
+* **Found while writing the patterns:** A3 item 1 first gave a
+  position as `^\s+\S+\.go:\d+:\d+:`, indented; `go vet`, the compiler
+  and golangci-lint print theirs at the start of the line. The pattern is
+  `^\s*…`, and A3 says so.
+* **Tests** (`tools/verify/tests/test_gates.py`, `TestFailureLines`, 62
+  to 67 tests): `test_an_early_failure_is_named`,
+  `test_a_failure_line_in_the_tail_is_quoted_once`,
+  `test_the_failure_lines_are_limited`,
+  `test_a_panic_and_a_position_are_quoted` and
+  `test_a_passing_gate_quotes_only_its_quote_lines`. Before the change,
+  three failed, each quoting only the `ok` lines, as D3's run did, or
+  finding no `FAIL_QUOTE`; the other two hold what the change must not
+  break, and mutations 8.4 and 8.5 show them failing.
+* **Mutations** through `tools.verify mutate`, 6 killed of 6:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | 8.1 the failure lines are not quoted | `test_an_early_failure_is_named`: the quoted lines start `ok  \tpkg/p16` |
+  | 8.2 `--- FAIL` is not a failure line | `test_an_early_failure_is_named`: the first quoted line is the test's message |
+  | 8.3 the limit is ignored | `test_the_failure_lines_are_limited`: `'--- FAIL: Test40 (0.00s)' != '… 10 more failure lines'` |
+  | 8.4 a passing gate quotes its failure lines | `test_a_passing_gate_quotes_only_its_quote_lines`: `['--- FAIL: TestPlanted (0.00s)', 'Ran 3 tests', 'FAIL'] != ['Ran 3 tests']` |
+  | 8.5 a failure line in the tail is quoted twice | `test_a_failure_line_in_the_tail_is_quoted_once`: `2 != 1` |
+  | 8.6 `panic:` is not a failure line | `test_a_panic_and_a_position_are_quoted`: the `panic:` line is missing |
+
+* **Acceptance,** on a scratch clone with this step's two files and a
+  test planted in `command` that fails: `gates --only lc-all-c` exited 1
+  on macOS (67 s) and through `remote windows` from the clone (100 s).
+  Each quoted `--- FAIL: TestPlantedFailure (0.00s)`, its message, and
+  `FAIL` with the `command` package, ahead of the 14 `ok` lines from
+  `layout` on and the last `FAIL`: the same 15 lines D3's run left, which
+  had hidden the failing package.
+* **Checks:** `python3 -m unittest discover -s tools -t .` "Ran 67
+  tests", OK, under Python 3.14 and 3.12; `py_compile` over `tools/`'s 25
+  files; `tools-tests` through `remote`: "Ran 67 tests" on the Linux
+  host (14 s) and the Windows host (20 s); `markdownlint` and `scan`
+  clean.
+* **Close-out:** this PLAN becomes `complete` again once CI is green on
+  the pushed tree, which is the owner's to push.

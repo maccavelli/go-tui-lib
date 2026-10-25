@@ -49,8 +49,8 @@ it was when they were written
 | 0016 | PLAN | [Implement: the toolchain floor moves to Go 1.27.2](decisions/0016-PLAN-go-1-27-2-for-go-2026-6604.md) | complete |
 | 0017 | MADR | [Write the repository's scripts in Python, standard library only, and port the ten shell scripts](decisions/0017-MADR-python-repository-scripts.md) | accepted; built |
 | 0017 | PLAN | [Implement Python repository scripts: port the ten shell scripts, `go-fuzz` first with the case-6 fix](decisions/0017-PLAN-python-repository-scripts.md) | complete |
-| 0018 | MADR | [Keep the agent's verification tooling in the repository, as one modular Python package under `tools/`](decisions/0018-MADR-python-verification-tools.md) | accepted; A1, A2 accepted; A1 built |
-| 0018 | PLAN | [Implement the Python verification tools](decisions/0018-PLAN-python-verification-tools.md) | complete |
+| 0018 | MADR | [Keep the agent's verification tooling in the repository, as one modular Python package under `tools/`](decisions/0018-MADR-python-verification-tools.md) | accepted; A1, A2 accepted; A1 built; A3 accepted |
+| 0018 | PLAN | [Implement the Python verification tools](decisions/0018-PLAN-python-verification-tools.md) | in-progress (Step 8, A3) |
 | 0019 | MADR | [Skip the full CI for a push or pull request that changes only the documents, and check them with a one-job docs workflow instead](decisions/0019-MADR-skip-full-ci-for-docs-only-pushes.md) | accepted |
 | 0019 | PLAN | [Implement: a docs-only push or pull request runs a docs job instead of the full CI](decisions/0019-PLAN-skip-full-ci-for-docs-only-pushes.md) | complete |
 | 0020 | MADR | [Give a line-mode CLI Charm-free cores of `termcap`, `termsvc`, `command` and `keymap`, with their Bubble Tea forms in sub-packages, status and meter glyphs in `glyph`, and `safetext` as the one sanitizer](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md) | accepted; Q1–Q8 answered; A1.1 answered (c); A1.2–A1.3 recorded; A2 accepted; A3 accepted; A4 accepted; A4.1 answered (`v2.0.0` at `/v2`); A4.2 accepted |

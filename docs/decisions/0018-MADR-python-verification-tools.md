@@ -281,6 +281,57 @@ Step 7.
    scripts' and tools' tests only when a step touches them, or fewer test
    runs, would drop checks, and are the owner's to ask for.
 
+### A3 (2026-10-25): a failing gate names what failed
+
+*Status: accepted (2026-10-25),* the owner's "proceed". Asked for by the owner in
+[0008-PLAN-command-palette.md](0008-PLAN-command-palette.md) Step 7,
+deviation D3 ("Record it, fix the tool (Recommended)"). Implemented by
+[0018-PLAN-python-verification-tools.md](0018-PLAN-python-verification-tools.md)
+Step 8.
+
+**Found.**
+
+1. **A failing gate quotes only its last 15 lines** (`gates.py`, `TAIL`).
+   `go test ./...` prints a failing package's `--- FAIL` and `FAIL` lines
+   where the package ends, and every package after it follows. On
+   2026-10-25 the Windows host's `lc-all-c` gate exited 1, and its 15
+   lines were 14 packages' `ok` lines and a bare `FAIL`: they said the
+   failing package sorts before `layout`, and not which it was.
+2. **The full output was gone.** The bootstrap removes the gates'
+   outputs after a run (item 3), so the quoted lines are all a remote
+   run leaves. Three reruns passed, so the failure could not be read
+   again.
+
+**Considered.**
+
+* **A. Quote the failure lines too:** every line of a failing gate's
+  output that marks a failure, up to a limit, before the tail. Small, in
+  `gates.py` alone, and the same on every host.
+* **B. Bring a failing gate's whole output back:** the bootstrap prints
+  it, or `remote` copies it back with `scp` before the directory is
+  removed. It keeps everything, but changes the bootstrap, `remote` and
+  where a run's files land locally, and a long output reaches the
+  terminal or a second local directory.
+* **C. Keep the outputs on the host.** It leaves files on a host after
+  every run, which item 3 rules out.
+
+**Decided:** "A", because the lines that name a failure are what a record
+needs, and they come back through the run's existing output on every
+host.
+
+1. **A failing gate quotes its failure lines, then its tail.** A line is
+   a failure line when it matches one of `FAIL_LINES`:
+   * `^\s*--- FAIL`, a failing test or subtest;
+   * `^FAIL\b`, a failing package, or `go test`'s last line;
+   * `^panic:`, and `^\s+\S+_test\.go:\d+:`, a test's own message;
+   * `^\s*\S+\.go:\d+:\d+:`, a compiler's, vet's or a linter's position.
+2. **Up to `FAIL_QUOTE` (40) failure lines are quoted,** in their order,
+   leaving out those the tail holds; more give one line, `… N more
+   failure lines`. Then come the last 15 lines, as now.
+3. **A gate that passes quotes as now,** by its `quote` patterns only.
+4. **What is not changed:** the bootstrap still removes every output,
+   and nothing new reaches a host.
+
 ## More Information
 
 * The scratch tools named above are the ones

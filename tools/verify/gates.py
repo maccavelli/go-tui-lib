@@ -4,8 +4,10 @@ Each gate is a name, an argument list, the environment changes it needs,
 and the lines of its output worth quoting. The runner writes each gate's
 whole output to a file, prints one line per gate as it ends,
 ``name: exit=N (Ns)``, with its quoted lines, goes on after a failure, and
-fails if any gate failed
-(docs/decisions/0018-MADR-python-verification-tools.md, item 2 and A2).
+fails if any gate failed. A failing gate quotes the lines that name its
+failure, then its last lines
+(docs/decisions/0018-MADR-python-verification-tools.md, item 2, A2 and
+A3).
 """
 
 from __future__ import annotations
@@ -27,6 +29,19 @@ GO_FILES_JOINED = "{go_files_joined}"
 
 #: The lines of a failing gate's output that are printed.
 TAIL = 15
+
+#: The lines of a failing gate's output that name its failure, quoted
+#: ahead of its tail wherever they are, since go test ./... prints a
+#: failing package's lines before every package after it (MADR A3).
+FAIL_LINES = (
+    r"^\s*--- FAIL",
+    r"^FAIL\b",
+    r"^panic:",
+    r"^\s+\S+_test\.go:\d+:",
+    r"^\s*\S+\.go:\d+:\d+:",
+)
+#: The most failure lines quoted ahead of the tail.
+FAIL_QUOTE = 40
 
 
 @dataclass(frozen=True)
@@ -187,10 +202,21 @@ def _run_one(g: Gate, *, env: Mapping[str, str | None], repo: Path, go_files: Se
         status = 1
     lines = text.splitlines()
     if status != 0:
-        quoted = lines[-TAIL:]
+        quoted = _failed(lines)
     else:
         quoted = [ln for ln in lines if any(re.search(p, ln) for p in g.quote)]
     return Outcome(g, status, lines=tuple(quoted), out=r.out, seconds=seconds)
+
+
+def _failed(lines: Sequence[str]) -> list[str]:
+    """A failing gate's quoted lines: the failure lines before its tail, at
+    most FAIL_QUOTE of them, then the tail."""
+    tail = list(lines[-TAIL:])
+    fails = [ln for ln in lines[:-TAIL] if any(re.search(p, ln) for p in FAIL_LINES)]
+    quoted = fails[:FAIL_QUOTE]
+    if len(fails) > FAIL_QUOTE:
+        quoted.append(f"… {len(fails) - FAIL_QUOTE} more failure lines")
+    return quoted + tail
 
 
 def _report(o: Outcome, emit: Callable[[str], None]) -> None:

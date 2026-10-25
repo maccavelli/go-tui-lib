@@ -1143,6 +1143,11 @@ Three deviations, D1 to D3, below.
 * **Chosen by the owner,** 2026-10-25: "Record it, fix the tool
   (Recommended)". The tooling change is 0018's, under its own approval;
   until it lands the cause is open. No decision of this pair changes.
+* **The tool, 2026-10-25:** 0018-MADR A3 is accepted, and
+  `0018-PLAN-python-verification-tools.md` Step 8 makes a failing gate
+  quote its `--- FAIL`, `FAIL`, `panic:` and position lines ahead of its
+  tail; a test planted in `command` was named that way on macOS and
+  Windows. D3's failure has not come back, so its cause is still open.
 
 #### What was built
 

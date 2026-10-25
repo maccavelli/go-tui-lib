@@ -78,6 +78,53 @@ class TestRunner(RepoCase):
         self.assertEqual(lines[1], "  | Summary: 0 issues")
 
 
+def go_test(head: list[str], oks: int, status: int = 1) -> tuple[str, ...]:
+    """A gate that prints head, then oks packages' ok lines and FAIL, as
+    go test ./... does when an early package fails."""
+    body = [*head, *(f"ok  \tpkg/p{i:02}\t0.1s" for i in range(oks)), "FAIL"]
+    return py(f"import sys; print({chr(10).join(body)!r}); sys.exit({status})")
+
+
+class TestFailureLines(RepoCase):
+    """A failing gate quotes the lines that name its failure, then its
+    tail (MADR A3)."""
+
+    def quoted(self, g: tuple[str, ...]) -> list[str]:
+        outcomes = gates.run([gates.Gate("t", g)], repo=self.repo, files=[], out_dir=self.tmp / "out", emit=lambda _: None)
+        return list(outcomes[0].lines)
+
+    def tail(self, oks: int) -> list[str]:
+        return [*(f"ok  \tpkg/p{i:02}\t0.1s" for i in range(oks - gates.TAIL + 1, oks)), "FAIL"]
+
+    def test_an_early_failure_is_named(self) -> None:
+        head = ["=== RUN   TestX", "--- FAIL: TestX (0.00s)", "    x_test.go:12: got 1, want 2", "FAIL\tpkg/early\t0.2s"]
+        lines = self.quoted(go_test(head, 30))
+        self.assertEqual(lines, [*head[1:], *self.tail(30)])
+
+    def test_a_failure_line_in_the_tail_is_quoted_once(self) -> None:
+        lines = self.quoted(go_test(["--- FAIL: TestY (0.00s)"], 3))
+        self.assertEqual(lines.count("--- FAIL: TestY (0.00s)"), 1)
+        self.assertEqual(lines[0], "--- FAIL: TestY (0.00s)")
+        self.assertEqual(len(lines), 5)
+
+    def test_the_failure_lines_are_limited(self) -> None:
+        head = [f"--- FAIL: Test{i:02} (0.00s)" for i in range(gates.FAIL_QUOTE + 10)]
+        lines = self.quoted(go_test(head, 30))
+        self.assertEqual(lines[: gates.FAIL_QUOTE], head[: gates.FAIL_QUOTE])
+        self.assertEqual(lines[gates.FAIL_QUOTE], "… 10 more failure lines")
+        self.assertEqual(lines[gates.FAIL_QUOTE + 1 :], self.tail(30))
+
+    def test_a_panic_and_a_position_are_quoted(self) -> None:
+        head = ["panic: runtime error: index out of range [3] with length 3", "palette/x.go:12:3: undefined: y"]
+        lines = self.quoted(go_test(head, 30))
+        self.assertEqual(lines[:2], head)
+
+    def test_a_passing_gate_quotes_only_its_quote_lines(self) -> None:
+        g = go_test(["--- FAIL: TestPlanted (0.00s)", "Ran 3 tests"], 30, status=0)
+        outcomes = gates.run([gates.Gate("t", g, quote=(r"^Ran \d+",))], repo=self.repo, files=[], out_dir=self.tmp / "out", emit=lambda _: None)
+        self.assertEqual(list(outcomes[0].lines), ["Ran 3 tests"])
+
+
 #: A child that runs a quick gate, then one that sleeps, and prints as the
 #: runner does by default.
 CHILD = """
