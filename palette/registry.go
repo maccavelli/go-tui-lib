@@ -108,10 +108,14 @@ func (r *registry) hit(c command.Command, sc fuzzy.Score, at when.Context) Hit {
 			})
 		},
 	}
-	// A schema that does not compile leaves Params empty; the argument
-	// stage asks command.Params again, and reports it.
-	if params, err := command.Params(c); err == nil {
-		h.Params = params
+	// A schema whose parameters cannot be read has no Params and no Run:
+	// accepting its hit sends SelectedMsg, and nothing runs (0008-MADR A3
+	// item 5).
+	params, err := command.Params(c)
+	if err != nil {
+		h.Run = nil
+		return h
 	}
+	h.Params = params
 	return h
 }

@@ -18,10 +18,14 @@ import (
 const minText = 8
 
 // restyle takes the input's prompt, mask, styles and width from the
-// workspace's theme now, so a theme change shows without reopening.
+// workspace's theme now, so a theme change shows without reopening. In the
+// argument stage the prompt names the parameter asked for.
 func (p *Picker) restyle() {
 	t := p.w.Theme()
 	p.input.Prompt = t.Glyphs.Prompt + " "
+	if p.args != nil {
+		p.input.Prompt += sanitize.Line(p.args.param().Name) + ": "
+	}
 	if r := []rune(t.Glyphs.Mask); len(r) > 0 {
 		p.input.EchoCharacter = r[0]
 	}
@@ -47,7 +51,7 @@ func (p *Picker) View(width, height int) string {
 			return out[0]
 		}
 	}
-	rows, ls := p.eng.rows(), p.lines()
+	rows, ls := p.rows(), p.lines()
 	for i := p.top; i < min(p.top+height-1-p.inputRows(), len(ls)); i++ {
 		l := ls[i]
 		if l.row < 0 {
@@ -85,7 +89,7 @@ func (p *Picker) drawRow(r row, selected bool, width int) string {
 	switch {
 	case r.failed:
 		text = g.Failed + " " + text + " failed"
-	case p.eng.prefix:
+	case p.listing():
 		hint = r.hit.Group
 	default:
 		switch r.hit.Danger {
@@ -122,7 +126,7 @@ func (p *Picker) drawRow(r row, selected bool, width int) string {
 	avail := max(room-right(), 0)
 
 	var cells []fuzzy.CellRange
-	if mt := p.eng.search.Matcher; mt != nil && !r.failed && !p.eng.prefix {
+	if mt := p.matcher(); mt != nil && !r.failed && !p.listing() {
 		p.matched++
 		if hit, ok := mt.Match(text); ok {
 			cells = fuzzy.Cells(text, hit.Ranges, m)
@@ -196,7 +200,8 @@ func cut(s string, a, b int, m ansi.Method) string {
 // helpLine is the selected hit's description, or a disabled hit's reason,
 // at the left, and the count at the right: "3 of 40", and while providers
 // still search, ", searching" and the ellipsis glyph, in words, as nothing
-// animates (0008-MADR §7).
+// animates (0008-MADR §7). In the argument stage it is why the last value
+// was refused, or else the parameter's description, and "argument 1 of 2".
 func (p *Picker) helpLine(rows []row, width int) string {
 	t, m := p.w.Theme(), p.w.WidthMethod()
 	count := "no results"
@@ -210,19 +215,25 @@ func (p *Picker) helpLine(rows []row, width int) string {
 			count += ", searching" + t.Glyphs.Ellipsis
 		}
 	}
-	count = sanitize.Truncate(count, width, m, t.Glyphs.Ellipsis)
-	help := ""
-	if r, ok := p.selected(); ok && !r.failed {
+	help, helpStyle := "", t.Styles.Muted
+	if st := p.args; st != nil {
+		count = fmt.Sprintf("argument %d of %d", st.at+1, len(st.params))
+		help = sanitize.Line(st.param().Description)
+		if st.reason != "" {
+			help, helpStyle = sanitize.Line(st.reason), t.Styles.Error
+		}
+	} else if r, ok := p.selected(); ok && !r.failed {
 		help = r.hit.Help
 		if r.hit.Disabled != "" {
 			help = r.hit.Disabled
 		}
 	}
+	count = sanitize.Truncate(count, width, m, t.Glyphs.Ellipsis)
 	room := width - m.StringWidth(count) - 1
 	if room < 1 || help == "" {
 		return strings.Repeat(" ", max(width-m.StringWidth(count), 0)) + t.Styles.Muted.Render(count)
 	}
 	help = sanitize.Truncate(help, room, m, t.Glyphs.Ellipsis)
 	pad := width - m.StringWidth(help) - m.StringWidth(count)
-	return t.Styles.Muted.Render(help) + strings.Repeat(" ", max(pad, 1)) + t.Styles.Muted.Render(count)
+	return helpStyle.Render(help) + strings.Repeat(" ", max(pad, 1)) + t.Styles.Muted.Render(count)
 }

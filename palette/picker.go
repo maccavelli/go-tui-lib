@@ -2,6 +2,7 @@ package palette
 
 import (
 	"context"
+	"encoding/json/jsontext"
 	"slices"
 
 	"charm.land/bubbles/v2/textinput"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/maccavelli/go-tui-lib/v2/command"
 	"github.com/maccavelli/go-tui-lib/v2/command/commandtea"
+	"github.com/maccavelli/go-tui-lib/v2/fuzzy"
 	"github.com/maccavelli/go-tui-lib/v2/keymap"
 	"github.com/maccavelli/go-tui-lib/v2/when"
 	"github.com/maccavelli/go-tui-lib/v2/workspace"
@@ -41,6 +43,7 @@ type Picker struct {
 	width, height int         // the content size, from SizeMsg
 	done          bool        // a hit was accepted; it waits to be closed
 	matched       int         // rows matched for their ranges, for a test
+	args          *stage      // the argument stage, while a hit's parameters are asked for
 }
 
 // NewPicker returns a picker for w, closed, with no providers.
@@ -75,7 +78,7 @@ func (p *Picker) Open(opts ...OverlayOption) tea.Cmd {
 	if p.id != "" && p.id != o.id {
 		cmds = append(cmds, p.w.Update(workspace.Close(p.id)))
 	}
-	p.input.Reset()
+	p.query()
 	p.sel, p.top, p.done = 0, 0, false
 	cmds = append(cmds, p.w.Push(workspace.Overlay{
 		ID: o.id, Pane: p, Anchor: o.anchor, Width: o.width, Height: o.height, Modal: !p.cfg.noInput,
@@ -170,7 +173,7 @@ func (p *Picker) Update(msg tea.Msg) (workspace.Pane, tea.Cmd) {
 		p.input.Blur()
 	case workspace.OverlayClosedMsg:
 		p.eng.close()
-		p.id = ""
+		p.id, p.args = "", nil
 	case hitsMsg, startMsg:
 		cmd := p.eng.update(msg)
 		p.clamp()
@@ -246,28 +249,62 @@ func (p *Picker) edit(msg tea.Msg) tea.Cmd {
 	return tea.Batch(cmd, p.requery())
 }
 
-// requery searches for the input's query, from the first row.
+// requery searches for the input's query, from the first row; in the
+// argument stage it filters the asked parameter's values, and clears the
+// last refusal.
 func (p *Picker) requery() tea.Cmd {
 	p.sel, p.top = 0, 0
+	if p.args != nil {
+		p.args.reason = ""
+		p.args.filter(p.input.Value())
+		if p.input.Value() == "" {
+			p.sel = p.args.first()
+		}
+		return nil
+	}
 	return p.eng.query(p.input.Value())
+}
+
+// rows is the list: the providers' hits, or in the argument stage the
+// asked parameter's values.
+func (p *Picker) rows() []row {
+	if p.args != nil {
+		return p.args.shown
+	}
+	return p.eng.rows()
+}
+
+// listing reports whether the rows are the providers' prefixes, for "?".
+func (p *Picker) listing() bool { return p.args == nil && p.eng.prefix }
+
+// matcher is what the drawn rows are matched with for their highlights.
+func (p *Picker) matcher() *fuzzy.Matcher {
+	if p.args != nil {
+		return p.args.matcher
+	}
+	return p.eng.search.Matcher
 }
 
 // selected is the selected row, if there is one.
 func (p *Picker) selected() (row, bool) {
-	rows := p.eng.rows()
+	rows := p.rows()
 	if p.sel < 0 || p.sel >= len(rows) {
 		return row{}, false
 	}
 	return rows[p.sel], true
 }
 
-// accept takes the selected hit: it sends SelectedMsg, runs the hit's Run
-// on the event loop, unless the picker is a completion pop-up, and returns
-// a command that closes the picker, which takes no more input until it is
-// closed (0008-MADR §6, A3 items 3, 4 and 6). A failure's row and a
-// disabled hit do nothing; the help line shows a disabled hit's reason.
-// One of "?"'s rows types its prefix.
+// accept takes the selected hit (0008-MADR §6, A3 items 3 to 6). A hit
+// with parameters to ask for opens the argument stage; one with a
+// parameter the stage cannot ask for falls through to SelectedMsg, and
+// nothing runs. Any other is finished. A failure's row and a disabled hit
+// do nothing; the help line shows a disabled hit's reason. One of "?"'s
+// rows types its prefix. In the argument stage, accept takes the asked
+// parameter's value.
 func (p *Picker) accept() tea.Cmd {
+	if p.args != nil {
+		return p.give()
+	}
 	r, ok := p.selected()
 	switch {
 	case !ok, r.failed, r.hit.Disabled != "":
@@ -275,15 +312,85 @@ func (p *Picker) accept() tea.Cmd {
 	case p.eng.prefix:
 		return p.set(r.hit.Text)
 	}
-	p.done = true
-	var run tea.Cmd
-	if r.hit.Run != nil && !p.cfg.noInput {
-		run = r.hit.Run(nil)
+	if len(r.hit.Params) == 0 || p.cfg.noInput {
+		return p.finish(r.hit, nil, true)
 	}
-	id, h := p.id, r.hit
+	ps, ok := asked(r.hit.Params)
+	switch {
+	case !ok:
+		return p.finish(r.hit, nil, false)
+	case len(ps) == 0:
+		return p.finish(r.hit, nil, true)
+	}
+	p.eng.reset() // the providers' searches are done with
+	p.args = &stage{hit: r.hit, params: ps}
+	p.ask()
+	return nil
+}
+
+// ask readies the input for the stage's next parameter: empty, with its
+// placeholder, masked when it is secret, and with no limit of the
+// picker's, since the registry checks a value's length.
+func (p *Picker) ask() {
+	st := p.args
+	st.begin()
+	par := st.param()
+	p.input.Reset()
+	p.input.CharLimit = 0
+	p.input.Placeholder = placeholder(par)
+	p.input.EchoMode = textinput.EchoNormal
+	if par.Secret {
+		p.input.EchoMode = textinput.EchoPassword
+	}
+	p.sel, p.top = st.first(), 0
+	p.scroll()
+}
+
+// query readies the input for a query: empty, with the picker's
+// placeholder, and echoed.
+func (p *Picker) query() {
+	p.args = nil
+	p.input.Reset()
+	p.input.CharLimit = maxQuery
+	p.input.Placeholder = p.cfg.placeholder
+	p.input.EchoMode = textinput.EchoNormal
+}
+
+// give takes the asked parameter's value, and asks for the next, or runs
+// the hit with every value given as one JSON object. A refused value stays
+// in the input, with the reason in the help line. Values that cannot be
+// encoded, which only an enum of the schema's could give, fall through to
+// SelectedMsg, as a parameter the stage cannot ask for does.
+func (p *Picker) give() tea.Cmd {
+	st := p.args
+	if !st.give(p.input.Value(), p.sel) {
+		return nil
+	}
+	if !st.done() {
+		p.ask()
+		return nil
+	}
+	args, err := st.args()
+	return p.finish(st.hit, args, err == nil)
+}
+
+// finish ends the picker with h: it records h's ID in the recents, sends
+// SelectedMsg, runs h's Run with args on the event loop when run is true
+// and the picker is not a completion pop-up, and returns a command that
+// closes the picker, which takes no more input until it is closed.
+func (p *Picker) finish(h Hit, args jsontext.Value, run bool) tea.Cmd {
+	p.done = true
+	if p.cfg.recents != nil {
+		p.cfg.recents.Record(h.ID)
+	}
+	var c tea.Cmd
+	if run && h.Run != nil && !p.cfg.noInput {
+		c = h.Run(args)
+	}
+	id := p.id
 	return tea.Batch(
 		func() tea.Msg { return SelectedMsg{ID: id, Hit: h} },
-		run,
+		c,
 		func() tea.Msg { return workspace.Close(id) },
 	)
 }
@@ -295,7 +402,7 @@ func (p *Picker) complete() tea.Cmd {
 	if !ok || r.failed {
 		return nil
 	}
-	if p.eng.prefix {
+	if p.args != nil || p.eng.prefix {
 		return p.set(r.hit.Text)
 	}
 	return p.set(p.eng.used + r.hit.Text)
@@ -310,7 +417,7 @@ func (p *Picker) set(s string) tea.Cmd {
 
 // move moves the selection by d rows, stopping at either end.
 func (p *Picker) move(d int) {
-	n := len(p.eng.rows())
+	n := len(p.rows())
 	if n == 0 {
 		return
 	}
@@ -320,7 +427,7 @@ func (p *Picker) move(d int) {
 
 // clamp keeps the selection on a row after the rows change.
 func (p *Picker) clamp() {
-	p.sel = max(min(p.sel, len(p.eng.rows())-1), 0)
+	p.sel = max(min(p.sel, len(p.rows())-1), 0)
 	p.scroll()
 }
 
@@ -402,11 +509,11 @@ type line struct {
 // lines is the result lines for the rows: each row, after a header where
 // its group starts under ByProvider.
 func (p *Picker) lines() []line {
-	rows := p.eng.rows()
+	rows := p.rows()
 	out := make([]line, 0, len(rows))
 	group := ""
 	for i, r := range rows {
-		if p.cfg.grouping == ByProvider && !p.eng.prefix && (i == 0 || r.hit.Group != group) {
+		if p.cfg.grouping == ByProvider && p.args == nil && !p.eng.prefix && (i == 0 || r.hit.Group != group) {
 			out = append(out, line{row: -1, header: r.hit.Group})
 		}
 		group = r.hit.Group

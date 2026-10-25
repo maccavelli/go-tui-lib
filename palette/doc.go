@@ -21,6 +21,18 @@
 // runs its Run on the event loop and closes the picker; closing it, by any
 // means, cancels its searches and stops its providers.
 //
+// A hit with Params opens an argument stage in the same overlay first: it
+// asks for each string, integer, number and boolean parameter, and any
+// with an enum, in order, from a list where there is one; it holds them to
+// Required, Default, Min and Max, with the reason for a refused value in
+// the help line; it skips Hidden ones and masks Secret ones; and it runs
+// the hit with the values as one JSON object. A hit with any other
+// parameter is sent as SelectedMsg, and nothing runs.
+//
+// A Frecency remembers the hits a picker made WithRecents runs, by ID
+// only, with a score that halves every half-life; Recents puts those hits
+// first. WriteTo and ReadFrom keep it between runs as versioned JSON.
+//
 // Four providers are built in: FromRegistry's commands, under the prefix
 // ">", which run through the registry with command.OriginPalette; Static's
 // fixed items; Panes' panes to focus or show; and Files' paths, under "@",

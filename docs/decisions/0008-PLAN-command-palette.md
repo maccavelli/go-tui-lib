@@ -1275,3 +1275,153 @@ Three deviations, D1 to D3, below.
   `WithRecents`, is Step 8's (D1); so is the argument stage, so a command
   hit's `Run` is given `nil` arguments, and one with a required argument
   is refused by the registry until then.
+
+### Step 8: arguments and recents
+
+*2026-10-25.* The owner approved this step ("committed, proceed"), after
+`7303467`. No deviation.
+
+#### What was built
+
+* `palette/args.go` and `palette/picker.go`: the argument stage. A hit
+  whose `Params` hold a parameter to ask for opens it in the same overlay
+  on accept. It asks for each `string`, `integer`, `number` and `boolean`
+  parameter, and each with an `Enum`, in the schema's order, skipping the
+  `Hidden`. The prompt names the parameter; a boolean or an enum is
+  chosen from the fuzzy list, which starts on the default. An empty value
+  is the `Default`, or nothing when the parameter is not `Required`, and a
+  required one without a default is refused; an integer that does not
+  parse, a number that is not finite, and either outside `Min` and `Max`,
+  are refused; each refusal names the parameter and its reason in the
+  help line, in the error style. A `Secret` value is drawn with the `Mask`
+  glyph. After the last, the hit's `Run` gets the values as one JSON
+  object, in the order asked, encoded with `encoding/json/v2`. A hit with
+  an `array` or `object` parameter, or any other the stage cannot ask for,
+  sends `SelectedMsg` and runs nothing.
+* `palette/registry.go`: a command whose parameters `command.Params`
+  cannot read gives a hit with no `Params` and no `Run`, so accepting it
+  sends `SelectedMsg` and runs nothing (MADR A3 item 5).
+* `palette/recents.go`: `Frecency`, `NewFrecency`, `FrecencyOption`
+  (`WithHalfLife`, default `DefaultHalfLife`, 7 days; `WithMaxEntries`,
+  default `DefaultMaxEntries`, 500), `Record`, `Score`, `WriteTo`,
+  `ReadFrom` and `ErrRecentsVersion`; `Recents(f, inner)`; and
+  `WithRecents(f)`, in `palette/options.go`, with which a picker records
+  the ID of each hit it accepts. Each use adds 1, halved every half-life,
+  worked out when read; the store keeps the best entries past its maximum.
+  The stored form is 0008-MADR §6's
+  `{"version":1,"entries":[{"id":…,"score":…,"at":…}]}`. `ReadFrom` reads
+  at most 1 MiB, decodes with `RejectUnknownMembers`, refuses another
+  version, wrapped as `ErrRecentsVersion`, an ID over 1024 bytes, and
+  leaves the store unchanged on any error.
+* `palette/view.go`: the stage's prompt, placeholder and help line.
+* `palette/doc.go` describes the stage and the recents.
+* **Choices made within MADR §5, §6 and A3.** None changes a decision:
+  1. Step 7's choice 4 said the stage would ask `command.Params` again
+     for a schema that does not compile; the picker holds a hit, not its
+     command, so it cannot. `FromRegistry` gives such a hit no `Run`, and
+     A3 item 5's fall-through follows. It is not reported: the provider
+     has no logger, and a registered command's schema always compiles.
+  2. A boolean is chosen from "true" and "false", as an enum is.
+  3. The stage checks a value's type, `Required`, `Default`, `Min` and
+     `Max`; the registry checks the rest of the schema, such as a pattern
+     or a length, when it runs the command, and reports through
+     `ResultMsg`.
+  4. A value has no length limit of the picker's: A3 item 10's 256
+     graphemes are the query's.
+  5. The placeholder is the parameter's `Placeholder` or name, with its
+     default unless it is secret; the help line's right side is "argument
+     1 of 3".
+  6. `esc` clears a value, and on an empty one closes the picker,
+     running nothing; there is no step back to an earlier parameter.
+  7. A completion pop-up never opens the stage: its hit is the pane's.
+  8. `Recents` adds 32 to a typed query's hit for each use, two matched
+     characters' worth, and lifts a recent hit above every hit discovered
+     for an empty query; it has `inner`'s name, prefix, debounce, start,
+     stop and the opening hook.
+  9. `Record` keeps no empty ID or one over 1024 bytes; `WriteTo` writes
+     the best scored first, with the stored scores and times, in UTC;
+     `ReadFrom` also refuses an empty or repeated ID and a score not above
+     0, and keeps the best past the maximum.
+  10. `DefaultHalfLife` and `DefaultMaxEntries` are exported, as Step 7's
+      defaults are.
+* **Tests:** `palette/args_test.go`: `TestArgumentStage` (the order;
+  `Required`; a word, and values below `Min` and above `Max`, each refused
+  with its reason; the default; a boolean and an enum from their lists,
+  the enum's starting on its default; a hidden parameter skipped; the
+  secret masked; the JSON object the picker runs the hit with, and the
+  command run through the registry; no secret in the recents or the log);
+  `TestArgumentsFallThrough` (an array, an array with enum items, a schema
+  that cannot be read, all parameters hidden, a completion pop-up);
+  `TestArgumentChoices` (filtering, tab, no match refused, esc);
+  `TestArgumentsGolden`, three frames, a list on its default, a secret as
+  typed and a refusal, 24 goldens across the matrix, each line within its
+  width and none holding the secret. `palette/recents_test.go`:
+  `TestFrecencyDecays` under synctest's clock, `TestFrecencyMaxEntries`,
+  `TestRecents` (an empty query's order, a typed one's boost within its
+  grade, a better grade kept first after 51 uses, `inner`'s prefix and
+  opening), `TestFrecencyJSON` (an exact round trip; nine inputs refused;
+  `errors.Is(err, ErrRecentsVersion)`; the store unchanged; the best kept).
+  `palette/fuzz_test.go`: `FuzzFrecencyRead`, 30 s and 2 183 777 inputs,
+  and `make fuzz FUZZTIME=3s`, "14 packages ran clean". Every Step 6 and 7
+  test passes unchanged; `go test -race ./palette/ ./internal/conformance/`
+  passes.
+* **Mutations,** through `python3 -m tools.verify mutate` on scratch
+  copies, 26 killed of 26, the PLAN's five first. A first run had two
+  kills for the wrong reason: 8.8 did not compile, as removing its line
+  left `fuzzy` unused, and 8.13 failed on the order of the arguments,
+  since the registry fills a missing default itself and encodes them
+  again. 8.8 was rewritten to compile, and `TestArgumentStage` now reads
+  the arguments the picker runs the hit with, before the registry; all 26
+  were run again.
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | the half-life is ignored | `TestFrecencyDecays`: `after one half-life: 1; want 0.5` |
+  | `Required` is not enforced | `TestArgumentStage`: the help line is the next parameter's, `argument 2 of 5` |
+  | an unknown version is accepted | `TestFrecencyJSON`: `no version: read` |
+  | the 1 MiB limit is removed | `TestFrecencyJSON`: `over 1 MiB: read` |
+  | a secret value is drawn unmasked | `TestArgumentStage`: "the secret is drawn"; `TestArgumentsGolden`: the secret frames differ |
+  | `WithMaxEntries` is ignored | `TestFrecencyMaxEntries`: `c kept true; want false` |
+  | `Recents` does not raise a typed query's hit | `TestRecents`: `light: {Grade:subsequence Value:16} boosted, {Grade:subsequence Value:16} plain` |
+  | `Recents` does not put recent hits first for an empty query | `TestRecents`: `an empty query lists [dark high light sepia]` |
+  | a recent hit passes a better grade | `TestRecents`: `light: {Grade:exact Value:80} boosted, {Grade:subsequence Value:16} plain` |
+  | `Recents` drops `inner`'s prefix | `TestRecents`: `Recents over FromRegistry has prefix ""; want >` |
+  | `Recents` does not tell `inner` the picker opened | `TestRecents`: `discovered [], <nil>` |
+  | the picker does not record what it runs | `TestArgumentStage`: `recents: app.deploy scored 0; want 1` |
+  | an empty value does not take the default | `TestArgumentStage`: the picker's object has no `count` |
+  | `Min` is not enforced | `TestArgumentStage`: `count "0"` passes to `argument 3 of 5`; `TestArgumentsGolden`: the refusal frames differ |
+  | `Max` is not enforced | `TestArgumentStage`: `count "12"` passes to `argument 3 of 5` |
+  | a word is taken as an integer | `TestArgumentStage`: `count "x": help "count: at least 1"` |
+  | a hidden parameter is asked for | `TestArgumentStage`: the first frame; `TestArgumentsFallThrough`: `all hidden: ran [], open "palette"` |
+  | an array with enum items is asked for | `TestArgumentsFallThrough`: `ran [], open "palette"` |
+  | a schema that cannot be read keeps its `Run` | `TestArgumentsFallThrough`: `Run set true` |
+  | a list does not start on the default | `TestArgumentStage`: `selection 0; want it on the default, safe`; `TestArgumentsGolden` |
+  | a refusal is not shown | `TestArgumentStage`: `help "where to deploy …"`; `TestArgumentsGolden` |
+  | `ReadFrom` takes a repeated ID | `TestFrecencyJSON`: `a repeated id: read` |
+  | `ReadFrom` takes an ID over 1024 bytes | `TestFrecencyJSON`: `a long id: read` |
+  | `ReadFrom` takes an unknown member | `TestFrecencyJSON`: `an unknown member: read` |
+  | a completion pop-up opens the stage | `TestArgumentsFallThrough`: `SelectedMsg [], stage true, open "completion"` |
+  | a list's values are not filtered | `TestArgumentChoices`: `sl: ["fast" "safe" "slow"]; want slow` |
+
+* **Names:** `python3 -m tools.verify names` over `Frecency` and
+  `FrecencyOption`: "2 planned name(s), clean". `docs/glossary.md` gains
+  their row.
+* **Gates:** `python3 -m tools.verify gates` over the step's 10 Go files
+  and 3 records.
+  * macOS: 19 passed, 0 failed, in 530 s: `gofmt`, `modernize`, the cross
+    vets for freebsd/amd64, openbsd/amd64 and linux/386, `race`,
+    `shuffle`, `lc-all-c`, `vuln` ("No vulnerabilities found"),
+    `release-check` ("324 file(s) clean in 1 module(s)", the tracked
+    files, with `apicheck` against `v2.0.0`), `shellcheck`, `markdownlint`
+    ("0 issues"), `actionlint`, the five script tests (29, 19, 27, 23 and
+    17 passed, 0 failed) and the tools' 67 tests.
+  * `remote linux`: 18 passed, 0 failed, 1 skipped (`gofmt`, which is
+    given no files there), in 1060 s; `release-check` "329 file(s) clean
+    in 1 module(s)", the step's five untracked Go files included.
+  * `remote windows`: 18 passed, 0 failed, 1 skipped (`gofmt`), in 1981 s;
+    `release-check` "329 file(s) clean".
+  * `make lint` reports "0 issues" for `GOOS=linux`, `darwin` and
+    `windows`. The identifier scan of the change and the untracked files
+    is clean.
+* **Not done here, by the PLAN:** the guide, the examples, the docs tree,
+  the release `v2.1.0` and the close-out are Step 9's.

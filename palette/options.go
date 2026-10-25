@@ -57,7 +57,8 @@ type config struct {
 	logger      *slog.Logger
 	goos        string // the system key hints are labelled for
 	placeholder string
-	noInput     bool // a completion pop-up: no input row, non-modal
+	noInput     bool      // a completion pop-up: no input row, non-modal
+	recents     *Frecency // where accepted hits are recorded, or nil
 }
 
 func newConfig(opts []Option) config {
@@ -106,6 +107,11 @@ func WithGOOS(goos string) Option {
 func WithPlaceholder(s string) Option {
 	return optionFunc(func(c *config) { c.placeholder = sanitize.Line(s) })
 }
+
+// WithRecents records the ID of each hit the picker accepts in f, which
+// Recents reads to put those hits first (0008-MADR §6). Only the ID is
+// kept, never a hit's arguments. nil records nothing.
+func WithRecents(f *Frecency) Option { return optionFunc(func(c *config) { c.recents = f }) }
 
 // WithoutInput makes the picker a completion pop-up, with no input row of
 // its own (0008-MADR §5, A3 item 6). It opens non-modal, so the focused
