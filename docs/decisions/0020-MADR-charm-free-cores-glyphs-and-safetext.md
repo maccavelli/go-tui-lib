@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-23
+date: 2026-10-24
 decision-makers: the repository owner
 consulted: "issues #2, #3, #4, #5, #11 and #12 of this repository's tracker, filed by gobble-cli on 2026-10-23, with their comments; gobble-cli docs/decisions/0032-MADR-go-tui-lib-integration-boundary.md and its amendment A1, read at gobble-cli 09673ba; this repository at 63c68d6; the module sources of charm.land/bubbletea/v2 v2.0.10, github.com/charmbracelet/colorprofile v0.4.3, github.com/charmbracelet/ultraviolet v0.0.0-20260811164956-006e29f97886 and github.com/charmbracelet/x/ansi v0.11.8; the external sources listed under More Information"
 informed: gobble-cli, pi-go
@@ -814,6 +814,10 @@ in one release; the draft had a release for `termcap`, `termsvc` and
 *A4, 2026-10-24: release 1 is `v1.13.0`, tagged in place of `v0.13.0`;
 release 2's version and form wait for A4.1.*
 
+*Released, 2026-10-24:* release 1 as `v1.13.0`, at `8be11e7`; release 2
+as `v2.0.0`, at the module path `github.com/maccavelli/go-tui-lib/v2`,
+at `e0ae2bd`. Each tag is annotated, the owner's, and CI passed on it.
+
 1. **Release 1, additive:** the gate and the clean packages, then `glyph`
    (D8) and `safetext` (D9). It also carries `fuzzy`, and so answers #6,
    #11 and #12.
@@ -1607,6 +1611,9 @@ major version.**
 
 ## More Information
 
+* The releases: `v1.13.0` (D12's release 1, at `8be11e7`) and `v2.0.0`
+  (release 2, at `e0ae2bd`), each with its notes in the PLAN's execution
+  record, Steps 6 and 13, and its section of `docs/guides/migrating.md`.
 * Issues of this repository: #2 (`termcap`), #3 (`termsvc`), #4
   (`command`), #5 (`keymap`), #11 (`glyph`), #12 (the sanitizer), each
   with gobble's comment of 2026-10-23 on the `x/ansi` relaxation; #6

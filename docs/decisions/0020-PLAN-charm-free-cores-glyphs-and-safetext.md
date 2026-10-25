@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-10-24
 associated-madr: "0020-MADR-charm-free-cores-glyphs-and-safetext.md"
 ---
@@ -3102,3 +3102,73 @@ loop test); `command/registry.go` imports Bubble Tea
   `apicheck` clean against `v2.0.0`; the MADR's D12 and More Information
   naming the two tags; this PLAN `complete`. The owner posts the issue
   comments above.
+* **The release.** The owner committed the first part as `e0ae2bd`. The
+  guard passed over the eight outgoing commits, `ea559a2` to `e0ae2bd`
+  against `8be11e7`, exit 0, with no finding, and `main` was not behind
+  `origin/main`. The owner pushed `main`: Docs passed, and CI passed on
+  `e0ae2bd` (`modules`, `gates`, and `test` on `macos-15`,
+  `ubuntu-24.04` and `windows-2025`). The owner then tagged `e0ae2bd` and
+  pushed the tag:
+  * `git ls-remote` shows `refs/tags/v2.0.0`, an annotated tag
+    (`db797f2`), peeled to `e0ae2bd`;
+  * `proxy.golang.org` lists `v2.0.0` for
+    `github.com/maccavelli/go-tui-lib/v2`, and its `.info` names
+    `refs/tags/v2.0.0` at `e0ae2bd`;
+  * CI on the tag: passed (run `40143509687`: `modules`, `gates`, and `test` on
+    `macos-15`, `ubuntu-24.04` and `windows-2025`).
+* **The consumer smoke test,** `releasing.md`'s procedure for a new major
+  version, run on 2026-10-24 by the script prepared above, each module in
+  the scratch directory, outside the repository. Each run had
+  `go get github.com/maccavelli/go-tui-lib/v2@v2.0.0`, which downloaded
+  from the proxy, `go mod tidy`, an empty `go env GOWORK`, the requirement
+  `github.com/maccavelli/go-tui-lib/v2 v2.0.0`, then `go vet ./...`,
+  `go build ./...`, `go run .` and staticcheck (`0 issues.`), each with
+  exit 0:
+  * *the line-mode program:* "smoke: PASS (report 1513 bytes, 2 writes, 30
+    replies, kitty keyboard supported)"; its closure, judged by Step 2's
+    `charm` rule, 146 packages on linux, 144 on darwin and 148 on windows,
+    two of them `x/ansi`'s, and none of another Charm module. `cli
+    charmfree: PASS`;
+  * *the Bubble Tea program:* "smoketui: PASS (terminal "xterm-kitty",
+    "saved" from ctrl+s, the pane got ["x"])"; 182, 180 and 187 packages,
+    Bubble Tea, Bubbles' `help` and `key`, Lip Gloss, `colorprofile`,
+    `ultraviolet` and `x/term` among them, as a Bubble Tea program's must.
+    `tui charm: PASS`;
+  * *the negative control:* the line-mode program importing
+    `termcap/termcaptea` builds and runs as the first, and its closure
+    holds `charm.land/bubbletea/v2`, `colorprofile`, `ultraviolet` and
+    `x/term` on all three, `x/termios` on linux and darwin and `x/windows`
+    on each: 173, 171 and 178 packages. `cli charm: PASS`. Judged by the
+    `charm` rule as the first program is, it fails at linux: "smoke: FAIL,
+    a Charm module beyond x/ansi".
+* **The close-out:**
+  * `scripts/apicheck.allow`: the four blocks of Steps 7 to 12, 34
+    entries, removed by a script that asserted their headings and count;
+    the file keeps its header. In this tree, whose `HEAD` is the tag, the
+    gate still takes `v1.13.0` as its base (the newest tag that does not
+    contain `HEAD`), so the claim was proved on a scratch clone: with the
+    emptied list committed on `v2.0.0`, `go-apicheck.py` gives "against
+    v2.0.0, 0 incompatible change(s)", "clean", exit 0; with the blocks
+    put back on a further commit it fails, exit 1, listing them as stale.
+    The scratch commits were made with hooks off, in the clone only, which
+    was then removed. On the close-out's own commit the base is `v2.0.0`;
+  * the MADR: D12 says, under "Released", that release 1 is `v1.13.0` at
+    `8be11e7` and release 2 `v2.0.0` at `e0ae2bd`, and More Information
+    names the two tags; its `date` is 2026-10-24;
+  * this PLAN is `complete`, and its `docs/README.md` row says so;
+  * the issue comments for #2 to #5 are drafted above, for the owner to
+    post now that the smoke test has passed.
+* **The Verification section, as the records show it:**
+  `TestCoresAreCharmFree` with all twelve cores on three targets, and
+  `charmfree` over the same twelve (Steps 2 and 12); the gates on every
+  host at each step's end; `apicheck` 0 incompatible changes through
+  `v1.13.0`, the listed blocks to `v2.0.0`, and clean against `v2.0.0`
+  (above); every mutation killed, with its line; the five fuzz targets in
+  `make fuzz` (above); `TestCoreAndAdapterAgree`,
+  `TestRepliesReachParseReply`, `TestDecoderMatchesUltraviolet` and
+  `TestKeyCodesMatchUltraviolet`, with the `differ` table (Steps 8 and
+  11); `make examples` in every `release-check`; both smoke tests, and the
+  control seen to fail (above); the scan clean at each handoff.
+* **Identifiers:** `python3 -m tools.verify scan`: `scan: clean (5 pattern(s))`.
+* **Not done:** the issue comments are the owner's to post. The close-out
+  is to be committed by the owner; nothing more is tagged.
