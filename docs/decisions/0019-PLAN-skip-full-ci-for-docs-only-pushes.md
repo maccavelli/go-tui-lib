@@ -444,3 +444,27 @@ The kept output of each:
   pattern(s))".
 * This step changes Markdown only, so its push is Step 4's docs-only
   test.
+
+### Step 4: live checks (2026-10-25)
+
+*Read from GitHub's run list for `main` and the tags, 2026-10-25, the last
+100 runs.*
+
+* **A push with a non-Markdown change** ran "CI", 5 of 5, and, when it
+  also changed Markdown, "Docs" beside it: the first such push after Step
+  2's workflows were on `main`, `63c68d6` (CI `39963257917`, 5 jobs, and
+  Docs `39963257717`, both `success`); then `8be11e7`, `e0ae2bd`,
+  `81177eb` and `d5509df` alike. V3's second half is met.
+* **Tags (V4):** the root tags `v1.13.0` (at `8be11e7`) and `v2.0.0` (at
+  `e0ae2bd`, run `40143509687`) each ran "CI" with 5 of 5 jobs and no
+  "Docs", as `docs.yml` takes no tag. V4 is met.
+* **A docs-only push (V3's first half): not yet seen.** No push since
+  Step 2 has changed only the documents' places: `e0ae2bd`'s commit changed
+  only Markdown, but it went up with code commits, and GitHub filters a
+  push by everything it carries; `81177eb`'s carried
+  `scripts/apicheck.allow`. The commit that holds this record changes only
+  Markdown under `docs/`, so its push, made alone, is the test: one run,
+  "Docs", and no "CI".
+* **A fixture change:** not exercised, as the step says.
+* **Not done yet:** V3's first half, and with it the closing, which
+  follow that push.

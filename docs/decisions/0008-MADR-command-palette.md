@@ -912,7 +912,76 @@ Found in Step 3 (its D1). The Context's "`Method` has `StringWidth` and
    gives the workspace. `fuzzy` itself uses none of them: `Cells` measures
    with `Method.StringWidth`.
 2. **Where the palette cuts a highlighted row:** open. Step 6 does not
-   start until it is decided, by an amendment of this item.
+   start until it is decided, by an amendment of this item. *A5.3,
+   2026-10-25, proposed: the palette cuts it with the repository's
+   cutter.*
+
+### A5 (2026-10-25): the palette under `v2`, its query type's name, and where highlights are cut (proposed)
+
+*Status: proposed. It decides A4 item 2, renames A2's `Input`, and adopts
+`v2.0.0`'s facts; nothing else in §1 to §8 or A1 to A4 changes.*
+
+**Found,** at `d5509df`, before
+[0008-PLAN-command-palette.md](0008-PLAN-command-palette.md) Step 5:
+
+1. **`v2.0.0` moved what the palette calls.**
+   [0020-MADR-charm-free-cores-glyphs-and-safetext.md](0020-MADR-charm-free-cores-glyphs-and-safetext.md)
+   shipped as `v2.0.0`, at the module path
+   `github.com/maccavelli/go-tui-lib/v2` (its A4.1). `Registry.Dispatch`
+   returns a `command.Effect`, and `commandtea.Dispatch(ctx, r, req)` is
+   its `tea.Cmd` (D6, A1.2). The keymap takes `termkey` keys, and its
+   Bubble Tea forms are `keymaptea`'s (D7). The next release of this
+   PLAN's additions is the next minor version, `v2.1.0`, against which
+   `make apicheck` compares with `v2.0.0` and an empty allow list (A4.2).
+   0020-MADR Q7 put the palette after it "so it is written once, against
+   `commandtea` and `keymaptea`".
+2. **`palette.Input` clashes.** A2 named the query a provider is given
+   `Input`; `termkey.Input`, a decoded input, is exported since `v2.0.0`.
+   `python3 -m tools.verify names` over the palette's 22 planned type
+   names: "names: palette.Input: also in termkey", the one clash;
+   `internal/conformance` would refuse it.
+3. **A4 item 2 is still open:** `lipgloss.StyleRanges` cuts in grapheme
+   width, while the workspace measures with `WcWidth` until the terminal
+   reports mode 2027, so a highlight after a cluster whose widths differ
+   lands in the wrong cells.
+
+**What changes.**
+
+* **A5.1, the facts adopted.** `FromRegistry`'s hits run through
+  `commandtea.Dispatch(ctx, reg, req)`, with `Origin:
+  command.OriginPalette` (§5, A3 item 6). `Hit.Run` stays
+  `func(jsontext.Value) tea.Cmd`: the palette is a Bubble Tea package, as
+  §1 and 0020-MADR Q7 have it. The release is `v2.1.0`, additions only;
+  the smoke test fetches `github.com/maccavelli/go-tui-lib/v2@v2.1.0`.
+* **A5.2, the name.** A2's `Input`, the query (`Text`, `Matcher`,
+  `WhenContext`), is `Search`. The options, recommended first:
+  * **`Search`:** what a provider is asked to do, and clean against the
+    tree and the glossary;
+  * **`Typed`:** what the user typed; clean too, but it names the text
+    alone, where the type carries the matcher and the when values as well.
+* **A5.3, A4 item 2: the palette cuts a highlighted row itself.** It
+  turns `fuzzy.Cells`' ranges into pieces of the row's text with the
+  repository's cutter, as Step 3's oracle does: the text of cells `[a, b)`
+  is `sanitize.Truncate(s, b, m, "")` less its prefix
+  `sanitize.Truncate(s, a, m, "")`, with `m` the workspace's
+  `WidthMethod()`; it renders each piece with its `lipgloss.Style`, the
+  highlight's or the row's, and joins them. `lipgloss.StyleRanges` is not
+  used. The options, recommended first:
+  * **the repository's cutter, piece by piece:** the cells a highlight
+    covers are the cells the workspace measures, under either method, by
+    the one cutter AGENTS.md's width rule names; its cost is a small
+    function of the palette's own, tested against the oracle Step 3
+    already has;
+  * **`lipgloss.StyleRanges` with the palette measuring in
+    `GraphemeWidth`:** no code of ours, but the palette's rows would be
+    measured otherwise than the workspace's, so a row could overflow its
+    box under `WcWidth`;
+  * **wait for upstream:** x/ansi's `WcWidth.Cut` and lipgloss's ranges
+    both cut otherwise today (A4), and no fix is released; Step 6 would
+    wait for one.
+
+**Unchanged:** the palette stays a Bubble Tea package; a line-mode picker,
+issue #8, is its own record, which may build on `fuzzy`.
 
 ## More Information
 

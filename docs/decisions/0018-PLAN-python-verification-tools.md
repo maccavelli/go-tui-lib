@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-10-14
 associated-madr: "0018-MADR-python-verification-tools.md"
 ---
@@ -587,3 +587,13 @@ it ("approved", then "proceed").
   `tools.verify scan`: "clean (5 pattern(s))".
 * **Close-out:** this PLAN becomes `complete` once CI is green on the
   pushed tree, which is the owner's to push.
+
+### Close-out (2026-10-25)
+
+* **CI was green on the pushed tree.** Step 7's code is `e2a904b`. Its
+  push to `main` ran CI, run `38921099237`, `success`, 5 of 5 jobs; every
+  push to `main` since has passed CI too, the last at `d5509df` (run
+  `40151758881`). Step 7's condition, "`complete` once CI is green on the
+  pushed tree", is met.
+* This PLAN is `complete`, and its `docs/README.md` row says so. The tools
+  it built ran every step of 0020-PLAN and 0021-PLAN on three hosts.

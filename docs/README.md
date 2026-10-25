@@ -24,8 +24,8 @@ it was when they were written
 | 0006 | PLAN | [Implement the command registry (`when`, `command`, `command/cli`, and the Cobra and Kong front ends)](decisions/0006-PLAN-command-registry.md) | complete |
 | 0007 | MADR | [Bind keys to command IDs through a context-aware keymap engine, with chords, a leader key and VS Code-format user keymaps](decisions/0007-MADR-keymap-engine.md) | accepted; A1, A2 accepted; A3 recorded; A4–A12 accepted; Q8 answered (A4) |
 | 0007 | PLAN | [Implement the keymap engine](decisions/0007-PLAN-keymap-engine.md) | complete |
-| 0008 | MADR | [Find and run anything from one command palette, built on an in-repository fuzzy matcher and asynchronous, scoped providers](decisions/0008-MADR-command-palette.md) | accepted; A1 accepted; A2 recorded; A3 accepted; A4 item 1 accepted, item 2 open |
-| 0008 | PLAN | [Implement the command palette and the fuzzy matcher](decisions/0008-PLAN-command-palette.md) | in-progress |
+| 0008 | MADR | [Find and run anything from one command palette, built on an in-repository fuzzy matcher and asynchronous, scoped providers](decisions/0008-MADR-command-palette.md) | accepted; A1 accepted; A2 recorded; A3 accepted; A4 item 1 accepted, item 2 open; A5 proposed |
+| 0008 | PLAN | [Implement the command palette and the fuzzy matcher](decisions/0008-PLAN-command-palette.md) | in-progress (Steps 1–4 done; Step 5 waits for A5) |
 | 0009 | MADR | [Stream agent output through a stable-prefix Markdown engine, a frame scheduler, an input filter and a safe-text sanitizer](decisions/0009-MADR-streaming-content-engine.md) | accepted; A1–A3 accepted; A4 recorded; Q9 open |
 | 0009 | PLAN | [Implement the streaming content engine](decisions/0009-PLAN-streaming-content-engine.md) | proposed |
 | 0010 | MADR | [Ship the Cobra, Kong and glamour adapters as nested Go modules, released apart from the root and developed through a committed go.work, with every gate run per module and without the workspace](decisions/0010-MADR-nested-adapter-modules.md) | accepted; A1–A3 accepted; the command adapters superseded by 0012 |
@@ -50,9 +50,9 @@ it was when they were written
 | 0017 | MADR | [Write the repository's scripts in Python, standard library only, and port the ten shell scripts](decisions/0017-MADR-python-repository-scripts.md) | accepted; built |
 | 0017 | PLAN | [Implement Python repository scripts: port the ten shell scripts, `go-fuzz` first with the case-6 fix](decisions/0017-PLAN-python-repository-scripts.md) | complete |
 | 0018 | MADR | [Keep the agent's verification tooling in the repository, as one modular Python package under `tools/`](decisions/0018-MADR-python-verification-tools.md) | accepted; A1, A2 accepted; A1 built |
-| 0018 | PLAN | [Implement the Python verification tools](decisions/0018-PLAN-python-verification-tools.md) | in-progress (Step 7, A2) |
+| 0018 | PLAN | [Implement the Python verification tools](decisions/0018-PLAN-python-verification-tools.md) | complete |
 | 0019 | MADR | [Skip the full CI for a push or pull request that changes only the documents, and check them with a one-job docs workflow instead](decisions/0019-MADR-skip-full-ci-for-docs-only-pushes.md) | accepted |
-| 0019 | PLAN | [Implement: a docs-only push or pull request runs a docs job instead of the full CI](decisions/0019-PLAN-skip-full-ci-for-docs-only-pushes.md) | in-progress |
+| 0019 | PLAN | [Implement: a docs-only push or pull request runs a docs job instead of the full CI](decisions/0019-PLAN-skip-full-ci-for-docs-only-pushes.md) | in-progress (Step 4, a docs-only push) |
 | 0020 | MADR | [Give a line-mode CLI Charm-free cores of `termcap`, `termsvc`, `command` and `keymap`, with their Bubble Tea forms in sub-packages, status and meter glyphs in `glyph`, and `safetext` as the one sanitizer](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md) | accepted; Q1–Q8 answered; A1.1 answered (c); A1.2–A1.3 recorded; A2 accepted; A3 accepted; A4 accepted; A4.1 answered (`v2.0.0` at `/v2`); A4.2 accepted |
 | 0020 | PLAN | [Implement Charm-free cores of `termcap`, `termsvc`, `command` and `keymap`, the `termkey` decoder, the status and meter glyphs, and `safetext`](decisions/0020-PLAN-charm-free-cores-glyphs-and-safetext.md) | complete (`v1.13.0` and `v2.0.0` tagged) |
 | 0021 | MADR | [Hold `termkey` to the standard library and `internal/enum` with a closure test and a strict depguard rule](decisions/0021-MADR-termkey-closure-gate.md) | accepted; A1 accepted |

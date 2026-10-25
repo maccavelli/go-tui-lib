@@ -46,6 +46,12 @@ to 4 was tagged `v1.13.0`, in place of `v0.13.0`, and kept; there is no
 `v0.13.0`. Where this PLAN says `v0.13.0`, read `v1.13.0`. Step 9's
 release follows 0020's release 2, whose version 0020-MADR A4.1 decides.
 
+**Revision, 2026-10-25, for MADR amendment A5 (proposed).** Steps 1 to 4
+stand. Steps 5 to 9 take `v2.0.0`'s names and the release `v2.1.0`, A5.2's
+`Search` for A2's `Input`, and A5.3's cut in Step 6; each change is
+annotated where it falls. Step 5 waits for A5's answers and the owner's
+approval.
+
 ## Goal
 
 Ship `fuzzy` and `palette`, so that a program finds and runs any command,
@@ -54,8 +60,8 @@ file, pane, theme or other item from one overlay, and drives slash and
 keymap binds and that run in the order they were pressed.
 
 Done means every item under Verification holds, CI is green on the pushed
-tree, `v0.13.0` is tagged by the owner, and the consumer smoke test
-passes.
+tree, ~~`v0.13.0`~~ `v2.1.0` (A5.1) is tagged by the owner, and the
+consumer smoke test passes.
 
 ## Scope
 
@@ -304,8 +310,8 @@ and this repository's `workspace`, `command`, `when`, `keymap`, `theme`,
 ### Step 5: `palette`, the engine
 
 * MADR §4 with A2 and A3: `Provider` and its optional `Discoverer`,
-  `Starter`, `Stopper`, `Prefixed` and `Debouncer`; `Input` (`Text`,
-  `Matcher`, `WhenContext`); `Hit` (`ID`, `Text`, `Ranges`, `Score`,
+  `Starter`, `Stopper`, `Prefixed` and `Debouncer`; ~~`Input`~~ `Search`
+  (A5.2) (`Text`, `Matcher`, `WhenContext`); `Hit` (`ID`, `Text`, `Ranges`, `Score`,
   `Group`, `Help`, `Hint`, `Command`, `Danger`, `Disabled`, `Params`,
   `Run func(jsontext.Value) tea.Cmd`); `Availability`; `Grouping` through
   `internal/enum` and the conformance table; the generation counter, the
@@ -343,7 +349,13 @@ and this repository's `workspace`, `command`, `when`, `keymap`, `theme`,
 *2026-10-12 (D1, MADR A4 item 2):* `lipgloss.StyleRanges` cuts in grapheme
 width whatever the workspace measures with. Where the palette cuts a
 highlighted row is decided by an amendment of MADR A4 item 2 before this
-step starts, and this step is amended to match.
+step starts, and this step is amended to match. *2026-10-25, MADR A5.3,
+proposed:* the palette cuts it itself, piece by piece, with
+`internal/sanitize`'s `Truncate` in `w.WidthMethod()`, and renders each
+piece with its style; `lipgloss.StyleRanges` is not used. The step's
+tests gain: each highlight covers the cells `fuzzy.Cells` gives, under
+`WcWidth` and `GraphemeWidth`, on a row holding a ZWJ family before a
+match; and its mutations: the cut in grapheme width under `WcWidth`.
 
 * MADR §7 with A3 items 1–4, 9, 11 and 12:
   * `NewPicker(w, opts...)`, `Register`, `Open(...OverlayOption)`
@@ -354,7 +366,8 @@ step starts, and this step is amended to match.
   * the `textinput.Model` held directly, with `Prompt` and the placeholder
     from `glyph` and the options;
   * the results window, help line and count, highlights with `fuzzy.Cells`
-    and `lipgloss.StyleRanges` in `w.WidthMethod()`, the selected-row
+    and ~~`lipgloss.StyleRanges`~~ the repository's cutter (A5.3) in
+    `w.WidthMethod()`, the selected-row
     marker, danger badges, `Disabled` rows, truncation with `Ellipsis`
     through `internal/sanitize`'s `Truncate`;
   * `sanitize.Line` on every hit's text fields and provider names;
@@ -406,7 +419,8 @@ step starts, and this step is amended to match.
   * `FromRegistry(reg)`: `Available(ctx, command.SurfacePalette)`; matches
     the title, `Category: Title`, the slash name and the aliases, keeping
     the best; sets `Command`, `Danger` and `Params`; its `Run` calls
-    `Dispatch` with `Origin: command.OriginPalette`;
+    ~~`Dispatch`~~ `commandtea.Dispatch(ctx, reg, req)` (A5.1) with
+    `Origin: command.OriginPalette`;
   * `Recents`, `Static` with `Item`, `Panes(w)`;
   * `Files(walk, opts...)` with `FileOption` (`WithIndexAbove`,
     `WithMaxFiles`), `Walker`, `WalkerFunc`, `FSWalker`, `PathFilter`,
@@ -479,15 +493,17 @@ step starts, and this step is amended to match.
   imports; `docs/guides/building-workspaces.md` gains `CommandConsumer`,
   `Close`, `Theme` and `Bindings`; `docs/glossary.md` its final entries;
   `docs/README.md` rows; README Status.
-* **The release, `v0.13.0`,** as 0007-PLAN's Steps 8 and 12 ran:
-  * `docs/guides/migrating.md` gains "Migrating to `v0.13.0`": additions
+* **The release, ~~`v0.13.0`~~ `v2.1.0` (A5.1),** as 0007-PLAN's Steps 8
+  and 12 ran, and 0020-PLAN's Step 13 for the `/v2` path:
+  * `docs/guides/migrating.md` gains "Migrating to `v2.1.0`": additions
     only;
   * release notes in the execution record;
   * the disclosure guard over the outgoing commits, then the owner's push;
   * CI green on `main`, then the owner's annotated tag, and CI green on
     the tag;
   * the consumer smoke test, in a scratch module outside the repository
-    with `GOWORK` empty: `go get` the tag from the proxy, build a program
+    with `GOWORK` empty: `go get github.com/maccavelli/go-tui-lib/v2@v2.1.0`
+    from the proxy, build a program
     that opens the palette over a registry and runs a command through it,
     under staticcheck, with a negative control seen to fail.
 * This PLAN becomes `complete`, and its `docs/README.md` row says so.
@@ -504,8 +520,8 @@ step starts, and this step is amended to match.
     `linux/386`;
   * `make fuzz`.
 * `go mod tidy -diff` is clean, and `go.mod` gains no requirement.
-* `make apicheck` reports no incompatible change against `v0.12.0`, and
-  `scripts/apicheck.allow` stays empty.
+* `make apicheck` reports no incompatible change against ~~`v0.12.0`~~
+  `v2.0.0` (A5.1), and `scripts/apicheck.allow` stays empty.
 * `internal/conformance` passes for `fuzzy` and `palette`: enums, names,
   options, stability lines, and no output, environment, exit or process.
 * No default binding in `palette` is `ctrl+c`.
@@ -515,7 +531,8 @@ step starts, and this step is amended to match.
 
 ## Rollout and Rollback
 
-* **Rollout.** The owner pushes Steps 1–9 and tags `v0.13.0`. pi-go adopts
+* **Rollout.** The owner pushes Steps 1–9 and tags ~~`v0.13.0`~~ `v2.1.0`
+  (A5.1). pi-go adopts
   the palette and the completion mode under its own records.
 * **Rollback.** Before the push, each step is one local commit. After it,
   a patch release fixes forward. Every change is an addition, so a program
