@@ -985,6 +985,44 @@ to A4 changes.*
 **Unchanged:** the palette stays a Bubble Tea package; a line-mode picker,
 issue #8, is its own record, which may build on `fuzzy`.
 
+### A6 (2026-10-25): an overlay is told when it closes
+
+*Status: accepted, 2026-10-25, the owner's choice ("Workspace tells it
+(Recommended)"), found before
+[0008-PLAN-command-palette.md](0008-PLAN-command-palette.md) Step 6 wrote
+any code. It adds to A3 items 3 and 13; nothing else changes.*
+
+**Found,** at `916cd07`:
+
+1. **The workspace closes an overlay without telling it.** `Pop`,
+   `Close(id)`, the `esc` binding (`workspace.overlay.close`) and a `Push`
+   that replaces an open ID each remove the overlay through
+   `removeOverlay`, which "sends no message"
+   (`workspace/overlay.go:126-134`).
+2. **`PaneBlurMsg` cannot stand in for it.** A modal overlay is sent
+   `PaneBlurMsg` when it closes and when another overlay covers it
+   (`workspace/focus.go:74-83`, `overlay.go:73-91`), and nothing when it
+   is closed while covered. A non-modal overlay, Step 7's completion
+   pop-up, is sent no focus message at all.
+3. **A closed overlay hears nothing more:** `Broadcast` reaches the open
+   overlays only (`workspace/workspace.go:620-629`). A picker closed
+   mid-search would leave its searches blocked on their channel, their
+   context never cancelled, against §4's "`Stopper` … when the palette
+   closes" and A3 item 13's "a closed picker leaves no goroutine".
+
+**Decided.** `workspace.OverlayClosedMsg struct{}` is delivered through
+an overlay's `Update` whenever the workspace removes it, by any of the
+four ways above, after its `PaneBlurMsg` if it had the keyboard; its
+command is batched with the closing's. The `Picker` ends its session on
+it: its searches are cancelled, and its providers stopped. A session runs
+from `Open` to that message, so `Starter` and `Stopper` keep "once per
+opening".
+
+**Not chosen:** the picker's session following the keyboard, ended on
+`PaneBlurMsg` and begun again on `PaneFocusMsg`. It needs no workspace
+change, but it runs `Start` and `Stop` each time another overlay covers
+the picker, and it does nothing for a non-modal pop-up.
+
 ## More Information
 
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md):

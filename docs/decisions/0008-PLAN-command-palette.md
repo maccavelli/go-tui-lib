@@ -357,6 +357,18 @@ tests gain: each highlight covers the cells `fuzzy.Cells` gives, under
 `WcWidth` and `GraphemeWidth`, on a row holding a ZWJ family before a
 match; and its mutations: the cut in grapheme width under `WcWidth`.
 
+*2026-10-25 (deviation D1, MADR A6, accepted):* the workspace told an
+overlay nothing when it closed it. This step's paths gain
+`workspace/overlay.go`, `workspace/workspace.go` and a workspace test:
+`workspace.OverlayClosedMsg`, delivered through an overlay's `Update`
+whenever the workspace removes it (`Pop`, `Close`, the `esc` binding, a
+replacing `Push`). The `Picker` ends its session on it. The step's tests
+gain: each of the four ways sends the message once, after `PaneBlurMsg`
+where the overlay had the keyboard, and its command runs; a picker closed
+mid-search, by `esc` and while covered by another overlay, leaves no
+goroutine and stops its used providers. Its mutations gain: a replacing
+`Push` sends no `OverlayClosedMsg`; the `Picker` ignores it.
+
 * MADR §7 with A3 items 1–4, 9, 11 and 12:
   * `NewPicker(w, opts...)`, `Register`, `Open(...OverlayOption)`
     (`WithID`, `WithAnchor`, `WithSize`), capturing `w.KeyPath()` and
@@ -892,3 +904,173 @@ approved this step ("committed, proceed with rcommendations").
 * **Not done here, by the PLAN:** `Ranges` are filled for drawn rows, and
   failure rows are drawn muted, by Step 6's pane. `Register`, `Open` and
   the `Picker` are also Step 6's.
+
+### Step 6: `palette`, the pane and its keys
+
+*2026-10-25.* The owner approved this step ("proceed"). One deviation,
+D1, below.
+
+#### Deviation D1, 2026-10-25: the workspace told an overlay nothing when it closed it
+
+* **Found,** before any code of this step: `Pop`, `Close(id)`, the `esc`
+  binding and a replacing `Push` remove an overlay through
+  `removeOverlay`, which sent no message (`workspace/overlay.go:126-134`
+  at `916cd07`). `PaneBlurMsg` came both when a modal overlay closed and
+  when another covered it, and not at all when it was closed while
+  covered, or for a non-modal overlay. A picker closed mid-search would
+  have left its searches blocked on their channel, against MADR §4 and A3
+  item 13.
+* **Resolutions offered:** the workspace tells the overlay
+  (recommended); or the picker's session follows the keyboard, with
+  `Start` and `Stop` on every cover and uncover, and nothing for Step 7's
+  non-modal pop-up.
+* **Chosen by the owner,** 2026-10-25: "Workspace tells it
+  (Recommended)". MADR A6 records the decision; Step 6 is annotated,
+  and its paths gain `workspace/overlay.go` and `workspace/closed_test.go`.
+
+#### What was built
+
+* **`workspace`** (A6): `OverlayClosedMsg struct{}`, sent through an
+  overlay's `Update` by `removeOverlay`, the one path every close takes,
+  after `PaneBlurMsg` when the overlay had the keyboard; its command is
+  batched with the closing's. `Push` and `closeOverlay` batch it. Every
+  existing workspace test passes unchanged.
+* **`palette`:**
+  * `palette/picker.go`: `Picker`; `NewPicker(w, opts...)`;
+    `Register(Provider, Availability) error`; `Open(opts...) tea.Cmd`,
+    which reads `w.KeyPath()` and `w.WhenContext()` before it pushes a
+    modal overlay; `OpenCommand(id, title, opts...) command.Command`, a
+    `Loop`, `UI` command whose handler returns `Open`'s command; and the
+    pane's `Update`, `KeyContexts` (`kind:picker`), `ConsumesCommand`,
+    `ConsumesEsc` and `Cursor`. The `textinput.Model` is held directly,
+    with a real cursor.
+  * `palette/view.go`: `View`: the input, a window of the rows, and the
+    help line; the selected row's `Focus` glyph and bold; highlights
+    from `fuzzy.Cells`, underlined and in `Accent`, each piece cut by
+    `internal/sanitize`'s `Truncate` in `w.WidthMethod()` (A5.3); danger
+    badges in words between `BadgeOpen` and `BadgeClose`, `Warning` for
+    `mutating` and `Error` for `destructive`; key hints from
+    `w.Bindings().Shortcut` along the path at open; truncation with
+    `Ellipsis`.
+  * `palette/keys.go`: `DefaultRules()`, A3 item 1's global `ctrl+p` and
+    `kind:picker` bindings; the commands' IDs stay unexported strings.
+  * `palette/options.go`: `WithGOOS`, `WithPlaceholder`; `OverlayOption`,
+    an interface with an unexported method, with `WithID`, `WithAnchor`
+    and `WithSize`.
+  * `palette/engine.go`: a hit's `Text`, `Group`, `Help`, `Hint` and
+    `Disabled`, and a provider's name, go through `sanitize.Line` as they
+    arrive (A3 item 9); `hitsMsg` and `startMsg` name their engine; the
+    engine remembers the prefix a query used.
+  * `palette/doc.go` describes the `Picker`.
+* **Choices made within MADR §7 and A3.** None changes a decision:
+  1. `Register` returns an error for a `When` that does not parse, and
+     adds nothing; §4's sketch had no result.
+  2. `OpenCommand` keeps A3's signature and panics when `command.New`
+     refuses its definition, as `command.MustNew` does.
+  3. An opening's overlay is modal, centred, `palette` by ID and 72 × 16
+     by default. Opening an open picker opens it afresh; under another ID,
+     the old overlay is closed first.
+  4. The input takes at most 256 characters, never more than the
+     matcher's 256 graphemes; its prompt, mask and styles are taken from
+     the workspace's theme each time it draws.
+  5. The selection stops at either end; a page is the result lines drawn.
+  6. A disabled hit's reason is drawn at the right of its row, where a
+     hint would be, and in the help line; a failure's row is the `Failed`
+     glyph, the provider's name and "failed", muted.
+  7. The count reads "3 of 40", ", searching" with the ellipsis while
+     searches run, "searching" with it before any hit, and "no results".
+  8. `esc` that reaches the picker clears the query; tab under a prefix
+     keeps the prefix; accepting or completing one of `?`'s rows types
+     its prefix and runs nothing.
+  9. The wheel scrolls one line and keeps the selection on a drawn line;
+     a left click on a row accepts it.
+  10. After a hit is accepted the picker takes no more input until it is
+      closed.
+  11. Below 8 cells of text, the hint is dropped, then the badge.
+* **Tests** (`palette/picker_test.go`), each through a real
+  `workspace.Workspace` with `workspace.DefaultRules()` and
+  `palette.DefaultRules()`, inside `testing/synctest`, with a loop that
+  plays the program's: `TestOpenKey`; `TestPickerKeys`;
+  `TestKeysRunInOrder` ("down, down, enter, down, enter" in one burst
+  runs the third row alone); `TestEscClearsThenCloses`; `TestRebind`;
+  `TestWithoutRules`; `TestThemeFollows`; `TestHitTextSanitized`;
+  `TestHints`; `TestOnlyVisibleMatched`; `TestCursor`; `TestMouse`;
+  `TestHighlightCells` and `TestRowHighlights` (each highlight on the
+  cells `fuzzy.Cells` gives, under `WcWidth` and `GraphemeWidth`, after a
+  ZWJ family); `TestClosedMidSearch` (by `esc`, and by `Close` while
+  covered: the provider stopped each time, and the `goroutineleak`
+  profile reports `total 0`); `TestOpenWhileOpen`;
+  `TestRegisterRefusesBadWhen`; `TestTwoPickers`;
+  `TestDisabledDoesNotRun`; `TestScrollFollowsSelection`;
+  `TestGroupHeaders`; `TestCompleteKeepsPrefix`. `workspace` gains
+  `TestOverlayClosedMsg` (`workspace/closed_test.go`): each of the four
+  ways sends it once, after `PaneBlurMsg`, and returns its command; a
+  covered overlay closed is told too; one still open is not.
+  `go test -race -count=50 ./palette/` is clean.
+* **Golden frames,** `TestPickerGolden`, across {colour, no colour} ×
+  {UTF-8, ASCII} at 60 and 100 columns, each line checked with
+  `tuitest.Fits`: `picker-recents` (an empty query's recent hits),
+  `picker-query` (highlights, a truncated highlight, both danger badges,
+  a disabled row, a hint of the hit's own and one from the keymap),
+  `picker-error` (a provider's failure) and `picker-searching`. All 32
+  were read before this record was written.
+* **Mutations,** through `python3 -m tools.verify mutate` on scratch
+  copies. The PLAN's seven, A5.3's and D1's two come first:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | the selected row loses its glyph marker | `TestPickerGolden`: `picker-recents color.utf8.60: line 2 differs`, want `▸ Open settings` |
+  | highlights use rune indexes | `TestRowHighlights`: `method 0: highlighted cells [{11 13} {14 16}]; want [{12 14} {15 17}]` |
+  | `esc` closes with a non-empty query | `TestEscClearsThenCloses`: `esc with a query: input "ab", overlays []; want it cleared and open` |
+  | truncation counts bytes | `TestHighlightCells`: `method 0: a row of exactly its 15 cells was cut` |
+  | `ConsumesCommand` returns false | `TestPickerKeys`: `ctrl+n: selection 0; want 1` |
+  | `sanitize.Line` is skipped for a hit | `TestHitTextSanitized`: "the view holds the hit's escape sequences" |
+  | the hint uses the overlay's path, not the one at open | `TestHints`: `no hint ctrl+k` |
+  | the cut is in grapheme width under `WcWidth` (A5.3) | `TestRowHighlights`: `method 0: highlighted cells [{16 17}]; want [{12 14} {15 17}]`; `TestHighlightCells` too |
+  | a replacing `Push` sends no `OverlayClosedMsg` (D1) | `TestOverlayClosedMsg/push`: `the closed overlay got 0 OverlayClosedMsgs; want 1` |
+  | the `Picker` ignores `OverlayClosedMsg` (D1) | `TestClosedMidSearch`: `closed by esc: stopped 0 times; want 1`, then synctest's "deadlock: main bubble goroutine has exited but blocked goroutines remain" |
+  | `removeOverlay` sends no `OverlayClosedMsg` | `TestOverlayClosedMsg`: `got 0 OverlayClosedMsgs; want 1`, in every case |
+  | `OverlayClosedMsg` comes before `PaneBlurMsg` | `TestOverlayClosedMsg`: "OverlayClosedMsg came before PaneBlurMsg" |
+  | the closed overlay's command is dropped | `TestOverlayClosedMsg`: "the closed overlay's command was not returned" |
+  | a batch is taken whatever engine sent it | `TestTwoPickers`: `the lower picker's rows ["theirs" "mine"]` |
+  | accepting does not close the picker | `TestPickerKeys`: `enter left [palette] open` |
+  | a disabled hit runs | `TestDisabledDoesNotRun`: `enter on a disabled hit ran ["a1"], overlays []` |
+  | `Open` reads the key path after it pushes | `TestHints`: `no hint ctrl+k` |
+  | keys after an accept are still taken | `TestKeysRunInOrder`: `ran ["c1" "d1"]; want c1 alone` |
+  | the wheel leaves the selection off the window | `TestMouse`: `wheel down: top 1, selection 0; want 1 and 1` |
+  | a click runs the row below the one under it | `TestMouse`: `a click on the third row ran ["d1"]; want c1` |
+  | tab drops the query's prefix | `TestCompleteKeepsPrefix`: `the input holds "Open file"; want >Open file` |
+  | accepting a row of `?` closes the picker | `TestCompleteKeepsPrefix`: `enter on ?'s row: input "?", overlays []` |
+  | `ctrl+p` opens under a modal overlay | `TestOpenKey`: `ctrl+p under a modal dialog: 1 more requests` |
+  | the window does not follow the selection down | `TestScrollFollowsSelection`: `nine downs: selection 9, top 0; want 9 and 2` |
+  | `ByProvider` draws no group headers | `TestGroupHeaders`: `lines ["a1" "a2" "b1" "" ""]` |
+  | the count does not say the providers still search | `TestPickerGolden`: `picker-searching color.utf8.60: line 10 differs` |
+  | a provider's name is not sanitised | `TestHitTextSanitized`: `the provider's name is "items\x1b]0;title\a"` |
+  | a disabled hit's reason is not on its row | `TestDisabledDoesNotRun`: "the reason is not on the row and in the help line" |
+
+  28 killed of 28. *2026-10-25:* the first run's "`Open` reads the key
+  path after it pushes" did not compile (`path` declared and not used), so
+  it proved nothing; its replacement, which reads the path in a deferred
+  call, is KILLED as above.
+
+* **Names:** `python3 -m tools.verify names` over `workspace`'s
+  `OverlayClosedMsg` and `palette`'s `Picker` and `OverlayOption`: "3
+  planned name(s), clean". `docs/glossary.md` gains their rows.
+* **Gates:** through `tools.verify` on the final tree: macOS, over
+  the step's nine Go files and four records, "gates: 19 passed, 0 failed,
+  0 skipped"; the Linux host and the Windows host each "gates: 18
+  passed, 0 failed, 1 skipped", the skip being `gofmt`, which a remote
+  run is given no files for. `release-check` is clean on each: 314
+  tracked files on macOS, where the five new files are untracked, and
+  319 on the hosts, whose copies' index tracks them; gofmt and `make
+  lint` cover the untracked files on macOS. `make lint` reports "0
+  issues" for `GOOS=linux`, `darwin` and `windows`, after `go fix`'s two
+  suggestions and five `gocritic` evalOrder findings in `Update` were
+  fixed. `make apicheck`: "against v2.0.0, 0 incompatible change(s)".
+  The identifier scan of the change and the untracked files is clean.
+* **Not done here, by the PLAN:** the recents record on accept, with
+  `WithRecents` and `Frecency`, and the argument stage, so `Run` is
+  given `nil` arguments, are Step 8's; the built-in providers,
+  completion mode, `SetQuery`, `SelectedMsg` and the
+  `overlay:completion` bindings are Step 7's. Step 7's non-modal pop-up
+  ends its session on `OverlayClosedMsg` too.

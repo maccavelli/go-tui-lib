@@ -93,6 +93,8 @@ of its own.
 | `Matcher`, `Match`, `Score`, `Grade`, `Range`, `Ranked`, `CellRange`, `CaseMode`, `Normalizer` | a compiled fuzzy query, a match with its byte ranges, its grade and value, the grades, a byte range on cluster boundaries, a ranked item, a range in cells, letter-case handling, a rune-mapping hook ([0008-MADR](decisions/0008-MADR-command-palette.md) §2, A2, A3) | `fuzzy` |
 | `Index`, `IndexOption` | the trigram index that narrows a large candidate set before scoring, and its options ([0008-MADR](decisions/0008-MADR-command-palette.md) §3, A2, A3) | `fuzzy` |
 | `CommandConsumer`, `CommandMsg` | a pane or overlay that runs some matched commands itself, and the matched command it is sent ([0008-MADR](decisions/0008-MADR-command-palette.md) A3 item 1) | `workspace` |
+| `OverlayClosedMsg` | what an overlay's pane is sent when the workspace closes it, by any means ([0008-MADR](decisions/0008-MADR-command-palette.md) A6) | `workspace` |
+| `Picker`, `OverlayOption` | the palette's overlay pane, and how one opening places it ([0008-MADR](decisions/0008-MADR-command-palette.md) §7, A2, A3) | `palette` |
 | `Provider`, `Discoverer`, `Starter`, `Stopper`, `Prefixed`, `Debouncer` | a source of palette hits, and its optional capabilities: hits for an empty query, work before its first search, a release when the picker closes, a prefix it owns, a wait after a keystroke ([0008-MADR](decisions/0008-MADR-command-palette.md) §4, A2) | `palette` |
 | `Search`, `Hit`, `Availability`, `Grouping` | what a provider is asked, one result, where a provider searches, how the hits are ordered ([0008-MADR](decisions/0008-MADR-command-palette.md) §4, A2, A3, A5.2) | `palette` |
 

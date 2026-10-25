@@ -11,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/maccavelli/go-tui-lib/v2/fuzzy"
+	"github.com/maccavelli/go-tui-lib/v2/internal/sanitize"
 	"github.com/maccavelli/go-tui-lib/v2/when"
 )
 
@@ -64,14 +65,18 @@ type event struct {
 	err error
 }
 
-// hitsMsg is one drained batch of a generation's events.
+// hitsMsg is one drained batch of a generation's events. It names its
+// engine, since the workspace broadcasts it to every pane and overlay, and
+// another picker's generation may have the same number.
 type hitsMsg struct {
+	e      *engine
 	gen    uint64
 	events []event
 }
 
-// startMsg ends a source's debounce in a generation.
+// startMsg ends a source's debounce in a generation of engine e.
 type startMsg struct {
+	e   *engine
 	gen uint64
 	src int
 }
@@ -104,8 +109,9 @@ type engine struct {
 	ctx     context.Context
 	ch      chan event
 	search  Search
-	pending int // the generation's sources that have not ended
-	prefix  bool
+	pending int    // the generation's sources that have not ended
+	prefix  bool   // the query is "?", which lists the prefixes
+	used    string // the prefix the query was restricted by, taken off its text
 
 	entries  []entry
 	failures []int // sources, in the order they failed
@@ -114,9 +120,10 @@ type engine struct {
 
 func newEngine(cfg config) *engine { return &engine{cfg: cfg} }
 
-// add registers p, available where a.When holds.
+// add registers p, available where a.When holds. Its name is read once,
+// as one line of display text (0008-MADR A3 item 9).
 func (e *engine) add(p Provider, a Availability) error {
-	src := &source{p: p, name: p.Name()}
+	src := &source{p: p, name: sanitize.Line(p.Name())}
 	if a.When != "" {
 		x, err := when.Parse(a.When)
 		if err != nil {
@@ -199,7 +206,7 @@ func (e *engine) reset() {
 	}
 	e.gen++
 	e.cancel, e.ctx, e.ch = nil, nil, nil
-	e.search, e.pending, e.prefix = Search{}, 0, false
+	e.search, e.pending, e.prefix, e.used = Search{}, 0, false, ""
 	e.entries, e.failures, e.seq = e.entries[:0], nil, 0
 }
 
@@ -229,7 +236,7 @@ func (e *engine) query(text string) tea.Cmd {
 		e.pending++
 		if src.debounce > 0 {
 			gen := e.gen
-			cmds = append(cmds, tea.Tick(src.debounce, func(time.Time) tea.Msg { return startMsg{gen: gen, src: i} }))
+			cmds = append(cmds, tea.Tick(src.debounce, func(time.Time) tea.Msg { return startMsg{e: e, gen: gen, src: i} }))
 			continue
 		}
 		e.launch(i)
@@ -250,6 +257,7 @@ func (e *engine) targets(text *string) []int {
 		}
 		if src.prefix != "" && strings.HasPrefix(*text, src.prefix) {
 			*text = (*text)[len(src.prefix):]
+			e.used = src.prefix
 			return []int{i}
 		}
 		all = append(all, i)
@@ -330,7 +338,7 @@ func (src *source) run(ctx context.Context, st *start, q Search, yield func(Hit)
 func (e *engine) drain() tea.Cmd {
 	gen, ctx, ch, pending := e.gen, e.ctx, e.ch, e.pending
 	return func() tea.Msg {
-		m := hitsMsg{gen: gen}
+		m := hitsMsg{e: e, gen: gen}
 		hits, ends := 0, 0
 		take := func(ev event) {
 			m.events = append(m.events, ev)
@@ -363,15 +371,16 @@ func (e *engine) drain() tea.Cmd {
 }
 
 // update takes the engine's own messages, and returns the next drain while
-// the generation has sources running.
+// the generation has sources running. Another engine's, and another
+// generation's, are dropped.
 func (e *engine) update(msg tea.Msg) tea.Cmd {
 	switch m := msg.(type) {
 	case startMsg:
-		if m.gen == e.gen {
+		if m.e == e && m.gen == e.gen {
 			e.launch(m.src)
 		}
 	case hitsMsg:
-		if m.gen != e.gen {
+		if m.e != e || m.gen != e.gen {
 			return nil
 		}
 		for _, ev := range m.events {
@@ -384,7 +393,10 @@ func (e *engine) update(msg tea.Msg) tea.Cmd {
 	return nil
 }
 
-// take merges one event of the current generation.
+// take merges one event of the current generation. A hit's text fields
+// are made one line of display text first, so that a file name or a title
+// with an escape sequence or a newline draws as one row of what it shows
+// (0008-MADR A3 item 9).
 func (e *engine) take(ev event) {
 	src := e.sources[ev.src]
 	if ev.end {
@@ -396,6 +408,8 @@ func (e *engine) take(ev event) {
 		return
 	}
 	h := ev.hit
+	h.Text, h.Group, h.Help = sanitize.Line(h.Text), sanitize.Line(h.Group), sanitize.Line(h.Help)
+	h.Hint, h.Disabled = sanitize.Line(h.Hint), sanitize.Line(h.Disabled)
 	if h.Group == "" {
 		h.Group = src.name
 	}

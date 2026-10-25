@@ -80,7 +80,7 @@ func (w *Workspace) Push(o Overlay) tea.Cmd {
 			cmds = append(cmds, w.lose(was))
 			was = focusTarget{}
 		}
-		w.removeOverlay(i)
+		cmds = append(cmds, w.removeOverlay(i))
 	}
 	w.overlays = append(w.overlays, o)
 	w.dirty = true
@@ -111,6 +111,15 @@ type closeMsg struct{ id string }
 // item 3).
 func Close(id string) tea.Msg { return closeMsg{id: id} }
 
+// OverlayClosedMsg tells an overlay's pane, through its Update, that the
+// workspace has closed it: by Pop, Close, the esc binding, or a Push of
+// another overlay with its ID. It comes after PaneBlurMsg when the overlay
+// had the keyboard, and is the last message the pane gets as that overlay,
+// so a pane that runs work while it is open, as a picker runs its
+// searches, ends that work here
+// (docs/decisions/0008-MADR-command-palette.md A6).
+type OverlayClosedMsg struct{}
+
 // closeOverlay closes overlay i, moving the keyboard on if it had it.
 func (w *Workspace) closeOverlay(i int) tea.Cmd {
 	was := w.focusTarget()
@@ -119,18 +128,20 @@ func (w *Workspace) closeOverlay(i int) tea.Cmd {
 		cmd = w.lose(was)
 		was = focusTarget{}
 	}
-	w.removeOverlay(i)
-	return tea.Batch(cmd, w.moveFocus(was))
+	closed := w.removeOverlay(i)
+	return tea.Batch(cmd, closed, w.moveFocus(was))
 }
 
-// removeOverlay removes overlay i and forgets its size and its cached
-// views. It sends no message.
-func (w *Workspace) removeOverlay(i int) {
+// removeOverlay sends overlay i OverlayClosedMsg, then removes it and
+// forgets its size and its cached views. It returns the overlay's command.
+func (w *Workspace) removeOverlay(i int) tea.Cmd {
+	cmd := w.updateOverlay(i, OverlayClosedMsg{})
 	id := w.overlays[i].ID
 	w.overlays = slices.Delete(w.overlays, i, i+1)
 	delete(w.osizes, id)
 	w.forget(overlayView, id)
 	w.dirty = true
+	return cmd
 }
 
 // overlayIndex is the position of the open overlay with id, or -1.

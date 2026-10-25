@@ -11,6 +11,16 @@
 // limit, and are de-duplicated by ID. A provider that fails or panics is
 // one muted row naming it; its error goes to the logger, never the screen.
 //
+// A Picker draws it all in a modal overlay of a workspace: an input, a
+// window of the hits with the matched cells underlined, danger badges and
+// key hints, and a help line with a count. Its keys are commands in one
+// keymap with the workspace's: build it with DefaultRules beside
+// workspace.DefaultRules, and register OpenCommand's command, which ctrl+p
+// runs. The picker runs its own moves as a workspace.CommandConsumer, so
+// they take effect in the order their keys were pressed. Accepting a hit
+// runs its Run on the event loop and closes the picker; closing it, by any
+// means, cancels its searches and stops its providers.
+//
 // palette is a Bubble Tea package: a hit's Run returns a tea.Cmd, and the
 // picker is a workspace pane.
 //
