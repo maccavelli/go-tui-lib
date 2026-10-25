@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-10-25
 decision-makers: the repository owner
 consulted: "issues #7, #8, #9 and #10 of this repository's tracker, with their comments; gobble-cli at 5fb6928: docs/decisions/0027-MADR-native-line-editor-word-wrap.md, 0028-MADR-reply-word-wrap.md, 0029-MADR-permission-prompt-layout.md, 0030-MADR-resize-and-performance.md and 0032-MADR-go-tui-lib-integration-boundary.md, with their PLANs, and internal/cli; golang.org/x/term v0.47.0; reedline 0.52.1, inquire 0.9.4, liner v1.2.3 and prompt_toolkit's documentation"
@@ -326,6 +326,9 @@ environment, starting a process or owning the terminal?
 * **F. Change nothing:** gobble keeps its own.
 
 ## Decision Outcome
+
+*Accepted 2026-10-25 by the owner, who committed the record with its
+answers and its PLAN and said "committed, proceed".*
 
 *The owner answered Q1 to Q7 on 2026-10-25 (Owner questions, below):
 each the recommendation but Q5, where the TUI's picker is a palette
@@ -746,6 +749,11 @@ func (t *Transcript) HandleTimeout(now time.Time, idle bool) string // the repri
   `make apicheck` reporting 0 incompatible changes.
 * **A release after each of steps 2, 3, 4 and 6,** `v2.2.0` to `v2.5.0`,
   so gobble takes each component as it lands (Q3).
+* *Note, 2026-10-25, by
+  [0024-MADR-opt-in-and-opt-out-coverage.md](0024-MADR-opt-in-and-opt-out-coverage.md)
+  Q5:* that record's first PLAN releases `v2.2.0` before this record's
+  first step, so these four releases are each the next minor version
+  after it, `v2.3.0` to `v2.6.0` if nothing else is released between.
 
 ### D13. Defaults and their controls
 

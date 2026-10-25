@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in-progress
 date: 2026-10-25
 associated-madr: "0024-MADR-opt-in-and-opt-out-coverage.md"
 ---
@@ -272,3 +272,23 @@ No module is added. `msgcat` imports the standard library alone.
   default changes, so a program that sets no new option sees no change.
 
 ## Execution Record
+
+### Step 1: records
+
+*2026-10-25.* The owner committed the three PLANs and approved this one
+("committed, proceed").
+
+* **Both MADRs are `accepted`,** each with a dated line naming the
+  owner's words, above its record of the answers.
+* **0023-MADR D12** has a dated note: its four releases follow this
+  PLAN's `v2.2.0`, each the next minor version.
+* **AGENTS.md's "API conventions"** gains rule 12, "Defaults are the
+  program's to refuse", worded as 0024-MADR D1, naming
+  `docs/guides/defaults.md`, which Step 3 writes.
+* **`docs/glossary.md`'s "Reserved by accepted records"** lists the type
+  names both MADRs take before they are built: 0023's, by package, and
+  0024's `msgcat.Catalog`, `CatalogFunc`, `MessageID` and `Table`,
+  `command.GatePolicy` and `GatePolicyFunc`, and `palette.Opener`. Each
+  passed `python3 -m tools.verify names` when its record was written.
+* **`docs/README.md`:** both MADRs `accepted`, this PLAN `in-progress`.
+* Records and AGENTS.md only: no source, test, CI or configuration.

@@ -31,9 +31,25 @@ are the only ones; none is added.
 A name an accepted record takes before it is built is listed here, and a
 later record does not reuse it for something else.
 
-None is reserved now: every name
 [0020-MADR-charm-free-cores-glyphs-and-safetext.md](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
-(A1.3, A2.2) reserved is built, as the next section lists.
+(A1.3, A2.2) reserved nothing still unbuilt: every name it reserved is
+built, as the next section lists. Reserved now, each checked with
+`python3 -m tools.verify names` when its record was written:
+
+| Package | Names | Record |
+| :--- | :--- | :--- |
+| `inline` | `Region`, `Reflow`, `Reader` | [0023-MADR](decisions/0023-MADR-line-mode-components.md) D3 |
+| `inline/inlinetest` | `Screen` | 0023-MADR D3 |
+| `ask` | `Question`, `Row`, `Answer`, `Response`, `Asker`, `AskEvent`, `AskEventKind` | 0023-MADR D4 |
+| `pick` | `Chooser`, `Entry`, `PickEvent`, `PickEventKind` | 0023-MADR D5 |
+| `lineedit` | `Composer`, `History`, `MemHistory`, `Completer`, `CompleterFunc`, `EditEvent`, `EditEventKind` | 0023-MADR D6 |
+| `stream` | `Printer`, `Markup`, `Style`, `Scanner`, beside 0009's `Doc` | 0023-MADR D7 |
+| `transcript` | `Transcript` | 0023-MADR D9 |
+| `msgcat` | `Catalog`, `CatalogFunc`, `MessageID`, `Table` | [0024-MADR](decisions/0024-MADR-opt-in-and-opt-out-coverage.md) D9 |
+| `command` | `GatePolicy`, `GatePolicyFunc` | 0024-MADR D4 |
+| `palette` | `Opener` | 0024-MADR D4 |
+
+Each package's options are its `Option`, the deliberate name above.
 
 ## Built from those records
 

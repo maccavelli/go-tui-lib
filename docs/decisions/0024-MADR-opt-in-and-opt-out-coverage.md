@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-10-25
 decision-makers: the repository owner
 consulted: "an audit of every non-test Go file in the public packages at 65d437b, by package group: command, command/commandtea, keymap, keymap/keymaptea, launch, launch/launchtest and when; workspace, palette, theme, glyph, layout and tuitest; termcap, termcap/termcaptea, termcap/termcaptest, termsvc, termsvc/termsvctea, termkey, safetext, fuzzy and internal/sanitize"
@@ -221,6 +221,9 @@ true as it grows, and which of the gaps above close first?
   no API change.
 
 ## Decision Outcome
+
+*Accepted 2026-10-25 by the owner, who committed the record with its
+answers and its PLAN and said "committed, proceed".*
 
 *The owner answered Q1 to Q6 on 2026-10-25 (Owner questions, below):
 each the recommendation but Q1, where a program's text comes from one

@@ -206,6 +206,29 @@ needs an exception says so.
     moves only by a record. It moves to the newest patch of a
     release Go still supports, and the record names the features that need
     it.
+12. **Defaults are the program's to refuse**
+    (`docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md` D1).
+    Everything the library does on a program's behalf has a documented
+    default and a control a program can use without forking:
+    - a key it binds, a command it registers or runs, a query or mode it
+      sends to the terminal, a policy it applies, a goroutine or timer it
+      starts for the program, and text it shows a user: a `Without…`
+      option, a nil or zero value, or a hook that replaces it;
+    - a value a program may legitimately need otherwise, such as a
+      timeout, a size, a cap on the program's own data: a `With…` option,
+      whose zero or negative value keeps the default;
+    - a behaviour added after `v2.1.0` that writes to the terminal, acts on
+      the user's behalf, or runs a program's command: off until a `With…`
+      or `On…` option turns it on, unless its record says why it is on;
+    - every convenience built on a lower layer: that layer exported, so a
+      program does the convenience its own way.
+
+    The floors in `docs/guides/defaults.md` are the exceptions, each with
+    its reason: the process rules, the cleaning of untrusted text, the
+    bounds on untrusted input, grammars and protocols, a command's
+    declared danger and a handler's recovered panic. A record that adds a
+    default lists it there, with its control; `internal/conformance`'s
+    `TestDefaultsInventory` resolves every control the guide names.
 
 ## MADR and PLAN before mutating work
 
