@@ -24,8 +24,8 @@ it was when they were written
 | 0006 | PLAN | [Implement the command registry (`when`, `command`, `command/cli`, and the Cobra and Kong front ends)](decisions/0006-PLAN-command-registry.md) | complete |
 | 0007 | MADR | [Bind keys to command IDs through a context-aware keymap engine, with chords, a leader key and VS Code-format user keymaps](decisions/0007-MADR-keymap-engine.md) | accepted; A1, A2 accepted; A3 recorded; A4–A12 accepted; Q8 answered (A4) |
 | 0007 | PLAN | [Implement the keymap engine](decisions/0007-PLAN-keymap-engine.md) | complete |
-| 0008 | MADR | [Find and run anything from one command palette, built on an in-repository fuzzy matcher and asynchronous, scoped providers](decisions/0008-MADR-command-palette.md) | accepted; A1 accepted; A2 recorded; A3 accepted; A4 item 1 accepted, item 2 open; A5 proposed |
-| 0008 | PLAN | [Implement the command palette and the fuzzy matcher](decisions/0008-PLAN-command-palette.md) | in-progress (Steps 1–4 done; Step 5 waits for A5) |
+| 0008 | MADR | [Find and run anything from one command palette, built on an in-repository fuzzy matcher and asynchronous, scoped providers](decisions/0008-MADR-command-palette.md) | accepted; A1 accepted; A2 recorded; A3 accepted; A4 accepted (item 2 by A5.3); A5 accepted |
+| 0008 | PLAN | [Implement the command palette and the fuzzy matcher](decisions/0008-PLAN-command-palette.md) | in-progress (Steps 1–5 done) |
 | 0009 | MADR | [Stream agent output through a stable-prefix Markdown engine, a frame scheduler, an input filter and a safe-text sanitizer](decisions/0009-MADR-streaming-content-engine.md) | accepted; A1–A3 accepted; A4 recorded; Q9 open |
 | 0009 | PLAN | [Implement the streaming content engine](decisions/0009-PLAN-streaming-content-engine.md) | proposed |
 | 0010 | MADR | [Ship the Cobra, Kong and glamour adapters as nested Go modules, released apart from the root and developed through a committed go.work, with every gate run per module and without the workspace](decisions/0010-MADR-nested-adapter-modules.md) | accepted; A1–A3 accepted; the command adapters superseded by 0012 |
@@ -57,6 +57,9 @@ it was when they were written
 | 0020 | PLAN | [Implement Charm-free cores of `termcap`, `termsvc`, `command` and `keymap`, the `termkey` decoder, the status and meter glyphs, and `safetext`](decisions/0020-PLAN-charm-free-cores-glyphs-and-safetext.md) | complete (`v1.13.0` and `v2.0.0` tagged) |
 | 0021 | MADR | [Hold `termkey` to the standard library and `internal/enum` with a closure test and a strict depguard rule](decisions/0021-MADR-termkey-closure-gate.md) | accepted; A1 accepted |
 | 0021 | PLAN | [Implement: hold `termkey` to the standard library and `internal/enum`](decisions/0021-PLAN-termkey-closure-gate.md) | complete |
+
+| 0022 | MADR | [Align docs-only CI and disclosure gates](decisions/0022-MADR-align-docs-ci-and-disclosure-gates.md) | proposed |
+| 0022 | PLAN | [Implement aligned docs-only CI and disclosure gates](decisions/0022-PLAN-align-docs-ci-and-disclosure-gates.md) | proposed |
 
 ## I want to…
 

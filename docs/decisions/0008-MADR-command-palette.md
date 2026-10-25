@@ -913,13 +913,15 @@ Found in Step 3 (its D1). The Context's "`Method` has `StringWidth` and
    with `Method.StringWidth`.
 2. **Where the palette cuts a highlighted row:** open. Step 6 does not
    start until it is decided, by an amendment of this item. *A5.3,
-   2026-10-25, proposed: the palette cuts it with the repository's
+   2026-10-25, accepted: the palette cuts it with the repository's
    cutter.*
 
-### A5 (2026-10-25): the palette under `v2`, its query type's name, and where highlights are cut (proposed)
+### A5 (2026-10-25): the palette under `v2`, its query type's name, and where highlights are cut
 
-*Status: proposed. It decides A4 item 2, renames A2's `Input`, and adopts
-`v2.0.0`'s facts; nothing else in §1 to §8 or A1 to A4 changes.*
+*Status: accepted, 2026-10-25, by the owner ("committed, proceed with rcommendations"), with A5.2's `Search`
+and A5.3's cut by the repository's cutter. It decides A4 item 2, renames
+A2's `Input`, and adopts `v2.0.0`'s facts; nothing else in §1 to §8 or A1
+to A4 changes.*
 
 **Found,** at `d5509df`, before
 [0008-PLAN-command-palette.md](0008-PLAN-command-palette.md) Step 5:

@@ -17,6 +17,7 @@ import (
 	"github.com/maccavelli/go-tui-lib/v2/keymap"
 	"github.com/maccavelli/go-tui-lib/v2/launch"
 	"github.com/maccavelli/go-tui-lib/v2/layout"
+	"github.com/maccavelli/go-tui-lib/v2/palette"
 	"github.com/maccavelli/go-tui-lib/v2/termcap"
 	"github.com/maccavelli/go-tui-lib/v2/termkey"
 	"github.com/maccavelli/go-tui-lib/v2/termsvc"
@@ -55,6 +56,7 @@ var enums = map[string]func(int64) any{
 	"layout.Axis":            as[layout.Axis],
 	"layout.SizeKind":        as[layout.SizeKind],
 	"layout.Span":            as[layout.Span],
+	"palette.Grouping":       as[palette.Grouping],
 	"termcap.Brand":          as[termcap.Brand],
 	"termcap.ColorProfile":   as[termcap.ColorProfile],
 	"termcap.Disposition":    as[termcap.Disposition],

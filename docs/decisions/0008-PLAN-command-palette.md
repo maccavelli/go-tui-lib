@@ -1,6 +1,6 @@
 ---
 status: in-progress
-date: 2026-10-11
+date: 2026-10-25
 associated-madr: "0008-MADR-command-palette.md"
 ---
 # Implement the command palette and the fuzzy matcher
@@ -46,11 +46,11 @@ to 4 was tagged `v1.13.0`, in place of `v0.13.0`, and kept; there is no
 `v0.13.0`. Where this PLAN says `v0.13.0`, read `v1.13.0`. Step 9's
 release follows 0020's release 2, whose version 0020-MADR A4.1 decides.
 
-**Revision, 2026-10-25, for MADR amendment A5 (proposed).** Steps 1 to 4
+**Revision, 2026-10-25, for MADR amendment A5, accepted the same day with
+both recommendations ("committed, proceed with rcommendations").** Steps 1 to 4
 stand. Steps 5 to 9 take `v2.0.0`'s names and the release `v2.1.0`, A5.2's
 `Search` for A2's `Input`, and A5.3's cut in Step 6; each change is
-annotated where it falls. Step 5 waits for A5's answers and the owner's
-approval.
+annotated where it falls. Step 5 is approved.
 
 ## Goal
 
@@ -350,7 +350,7 @@ and this repository's `workspace`, `command`, `when`, `keymap`, `theme`,
 width whatever the workspace measures with. Where the palette cuts a
 highlighted row is decided by an amendment of MADR A4 item 2 before this
 step starts, and this step is amended to match. *2026-10-25, MADR A5.3,
-proposed:* the palette cuts it itself, piece by piece, with
+accepted:* the palette cuts it itself, piece by piece, with
 `internal/sanitize`'s `Truncate` in `w.WidthMethod()`, and renders each
 piece with its style; `lipgloss.StyleRanges` is not used. The step's
 tests gain: each highlight covers the cells `fuzzy.Cells` gives, under
@@ -776,3 +776,119 @@ at Step 9, with the index's.
   `release-check` clean (240 tracked files on macOS; 242 on the hosts,
   whose copies' index tracks the two new files).
 * **Docs:** `docs/glossary.md` gains `Index` and `IndexOption` under `fuzzy`.
+
+### Step 5: `palette`, the engine
+
+*2026-10-25.* The owner accepted MADR A5 with both recommendations and
+approved this step ("committed, proceed with rcommendations").
+
+* **`palette`** is new, a Bubble Tea package
+  (`palette/doc.go`, with its stability line):
+  * `palette/provider.go`: `Provider` (`Name`, `Search(ctx, Search, yield)`),
+    the optional `Discoverer`, `Starter`, `Stopper`, `Prefixed` and
+    `Debouncer`; `Search` (`Text`, `Matcher`, `WhenContext`, A5.2); `Hit`
+    with the twelve fields this step lists, `Run func(jsontext.Value)
+    tea.Cmd` among them; `Availability` (`When`).
+  * `palette/options.go`: `Grouping` (`ByScore`, `ByProvider`; tokens
+    `score` and `provider`) through `internal/enum`'s `Names`;
+    `DefaultLimit` (200); `Option`, an interface with an unexported method;
+    `WithLimit`, `WithGrouping` and `WithLogger(slog.Handler)`.
+  * `palette/engine.go`, unexported: the engine Step 6's `Picker` wraps.
+    Each keystroke cancels the last generation's context, counts a new
+    generation, compiles one `fuzzy.Matcher`, and starts each target
+    provider's search on a goroutine, or a `tea.Tick` carrying the
+    generation for a provider with a debounce. Searches send into a
+    channel of 64. The drain command waits for the first event, then takes
+    what arrives within 16 ms, up to 64 hits, and returns
+    `hitsMsg{gen, events}`. `update` drops a batch or a debounce of another
+    generation, merges hits into a top-k kept in order under the limit,
+    de-duplicates by `ID`, and issues the next drain while searches run.
+    A search's error or panic is logged to the `slog.Handler` and is one
+    row naming the provider.
+* **Choices made within MADR §4.** None changes a decision; they are
+  listed for Step 6, which builds on them:
+  1. `Start` runs once per opening of the picker, on a goroutine of its
+     own, with a context that closing cancels; each search waits for it
+     or for its own cancellation. The first version used `sync.Once`,
+     which held a second search on a mutex behind a slow `Start`,
+     deaf to its own cancellation. `TestNoLeaks` hung on it: synctest does
+     not count a mutex wait as durable, so `synctest.Wait` never returned.
+  2. `Stop` is called off the event loop, after the opening's searches and
+     `Start`s have returned, and only for a provider used in that opening.
+     A panic in it is logged.
+  3. A drain also returns as soon as every search it waits for has ended,
+     so the last batch does not wait out its frame.
+  4. Without a prefix, every available provider searches, prefixed ones
+     too. A prefix belongs to an available provider only.
+  5. An empty query asks the discoverers alone. `Search` is never called
+     with empty text.
+  6. A hit with an empty `ID` is never de-duplicated.
+  7. Failure rows follow the hits, outside the limit, in the order the
+     failures arrived. `?`'s rows carry the prefix as `Text` and the
+     provider's name as `Group`.
+  8. Registration returns a `When` that does not parse as an error, and
+     reads `Prefix` and `Debounce` once. `Register`'s exported signature is
+     Step 6's.
+* **Tests** (`palette/engine_test.go`), each inside `testing/synctest`
+  through a loop that plays Bubble Tea's, with fake providers:
+  `TestStaleHitsNeverAppear`; `TestBatches` (`64`: 200 hits arrive in
+  batches of at most 64; `frame`: a lone hit within 16 ms);
+  `TestFailuresAreContained` (an error, a panic and a failed `Start`: three
+  rows naming the providers, none showing the error, each error in the log,
+  and the good provider's hits); `TestNoLeaks` (the keystroke cancels the
+  last search, closing cancels a `Start` still running and stops the used
+  provider and not the unused one; `synctest.Test` returns, and the
+  `goroutineleak` profile, taken after it, reports `total 0`);
+  `TestAvailability`; `TestPrefixes`; `TestDebounce`; `TestDuplicates`;
+  `TestLimit` (checked after every message); `TestGrouping`;
+  `TestStartAndDiscover`. `go test -race -count=200 ./palette/` is clean.
+* **Conformance:** `TestEveryEnumRoundTrips` failed on the new enum
+  ("palette.Grouping is an enum the table lacks") before the table gained
+  `palette.Grouping`.
+* **Mutations,** through `python3 -m tools.verify mutate` on scratch
+  copies, 21 killed of 21. The PLAN's five come first:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | `update` ignores a batch's generation | `TestStaleHitsNeverAppear`: `rows ["a" "b"]; want only b` |
+  | a keystroke does not cancel the last search | `TestNoLeaks`: "the search for a was not cancelled by the next keystroke" |
+  | a provider's panic is not recovered | `TestFailuresAreContained`: the test binary panics, `boom` |
+  | de-duplication keeps the first hit | `TestDuplicates`: `x:subsequence/1`, want `x:exact/5` |
+  | the drain ignores the 64-hit bound | `TestBatches`: `batches [200]` |
+  | a stale debounce still launches | `TestDebounce`: `40ms in, searched ["ab"]` |
+  | the kept hits are not cut to the limit | `TestLimit`: "13 hits kept; the limit is 5" |
+  | closing does not cancel the opening's context | `TestNoLeaks`: synctest's "deadlock: main bubble goroutine has exited but blocked goroutines remain" |
+  | closing stops a provider that was not used | `TestNoLeaks`: "stopped 1 and 1 times" |
+  | every search starts the provider afresh | `TestStartAndDiscover`: "started 2 times in one opening" |
+  | availability is ignored | `TestAvailability`: `editor searched ["x" "y"]` |
+  | a prefix is not taken off the query | `TestPrefixes`: `commands asked ">ab"` |
+  | `?` searches instead of listing the prefixes | `TestPrefixes`: `? lists []` |
+  | the drain ignores its frame | `TestBatches`: "after 16ms: rows []" |
+  | a failure is not logged | `TestFailuresAreContained`: the log lacks `provider=bad` |
+  | a hit's group does not default to its provider | `TestGrouping`: `b1's group ""` |
+  | `ByProvider` orders by score | `TestGrouping`: `provider: rows ["b1" "a1" "b2" "a2"]` |
+  | an empty query skips the discoverers | `TestStartAndDiscover`: `an empty query: rows []` |
+  | the drain waits out its frame after every search ended | `TestDuplicates`: `rows []` |
+  | the enums table lacks `palette.Grouping` | `TestEveryEnumRoundTrips` |
+  | a goroutine leaks beside `TestNoLeaks` | `noLeaks`: "leaked goroutines" |
+
+  *2026-10-25:* the first run left "closing does not cancel the opening's
+  context" alive. Closing also cancels the generation's context, so only
+  a running `Start` could tell the two apart. `TestNoLeaks` gained a
+  provider whose `Start` runs until closing, and the mutation is now
+  killed.
+* **Names:** `python3 -m tools.verify names` over the eleven exported
+  types: "11 planned name(s), clean". `docs/glossary.md` gains two
+  `palette` rows.
+* **Gates,** through `tools.verify` on the final tree: macOS, over the
+  step's six Go files and four records, "gates: 19 passed, 0 failed, 0
+  skipped"; the Linux host and the Windows host each "gates: 18 passed,
+  0 failed, 1 skipped", the skip being `gofmt`, which a remote run is given
+  no files for. `release-check` is clean on each: 309 tracked files on
+  macOS, where `palette/` is untracked, and 314 on the hosts, whose
+  copies' index tracks its five files. `make lint` reports "0 issues" for
+  `GOOS=linux`, `darwin` and `windows`. The identifier scan of the change
+  and the untracked files is clean.
+* **Not done here, by the PLAN:** `Ranges` are filled for drawn rows, and
+  failure rows are drawn muted, by Step 6's pane. `Register`, `Open` and
+  the `Picker` are also Step 6's.
