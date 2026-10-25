@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-10-25
 decision-makers: the repository owner
 consulted: "0020-MADR-charm-free-cores-glyphs-and-safetext.md D7, D9 and D11; 0020-PLAN-charm-free-cores-glyphs-and-safetext.md, the Step 11 record; this repository at 81177eb; golangci-lint 2.14.0 and its depguard"

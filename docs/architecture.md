@@ -289,6 +289,10 @@ docs/
   checks what they link through other packages
   ([0020-MADR](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
   D11).
+- **Kept to the standard library and `internal/enum` by `depguard`'s
+  `termkeystd`:** `termkey`, in its non-test files, as `internal/conformance`
+  checks its whole closure
+  ([0021-MADR](decisions/0021-MADR-termkey-closure-gate.md)).
 
 ## Tooling
 
@@ -339,6 +343,11 @@ docs/
     closure with `go list -deps`, for `GOOS=linux`, `darwin` and
     `windows`, and fails on any Charm module but `x/ansi`, naming the
     shortest import chain to it; `cores` names the packages.
+  - `TestNarrowClosures` does the same for each core whose record
+    allows less, `termkey` today, and fails on any package outside
+    the standard library, the core and what `narrow` allows it, on an
+    entry `cores` does not list, and on an allowance its closure no
+    longer holds ([0021-MADR](decisions/0021-MADR-termkey-closure-gate.md)).
   - It reads each package's files for the host's `GOOS`; CI's three
     operating systems cover the rest.
 - **`make fuzz`** fuzzes, in every module, each fuzz target of every

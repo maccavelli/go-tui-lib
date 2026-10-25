@@ -68,11 +68,13 @@ func TestCharmPredicate(t *testing.T) {
 	}
 }
 
-// depGraph is one go list -deps run: each package's direct imports, and
-// the packages go list could not load, with its error.
+// depGraph is one go list -deps run: each package's direct imports,
+// whether it is in the standard library, and the packages go list could
+// not load, with its error.
 type depGraph struct {
-	imports map[string][]string
-	broken  map[string]string
+	imports  map[string][]string
+	standard map[string]bool
+	broken   map[string]string
 }
 
 // listDeps runs go list -e -deps over pkgs, directories relative to root,
@@ -80,7 +82,7 @@ type depGraph struct {
 // it prints: every package in the closure, test files left out.
 func listDeps(t *testing.T, root, goos string, pkgs []string) depGraph {
 	t.Helper()
-	args := []string{"list", "-e", "-deps", "-f", "{{.ImportPath}}\t{{if .Error}}{{.Error}}{{end}}\t{{join .Imports \" \"}}"}
+	args := []string{"list", "-e", "-deps", "-f", "{{.ImportPath}}\t{{if .Error}}{{.Error}}{{end}}\t{{.Standard}}\t{{join .Imports \" \"}}"}
 	for _, p := range pkgs {
 		args = append(args, "./"+p)
 	}
@@ -94,35 +96,37 @@ func listDeps(t *testing.T, root, goos string, pkgs []string) depGraph {
 		}
 		t.Fatalf("go list for GOOS=%s: %v", goos, err)
 	}
-	g := depGraph{imports: map[string][]string{}, broken: map[string]string{}}
+	g := depGraph{imports: map[string][]string{}, standard: map[string]bool{}, broken: map[string]string{}}
 	for line := range strings.Lines(string(out)) {
-		fields := strings.SplitN(strings.TrimRight(line, "\r\n"), "\t", 3)
-		if len(fields) != 3 {
+		fields := strings.SplitN(strings.TrimRight(line, "\r\n"), "\t", 4)
+		if len(fields) != 4 {
 			t.Fatalf("go list for GOOS=%s printed %q", goos, line)
 		}
-		path, failure, imports := fields[0], fields[1], fields[2]
+		path, failure, standard, imports := fields[0], fields[1], fields[2], fields[3]
 		if failure != "" {
 			g.broken[path] = failure
 			continue
 		}
 		g.imports[path] = strings.Fields(imports)
+		g.standard[path] = standard == "true"
 	}
 	return g
 }
 
-// charmChains is, for each Charm package from reaches, the shortest import
-// chain to it, from first: a breadth-first walk over imports in lexical
-// order, so that of two chains of one length the lexically first is kept.
-// The walk does not go on through a Charm package, so each chain names the
-// Charm package a non-Charm one imports, not the ones beneath it.
-func charmChains(g depGraph, from string) [][]string {
+// chains is, for each package from reaches that stop is true for, the
+// shortest import chain to it, from first: a breadth-first walk over
+// imports in lexical order, so that of two chains of one length the
+// lexically first is kept. The walk does not go on through a package stop
+// is true for, so each chain names the one a package stop is false for
+// imports, not the ones beneath it.
+func chains(g depGraph, from string, stop func(string) bool) [][]string {
 	prev := map[string]string{from: ""}
 	queue := []string{from}
 	var hits []string
 	for len(queue) > 0 {
 		p := queue[0]
 		queue = queue[1:]
-		if charm(p) {
+		if stop(p) {
 			hits = append(hits, p)
 			continue
 		}
@@ -166,7 +170,7 @@ func TestCoresAreCharmFree(t *testing.T) {
 					t.Errorf("cores lists %s, which go list does not find (%s)", core, g.broken["./"+core])
 					continue
 				}
-				for _, chain := range charmChains(g, path) {
+				for _, chain := range chains(g, path, charm) {
 					names := make([]string, len(chain))
 					for i, p := range chain {
 						names[i] = short(p)
@@ -175,5 +179,117 @@ func TestCoresAreCharmFree(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// narrowCore is a core whose record allows a narrower closure than the
+// cores' rule: the standard library, the core, and the packages of this
+// module it names, by directory relative to the repository root.
+type narrowCore struct {
+	core   string
+	allow  []string
+	record string
+}
+
+// narrow is every core with a narrower rule
+// (docs/decisions/0021-MADR-termkey-closure-gate.md N1). A core joins by
+// the record that states its rule, with a depguard rule beside it that
+// allows the same, as termkeystd does termkey's (N4).
+var narrow = []narrowCore{
+	{core: "termkey", allow: []string{"internal/enum"}, record: "0020-MADR D7, 0021-MADR N1"},
+}
+
+// strayFrom reports, for g, whether a package is one a narrow core may not
+// link: not in the standard library, and not one of allowed.
+func strayFrom(g depGraph, allowed map[string]bool) func(string) bool {
+	return func(p string) bool { return !g.standard[p] && !allowed[p] }
+}
+
+// closure is every package from reaches in g, from included.
+func closure(g depGraph, from string) map[string]bool {
+	seen := map[string]bool{from: true}
+	for queue := []string{from}; len(queue) > 0; queue = queue[1:] {
+		for _, next := range g.imports[queue[0]] {
+			if !seen[next] {
+				seen[next] = true
+				queue = append(queue, next)
+			}
+		}
+	}
+	return seen
+}
+
+// TestNarrowClosures fails when a narrow core's non-test closure, for any
+// of charmGOOS, holds a package its record does not allow, naming the core,
+// the package and the shortest chain to it; when narrow lists a package
+// cores does not, or go list does not find; and when it allows a package
+// the closure does not hold (0021-MADR N2).
+func TestNarrowClosures(t *testing.T) {
+	root := repoRoot(t)
+	mod := modulePath(t, root)
+	short := func(p string) string { return strings.TrimPrefix(p, mod+"/") }
+	dirs := make([]string, 0, len(narrow))
+	for _, n := range narrow {
+		if !slices.Contains(cores, n.core) {
+			t.Errorf("narrow lists %s, which cores does not", n.core)
+		}
+		dirs = append(dirs, n.core)
+	}
+	for _, goos := range charmGOOS {
+		t.Run(goos, func(t *testing.T) {
+			g := listDeps(t, root, goos, dirs)
+			for _, n := range narrow {
+				path := mod + "/" + n.core
+				if _, ok := g.imports[path]; !ok {
+					t.Errorf("narrow lists %s, which go list does not find (%s)", n.core, g.broken["./"+n.core])
+					continue
+				}
+				allowed := map[string]bool{path: true}
+				for _, a := range n.allow {
+					allowed[mod+"/"+a] = true
+				}
+				for _, chain := range chains(g, path, strayFrom(g, allowed)) {
+					names := make([]string, len(chain))
+					for i, p := range chain {
+						names[i] = short(p)
+					}
+					t.Errorf("%s (GOOS=%s) links %s, which %s does not allow: %s",
+						n.core, goos, chain[len(chain)-1], n.record, strings.Join(names, " → "))
+				}
+				held := closure(g, path)
+				for _, a := range n.allow {
+					if !held[mod+"/"+a] {
+						t.Errorf("narrow allows %s for %s, which its closure does not hold (GOOS=%s)", a, n.core, goos)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestNarrowChains: over a graph of a core, a standard package, an allowed
+// one and two stray ones, the walk with the narrow predicate gives the
+// chain to each stray package and stops there, and passes through the
+// standard and the allowed packages.
+func TestNarrowChains(t *testing.T) {
+	g := depGraph{
+		imports: map[string][]string{
+			"m/core": {"fmt", "m/ok", "m/bad"},
+			"fmt":    {"io"},
+			"io":     nil,
+			"m/ok":   {"x/mod"},
+			"m/bad":  {"m/deep"},
+			"m/deep": nil,
+			"x/mod":  nil,
+		},
+		standard: map[string]bool{"fmt": true, "io": true},
+	}
+	got := chains(g, "m/core", strayFrom(g, map[string]bool{"m/core": true, "m/ok": true}))
+	want := [][]string{{"m/core", "m/bad"}, {"m/core", "m/ok", "x/mod"}}
+	if !slices.EqualFunc(got, want, slices.Equal[[]string]) {
+		t.Errorf("chains = %q, want %q", got, want)
+	}
+	if held := closure(g, "m/core"); len(held) != 7 || !held["m/deep"] {
+		t.Errorf("closure = %v, want all seven packages", held)
 	}
 }

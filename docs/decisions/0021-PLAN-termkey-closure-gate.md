@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: complete
 date: 2026-10-25
 associated-madr: "0021-MADR-termkey-closure-gate.md"
 ---
@@ -185,4 +185,76 @@ scan; the record.
 
 ## Execution Record
 
-Nothing executed yet.
+### Step 1: records (2026-10-25)
+
+* The pair and its index rows, committed by the owner as `8d2cb67`.
+* **Approval:** the owner, 2026-10-25: "committed proceed". The MADR
+  is `accepted`; this PLAN is `in-progress`.
+
+### Step 2: the gate (2026-10-25)
+
+* **`internal/conformance/charmfree_test.go`,** as the step says:
+  * `depGraph` gains `standard`, which `listDeps` fills from a fourth
+    field, `{{.Standard}}`;
+  * `charmChains` is `chains(g, from, stop)`, and `TestCoresAreCharmFree`
+    calls it with `charm`, its messages unchanged;
+  * `narrowCore`, `narrow` (one entry: `termkey`, allowing
+    `internal/enum`, by "0020-MADR D7, 0021-MADR N1"), `strayFrom`, the
+    narrow predicate, and `closure`;
+  * `TestNarrowClosures` and `TestNarrowChains`.
+* **`.golangci.yml`:** `termkeystd`, after `charmfree`, with its comment,
+  as the step gives it.
+* **`AGENTS.md`,** "Dependencies": the sentence on `termkey`'s rule.
+  **`docs/architecture.md`:** a bullet beside `charmfree`'s in the
+  depguard list, and a Tooling bullet on `TestNarrowClosures`.
+  **`docs/README.md`:** the rows' statuses.
+* **Checks:**
+  * `GOWORK=off go test -count=1 -v -run
+    'TestNarrow|TestCoresAreCharmFree|TestCharmPredicate'
+    ./internal/conformance/`: `PASS` for `TestCharmPredicate`,
+    `TestCoresAreCharmFree` (linux, darwin, windows),
+    `TestNarrowClosures` (linux, darwin, windows) and `TestNarrowChains`;
+  * `make lint`: `go fix -diff` empty, and `0 issues.` for linux, darwin
+    and windows, `termkeystd` among the rules;
+  * `markdownlint-cli2` over `AGENTS.md`, `architecture.md` and the index:
+    "0 issues".
+* **Mutations,** each on a fresh copy. Twelve that a check must kill, all
+  killed by the check named; and two that a check must let through, both
+  let through, which show what each gate alone would miss:
+
+  | Mutation | Seen by |
+  | :--- | :--- |
+  | 21.1 termkey imports x/ansi (TestNarrowClosures) | `charmfree_test.go:256: termkey (GOOS=linux) links github.com/charmbracelet/x/ansi, which 0020-MADR D7, 0021-MADR N1 does not allow: termkey → github.com/charmbracelet/x/a…` |
+  | 21.1p the same: TestCoresAreCharmFree passes, the gap the step closes | `SURVIVED (exit 0)` |
+  | 21.2 the same, refused by depguard's termkeystd, and not by charmfree | `termkey/key.go:6:2: import 'github.com/charmbracelet/x/ansi' is not allowed from list 'termkeystd' (depguard)`, the one depguard issue |
+  | 21.3 internal/enum imports x/ansi (TestNarrowClosures) | `charmfree_test.go:256: termkey (GOOS=linux) links github.com/charmbracelet/x/ansi, which 0020-MADR D7, 0021-MADR N1 does not allow: termkey → internal/enum → github.com/c…` |
+  | 21.3p the same: golangci-lint over termkey passes, why the closure test is needed | `0 issues.`, `SURVIVED (exit 0)` |
+  | 21.4 termkey imports glyph (TestNarrowClosures) | `charmfree_test.go:256: termkey (GOOS=linux) links github.com/maccavelli/go-tui-lib/v2/glyph, which 0020-MADR D7, 0021-MADR N1 does not allow: termkey → glyph` |
+  | 21.4b the same, refused by depguard's termkeystd | `termkey/key.go:6:2: import 'github.com/maccavelli/go-tui-lib/v2/glyph' is not allowed from list 'termkeystd' (depguard)` |
+  | 21.5 narrow names termkeys (TestNarrowClosures) | `charmfree_test.go:234: narrow lists termkeys, which cores does not` |
+  | 21.6 narrow allows glyph too (TestNarrowClosures) | `charmfree_test.go:262: narrow allows glyph for termkey, which its closure does not hold (GOOS=linux)` |
+  | 21.7 the narrow predicate takes every package for standard (TestNarrowChains) | `charmfree_test.go:290: chains = [], want [["m/core" "m/bad"] ["m/core" "m/ok" "x/mod"]]` |
+  | 21.8 the walk goes on past a stopping package (TestNarrowChains) | `charmfree_test.go:289: chains = [["m/core" "m/bad"] ["m/core" "m/bad" "m/deep"] ["m/core" "m/ok" "x/mod"]], want [["m/core" "m/bad"] ["m/core" "m/ok" "x/mod"]]` |
+  | 21.9 closure holds only its start (TestNarrowChains) | `charmfree_test.go:293: closure = map[m/core:true], want all seven packages` |
+  | 21.9b the same, seen by TestNarrowClosures as a stale allowance | `charmfree_test.go:262: narrow allows internal/enum for termkey, which its closure does not hold (GOOS=linux)` |
+  | 21.10 listDeps reads no package as standard (TestNarrowClosures) | `charmfree_test.go:256: termkey (GOOS=linux) links bytes, which 0020-MADR D7, 0021-MADR N1 does not allow: termkey → bytes` |
+
+  21.9, 21.9b and 21.10 are beyond the step's eight, so that `closure` and
+  the `.Standard` field, which the step adds, are seen failing too. The
+  depguard lines of 21.2 and 21.4b were read from their kept copies; each
+  copy also reports its mutation's own `unused` placeholder.
+* **Gates,** `python3 -m tools.verify gates` over the step's seven files,
+  nothing skipped: macOS `gates: 19 passed, 0 failed, 0 skipped in 575s`; the Linux host
+  `gates: 19 passed, 0 failed, 0 skipped in 1001s`; the Windows host
+  `gates: 19 passed, 0 failed, 0 skipped in 1827s`. `release-check` is
+  "309 file(s) clean" on each, with `apicheck` (no incompatible change)
+  and the examples gate.
+* **Identifiers:** `python3 -m tools.verify scan`: `scan: clean (5 pattern(s))`.
+* **CI on `81177eb`,** 0020-PLAN's close-out, passed (`modules`, `gates`,
+  and `test` on three systems): the first run whose API gate took
+  `v2.0.0` as its base, with the emptied allow-list.
+* **Not done here:** nothing of this PLAN's. `safetext`'s rule stays out
+  of scope (0021-MADR N5). Nothing is tagged: the step changes no exported
+  name.
+* **The PLAN is `complete`:** each item of Verification is met, as
+  above. The owner commits the step.
