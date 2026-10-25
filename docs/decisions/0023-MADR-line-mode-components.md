@@ -1,0 +1,928 @@
+---
+status: proposed
+date: 2026-10-25
+decision-makers: the repository owner
+consulted: "issues #7, #8, #9 and #10 of this repository's tracker, with their comments; gobble-cli at 5fb6928: docs/decisions/0027-MADR-native-line-editor-word-wrap.md, 0028-MADR-reply-word-wrap.md, 0029-MADR-permission-prompt-layout.md, 0030-MADR-resize-and-performance.md and 0032-MADR-go-tui-lib-integration-boundary.md, with their PLANs, and internal/cli; golang.org/x/term v0.47.0; reedline 0.52.1, inquire 0.9.4, liner v1.2.3 and prompt_toolkit's documentation"
+informed: gobble-cli, through issues #7 to #10
+---
+# Give a line-mode CLI an inline question, a picker, a composer and a streamed transcript, as I/O-free Charm-free cores on one live region, with their Bubble Tea forms in sub-packages
+
+## Context and Problem Statement
+
+On 2026-10-25 the owner asked: "let's work through the open issues.
+research the codebase, analyze the 7-10 issue requested items. determine
+the most go-native, idiomatic, 1.27.3 compatible, detailed, and
+comprehensive way to implement them. present findings as an madr for
+review."
+
+Issues #7 to #10 come from one decision in another repository, as #2 to
+#6, #11 and #12 did
+([0020-MADR-charm-free-cores-glyphs-and-safetext.md](0020-MADR-charm-free-cores-glyphs-and-safetext.md)).
+gobble-cli `docs/decisions/0032-MADR-go-tui-lib-integration-boundary.md`
+lets gobble's native line-mode CLI import a go-tui-lib package only when
+its whole import closure holds no Charm module but `x/ansi` (its D1 and
+A1.1). gobble builds no copy of what go-tui-lib does: it waits, and files
+what it needs here (its D3, D5). Each issue's first comment records the
+A1 relaxation: the line-mode form "may measure, wrap and clean with
+`x/ansi` and `internal/sanitize`", and links no Bubble Tea, Bubbles, Lip
+Gloss, `colorprofile` or `ultraviolet`.
+
+Every fact below about this repository was read on 2026-10-25 at
+`65d437b`; every fact about gobble at gobble-cli `5fb6928`, with its path.
+
+### What the four issues ask
+
+| Issue | Asks for | gobble today | gobble's record |
+| :--- | :--- | :--- | :--- |
+| #7 | an inline question: a wrapped title, notes, rows of keyed options never split, a reason read after a key, the answer echoed; laid out as a pure function of the question and the width; keys read over an `io.Reader`; in the TUI too | one line, `permissionLine` (`internal/cli/permission.go:61-94`), which wraps mid-word | `0029-MADR-permission-prompt-layout.md` D1, D2, D5, D6; its PLAN's P2, the layout, is stopped to wait for #7 (`0029-PLAN-permission-prompt-layout.md:163-168`) |
+| #8 | an inline filterable picker: type to filter with the palette's matcher, arrows, Enter, Escape, a few rows tall, redrawn in place, the choice left in scrollback as one line; for `/model` and sessions | `/model` answers as Markdown tables streamed as a reply (`internal/acpserver/choice.go:297-368`); sessions are chosen by `-c` or `--session`, by id or unique prefix (`internal/cli/sessions.go:126-174`); there is no `/resume` | `0032-MADR-go-tui-lib-integration-boundary.md` D4 |
+| #9 | a composer: the line in whole words to the width, a multi-row line redrawn by its changed rows only, history, bracketed paste, an external editor, a resize redrawn by how the terminal re-wraps, a bytes-per-key budget; sharing stdin; never closing a Windows console handle while a read is pending | `internal/cli/editor`, about 1,800 lines | `0027-MADR-native-line-editor-word-wrap.md`, `0030-MADR-resize-and-performance.md` |
+| #10 | a transcript: a reply's Markdown styled and wrapped at whole words as it streams, code, tables and long words kept whole; on a resize the conversation, bounded in bytes, drawn again at the new width once resizing settles | `internal/cli/render`, `internal/cli/transcript.go`, `internal/cli/view.go` | `0028-MADR-reply-word-wrap.md`, `0030-MADR-resize-and-performance.md` |
+
+### What this repository has
+
+* **The Charm-free cores** are the list `TestCoresAreCharmFree` checks
+  (`internal/conformance/charmfree_test.go`): `command`, `fuzzy`,
+  `glyph`, `internal/enum`, `internal/sanitize`, `keymap`, `layout`,
+  `safetext`, `termcap`, `termkey`, `termsvc` and `when`. Every part a
+  line-mode component needs is among them:
+  * **keys:** `termkey.Decoder` reads bytes as keys, pastes and unknown
+    sequences, with no goroutine and no clock; it holds a lone `ESC` and
+    says so with `Pending`, and the host calls `Flush` after
+    `DefaultEscTimeout`, 50 ms. It reads the legacy CSI and SS3 keys,
+    xterm's modifier parameter and modifyOtherKeys, the Kitty protocol and
+    bracketed paste (0020-MADR D7);
+  * **bindings:** `keymap`'s `Dispatcher` takes `termkey` keys and time
+    (`Key`, `Expire`), and `DefaultRules`-style defaults bind command IDs
+    in scopes;
+  * **text:** `safetext` and `internal/sanitize` (`Line`, `Truncate`, never
+    wider than asked); `x/ansi`'s `StringWidth`, `Wordwrap`, `Wrap`,
+    `Hardwrap` and `Truncate`, each with a `Wc` form, and its `Method`,
+    `WcWidth` or `GraphemeWidth`;
+  * **ranking:** `fuzzy.Matcher` and `Rank`, `fuzzy.Index` for large
+    lists, `fuzzy.Cells` for highlights;
+  * **glyphs:** `glyph.Set`, with `Prompt`, `Mask`, `Focus`, `Ellipsis`,
+    `BadgeOpen` and `BadgeClose`, `Done`, `Failed`, `Running`, `Pending`;
+  * **the terminal's facts:** `termcap.Probe`, an engine that does no I/O
+    (0020-MADR A2), and `ParseReply`.
+* **The I/O-free engine is this repository's form for a terminal
+  protocol.** 0020-MADR A2.3's eight rules, for `termcap.Probe`: no I/O,
+  no clock, no goroutine; time in, a deadline out; events pulled from a
+  struct with a `Kind`, and a host ignores a kind it does not know; an
+  event that needs the host to act only after the host opts in; fields
+  only grow; no dependency type where one of the repository's own will
+  do; strings out, never a shared buffer; one goroutine drives it.
+* **What a line-mode CLI cannot use today:**
+  * `palette` is a Bubble Tea package: `Hit.Run` is
+    `func(jsontext.Value) tea.Cmd` (`palette/provider.go:87`), and its
+    picker is a workspace pane;
+  * `stream`, as accepted in
+    [0009-MADR-streaming-content-engine.md](0009-MADR-streaming-content-engine.md)
+    §1, imports `frame`, which imports Bubble Tea, and `workspace`; it is
+    not built (its PLAN is `proposed`);
+  * `launch` imports `github.com/charmbracelet/x/term`
+    (`launch/restore.go:20-30`, `launch/terminal.go:15-28`), which only it
+    may import (depguard's `xterm` rule).
+* **The library's rules** (AGENTS.md, "TUI conventions" 1 and 2 and "API
+  conventions" 9; `internal/conformance`): output goes where the caller
+  says; the caller owns the screen and the signals; no read of the
+  process's environment, no `os.Exit`, no started process, no `os/exec`.
+
+### What gobble does, and what a library must keep
+
+The editor (`internal/cli/editor`):
+
+* **Its API** is `editor.New(in io.Reader, out, errw io.Writer, opts
+  Options)` and `ReadPrompt(ctx) (string, error)` (`editor.go:102`,
+  `:127`). It never opens stdin. `Options` has the prompt and its
+  continuation, a `History` interface of `Add`, `Len` and `At`
+  (`:24-28`), a completion function, a header, the width and height as
+  functions, a resize channel and a reprint function (`:40-58`).
+  `MaxWidth` is 120 and `DefaultWidth` 80 (`:62-65`).
+* **Stdin is read only when asked.** One goroutine reads 512-byte chunks,
+  one read per request that finds nothing buffered (`reader.go:12`,
+  `:49-70`, `:115-137`), because a Windows console read keeps the mode it
+  started in: a read started before raw mode returned 379 bytes at the
+  first Enter in 6 of 10 runs under Console Host and 3 of 10 under Windows
+  Terminal, and 0 of 10 after the change
+  (`0027-MADR-native-line-editor-word-wrap.md` D5's amendment,
+  `:114-124`). The reader is never closed, since closing console input
+  while a read is pending hangs the process (`reader.go:28`, `:45-48`);
+  `TestNoCloseOnStdin` scans the files for any `.Close` call
+  (`keys_test.go:107-127`).
+* **Raw mode** is `golang.org/x/term`'s `MakeRaw` and `Restore`, with VT
+  input enabled on Windows (`editor.go:447-457`); the line session leaves
+  it for every submission (`internal/cli/line.go:202-218`).
+* **Keys** are its own decoder (`buffer.go:83-116`): no SS3, no Kitty, no
+  modifyOtherKeys, and no timeout for a lone `ESC`.
+* **Layout** breaks only at spaces, leaves a word wider than a row whole,
+  indents continuation rows by the prompt's width, and caps the width at
+  120 (`layout.go:19-88`). It measures with `golang.org/x/text/width`, so
+  a combining mark, a ZWJ sequence or an emoji modifier counts one cell
+  each (`layout.go:99-116`): the defect 0032-MADR A1 names, which
+  `x/ansi`'s grapheme width fixes.
+* **Drawing** skips unchanged rows, rewrites a changed row from its shared
+  prefix, clears with `CSI K` and `CSI J`, moves with `CSI n A`, `\r` and
+  `CSI n C`, and wraps every write in mode 2026 with the cursor hidden
+  (`draw.go:12-17`, `:62-139`). It never erases first, because Windows
+  Terminal flickered when it did (0027-MADR D3's amendment, `:89-96`).
+  A key's drawing writes at most the changed text plus 40 bytes
+  (0030-MADR D5; `budget_test.go:8-45`).
+* **A resize** is redrawn by how the terminal re-wraps. 0030's PLAN, P1,
+  narrowed 80 columns to 41 to 43: WezTerm, kitty, Terminal.app and the
+  Windows pseudo-console re-wrap and move the cursor down; iTerm2 and
+  xfce4-terminal (VTE) re-wrap and keep the cursor's row; xterm cuts
+  (`0030-PLAN-resize-and-performance.md:143-163`). The editor asks for the
+  cursor (`CSI 6 n`), waits 150 ms, takes the report out of the input
+  (`editor.go:263-296`, `:364-385`), and decides cut or re-wrap from it
+  (`draw.go:45-60`); with no report it falls back to reading
+  `XTERM_VERSION` from the environment (`editor.go:308`). 150 ms after the
+  last resize it reprints the transcript (`editor.go:318-335`).
+* **History** is a file of at most 1000 entries, one per line with `\n`
+  and `\` escaped, consecutive duplicates dropped, saved by an atomic
+  rename at mode 0600 (`history.go:13`, `:76-105`).
+* **The external editor** is `Compose(ctx, env, configured, dir, initial,
+  run func(*exec.Cmd) error)`: it reads `GOBBLE_EDITOR`, the setting,
+  `VISUAL` and `EDITOR`, and builds an `*exec.Cmd` the caller runs
+  (`external.go:20-122`).
+* **Keys bound:** the arrows and Ctrl+B and Ctrl+F; Home, End, Ctrl+A and
+  Ctrl+E to the line's ends; Alt or Ctrl with the arrows, `ESC b` and
+  `ESC f` by space-delimited words; Up, Down, Ctrl+P and Ctrl+N by visual
+  row, then history; Backspace, Ctrl+H, Delete, Ctrl+D (end of input on an
+  empty line), Ctrl+K, Ctrl+U, Ctrl+W, Ctrl+T, Ctrl+L, Tab to completion,
+  Enter; a trailing `\` continues the line; a 4096-rune limit; Ctrl+C
+  clears a line, and on an empty line arms a 2 s window to exit
+  (`buffer.go:16`, `:204-362`; `keys.go:119-135`). There is no undo, no
+  kill ring and no Shift+Enter newline. A bracketed paste is one
+  submission, not editable (0027-MADR Q2=A).
+* **Tests** run on `termtest.Screen`, a cell grid with pending wrap,
+  scrolling, the cursor moves, `J`, `K`, DECTCEM, answered DSR, and
+  `Resize(columns, ReflowDown|ReflowKeepRow|Cut)`
+  (`internal/cli/term/termtest/screen.go:161-252`); a parity test against
+  x/term's `Terminal` over 55 keys (`buffer_test.go:210-366`); per-key
+  benchmarks with a budget test that fails past three times the baseline
+  (`perf_test.go:14-32`).
+
+The reply and the transcript (`internal/cli/render`, `transcript.go`,
+`view.go`):
+
+* **Markdown is gobble's own,** a port of goose's MarkdownBuffer, with no
+  goldmark and no glamour (`render/mdstream.go:9-31`). It holds back an
+  open fence, a table until a blank line, a heading until its line ends,
+  an unclosed inline construct, and the incomplete last line
+  (`mdstream.go:33-90`, `:154-285`).
+* **It styles in place and keeps every marker:** headings bold, fences
+  dim with the language in cyan, inline code dim, list and quote markers
+  cyan, emphasis by its markers, from bold, dim, italic, underline and the
+  eight colours; with colour off, the input comes back byte for byte
+  (`render/mdstyle.go:9-198`; `term/style.go:5-47`). The colour decision
+  takes an injected environment and never reads the process's
+  (`term/caps.go:29-85`).
+* **It wraps at whole words after styling** (0028-MADR D7, amended):
+  prose at spaces, a word wider than a row whole on its own row; fences,
+  indented code, table rows and headings unwrapped; list continuations
+  under their text; quotes repeating `>`; no row starting with a word that
+  would open a block; escapes zero-width and kept with their word; the
+  output the same for any split of the input (`render/wrap.go:8-453`;
+  `TestWrapAnySplit`).
+* **The transcript** keeps ordered pieces, each fixed, a message, or
+  drawn by a function of the width; replies keep their sanitised Markdown
+  source (`transcript.go:25-55`; `view.go:495-504`). It is bounded at 4
+  MiB, oldest first, and a reprint draws the newest pieces back to 10,000
+  rows, after a dim "(earlier output is not shown again)" when it cut
+  (`transcript.go:31-125`). A reprint waits for the view to be at a line
+  start with both wrappers idle, then writes `CSI ?2026h CSI 2J CSI 3J CSI
+  H`, the text, and `CSI ?2026l` (`view.go:444-487`). It clears the
+  scrollback from before the program started (0030-MADR:139).
+
+The question (`0029-MADR-permission-prompt-layout.md`):
+
+* D1: the whole title wrapped at spaces, continuation indent 2, a long
+  word whole; `Patterns:` when answers are remembered; rows `Allow [1]
+  once [2] session [3] project [4] everywhere` and `Reject [5] … [8]`;
+  `[f] reject and say why   [c] cancel`; notes above; the answer echoed
+  after `> ` in words. D2: the other questions use a title and rows that
+  never split an option. D5: the width is stderr's, at most 120. D6:
+  everything sanitised.
+* Keys are one byte each, no Enter; a key not shown is ignored; `c`,
+  Ctrl+C or the end of input cancel; `[f]` reads a reason up to Enter,
+  echoed, with Backspace, capped at 2048 bytes
+  (`internal/cli/permission.go:111-179`).
+* The other questions: trust (five options, `internal/cli/trust.go:166-205`),
+  leaving plan mode (two), a grant (two), a personality switch (two), and
+  a tool call (eight, its title cut at 2000 runes,
+  `internal/acpserver/question.go:55-94`).
+
+### What other line editors do
+
+* **golang.org/x/term's `Terminal`** owns reading: `NewTerminal(c
+  io.ReadWriter, prompt)`, a blocking `ReadLine`, and a `History`
+  interface of `Add`, `Len` and `At`. Its `Write`, while a line is on the
+  screen, clears the prompt and the line, writes the text, and draws the
+  prompt and the line again below it (`terminal.go`, v0.47.0): printing
+  above a live prompt.
+* **reedline** (Nushell, 0.52.1) owns reading too (`read_line`), with a
+  `History` trait and `FileBackedHistory`, a `Validator` for multi-line
+  input, menus, a hinter, `with_buffer_editor(Command, PathBuf)` for an
+  external editor, and an experimental `ExternalPrinter`, a bounded
+  channel whose lines print above the prompt
+  (<https://docs.rs/reedline/latest/reedline/struct.ExternalPrinter.html>).
+* **prompt_toolkit's `patch_stdout()`** makes other output print above an
+  active prompt: "This ensures that other output won't destroy the
+  prompt"
+  (<https://python-prompt-toolkit.readthedocs.io/en/master/pages/asking_for_input.html>).
+* **inquire** (Rust, 0.9.4) has `Select`, `MultiSelect`, `Text`,
+  `Confirm`, `CustomType`, `Password` and `Editor` prompts with custom
+  list filters, on crossterm, termion or console
+  (<https://docs.rs/inquire/latest/inquire/>).
+* **liner** (Go, v1.2.3) puts the terminal in raw mode in `NewLiner`,
+  prompts with `Prompt`, and reads and writes history with
+  `ReadHistory(io.Reader)` and `WriteHistory(io.Writer)`, limited to 1000
+  (<https://pkg.go.dev/github.com/peterh/liner>).
+
+Each of them owns the reader, and so the terminal's mode, for as long as a
+prompt is active.
+
+### Probed here
+
+A scratch program over this repository's `termkey` and `termcap`, on
+2026-10-25:
+
+| Bytes | `termkey.Decoder` gives | `termcap.ParseReply` gives |
+| :--- | :--- | :--- |
+| `CSI 12 ; 40 R`, a cursor report | `InputUnknown` | `ReplyUnknown` |
+| `CSI 1 ; 5 R`, a cursor report on row 1 | the key `ctrl+f3` | `ReplyUnknown` |
+| `CSI 1 ; 1 R` | the key `f3` | `ReplyUnknown` |
+| `CSI ? 12 ; 40 R`, DECXCPR's report | `InputUnknown` | `ReplyUnknown` |
+
+A cursor report on the first row reads as a modified F3, the known
+ambiguity of the two encodings, and `ParseReply` has no kind for a cursor
+report.
+
+### Go
+
+Go 1.27.3, released 2026-10-19, "includes security fixes to the
+crypto/x509 package" (<https://go.dev/doc/devel/release>). Nothing here
+uses `crypto/x509`. The floor stays 1.27.2 (AGENTS.md, API conventions
+11; [0016-MADR-go-1-27-2-for-go-2026-6604.md](0016-MADR-go-1-27-2-for-go-2026-6604.md)),
+and nothing below needs a feature newer than 1.27. Both are tested: CI
+takes its version from `go.work` (`go-version-file: go.work`), the floor,
+and the macOS, Linux and Windows hosts the gates run on have `go1.27.3`
+(`go version`, 2026-10-25). gobble's `go.mod` says `go 1.27.3`, which a
+module requiring this one at 1.27.2 may.
+
+### The question
+
+How does go-tui-lib give a line-mode CLI an inline question, a picker, a
+composer and a streamed transcript, each linking no Charm module but
+`x/ansi`, each sharing its logic with the TUI, each testable without a
+terminal, and keeping what gobble measured, without reading the
+environment, starting a process or owning the terminal?
+
+## Decision Drivers
+
+* **One implementation for both modes** (gobble's 0032-MADR D3; 0020-MADR's
+  first driver). A line-mode CLI and the TUI share each component's logic.
+* **The closure, not the import** (0020-MADR D1, D11). Every package a
+  line-mode CLI imports joins the cores, and the gate holds it there.
+* **The library's rules.** No read of the environment, no process, no
+  write to `os.Stdout` or `os.Stderr`; the caller owns the screen, the
+  signals and the terminal's mode.
+* **What gobble measured must survive:** reading only when asked on
+  Windows, never closing console input, the three re-wrap kinds, drawing
+  without erasing first, the bytes-per-key budget, the settle before a
+  reprint, and the reprint's bound.
+* **Testable without a terminal** (issue #7): a layout is a pure
+  function; a component's whole behaviour is a function of its inputs and
+  the time.
+* **Correct widths.** Grapheme clusters, by `x/ansi`, in the width method
+  the terminal uses: `WcWidth` until it reports mode 2027, as the
+  workspace measures.
+* **Untrusted text is a security boundary.** Model output, tool titles,
+  file names and session titles reach the screen; each is cleaned once,
+  on the way in.
+* **Go-native:** small packages named for what they hold, `io.Reader` and
+  `io.Writer` at the edges, an interface for a hook with a `…Func`
+  adapter, options that are opaque, no new module unless a record names
+  it.
+* **gobble's order.** The question first (its D4, issue #7), then the
+  picker, the composer and the transcript (`0032-PLAN:142-153`).
+
+## Considered Options
+
+* **A. An I/O-free engine for each component, each its own Charm-free
+  package, on one shared live-region package, with a Bubble Tea form in a
+  `<pkg>tea` sub-package where the TUI needs one; the transcript on a
+  Charm-free `stream` core split from 0009's.**
+* **B. Blocking components that own a reader and a writer,** as x/term's
+  `Terminal`, liner and gobble's editor do: `ReadLine`-style calls that
+  return the answer.
+* **C. Bubble Tea programs drawn inline,** without the alternate screen,
+  as charm.land's `huh` forms and erikgeiser's promptkit do.
+* **D. Wrap an existing Go line editor,** such as peterh/liner or
+  chzyer/readline, behind this repository's API.
+* **E. Option A's engines, all in one package,** `inline`, with one
+  import path.
+* **F. Change nothing:** gobble keeps its own.
+
+## Decision Outcome
+
+*The owner answered Q1 to Q7 on 2026-10-25 (Owner questions, below):
+each the recommendation but Q5, where the TUI's picker is a palette
+provider over `pick`'s entries. D1, D5 and D12 say so.*
+
+Chosen option: **"A"**, because it is the only option that gives gobble
+clean closures, shares one engine between both modes, keeps the
+terminal, its mode and its reader the host's, and makes every behaviour
+gobble measured a deterministic test. B reads the terminal for the length
+of a prompt, which is the shape gobble had to change for Windows, and it
+cannot print a streaming reply above an editor without a lock across
+goroutines; C links Bubble Tea, which the boundary forbids; D brings a
+module that owns stdin, measures without graphemes and reads its own
+keys, beside `termkey`; E links the editor's and the picker's
+dependencies into a program that asks one question; F contradicts both
+repositories' records.
+
+The decision has thirteen parts, D1 to D13.
+
+### D1. The packages
+
+| Package | Holds | Imports | Issue |
+| :--- | :--- | :--- | :--- |
+| `inline` | `Region`, the live rows below the scrollback; `Reflow`; `Reader`, the read-when-asked edge | `termkey`, `termcap`, `glyph`, `internal/enum`, `internal/sanitize`; `x/ansi` | all |
+| `inline/inlinetest` | `Screen`, a terminal grid for tests, with the three re-wrap kinds | `x/ansi` | all |
+| `ask` | `Question`, `Row`, `Answer`, `Layout`, `Asker`, `Response` | `inline`, `lineedit`, `glyph`, `internal/sanitize`; `x/ansi` | #7 |
+| `ask/asktea` | the question as a workspace overlay pane | `ask`, `workspace`; Bubble Tea | #7 |
+| `pick` | `Entry`, `Chooser` | `inline`, `lineedit`, `fuzzy`, `internal/sanitize`; `x/ansi` | #8 |
+| `palette` (existing) | gains `FromEntries`, the TUI's form of `pick` (Q5) | `pick`, a core, beside its imports today | #8 |
+| `lineedit` | `Composer`, `History`, `MemHistory`, `Completer` | `inline`, `keymap`, `termkey`, `glyph`, `internal/sanitize`; `x/ansi` | #9 |
+| `lineedit/lineedittea` | the composer as a workspace pane | `lineedit`, `keymap/keymaptea`, `workspace`; Bubble Tea | #9 |
+| `stream` | 0009's `Doc`, `Renderer` and `Plain`; the block `Scanner`; `Printer`, the line-stable Markdown printer; `Markup` and `Style` | `safetext`, `internal/enum`, `internal/sanitize`; `x/ansi` | #10 |
+| `stream/streamtea` | 0009's `Buffer` and `Pane` | `stream`, `frame`, `workspace`; Bubble Tea | (0009) |
+| `transcript` | `Transcript`, the bounded, reprintable conversation | `stream`, `inline`, `internal/sanitize`; `x/ansi` | #10 |
+
+* **The cores gain** `inline`, `inline/inlinetest`, `ask`, `pick`,
+  `lineedit`, `stream` and `transcript`, each in the commit that builds it
+  (0020-MADR D11). `TestCoresAreCharmFree` and depguard's `charmfree`
+  rule hold them.
+* **No module is added.** Every import above is in the root module's list
+  today (AGENTS.md, Dependencies). goldmark is not taken (D8).
+* **Names** were checked with `python3 -m tools.verify names` over the 31
+  planned type names: "31 planned name(s), clean", after two renames, the
+  composer from `Editor` (`termcap.Editor`) and the styles from `Styles`
+  (`theme.Styles`). An option type in each package is `Option`, which the
+  glossary and `sharedNames` allow everywhere.
+* **Each package is small and stands alone** (0020-MADR's split, `termkey`
+  beside `keymap`): a program that asks one question links `ask`,
+  `inline` and `lineedit`, and no `fuzzy`, no `stream`.
+
+### D2. The engine contract
+
+Every component is an engine under 0020-MADR A2.3's rules, so that one
+host loop drives any of them, and a test is a transcript of bytes and
+times.
+
+* **In:** `HandleInput(in termkey.Input, now time.Time)`, one decoded
+  input, in order; `Resize(width int, now time.Time)`; `HandleTimeout(now
+  time.Time)` once the deadline `Timeout() (time.Time, bool)` gave has
+  passed. The host decodes with `termkey.Decoder` and calls `Flush` after
+  the escape timeout.
+* **Out:** `NextEvent()`, drained until its zero kind, each package's
+  event a struct with a `Kind` (`AskEvent`, `PickEvent`, `EditEvent`):
+  * the base kinds every host handles: write `Data` to the terminal, in
+    order; and the component is done, with its result;
+  * kinds that need the host to act, such as the composer's external
+    editor, only after an option opts in (A2.3 rule 3); a host ignores a
+    kind it does not know.
+* **No I/O, no clock, no goroutine, no environment.** `now` comes in; a
+  deadline goes out; bytes are strings. One goroutine drives an engine.
+* **Width and method are the host's.** `Resize` gives the width in cells;
+  `WithMethod(ansi.Method)` the width method, `ansi.WcWidth` by default,
+  `ansi.GraphemeWidth` once `termcap` reports mode 2027, as the workspace
+  measures. No component caps the width: gobble's 120 is gobble's.
+* **Text is cleaned on the way in,** every caller's and every model's
+  string, by `internal/sanitize.Line` or a `safetext` preset, once.
+* **Glyphs and styles are the host's:** `WithGlyphs(glyph.Set)`, and an
+  SGR `stream.Markup` (D7) where a component colours, so a host's
+  `NO_COLOR` and its `termcap.ColorProfile` decide, read through
+  `termcap.Env`, never by the library.
+
+### D3. `inline`: the live region, and the edge
+
+* **`Region` owns the rows below the scrollback** that a component draws
+  and redraws in place, and nothing else:
+
+  ```go
+  type Region struct{ /* the rows as drawn, the cursor, the width, the reflow state */ }
+
+  func NewRegion(o ...Option) *Region            // WithMethod, WithSynchronized, WithReflow
+  func (r *Region) Draw(rows []string, row, col int) string // the bytes that show rows, the cursor at (row, col)
+  func (r *Region) Print(text string) string     // text above the region, then the region again
+  func (r *Region) Commit(rows []string) string  // rows left in the scrollback; the region is empty
+  func (r *Region) Clear() string                // the region removed
+  func (r *Region) Resize(width int, now time.Time) string // a cursor query, or the redraw
+  func (r *Region) HandleInput(in termkey.Input, now time.Time) (string, bool) // a cursor report, if it is one
+  func (r *Region) Timeout() (time.Time, bool)
+  func (r *Region) HandleTimeout(now time.Time) string
+  func (r *Region) Restore() string              // bytes that reset what it set
+  ```
+
+* **Drawing is gobble's** (0027-MADR D3's amendment, 0030-MADR D5):
+  unchanged rows skipped; a changed row rewritten from its shared prefix,
+  in cells, under the width method; `CSI K` for a shorter row, `CSI J`
+  for rows the region no longer has; moves by `CSI n A`, `\r` and `CSI n
+  C`, never an absolute position; a first draw from `\r CSI J`; every
+  write wrapped in mode 2026 with the cursor hidden, unless
+  `WithSynchronized(false)`; a region taller than the height given is
+  windowed around the cursor's row. A test holds a one-key change to at
+  most the changed text plus 40 bytes.
+* **`Print` is x/term's `Terminal.Write`:** clear the region, write the
+  text, draw the region again below it. A streaming reply prints above a
+  composer this way, with no lock: both run on the host's loop.
+* **A resize follows the terminal's re-wrap** (0030-MADR D2). `Reflow` is
+  an enum, `ReflowUnknown`, `ReflowDown`, `ReflowKeepRow` and
+  `ReflowCut`, tokens from `internal/enum`. On `Resize` the region writes
+  `CSI 6 n` and waits, by default 150 ms, for the report; gobble's rule
+  (`draw.go:45-60`) reads cut or re-wrap from it, and the region moves up
+  by the rows as drawn, or as re-wrapped, and redraws. With no report it
+  takes `WithReflow`'s kind, which the host sets from what it knows, such
+  as `termcap`'s identity of xterm: that replaces gobble's read of
+  `XTERM_VERSION`. A keep-row terminal is redrawn as a re-wrap, and `CSI
+  A` clamps at the top, as in gobble (0030-PLAN:272-273).
+* **The cursor report is the region's to read.** While it waits for one,
+  `HandleInput` takes `CSI row ; col R` out of the input, as gobble's
+  `takeCursorReport` does, including the row-1 report `termkey` reads as
+  a modified F3 (Probed here); every other input goes on to the
+  component. `termcap.ParseReply` gains `ReplyCursorPosition`, with `Row`
+  and `Col`, an addition under 0020-MADR A2.3 rule 4, and `CSI ? row ;
+  col R` (DECXCPR) is read the same.
+* **`Reader` is the one part with a goroutine**, at the edge: it reads the
+  host's `io.Reader` only when asked, and never closes it, for the reasons
+  gobble measured on Windows (gobble's 0027-MADR D5's amendment, and its
+  rule against closing console input while a read is pending):
+
+  ```go
+  func NewReader(r io.Reader) *Reader
+  func (r *Reader) Read(ctx context.Context, p []byte) (int, error) // one read in flight at most; ctx ends the wait, not the read
+  ```
+
+  The program shares it: its own prompts read the same `Reader`, so no
+  second reader steals keys.
+* **What stays the host's:** raw mode (gobble's `golang.org/x/term`), the
+  console's VT modes on Windows, the size and SIGWINCH or its polling,
+  and when to write bracketed paste on and off. The region gives the
+  bytes: `Restore` undoes what it set, the shape `launch.Restorer` takes.
+* **`inlinetest.Screen`** is gobble's `termtest.Screen` rebuilt on `x/ansi`
+  widths, by grapheme cluster, with a wide character kept whole on a
+  re-wrap: pending wrap, scrolling, the moves, `J`, `K`, DECTCEM, mode
+  2026, a cursor report answered, and `Resize(columns, Reflow)`. Every
+  component's tests, and a program's, draw on it; its text form is what
+  the goldens hold.
+
+### D4. `ask`: the question (issue #7)
+
+```go
+type Question struct {
+	Notes  []string // lines before the title: why only "once" is offered, a limit
+	Title  string   // wrapped at spaces, continuation rows indented two
+	After  []string // lines after the title: "Patterns: …"
+	Rows   []Row
+	Cancel Answer   // the key that cancels, and its label: "[c] cancel"
+}
+type Row struct {
+	Label   string   // "Allow", "Reject", or "" for a row of its own
+	Answers []Answer
+}
+type Answer struct {
+	ID     string // the caller's
+	Key    string // one key, as keymap's notation names it: "1", "f", "y"
+	Label  string // "once", "reject and say why"
+	Echo   string // the answer in words: "allow for this session"
+	Reason bool   // a reason is read after the key, up to enter
+}
+type Response struct {
+	Answer   Answer
+	Reason   string
+	Canceled bool // the cancel key, ctrl+c, or the end of input
+}
+
+func Layout(q Question, width int, m ansi.Method, g glyph.Set) []string // pure
+func NewAsker(q Question, o ...Option) *Asker
+```
+
+* **`Layout` is a pure function** of the question, the width, the method
+  and the glyphs, as gobble's 0029-MADR asks: the title wrapped at spaces,
+  a word wider than a row left whole; continuation rows indented two;
+  each row's label padded to the widest label; each answer `[k] label`,
+  answers two spaces apart; a row that does not fit breaks between
+  answers, never inside one, its continuation under its first answer;
+  the notes, the lines after the title, the rows, then the prompt
+  (`glyph.Set.Prompt`). The caller's words are drawn as given, cleaned:
+  the capital and the `?` are the caller's.
+* **Keys:** one key, no enter; a key no answer shows is ignored; the cancel
+  key, ctrl+c or the end of input cancel. An answer with `Reason` reads a
+  line through a one-row `lineedit.Composer`, echoed, with its editing
+  keys, bounded at 2048 bytes by default, as gobble's is.
+* **The answer stays in the scrollback:** the region commits the question
+  and `> ` with the answer's `Echo`, and the reason, so the transcript
+  keeps both (`internal/cli/permission.go:223-227`).
+* **The TUI's form** is `ask/asktea`: an overlay pane that draws `Layout`
+  at the overlay's width and drives the same `Asker`, so a permission
+  question reads alike in both modes.
+* **What gobble's six questions need,** trust, plan mode, a grant, a
+  personality switch, a tool call and the permission question, is this
+  one shape: rows of keyed answers, at most one reason.
+
+### D5. `pick`: the picker (issue #8)
+
+```go
+type Entry struct {
+	ID     string
+	Text   string // matched and drawn: "anthropic/claude-sonnet-5-5", a session's title
+	Detail string // drawn after the text, not matched: "1M  $3.00/$15.00", "2 hours ago"
+}
+
+func NewChooser(entries []Entry, o ...Option) *Chooser // WithHeight (8), WithPrompt, WithMethod, WithIndexAbove
+```
+
+* **It filters with `fuzzy`, the palette's matcher:** each keystroke
+  compiles one `fuzzy.Matcher` and ranks with `Rank`, best first, stable
+  on ties; above `WithIndexAbove` entries (5000, as `palette.Files`) it
+  narrows with a `fuzzy.Index` first. Matched cells are underlined through
+  `fuzzy.Cells`, in the width method, when the host's `Markup` styles.
+* **Keys:** typing edits the query in a one-row `lineedit.Composer`; up,
+  down, page up and page down move; enter chooses; esc cancels, as #8
+  asks. The rows, `WithHeight` tall, the query and a count line are
+  redrawn in place by the region; the choice is committed as one line.
+* **The data is the caller's:** a program lists its models with their
+  context and prices in `Detail`, or its sessions by title and time. It
+  lists them all; a picker with providers that stream is the palette's
+  job, in the TUI.
+* **The TUI's form is a palette provider** (Q5):
+
+  ```go
+  func FromEntries(name string, entries []pick.Entry) Provider // in palette
+  ```
+
+  Each entry is one hit: its `ID` the entry's, its `Text` matched and
+  drawn, its `Detail` in the hint slot, no `Run`, so accepting it sends
+  `palette.SelectedMsg` with the hit, as a file hit does, and the program
+  acts on the entry's ID. An empty query lists the entries in their order.
+  The program gives the same `[]pick.Entry` to a `pick.Chooser` in the
+  line mode and to `FromEntries` in the TUI, so one list serves both
+  modes, ranked by one matcher. There is no `picktea`: the palette is the
+  TUI's picker.
+
+### D6. `lineedit`: the composer (issue #9)
+
+```go
+func NewComposer(o ...Option) *Composer
+	// WithPrompt, WithContinue, WithHeader, WithHistory, WithCompleter,
+	// WithKeymap, WithLimit (4096 runes), WithPaste(PasteInsert|PasteSubmit),
+	// WithExternalEditor, WithMethod, WithGlyphs
+
+type History interface { // x/term's shape, so its and gobble's plug in
+	Add(entry string)
+	Len() int
+	At(i int) string // 0 is the newest
+}
+type MemHistory struct{ /* bounded, 1000 by default; consecutive duplicates dropped */ }
+func (h *MemHistory) WriteTo(w io.Writer) (int64, error)  // one entry per line, \n and \ escaped
+func (h *MemHistory) ReadFrom(r io.Reader) (int64, error)
+
+type Completer interface{ Complete(line string, pos int) (string, int, bool) }
+type CompleterFunc func(line string, pos int) (string, int, bool)
+```
+
+* **The buffer is grapheme clusters,** under the width method, so a
+  combining mark, a ZWJ sequence or a flag is one cursor step and its true
+  width: the defect gobble's 0032-MADR A1 names, fixed.
+* **The layout is gobble's** (0027-MADR D2): whole words to the width,
+  breaking only at spaces, a wider word left whole; continuation rows
+  indented by the prompt's width; a cursor past the last column on a new
+  row; drawn through the `Region`, so its diff, its budget and its re-wrap
+  apply.
+* **Keys are commands in the program's one keymap,**
+  `lineedit.DefaultRules()`, in the scope `kind:composer`, dispatched by
+  `keymap`'s `Dispatcher`, as the palette's are: gobble's bindings above
+  as the defaults, and a user's `keybindings.json` rebinds them. Without
+  `WithKeymap` the composer builds its defaults alone. Shift+enter, where
+  the terminal reports it (Kitty or modifyOtherKeys, by `termkey`),
+  inserts a newline; so does a trailing `\` before enter.
+* **Events:** `EditWrite`; `EditSubmit`, with the text; `EditEOF`, ctrl+d
+  on an empty line; `EditInterrupt`, ctrl+c, whose policy, such as
+  gobble's second press within 2 s, is the host's; with
+  `WithExternalEditor`, `EditExternal`, with the text, for the host to
+  edit in a process it starts and give back with `SetText`. The library
+  reads no `EDITOR` and runs nothing (AGENTS.md, API conventions 9).
+* **History** is the `History` interface, x/term's shape; `MemHistory`
+  is gobble's rules in memory, and its `WriteTo` and `ReadFrom` its file
+  format, so the file, its path, its rename and its mode stay the host's.
+* **Paste:** `PasteInsert`, the default, puts a bracketed paste into the
+  buffer as text, editable; `PasteSubmit` submits it whole, gobble's
+  choice (its 0027-MADR Q2=A).
+* **The TUI's form** is `lineedit/lineedittea`: a workspace pane over the
+  same `Composer`, its rows drawn into the pane, its keys through
+  `keymaptea`, so the TUI's composer and the CLI's edit alike.
+* **Not in this record:** undo and a kill ring, which gobble has not
+  either; each is an addition later, with its keys in `DefaultRules`.
+
+### D7. `stream`: a Charm-free core, amending 0009
+
+* **0009's `stream` becomes a core.** Its `Doc`, `Renderer`,
+  `RendererFunc` and `Plain` stay in `stream`, which imports `safetext`,
+  `internal/enum`, `internal/sanitize` and `x/ansi` alone. What names
+  Bubble Tea, `Buffer`, `Doc.Pull` and `Pane`, moves to `stream/streamtea`,
+  under 0020-MADR D2's split rule. Nothing is shipped, so nothing breaks.
+  [0009-MADR-streaming-content-engine.md](0009-MADR-streaming-content-engine.md)
+  gains an amendment saying so, and its PLAN is amended before it runs.
+* **One block scanner, two consumers.** 0009 §4's scanner, the open fence,
+  the containers, the HTML block, the table, is `stream.Scanner`, and
+  serves two forms of output:
+  * `Doc`, block-stable, re-rendered by a `Renderer` that may reflow a
+    whole block (glamour, through `stream/glamourmd`): the TUI's pane;
+  * `Printer`, line-stable and append-only, for a scrollback that cannot
+    be redrawn: the line mode.
+* **`Printer` prints each source line once it is stable,** as gobble's
+  `render.Stream` does: a complete line outside a table and outside an
+  unclosed inline construct, cleaned by a `safetext.Sanitizer`, styled by
+  its `Markup`, wrapped at whole words to the width, and written once. A
+  table is held until a blank line ends it, then laid out; a heading until
+  its line ends; a fence's lines print as they complete.
+* **Styling keeps every marker** (gobble's `mdstyle.go`): headings bold,
+  fences dim with the language in a colour, inline code dim, list and
+  quote markers in a colour, emphasis by its markers. `Markup` is data: a
+  `Style` per role, each an SGR attribute set (bold, dim, italic,
+  underline, and a colour of the eight, or none). The zero `Markup` styles
+  nothing, and the output is the input, byte for byte.
+* **Wrapping is gobble's** (0028-MADR D5 and D7, amended): after styling;
+  prose at spaces, a wider word whole; fences, indented code, table rows
+  and headings unwrapped; list continuations under their text; quotes
+  repeating `>`; no row beginning with a word that would open a block;
+  escapes zero-width and kept with their word. The output is the same for
+  any split of the input, a property test as gobble's `TestWrapAnySplit`
+  is.
+
+### D8. Markdown in the line mode: the repository's own printer
+
+* **Not glamour,** which links Lip Gloss: Charm beyond `x/ansi`.
+* **Not goldmark.** goldmark (v1.8.2, MIT, no requirements of its own)
+  parses a whole document into a tree. A line-stable printer cannot wait
+  for a document, and a renderer that reflows restyles text the user has
+  already read; gobble's users see the markers kept (its 0028-MADR). It
+  would also be a module this record must name, for a parse the scanner
+  already does to the depth the printer needs.
+* **The printer is the scanner and a styler,** the size of gobble's
+  `mdstream.go`, `mdstyle.go` and `wrap.go`, about 1,000 lines, built
+  here once, for both repositories.
+
+### D9. `transcript`: the conversation, reprinted on a resize (issue #10)
+
+```go
+func NewTranscript(o ...Option) *Transcript // WithMaxBytes (4 MiB), WithMaxRows (10 000), WithSettle (150 ms), WithMethod
+
+func (t *Transcript) AddText(s string)                   // as written, cleaned
+func (t *Transcript) AddDrawn(f func(width int) string)  // drawn anew at each width: help, a log record
+func (t *Transcript) AddReply(p *stream.Printer)         // a reply, kept as its cleaned source
+func (t *Transcript) Resize(width int, now time.Time)
+func (t *Transcript) Timeout() (time.Time, bool)
+func (t *Transcript) HandleTimeout(now time.Time, idle bool) string // the reprint, once resizing has settled and the host is idle
+```
+
+* **Bounded in bytes:** past `WithMaxBytes`, the oldest pieces go, as in
+  gobble (`transcript.go:31-80`).
+* **A resize reprints once it settles:** the last `Resize` sets a deadline
+  `WithSettle` later; at it, when the host says the output is idle (at a
+  line start, nothing held), the transcript gives `CSI ?2026h CSI 2J CSI
+  3J CSI H`, the newest pieces back to `WithMaxRows` rows drawn at the
+  new width, and `CSI ?2026l`, after the caller's notice line when it
+  cut, as gobble writes it (`view.go:444-487`). The host then redraws its
+  region.
+* **It clears the terminal's scrollback,** and with it what came before
+  the program, as gobble's does (0030-MADR:139): the price of a reprint
+  that lines up. A terminal's own re-wrap of a styled table, a diff or a
+  code block cannot line up.
+
+### D10. What stays the host's, and what is not built
+
+* **The host's:** raw mode and its restore; Windows console modes; the
+  terminal's size and the resize signal or poll; bracketed paste on and
+  off, from the region's bytes; the external editor's process; the
+  history file; the colour and Unicode decision, through `termcap`; the
+  cap on the width; a second ctrl+c's meaning.
+* **Not built here:** a line-mode multi-select; mouse input in the line
+  mode; Windows' win32-input-mode, which `termkey` reads as an unknown
+  sequence (0020-MADR D7); undo and a kill ring (D6); a `picktea` (D5).
+
+### D11. Tests and gates
+
+* **Every engine is a function of its inputs and the time:** each test
+  feeds bytes and times, and reads the events.
+* **Goldens on `inlinetest.Screen`,** across {colour, no colour} × {UTF-8,
+  ASCII} × widths 60 and 100, and gobble's 177 for the question
+  (`0029-PLAN:49-60`), each line within its width under the method.
+* **Fuzz targets:** `Layout` never splits an answer and never writes a row
+  wider than the width; the composer and the picker never panic on any
+  input stream; the printer gives the same output for any split of its
+  input; `MemHistory.ReadFrom` writes back what it read.
+* **Budgets:** a one-key change at most the changed text plus 40 bytes;
+  per-key benchmarks with recorded baselines, as gobble's 0030-MADR D5.
+* **Re-wrap tests** for each of the three kinds, with and without a
+  cursor report, and keys typed while the report is awaited.
+* **The Windows edge:** a test that `Reader` holds one read in flight at
+  most and never calls `Close`, as gobble's `TestNoCloseOnStdin` does.
+* **The gate:** each new core joins `TestCoresAreCharmFree` in the commit
+  that builds it; the `<pkg>tea` packages are not cores.
+
+### D12. Order and releases
+
+* **In gobble's order,** each a step of its own: (1) `inline`,
+  `inlinetest` and `termcap.ReplyCursorPosition`; (2) `ask` and
+  `ask/asktea`, gobble's first need; (3) `pick` and
+  `palette.FromEntries`; (4) `lineedit` and
+  `lineedit/lineedittea`; (5) `stream`'s core, `Printer` and `Markup`,
+  with 0009's amendment; (6) `transcript`.
+* **Additions only,** so each release is a minor version of `v2`, with
+  `make apicheck` reporting 0 incompatible changes.
+* **A release after each of steps 2, 3, 4 and 6,** `v2.2.0` to `v2.5.0`,
+  so gobble takes each component as it lands (Q3).
+
+### D13. Defaults and their controls
+
+*Added 2026-10-25, for
+[0024-MADR-opt-in-and-opt-out-coverage.md](0024-MADR-opt-in-and-opt-out-coverage.md)
+D8, before this record is accepted.* Every component follows API
+convention 12 from its first step: each default it applies is listed in
+`docs/guides/defaults.md` with its control before it is built. Three gain
+a control beyond D3 to D9:
+
+* `inline.WithoutCursorQuery()`: a resize sends no `CSI 6 n`, and the
+  region redraws by `WithReflow`'s kind alone;
+* `transcript.WithoutScrollbackClear()`: a reprint writes `CSI 2 J`
+  without `CSI 3 J`, keeping the terminal's scrollback, at the cost of
+  the old rows above it;
+* `WithRules(safetext.Rules)` on each component that cleans text, never
+  weaker than `safetext.Line`, the floor of 0024-MADR D2.
+
+The text each component shows, such as the picker's count and the
+question's prompt, has a message ID and an English default, and comes
+from the program's catalogue through `WithCatalog` (0024-MADR D9). The
+floors stay: cleaning, the input bounds, and the protocol of the cursor
+report.
+
+### Consequences
+
+* Good, because gobble's line-mode CLI gets all four components with
+  clean closures, and can drop its own: the editor (about 1,800 lines),
+  the Markdown streaming, styling and wrapping of `render` (`mdstream.go`,
+  `mdstyle.go`, `wrap.go`, `table.go`), and the transcript, and need not
+  build the question.
+* Good, because every behaviour gobble measured becomes a deterministic
+  test here, on a screen that re-wraps three ways.
+* Good, because the TUI and the line mode share the question, the
+  composer, a picker's entries and the Markdown scanner.
+* Neutral, because `palette` imports `pick` for `FromEntries`; `pick` is a
+  core, so the palette's closure gains no Charm module.
+* Good, because widths are by grapheme cluster, in the terminal's method,
+  where gobble's are not.
+* Good, because the library still owns no terminal: no raw mode, no
+  stdin, no environment, no process.
+* Neutral, because 0009's `stream` changes its package graph before it is
+  built; its design otherwise stands.
+* Bad, because a host writes a loop: read, decode, feed an engine, drain
+  its events, write, and arm a timer for its deadline. Each package's
+  documentation and an example show that loop.
+* Bad, because seven packages join the cores, and the conformance test
+  lists them.
+* Bad, because a reprint clears the terminal's scrollback.
+* Bad, because a cursor report on the first row must be read by the region
+  while it waits for one, since it is a modified F3 to a decoder.
+
+### Confirmation
+
+* `TestCoresAreCharmFree` passes with each new core listed, on Linux,
+  macOS and Windows, and fails on a scratch copy that imports Bubble Tea
+  into one.
+* The goldens, fuzz targets, budgets and re-wrap tests of D11 pass, each
+  seen failing on a scratch copy first.
+* gobble's issue #7 layout, drawn by `ask.Layout` at 60, 100 and 177
+  columns, matches its 0029-MADR D1 sketch.
+* A consumer smoke test in a scratch module asks a question, picks an
+  entry, edits and submits a line, and streams a reply, on a fake
+  terminal, linking no Charm module but `x/ansi`.
+* `make apicheck` reports 0 incompatible changes at each release.
+
+## Pros and Cons of the Options
+
+### A. I/O-free engines, a package each, on one live region
+
+* Good, because the host owns the reader, so one reader serves the
+  editor, a question asked mid-turn and a sign-in prompt, as gobble's
+  `Reader` does.
+* Good, because a streaming reply prints above the composer from the same
+  loop, with no lock (x/term's `Write`, done as bytes).
+* Good, because it is 0020-MADR A2's form, already used by `termcap.Probe`.
+* Bad, because it is the most code, and each host writes its loop.
+
+### B. Blocking components that own a reader
+
+* Good, because `ReadLine()` is the simplest call there is.
+* Bad, because a component holds the terminal for the length of a prompt:
+  output from another goroutine needs a lock and a redraw inside it, as
+  x/term's `Terminal.Write` takes `t.lock`.
+* Bad, because a reader that reads before raw mode is what returned 379
+  bytes on Windows; the fix was reading only when asked.
+* Bad, because its tests need a goroutine and a pipe for every case.
+
+### C. Bubble Tea drawn inline
+
+* Good, because huh and promptkit already draw questions and lists so.
+* Bad, because the closure holds Bubble Tea, `colorprofile` and
+  `ultraviolet`: what gobble's boundary forbids.
+
+### D. Wrap an existing Go line editor
+
+* Good, because liner and readline exist and have users.
+* Bad, because each owns stdin and raw mode (`NewLiner` "sets the terminal
+  into raw mode"), measures without grapheme clusters, decodes keys beside
+  `termkey`, and is a module this record would have to name.
+
+### E. One package for all four
+
+* Good, because there is one import path and one document.
+* Bad, because a program that asks one question links the picker's
+  `fuzzy`, the transcript's `stream` and the composer's keymap.
+* Bad, because the types would need prefixes to stay apart in one
+  package (`QuestionEvent`, `PickerEvent`).
+
+### F. Change nothing
+
+* Good, because nothing is built.
+* Bad, because gobble's 0032-MADR D5 waits for this repository, and its
+  0029-PLAN's P2 is stopped for #7.
+
+## Owner questions
+
+*Answered 2026-10-25,* each picked from three options: Q1 "A package
+each (Recommended)"; Q2 "Own line-stable printer (Recommended)"; Q3 "A
+minor per component (Recommended)"; Q4 "The program's keymap
+(Recommended)"; Q5 "A palette provider"; Q6 "Amend 0009 here
+(Recommended)"; Q7 "Insert, editable (Recommended)". Q5 is not the
+recommendation: D5's TUI form is `palette.FromEntries`, not the palette
+with a `Static` provider and no TUI form of `pick`.
+
+* **Q1. The packages.** Recommended: D1's, one package per component on a
+  shared `inline`. The alternative is option E, one package.
+* **Q2. Markdown in the line mode.** Recommended: D8, the repository's own
+  line-stable printer that keeps the markers. The alternatives are a
+  goldmark-based renderer, which adds a module and restyles text, or none,
+  leaving gobble's `render` in gobble.
+* **Q3. Releases.** Recommended: a minor release after each of D12's
+  steps 2, 3, 4 and 6. The alternative is one release when all six steps
+  are done.
+* **Q4. The composer's keys.** Recommended: commands in the program's one
+  keymap, `lineedit.DefaultRules()`, as the palette's are. The
+  alternative is a fixed set of keys, as gobble has today.
+* **Q5. The picker in the TUI.** Recommended: the palette, with no
+  `picktea`. The alternatives are a `pick/picktea` pane, or a palette
+  provider over `pick`'s entries, `palette.FromEntries`, which the owner
+  chose.
+* **Q6. 0009's split.** Recommended: amend
+  [0009-MADR-streaming-content-engine.md](0009-MADR-streaming-content-engine.md)
+  as D7 says, in this record's first PLAN. The alternative is a record of
+  its own for the split, before step 5.
+* **Q7. A bracketed paste in the composer.** Recommended: inserted as
+  text by default, with gobble's submit-whole an option. The alternative
+  is gobble's behaviour as the default.
+
+## More Information
+
+* Issues of this repository: #7, #8, #9 and #10, each with gobble's
+  comment of 2026-10-23 on the `x/ansi` relaxation.
+* gobble-cli, at `5fb6928`: `docs/decisions/0027-MADR-native-line-editor-word-wrap.md`
+  (D2, D3, D5 and their amendments, Q2) and its PLAN;
+  `0028-MADR-reply-word-wrap.md` (D5, D7); `0029-MADR-permission-prompt-layout.md`
+  (D1, D2, D5, D6) and its PLAN (P2); `0030-MADR-resize-and-performance.md`
+  (D1 to D5) and its PLAN (P1, P4, P5); `0032-MADR-go-tui-lib-integration-boundary.md`
+  (D1 to D7, A1) and its PLAN; and `internal/cli`'s `editor`, `render`,
+  `term`, `term/termtest`, `transcript.go`, `view.go`, `permission.go`,
+  `trust.go`, `sessions.go` and `line.go`.
+* Records here:
+  [0007-MADR-keymap-engine.md](0007-MADR-keymap-engine.md);
+  [0008-MADR-command-palette.md](0008-MADR-command-palette.md) (the
+  palette; A3's keys as commands);
+  [0009-MADR-streaming-content-engine.md](0009-MADR-streaming-content-engine.md)
+  (§1, §4, A2), which D7 amends;
+  [0016-MADR-go-1-27-2-for-go-2026-6604.md](0016-MADR-go-1-27-2-for-go-2026-6604.md);
+  [0020-MADR-charm-free-cores-glyphs-and-safetext.md](0020-MADR-charm-free-cores-glyphs-and-safetext.md)
+  (D1, D2, D7, D11, A2);
+  [0021-MADR-termkey-closure-gate.md](0021-MADR-termkey-closure-gate.md);
+  [docs/glossary.md](../glossary.md).
+* External sources, read 2026-10-25: golang.org/x/term v0.47.0,
+  `terminal.go` (`Terminal.Write`) and its `History`; reedline 0.52.1,
+  <https://docs.rs/reedline/latest/reedline/>; prompt_toolkit,
+  <https://python-prompt-toolkit.readthedocs.io/en/master/pages/asking_for_input.html>;
+  inquire 0.9.4, <https://docs.rs/inquire/latest/inquire/>; liner v1.2.3,
+  <https://pkg.go.dev/github.com/peterh/liner>; goldmark v1.8.2's
+  `go.mod`; the Go release history, <https://go.dev/doc/devel/release>.
+* No PLAN is written yet: the owner asked for the decision first.
