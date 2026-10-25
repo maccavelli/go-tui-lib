@@ -55,6 +55,8 @@ it was when they were written
 | 0019 | PLAN | [Implement: a docs-only push or pull request runs a docs job instead of the full CI](decisions/0019-PLAN-skip-full-ci-for-docs-only-pushes.md) | in-progress |
 | 0020 | MADR | [Give a line-mode CLI Charm-free cores of `termcap`, `termsvc`, `command` and `keymap`, with their Bubble Tea forms in sub-packages, status and meter glyphs in `glyph`, and `safetext` as the one sanitizer](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md) | accepted; Q1–Q8 answered; A1.1 answered (c); A1.2–A1.3 recorded; A2 accepted; A3 accepted; A4 accepted; A4.1 answered (`v2.0.0` at `/v2`); A4.2 accepted |
 | 0020 | PLAN | [Implement Charm-free cores of `termcap`, `termsvc`, `command` and `keymap`, the `termkey` decoder, the status and meter glyphs, and `safetext`](decisions/0020-PLAN-charm-free-cores-glyphs-and-safetext.md) | complete (`v1.13.0` and `v2.0.0` tagged) |
+| 0021 | MADR | [Hold `termkey` to the standard library and `internal/enum` with a closure test and a strict depguard rule](decisions/0021-MADR-termkey-closure-gate.md) | proposed |
+| 0021 | PLAN | [Implement: hold `termkey` to the standard library and `internal/enum`](decisions/0021-PLAN-termkey-closure-gate.md) | proposed |
 
 ## I want to…
 
