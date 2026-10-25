@@ -57,7 +57,6 @@ it was when they were written
 | 0020 | PLAN | [Implement Charm-free cores of `termcap`, `termsvc`, `command` and `keymap`, the `termkey` decoder, the status and meter glyphs, and `safetext`](decisions/0020-PLAN-charm-free-cores-glyphs-and-safetext.md) | complete (`v1.13.0` and `v2.0.0` tagged) |
 | 0021 | MADR | [Hold `termkey` to the standard library and `internal/enum` with a closure test and a strict depguard rule](decisions/0021-MADR-termkey-closure-gate.md) | accepted; A1 accepted |
 | 0021 | PLAN | [Implement: hold `termkey` to the standard library and `internal/enum`](decisions/0021-PLAN-termkey-closure-gate.md) | complete |
-
 | 0022 | MADR | [Align docs-only CI and disclosure gates](decisions/0022-MADR-align-docs-ci-and-disclosure-gates.md) | proposed |
 | 0022 | PLAN | [Implement aligned docs-only CI and disclosure gates](decisions/0022-PLAN-align-docs-ci-and-disclosure-gates.md) | proposed |
 
