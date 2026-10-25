@@ -1,0 +1,274 @@
+---
+status: proposed
+date: 2026-10-25
+associated-madr: "0024-MADR-opt-in-and-opt-out-coverage.md"
+---
+# Implement API rule 12, its floors, the message catalogue and the defaults inventory, and close the command-and-control gaps
+
+Associated MADR: [0024-MADR-opt-in-and-opt-out-coverage.md](0024-MADR-opt-in-and-opt-out-coverage.md)
+
+This is the first of the MADR's two PLANs, by its answer to Q5: D1 to D4,
+and D9's `msgcat` package, which
+[0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
+needs before its components draw text. D5 to D7, and the catalogue's
+adoption by the existing packages, are
+[0024-PLAN-terminal-text-and-convention-opt-outs.md](0024-PLAN-terminal-text-and-convention-opt-outs.md).
+
+## Goal
+
+A program with its own CLI can run the workspace's commands through its
+own registry, set its own permission policy, forget a remembered verdict,
+leave out the registry's built-in commands, make `launch`'s decision its
+own way with the library's helpers, choose where the epilogue goes or
+whether it is written, and bind the palette's commands under its own
+names; AGENTS.md carries rule 12 and its floors; `docs/guides/defaults.md`
+lists every default with its control, and a test holds it to the code;
+and `msgcat` is built.
+
+Done means every item under Verification holds, CI is green on the pushed
+tree, `v2.2.0` is tagged by the owner, and the consumer smoke test passes.
+
+## Scope
+
+### Facts re-read before execution (2026-10-25, at `65d437b`)
+
+| Fact | Step |
+| :--- | :--- |
+| `workspace.(*Workspace).run` runs a `workspace.*` command's handler with `context.Background()`; any other ID goes to a `CommandConsumer`, else back as `RequestMsg` (`workspace/bindings.go:253-274`) | 5 |
+| `command.asks` is the fixed table: mutating asks for the agent, destructive for the agent or the shell (`command/gate.go:78-89`); `policy.decide` consults `Request.Gate` only where it asks, and remembers `AllowAlways` and `RejectAlways` by ID and caller (`:104-134`) | 4 |
+| `NewRegistry` adds `command.list`, `command.describe` and `app.quit` (`command/registry.go:157-174`), whose IDs are unexported (`builtin.go:11-15`) | 4 |
+| `Decide` reads `CI` by name only when `Choice` is not `ChoiceTUI`, and `TERM=dumb` is plain under every choice (`launch/decide.go:205-218`); `colourEnv` and `profile` are unexported (`launch/colour.go:19`, `:38`), and so is the locale's tier (`locale.go:18-31`) | 6 |
+| `Run` writes `Epilogue()` to `Out` on a clean end (`launch/run.go:131-137`) | 6 |
+| The picker's command IDs and its scope are unexported (`palette/keys.go:12-29`); the opening hook is the unexported `opener` (`palette/picker.go:96-100`) | 7 |
+| The cores are `internal/conformance/charmfree_test.go`'s `cores` and `.golangci.yml`'s `charmfree` files; the narrow closures are `narrow`; shared type names are `conformance_test.go`'s `sharedNames` | 2 |
+
+### In scope
+
+| Step | Paths | What |
+| :--- | :--- | :--- |
+| 1 | `docs/decisions/0023-*`, `docs/decisions/0024-*`, `docs/README.md`, `docs/glossary.md`, `AGENTS.md` | accept both MADRs; rule 12; this PLAN `in-progress` |
+| 2 | `msgcat/`, `internal/conformance/charmfree_test.go`, `.golangci.yml` | the catalogue package, a core with a narrow closure |
+| 3 | `docs/guides/defaults.md`, `internal/conformance/defaults_test.go` | the inventory and `TestDefaultsInventory` |
+| 4 | `command/` | `WithGatePolicy`, `GatePolicy`, `GatePolicyFunc`, `DefaultGatePolicy`, `Registry.Forget`, `ForgetAll`, `WithoutBuiltins`, `BuiltinList`, `BuiltinDescribe`, `BuiltinQuit` |
+| 5 | `workspace/` | `WithoutOwnCommands` |
+| 6 | `launch/` | `Config.AllowDumb`, `Config.IgnoreCI`, `ColorProfile`, `GlyphTier`, `WithoutEpilogue`, `WithEpilogueWriter` |
+| 7 | `palette/` | the picker's command IDs and scope exported, `CompletionRules`, `Opener` |
+| 8 | `docs/`, `README.md` | the guides, the release `v2.2.0`, the close-out |
+
+No module is added. `msgcat` imports the standard library alone.
+
+### Out of scope
+
+* MADR D5 to D7, and each package's adoption of the catalogue (its
+  `Messages()`, `WithCatalog` and IDs): the second PLAN.
+* 0023's components: their PLAN.
+* `git push` and tags, which are the owner's.
+
+## Prerequisites
+
+* The owner has accepted the MADR and approved this PLAN.
+* `v2.1.0` is the latest tag, and `make apicheck` compares with it.
+
+## Rules for every step
+
+0008-PLAN's rules, which every recent PLAN has run under:
+
+1. **Order.** Each step's packages compile, pass their tests and pass the
+   gates before the next starts.
+2. **Every default unchanged.** Each step adds a test that the behaviour
+   without its new option is today's, and one that the option changes it.
+3. **Mutation proofs,** through `python3 -m tools.verify mutate` on
+   scratch copies, each making a named test fail, each failure quoted in
+   the record.
+4. **Gates:** `python3 -m tools.verify gates` on macOS and through
+   `remote linux` and `remote windows`; `make apicheck` reports 0
+   incompatible changes against `v2.1.0`.
+5. **Names:** each new type name through `python3 -m tools.verify names`
+   before it is written.
+6. **Identifiers:** the scan of the step's diff before each handoff.
+7. **Commit.** One commit per step, by the owner, after the agent stops
+   with the step's evidence in the execution record; the agent stages and
+   commits nothing.
+8. **Deviations** stop the work, with resolutions offered; the owner's
+   choice is recorded here, dated, and in the MADR when a decision changes.
+
+## Implementation Steps
+
+### Step 1: records
+
+* Both MADRs `accepted`, with the owner's words; this PLAN `in-progress`;
+  `docs/README.md`'s rows.
+* [0023-MADR-line-mode-components.md](0023-MADR-line-mode-components.md)
+  D12 gains a dated note: its releases are each the next minor version
+  after this PLAN's `v2.2.0`, by 0024-MADR Q5, so D12's `v2.2.0` to
+  `v2.5.0` read as the next four minors.
+* AGENTS.md's "API conventions" gains rule 12, as 0024-MADR D1 words it,
+  naming `docs/guides/defaults.md`.
+* `docs/glossary.md`: `msgcat`'s `Catalog`, `CatalogFunc`, `MessageID`
+  and `Table`; `command.GatePolicy` and `GatePolicyFunc`; `palette.Opener`.
+* Records and AGENTS.md only.
+
+### Step 2: `msgcat`
+
+* `msgcat/`: `MessageID`, `Catalog`, `CatalogFunc`, `Table` (a `Catalog`),
+  `Format(c Catalog, id MessageID, def string, args ...any) string` (a nil
+  catalogue, or a false answer, is `def`), and `Check(defaults Table, c
+  Catalog) error`, which reports each message whose fmt verbs differ from
+  its default's, joined; its documentation with the stability line.
+* **The gates:** `msgcat` joins `cores`, the `charmfree` files, and
+  `narrow` with an empty allow list: the standard library alone.
+* **Tests:** a default kept for a nil catalogue and for a missing ID; a
+  translation used; explicit argument indexes reorder; `Check` names a
+  translation with a missing verb, an extra one and another verb, and
+  passes a matching one; `CatalogFunc` and `Table` are `Catalog`s.
+* **Mutations:** `Format` ignores the catalogue; `Format` ignores a false
+  answer and prints an empty string; `Check` compares the count of verbs
+  only; `msgcat` imports `x/ansi`, which `TestNarrowClosures` and the
+  `charmfree` rule's neighbour fail.
+
+### Step 3: the inventory
+
+* `docs/guides/defaults.md`: what rule 12 asks; the floors of MADR D2,
+  each with its reason and its lower layer; then a table per package,
+  `Behaviour | Default | Control | Status`, from the MADR's audit: every
+  behaviour, its control in backticks (`workspace.WithoutMouse`,
+  `command.Registry.Remove`), and a status of `built`, `planned` (with the
+  PLAN that builds it) or `floor`.
+* `internal/conformance/defaults_test.go`, `TestDefaultsInventory`: it
+  reads the guide's tables, and resolves every control in a `built` row,
+  `pkg.Name` or `pkg.Type.Method`, in the type-checked packages; one that
+  does not resolve fails, naming the row. A `planned` row must name its
+  PLAN by file name.
+* **Tests and proofs:** on a scratch copy, a `built` row naming
+  `workspace.WithoutMice` fails; a `planned` row with no PLAN fails; a
+  method that does not exist fails.
+
+### Step 4: `command`
+
+* `GatePolicy interface{ Asks(c Command, o Origin) bool }`,
+  `GatePolicyFunc`, `DefaultGatePolicy()`, today's `asks` table, and the
+  option `WithGatePolicy(GatePolicy)`; a nil policy keeps the default.
+  `policy.decide` asks the registry's policy where it asked `asks`.
+* `Registry.Forget(id ID, caller string)` and `Registry.ForgetAll()` drop
+  remembered verdicts.
+* `WithoutBuiltins()`: `NewRegistry` adds none of its three commands.
+  `BuiltinList`, `BuiltinDescribe` and `BuiltinQuit`, exported `ID`
+  constants; the unexported names become those.
+* **Tests:**
+  * without the option, every danger and origin pair asks as today: a
+    table test over all four dangers and seven origins;
+  * a policy that asks for every destructive command puts a destructive
+    key request to the gate; one that asks for nothing lets the agent's
+    mutating request run unasked;
+  * `AllowAlways`, then `Forget`, asks again; `ForgetAll` forgets every
+    caller's;
+  * `WithoutBuiltins`: `All`, `MCPTools`, `Manifest` and `Complete` hold
+    none of the three; without it, all three are there;
+  * the exported IDs equal the commands' IDs.
+* **Mutations:** `decide` ignores the policy; `DefaultGatePolicy` asks for
+  mutating key requests; `Forget` forgets nothing; `WithoutBuiltins` is
+  ignored; `ForgetAll` forgets only the first caller.
+
+### Step 5: `workspace`
+
+* `WithoutOwnCommands()`: `run` treats a `workspace.*` command as any
+  other: offered to a `CommandConsumer`, else a `RequestMsg`. The esc
+  binding's offer to an `EscConsumer` stays first. A program that wants
+  the commands registers `workspace.Commands(ws)` in its registry.
+* **Tests:**
+  * without the option, a `workspace.focus.next` key moves focus with no
+    `RequestMsg`, as today;
+  * with it, the key comes back as a `RequestMsg` with `OriginKey` and
+    the workspace's when values; dispatched to a registry holding
+    `workspace.Commands(ws)`, whose gate records what it is asked and
+    whose auditor records every request, focus moves, the auditor holds
+    the request, and a policy that asks for every UI command puts it to
+    the gate;
+  * an overlay that consumes esc still takes it under the option.
+* **Mutations:** the option is ignored; the option drops the esc
+  consumer's offer; the request loses its when values.
+
+### Step 6: `launch`
+
+* `Config.AllowDumb`: `TERM=dumb` no longer forces plain output; the rest
+  of the decision runs. `Config.IgnoreCI`: `CI` no longer vetoes the
+  automatic choice. Both false by default.
+* `ColorProfile(s Streams) colorprofile.Profile` and `GlyphTier(s Streams)
+  glyph.Tier`, the helpers `Decide` uses, exported; `Decide` calls them.
+* `WithoutEpilogue()` writes no epilogue; `WithEpilogueWriter(w
+  io.Writer)` writes it to `w`. `Run`'s default is today's.
+* **Tests:** `Decide`'s reasons without the fields, as today; with
+  `AllowDumb` and a terminal, a TUI decision; with `IgnoreCI` and `CI=1`,
+  the automatic choice decides by the terminal; `ColorProfile` and
+  `GlyphTier` equal what `Decide` puts in its decision, for every fixture
+  `launchtest` has; the epilogue to `Out` by default, to the given writer,
+  or nowhere.
+* **Mutations:** `AllowDumb` ignored; `IgnoreCI` also drops the program's
+  `NoInputEnv`; `Decide` stops calling the exported helpers and keeps a
+  copy that drifts (a fixture that differs); `WithoutEpilogue` ignored.
+* **The examples gate** (`make examples`) still passes: the framework
+  examples use none of these.
+
+### Step 7: `palette`
+
+* The picker's command IDs exported: `OpenID`, `SelectNextID`,
+  `SelectPrevID`, `PageNextID`, `PagePrevID`, `AcceptID`, `CompleteID`;
+  its scope, `PickerScope`. `DefaultRules` reads them.
+* `CompletionRules(id string) []keymap.Default`: the completion bindings
+  in `overlay:<id>`, so a pop-up under another ID has its keys.
+  `DefaultRules` uses it for `completion`.
+* `Opener interface{ Opened(c when.Context) }`, exported: `Open` calls it
+  on each provider that has it, as it calls `opener` today; `FromRegistry`,
+  `Panes` and `Recents` implement it.
+* **Tests:** `DefaultRules` unchanged, compared binding for binding with
+  `v2.1.0`'s; `CompletionRules("notes")` binds in `overlay:notes`, and a
+  pop-up opened `WithID("notes")` moves and accepts with them; a program's
+  own wrapper of `FromRegistry` that forwards `Opened` lists the commands
+  for an empty query, and one that does not lists none.
+* **Mutations:** `CompletionRules` ignores its ID; `Open` stops calling
+  `Opened`; `Recents` stops forwarding it.
+
+### Step 8: documentation, the release `v2.2.0`, and the close-out
+
+* **Guides:** `docs/guides/commands.md` gains the gate policy, forgetting,
+  and a registry without built-ins; `building-workspaces.md`
+  `WithoutOwnCommands`; `command-palette.md` the exported IDs,
+  `CompletionRules` and `Opener`; the commands guide's launch section the
+  new `Config` fields, the helpers and the epilogue options; the defaults
+  guide's rows for Steps 4 to 7 move to `built`.
+* `docs/guides/migrating.md`: "Migrating to `v2.2.0`", additions only.
+* `README.md`: the current release, and a Status bullet.
+* **The release,** as 0008-PLAN Step 9 ran: the API listed by apidiff
+  with compatible changes; release notes in the execution record; the
+  disclosure guard; the owner's push; CI green; the owner's annotated tag;
+  CI green on the tag; the consumer smoke test from the proxy, a program
+  with its own registry, policy and `WithoutBuiltins`, a workspace
+  `WithoutOwnCommands`, and its own launch decision, with a negative
+  control seen to fail.
+* This PLAN becomes `complete`, and its `docs/README.md` row says so.
+
+## Verification
+
+* Every step's mutations are killed, each failure quoted in the record.
+* `python3 -m tools.verify gates` passes on macOS, Linux and Windows for
+  every step.
+* `make apicheck` reports 0 incompatible changes against `v2.1.0`, and
+  `scripts/apicheck.allow` stays empty.
+* `TestDefaultsInventory` passes, and every behaviour of the MADR's audit
+  has a row.
+* `TestCoresAreCharmFree` and `TestNarrowClosures` pass with `msgcat`.
+* Without any new option, every existing test passes unchanged.
+* The identifier scan finds nothing.
+* After the owner's push, CI is green on all three operating systems.
+
+## Rollout and Rollback
+
+* **Rollout.** The owner pushes Steps 1 to 8 and tags `v2.2.0`.
+  [0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
+  starts after this PLAN's close-out, by 0024-MADR Q5, and its first
+  release follows this one.
+* **Rollback.** Before the push, each step is one local commit. After it,
+  a patch release fixes forward. Every change is an addition, and no
+  default changes, so a program that sets no new option sees no change.
+
+## Execution Record
