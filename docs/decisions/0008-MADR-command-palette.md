@@ -1025,6 +1025,11 @@ the picker, and it does nothing for a non-modal pop-up.
 
 ## More Information
 
+* Built by [0008-PLAN-command-palette.md](0008-PLAN-command-palette.md),
+  `complete` on 2026-10-25: `fuzzy` and the `workspace` and `glyph`
+  additions released in `v1.13.0`, and `palette` with
+  `workspace.OverlayClosedMsg` in `v2.1.0`. The guide is
+  [docs/guides/command-palette.md](../guides/command-palette.md).
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md):
   §3 (crush, codex, toad), §4 (Textual, Posting, k9s), §7 (item 3).
 * [0002-MADR-multi-pane-workspace-layouts.md](0002-MADR-multi-pane-workspace-layouts.md)

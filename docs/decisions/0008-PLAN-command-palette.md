@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-10-25
 associated-madr: "0008-MADR-command-palette.md"
 ---
@@ -1575,3 +1575,62 @@ Step 8's `d0815db`. One deviation, D1, below.
   tag `v2.1.0` and CI green on it; the consumer smoke test, with a
   negative control; and this PLAN `complete`, with its `docs/README.md`
   row.
+
+#### The release and the close-out
+
+* **The release.** The owner committed this step as `bfe819d`. The guard
+  passed over the 12 outgoing commits, `02a7879` to `bfe819d` against
+  `2ecc8bb`, exit 0, with no finding, and `main` was not behind
+  `origin/main`. The owner pushed `main`: Docs passed (run
+  `40221816785`), and CI passed on `bfe819d` (run `40221816750`:
+  `modules`, `gates`, and `test` on `macos-15`, `ubuntu-24.04` and
+  `windows-2025`). The owner then tagged `bfe819d` and pushed the tag:
+  * `git ls-remote` shows `refs/tags/v2.1.0`, an annotated tag
+    (`e17e384`), peeled to `bfe819d`;
+  * `proxy.golang.org` serves `v2.1.0` for
+    `github.com/maccavelli/go-tui-lib/v2`, and its `.info` names
+    `refs/tags/v2.1.0` at `bfe819d`;
+  * CI on the tag: passed (run `40223697534`: `modules`, `gates`, and
+    `test` on `macos-15`, `ubuntu-24.04` and `windows-2025`).
+* **The consumer smoke test,** `releasing.md`'s procedure, in a scratch
+  module outside the repository: `go get
+  github.com/maccavelli/go-tui-lib/v2@v2.1.0`, which downloaded from the
+  proxy, `go mod tidy`, an empty `go env GOWORK`, the requirement
+  `github.com/maccavelli/go-tui-lib/v2 v2.1.0`, then `go vet ./...`, `go
+  build ./...`, `go run .` and staticcheck (`0 issues.`), each with exit
+  0. The program builds a registry with `app.greet`, which takes a
+  required `name`, the workspace's and the palette's rules in one keymap,
+  and a picker `WithRecents` over `Recents(FromRegistry(reg))`, with
+  `OpenCommand` registered; it presses `ctrl+p`, which reaches the
+  registry as a `RequestMsg` and opens the picker, types `>greet`, gives
+  the name in the argument stage, and runs the command: "smoke: PASS (ran
+  app.greet with "world" from the palette; recents 90 bytes, by ID
+  only)". *The negative control,* the same program giving no name, builds
+  as the first and fails: "smoke: FAIL, the command ran with []; want
+  once, with world", exit 1. A rehearsal against the tree, by a
+  `replace`, had found the program's own check too strict, a score of
+  exactly 1 on a real clock, and it was loosened to 0.99 before the run
+  from the proxy.
+* **Verification, each item:**
+  * every step's mutations killed, each failure quoted in its record;
+  * on macOS and the Windows host, the gates' default list, which covers
+    the pre-add check, lint, `vuln`, `apicheck`, the examples,
+    `release-check`, `-race`, `-shuffle=on -count=2`, `LC_ALL=C`,
+    workspace mode and the cross vets (Rule 3's note of 2026-10-15), for
+    every step; and `make fuzz FUZZTIME=3s` on the released tree, "14
+    packages ran clean" on both, the Windows host's through `remote`'s
+    copy of the tree with `make fuzz` in place of the gates;
+  * `go mod tidy -diff` clean, and `go.mod` gained no requirement;
+  * `make apicheck`: "against v2.0.0, 0 incompatible change(s)", with
+    `scripts/apicheck.allow` empty;
+  * `internal/conformance` passes for `fuzzy` and `palette`;
+  * no default binding in `palette` is `ctrl+c`: the one match in
+    `palette/` is `keys.go`'s comment saying so;
+  * the benchmarks and the index's recall are in Steps 3 and 4's records;
+  * the identifier scan clean at every step;
+  * CI green after the push, on all three systems, on `main` and on the
+    tag.
+* **The close-out:** this PLAN is `complete`, and its `docs/README.md`
+  row says so; the MADR's More Information and its row name the
+  releases. `scripts/apicheck.allow` had no block to remove. On the
+  close-out's own commit `make apicheck` takes `v2.1.0` as its base.
