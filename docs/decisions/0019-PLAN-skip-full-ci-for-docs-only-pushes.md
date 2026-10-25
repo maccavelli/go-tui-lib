@@ -1,6 +1,6 @@
 ---
-status: in-progress
-date: 2026-10-20
+status: complete
+date: 2026-10-25
 associated-madr: "0019-MADR-skip-full-ci-for-docs-only-pushes.md"
 ---
 # Implement: a docs-only push or pull request runs a docs job instead of the full CI
@@ -468,3 +468,36 @@ The kept output of each:
 * **A fixture change:** not exercised, as the step says.
 * **Not done yet:** V3's first half, and with it the closing, which
   follow that push.
+
+### Step 4, continued: the docs-only push, and closing (2026-10-25)
+
+*2026-10-25.* No deviation.
+
+* **A docs-only push (V3's first half):** the owner pushed `2ecc8bb`
+  alone; `origin/main` moved from `d5509df` to `2ecc8bb`. That commit
+  changes Markdown under `docs/` only: `docs/README.md`, the 0008 MADR
+  and PLAN, `docs/decisions/0018-PLAN-python-verification-tools.md` and
+  this PLAN. GitHub's run list for it,
+  `actions/runs?head_sha=2ecc8bbb5fbcf25943cff728eb23c25d5d55eae4`, holds
+  `total_count` 1: run `40188859464`, "Docs", event `push`, conclusion
+  `success`, started 11:26:17Z and updated 11:26:34Z, 17 s; its one job,
+  `docs`, `success`. No "CI" run. V3 is met.
+* **Closing:** this PLAN is `complete`, with the verification below, and
+  `docs/README.md`'s row for it says so. The MADR stays `accepted`.
+* **Not done here, as Step 4 says:** a fixture change was not exercised
+  live; the next commit that touches `command/testdata/commands/` runs
+  CI, which its own record can note.
+
+### Verification, at closing
+
+* **V1 (filters):** met at Step 2; actionlint exit 0 on both workflows.
+* **V2 (seen failing):** met at Step 2: the MD018 plant, the excerpt
+  plant and the `notes.md` heading plant each KILLED for its planted
+  reason; the tree passes markdownlint and the guide check.
+* **V3 (live):** met. The docs-only push of `2ecc8bb` ran only "Docs"
+  (`40188859464`, `success`); the push of `63c68d6`, with non-Markdown
+  changes, ran "CI" 5 of 5 (`39963257917`), and later pushes alike.
+* **V4 (tags):** met. `v1.13.0` and `v2.0.0` (`40143509687`) each ran
+  "CI" 5 of 5 and no "Docs".
+* **V5 (documents):** met at Step 3; markdownlint and the identifier scan
+  clean.
