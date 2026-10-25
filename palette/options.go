@@ -57,6 +57,7 @@ type config struct {
 	logger      *slog.Logger
 	goos        string // the system key hints are labelled for
 	placeholder string
+	noInput     bool // a completion pop-up: no input row, non-modal
 }
 
 func newConfig(opts []Option) config {
@@ -106,6 +107,15 @@ func WithPlaceholder(s string) Option {
 	return optionFunc(func(c *config) { c.placeholder = sanitize.Line(s) })
 }
 
+// WithoutInput makes the picker a completion pop-up, with no input row of
+// its own (0008-MADR §5, A3 item 6). It opens non-modal, so the focused
+// pane keeps the keyboard and sends it SetQuery as its "@" or "/" token
+// changes, as the overlay "completion" unless WithID names another, under
+// the pane's cursor. Its keys are DefaultRules' "overlay:completion"
+// bindings; a program that picks another ID binds its own. Accepting a
+// hit sends SelectedMsg, runs nothing, and closes the pop-up.
+func WithoutInput() Option { return optionFunc(func(c *config) { c.noInput = true }) }
+
 // OverlayOption places a picker's overlay when it opens.
 type OverlayOption interface{ applyOverlay(*overlayConfig) }
 
@@ -115,11 +125,15 @@ func (f overlayFunc) applyOverlay(c *overlayConfig) { f(c) }
 
 // The overlay a picker opens in, unless an OverlayOption says otherwise:
 // its ID, and its size, chrome included, which the workspace clamps to
-// itself.
+// itself; and a completion pop-up's.
 const (
 	defaultID     = "palette"
 	defaultWidth  = 72
 	defaultHeight = 16
+
+	completionID     = "completion"
+	completionWidth  = 48
+	completionHeight = 10
 )
 
 // overlayConfig is an opening's OverlayOptions, applied.
@@ -129,8 +143,16 @@ type overlayConfig struct {
 	width, height int
 }
 
-func newOverlayConfig(opts []OverlayOption) overlayConfig {
+// newOverlayConfig applies opts over the defaults: a picker's, or a
+// completion pop-up's, which sits under the focused pane's cursor.
+func newOverlayConfig(opts []OverlayOption, completion bool) overlayConfig {
 	c := overlayConfig{id: defaultID, width: defaultWidth, height: defaultHeight}
+	if completion {
+		c = overlayConfig{
+			id: completionID, anchor: workspace.Anchor{Kind: workspace.BelowCursor},
+			width: completionWidth, height: completionHeight,
+		}
+	}
 	for _, o := range opts {
 		o.applyOverlay(&c)
 	}
@@ -138,7 +160,8 @@ func newOverlayConfig(opts []OverlayOption) overlayConfig {
 }
 
 // WithID names the overlay, for workspace.Close, SendOverlay and its
-// "overlay:<id>" key scope; "" keeps the default, "palette".
+// "overlay:<id>" key scope; "" keeps the default, "palette", or a
+// completion pop-up's "completion".
 func WithID(id string) OverlayOption {
 	return overlayFunc(func(c *overlayConfig) {
 		if id != "" {
@@ -147,13 +170,15 @@ func WithID(id string) OverlayOption {
 	})
 }
 
-// WithAnchor places the overlay at a; it is centred without it.
+// WithAnchor places the overlay at a; without it a picker is centred, and
+// a completion pop-up is under the focused pane's cursor.
 func WithAnchor(a workspace.Anchor) OverlayOption {
 	return overlayFunc(func(c *overlayConfig) { c.anchor = a })
 }
 
 // WithSize is the overlay's size in cells, chrome included; a side below 1
-// keeps its default, 72 by 16. The workspace clamps it to its own size.
+// keeps its default, 72 by 16, or 48 by 10 for a completion pop-up. The
+// workspace clamps it to its own size.
 func WithSize(width, height int) OverlayOption {
 	return overlayFunc(func(c *overlayConfig) {
 		if width > 0 {

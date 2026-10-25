@@ -69,7 +69,15 @@ var asciiTheme = theme.New(colorprofile.ASCII, theme.Unknown, glyph.ASCII())
 // newProg is an 80 × 24 workspace whose keys go through km, or its
 // defaults when km is nil, with a picker labelling hints for Linux.
 func newProg(t *testing.T, km *keymap.Keymap, wopts []workspace.Option, opts ...Option) *prog {
-	g := &prog{t: t, main: &pane{}}
+	main := &pane{}
+	g := newProgOn(t, layout.Pane{ID: "main"}, map[layout.PaneID]workspace.Pane{"main": main}, km, wopts, opts...)
+	g.main = main
+	return g
+}
+
+// newProgOn is newProg over the layout root and its panes.
+func newProgOn(t *testing.T, root layout.Node, panes map[layout.PaneID]workspace.Pane, km *keymap.Keymap, wopts []workspace.Option, opts ...Option) *prog {
+	g := &prog{t: t}
 	if wopts == nil {
 		wopts = []workspace.Option{workspace.WithTheme(asciiTheme)}
 	}
@@ -77,7 +85,7 @@ func newProg(t *testing.T, km *keymap.Keymap, wopts []workspace.Option, opts ...
 	if km != nil {
 		wopts = append(wopts, workspace.WithBindings(km))
 	}
-	g.w = workspace.New(layout.Pane{ID: "main"}, map[layout.PaneID]workspace.Pane{"main": g.main}, wopts...)
+	g.w = workspace.New(root, panes, wopts...)
 	g.run(g.w.Init())
 	g.send(tea.WindowSizeMsg{Width: 80, Height: 24})
 	g.p = NewPicker(g.w, append([]Option{WithGOOS("linux")}, opts...)...)

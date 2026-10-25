@@ -30,9 +30,9 @@ func (p *Picker) restyle() {
 	p.input.SetWidth(max(p.width-p.w.WidthMethod().StringWidth(p.input.Prompt)-1, 1))
 }
 
-// View draws the picker into width × height cells: the input, a window of
-// the results, and a help line with the selected hit's description and a
-// count. Rows are measured and cut in the workspace's width method
+// View draws the picker into width × height cells: the input, unless it is
+// WithoutInput, a window of the results, and a help line with the selected
+// hit's description and a count. Rows are measured and cut in the workspace's width method
 // (0008-MADR §7, A5.3).
 func (p *Picker) View(width, height int) string {
 	if width <= 0 || height <= 0 {
@@ -40,12 +40,15 @@ func (p *Picker) View(width, height int) string {
 	}
 	p.restyle()
 	t, m := p.w.Theme(), p.w.WidthMethod()
-	out := []string{sanitize.Truncate(p.input.View(), width, m, "")}
-	if height == 1 {
-		return out[0]
+	var out []string
+	if !p.cfg.noInput {
+		out = append(out, sanitize.Truncate(p.input.View(), width, m, ""))
+		if height == 1 {
+			return out[0]
+		}
 	}
 	rows, ls := p.eng.rows(), p.lines()
-	for i := p.top; i < min(p.top+height-2, len(ls)); i++ {
+	for i := p.top; i < min(p.top+height-1-p.inputRows(), len(ls)); i++ {
 		l := ls[i]
 		if l.row < 0 {
 			out = append(out, t.Styles.Muted.Render(sanitize.Truncate(l.header, width, m, t.Glyphs.Ellipsis)))

@@ -23,6 +23,11 @@ const (
 // workspace.KeyContexter.
 const pickerScope command.Scope = "kind:picker"
 
+// completionScope is a completion pop-up's key scope under its default ID:
+// a non-modal overlay's own scopes are not on the key path, its
+// "overlay:<id>" is (0008-MADR A3 item 6).
+const completionScope command.Scope = "overlay:" + completionID
+
 // seq is a default's keys, which are fixed: an error is a bug.
 func seq(s string) keymap.Sequence {
 	q, err := keymap.ParseSequence(s, nil)
@@ -46,9 +51,11 @@ func bind(scope command.Scope, keys string, id command.ID, when string) keymap.D
 // OpenCommand, where no modal overlay is open; in an open picker, the
 // "kind:picker" scope, up and ctrl+p, and down and ctrl+n, move the
 // selection, pgup and pgdown page, enter runs the selected hit, and tab
-// completes the query to it. esc stays the workspace's: a picker takes it
-// while its query is not empty, to clear it. None is ctrl+c, which is the
-// program's.
+// completes the query to it; in a completion pop-up, "overlay:completion",
+// the same moves, and tab and enter accept, shadowing the pane's own
+// bindings of those keys only while it is open. esc stays the workspace's:
+// a picker takes it while its query is not empty, to clear it, and esc
+// closes a pop-up. None is ctrl+c, which is the program's.
 //
 // Without these rules a picker's keys reach its input, and nothing moves
 // the selection.
@@ -63,5 +70,11 @@ func DefaultRules() []keymap.Default {
 		bind(pickerScope, "pgdown", pageNextID, ""),
 		bind(pickerScope, "enter", acceptID, ""),
 		bind(pickerScope, "tab", completeID, ""),
+		bind(completionScope, "up", prevID, ""),
+		bind(completionScope, "ctrl+p", prevID, ""),
+		bind(completionScope, "down", nextID, ""),
+		bind(completionScope, "ctrl+n", nextID, ""),
+		bind(completionScope, "tab", acceptID, ""),
+		bind(completionScope, "enter", acceptID, ""),
 	}
 }

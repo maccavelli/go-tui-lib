@@ -21,6 +21,13 @@
 // runs its Run on the event loop and closes the picker; closing it, by any
 // means, cancels its searches and stops its providers.
 //
+// Four providers are built in: FromRegistry's commands, under the prefix
+// ">", which run through the registry with command.OriginPalette; Static's
+// fixed items; Panes' panes to focus or show; and Files' paths, under "@",
+// walked from an fs.FS the caller gives and ranked by their last element.
+// A picker made WithoutInput is a completion pop-up for an editor pane,
+// which drives it with SetQuery and is sent SelectedMsg.
+//
 // palette is a Bubble Tea package: a hit's Run returns a tea.Cmd, and the
 // picker is a workspace pane.
 //

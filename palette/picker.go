@@ -10,6 +10,7 @@ import (
 	"github.com/maccavelli/go-tui-lib/v2/command"
 	"github.com/maccavelli/go-tui-lib/v2/command/commandtea"
 	"github.com/maccavelli/go-tui-lib/v2/keymap"
+	"github.com/maccavelli/go-tui-lib/v2/when"
 	"github.com/maccavelli/go-tui-lib/v2/workspace"
 )
 
@@ -63,8 +64,12 @@ func (p *Picker) Register(pr Provider, a Availability) error { return p.eng.add(
 // first, so the hints, and the providers' availability, are those of where
 // the user was. Opening it while it is open opens it afresh: the last
 // opening's searches are cancelled and its providers stopped.
+//
+// A picker made WithoutInput opens non-modal instead, by default as the
+// overlay "completion" under the focused pane's cursor: the pane keeps the
+// keyboard and drives it with SetQuery.
 func (p *Picker) Open(opts ...OverlayOption) tea.Cmd {
-	o := newOverlayConfig(opts)
+	o := newOverlayConfig(opts, p.cfg.noInput)
 	path, ctx := p.w.KeyPath(), p.w.WhenContext()
 	var cmds []tea.Cmd
 	if p.id != "" && p.id != o.id {
@@ -73,12 +78,23 @@ func (p *Picker) Open(opts ...OverlayOption) tea.Cmd {
 	p.input.Reset()
 	p.sel, p.top, p.done = 0, 0, false
 	cmds = append(cmds, p.w.Push(workspace.Overlay{
-		ID: o.id, Pane: p, Anchor: o.anchor, Width: o.width, Height: o.height, Modal: true,
+		ID: o.id, Pane: p, Anchor: o.anchor, Width: o.width, Height: o.height, Modal: !p.cfg.noInput,
 	}))
 	p.id, p.path = o.id, path
+	for _, src := range p.eng.sources {
+		if op, ok := src.p.(opener); ok {
+			op.opened(ctx)
+		}
+	}
 	p.eng.open(ctx)
 	return tea.Batch(append(cmds, p.eng.query(""))...)
 }
+
+// opener is a built-in provider that reads something on the event loop
+// when the picker opens, before any search: the when values, which its
+// Discover is not given, or the workspace's panes, which only the loop may
+// read.
+type opener interface{ opened(c when.Context) }
 
 // OpenCommand is a command that opens this picker, for the program's
 // registry: palette.open is the ID DefaultRules binds ctrl+p to. Since no
@@ -110,14 +126,35 @@ func (p *Picker) ConsumesCommand(id command.ID) bool {
 }
 
 // ConsumesEsc takes esc while the query is not empty, to clear it; then
-// esc closes the picker, as the workspace closes any overlay.
-func (p *Picker) ConsumesEsc() bool { return p.input.Value() != "" }
+// esc closes the picker, as the workspace closes any overlay. A picker
+// WithoutInput never takes it, so esc closes the pop-up.
+func (p *Picker) ConsumesEsc() bool { return !p.cfg.noInput && p.input.Value() != "" }
 
 // Cursor is the input's cursor, in the picker's cells: the input is its
-// first row.
+// first row. A picker WithoutInput has none.
 func (p *Picker) Cursor() *tea.Cursor {
+	if p.cfg.noInput {
+		return nil
+	}
 	p.restyle()
 	return p.input.Cursor()
+}
+
+// setQueryMsg is SetQuery's message.
+type setQueryMsg struct{ q string }
+
+// SetQuery wraps a query for a picker, which searches for it as if it had
+// been typed: how an editor pane drives a completion pop-up as its "@" or
+// "/" token changes, through workspace.SendOverlay or To
+// (0008-MADR A3 item 6).
+func SetQuery(q string) tea.Msg { return setQueryMsg{q: q} }
+
+// SelectedMsg is a hit the user accepted, from the picker in the overlay
+// ID. A picker sends it on every accept; a completion pop-up's hit is the
+// pane's to use, and its Run is not called.
+type SelectedMsg struct {
+	ID  string // the overlay's ID
+	Hit Hit
 }
 
 // Update handles the workspace's messages, the keys and commands that
@@ -150,6 +187,8 @@ func (p *Picker) Update(msg tea.Msg) (workspace.Pane, tea.Cmd) {
 // commands, keys, paste and the mouse.
 func (p *Picker) handle(msg tea.Msg) tea.Cmd {
 	switch m := msg.(type) {
+	case setQueryMsg:
+		return p.set(m.q)
 	case workspace.CommandMsg:
 		return p.command(m.Request.ID)
 	case tea.KeyPressMsg:
@@ -222,10 +261,12 @@ func (p *Picker) selected() (row, bool) {
 	return rows[p.sel], true
 }
 
-// accept runs the selected hit: its Run, on the event loop, and a command
-// that closes the picker, which takes no more input until it is closed. A
-// failure's row and a disabled hit do nothing; the help line shows a
-// disabled hit's reason. One of "?"'s rows types its prefix.
+// accept takes the selected hit: it sends SelectedMsg, runs the hit's Run
+// on the event loop, unless the picker is a completion pop-up, and returns
+// a command that closes the picker, which takes no more input until it is
+// closed (0008-MADR §6, A3 items 3, 4 and 6). A failure's row and a
+// disabled hit do nothing; the help line shows a disabled hit's reason.
+// One of "?"'s rows types its prefix.
 func (p *Picker) accept() tea.Cmd {
 	r, ok := p.selected()
 	switch {
@@ -236,11 +277,15 @@ func (p *Picker) accept() tea.Cmd {
 	}
 	p.done = true
 	var run tea.Cmd
-	if r.hit.Run != nil {
+	if r.hit.Run != nil && !p.cfg.noInput {
 		run = r.hit.Run(nil)
 	}
-	id := p.id
-	return tea.Batch(run, func() tea.Msg { return workspace.Close(id) })
+	id, h := p.id, r.hit
+	return tea.Batch(
+		func() tea.Msg { return SelectedMsg{ID: id, Hit: h} },
+		run,
+		func() tea.Msg { return workspace.Close(id) },
+	)
 }
 
 // complete makes the query the selected hit's text, under the prefix the
@@ -280,8 +325,16 @@ func (p *Picker) clamp() {
 }
 
 // visible is how many result lines the picker draws: its height less the
-// input and the help line.
-func (p *Picker) visible() int { return max(p.height-2, 0) }
+// input, if it has one, and the help line.
+func (p *Picker) visible() int { return max(p.height-1-p.inputRows(), 0) }
+
+// inputRows is the rows the input takes: one, or none WithoutInput.
+func (p *Picker) inputRows() int {
+	if p.cfg.noInput {
+		return 0
+	}
+	return 1
+}
 
 // scroll moves the window so the selected row's line is drawn.
 func (p *Picker) scroll() {
@@ -326,11 +379,12 @@ func (p *Picker) wheel(m tea.MouseWheelMsg) {
 // click runs the row under a left click; the input row and the help line
 // do nothing.
 func (p *Picker) click(m tea.MouseClickMsg) tea.Cmd {
-	if m.Button != tea.MouseLeft || m.Y < 1 || m.Y > p.visible() {
+	first := p.inputRows()
+	if m.Button != tea.MouseLeft || m.Y < first || m.Y >= first+p.visible() {
 		return nil
 	}
 	ls := p.lines()
-	at := p.top + m.Y - 1
+	at := p.top + m.Y - first
 	if at >= len(ls) || ls[at].row < 0 {
 		return nil
 	}
