@@ -105,6 +105,8 @@ hole.
   `glyph` and `internal/enum`). It is not this record's: N4 lets a later
   record, or an amendment here, add it.
 
+  *A1, 2026-10-25, proposed: `safetext` joins `narrow`.*
+
 ### Consequences
 
 * Good, because an `x/ansi` import in `termkey`, or a new dependency of
@@ -170,6 +172,72 @@ The PLAN sees each check fail on a scratch copy:
 * Good, because no work.
 * Bad, because D7's rule holds by accident, and the Step 11 record says
   so.
+
+## Amendments
+
+### A1 (2026-10-25): `safetext` joins `narrow` (proposed)
+
+*Status: proposed. It changes N5; N1 to N4 stand.*
+
+**Found,** at `a7245d5`, after N1 to N4 were built
+(0021-PLAN Step 2):
+* **The rule, twice.**
+  [0009-MADR-streaming-content-engine.md](0009-MADR-streaming-content-engine.md)
+  §1 says `safetext` "imports only the standard library and `glyph`".
+  [0020-MADR-charm-free-cores-glyphs-and-safetext.md](0020-MADR-charm-free-cores-glyphs-and-safetext.md)
+  D9, which shipped it, says "`safetext` imports the standard library,
+  `glyph` and `internal/enum` only": `glyph` itself imports `internal/enum`,
+  for `glyph.Tier`'s tokens (`glyph/glyph.go:195`, AGENTS.md's API rule 5).
+* **Today,** `GOWORK=off go list` for linux, darwin and windows:
+  `safetext`'s direct imports are the standard library and `glyph`; its
+  closure outside the standard library is `safetext`, `glyph` and
+  `internal/enum`. Both statements hold; no gate keeps either.
+* **What reaches `safetext` from below.** `glyph` is not a narrow core:
+  `charmfree` and `TestCoresAreCharmFree` would let it take `x/ansi`, and
+  `safetext` would link it with no gate failing, as 0021-PLAN's mutation
+  21.3 showed for `internal/enum` under `termkey`.
+
+**What changes.**
+* **A1.1. `narrow` gains `safetext`,** allowing `glyph` and
+  `internal/enum`, by "0020-MADR D9, 0021-MADR A1": D9's rule, over the
+  closure, since D9 is the record that built `safetext` and its words name
+  the closure 0009-MADR §1 did not foresee.
+* **A1.2. depguard gains `safetextstd`,** `list-mode: strict` over
+  `**/safetext/*.go` and `!$test`, allowing `$gostd`, `glyph` and
+  `internal/enum`: the same list as `narrow`'s entry, as N3 keeps
+  `termkeystd` and `termkey`'s entry the same. A direct import of
+  `internal/enum`, which D9 allows and `safetext` does not make today,
+  passes; anything else fails at lint.
+* **A1.3. N5 is answered, and `when` is found.** A search of the MADRs for
+  narrow import rules finds one more for a built core:
+  [0006-MADR-command-registry.md](0006-MADR-command-registry.md), "Imports
+  point downward": "`when` imports only the standard library, so `keymap`
+  and any non-Charm front end can use it." It no longer holds: since
+  [0014-PLAN-canonicalization.md](0014-PLAN-canonicalization.md) (its
+  line 823), `when` imports `internal/enum` for `when.Kind`'s tokens, by
+  [0014-MADR-native-integration-api.md](0014-MADR-native-integration-api.md)
+  W0's enum rule, and no record amended 0006's sentence.
+  `docs/architecture.md:97` repeats it. The sentence's reason, a non-Charm
+  front end, is what `charmfree` and `TestCoresAreCharmFree` hold.
+  (0009-MADR's rules for `frame` and `inputfilter` are for packages not
+  built.) The options for `when`, recommended first:
+  * **leave it out of `narrow`:** record 0006's sentence as overtaken by
+    0014's enum rule, its reason kept by the cores' rule, and correct
+    `architecture.md:97`. No record asks for more, and a gate on `when`
+    would be a new decision, not one a record already made;
+  * **add it:** `when`, allowing `internal/enum`, by "0006-MADR, as 0014-MADR
+    W0 changed it", with a `whenstd` rule; one more table entry and rule,
+    for a package whose only in-module import is the enum tables.
+
+**The options for A1.2's allow list,** recommended first:
+* **D9's list, `glyph` and `internal/enum`:** the rule as the building
+  record states it, and the same list as `narrow`, so one sentence
+  describes both gates. Its cost: a direct `internal/enum` import passes
+  lint, which D9 allows.
+* **0009-MADR §1's, `glyph` alone:** today's direct imports exactly, so
+  lint is stricter than the closure test; its cost: the two lists differ,
+  and an exported enum in `safetext`, which AGENTS.md's API rule 5 builds
+  on `internal/enum`, would need a record first.
 
 ## More Information
 

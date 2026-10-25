@@ -1,5 +1,5 @@
 ---
-status: complete
+status: proposed
 date: 2026-10-25
 associated-madr: "0021-MADR-termkey-closure-gate.md"
 ---
@@ -44,7 +44,8 @@ and depguard's `termkeystd` rule over `termkey`'s own imports
 
 ### Out of scope
 
-* `safetext`'s rule of 0020-MADR D9 (0021-MADR N5).
+* ~~`safetext`'s rule of 0020-MADR D9 (0021-MADR N5).~~ *A1, 2026-10-25:
+  Step 3, proposed.*
 * Any change to `termkey`'s code or API: the step adds checks only, so
   `make apicheck` stays clean and nothing is released.
 
@@ -164,6 +165,86 @@ gains `TestNarrowClosures` and `narrow`; the depguard list gains
 **Gates** on every host (Rule 2) over the step's files; the identifier
 scan; the record.
 
+### Step 3: `safetext` joins `narrow` (0021-MADR A1)
+
+*Proposed 2026-10-25, with A1. Steps 1 and 2 are complete.*
+
+**Facts** (read 2026-10-25, at `a7245d5`):
+
+| Fact | Where |
+| :--- | :--- |
+| `safetext`'s direct imports outside the standard library: `glyph`, on linux, darwin and windows | `GOWORK=off GOOS=<os> go list -f '{{join .Imports " "}}' ./safetext` |
+| its closure outside the standard library: `safetext`, `glyph`, `internal/enum` | `GOWORK=off go list -deps ./safetext` |
+| `glyph` imports `internal/enum`, for `Tier`'s tokens | `glyph/glyph.go:16`, `:195` |
+| `narrow` holds `termkey` alone; `termkeystd` follows `charmfree` in `.golangci.yml` | `internal/conformance/charmfree_test.go`, `.golangci.yml` |
+| `docs/architecture.md:97` says "`when` imports only the standard library"; `when` imports `internal/enum` | `GOWORK=off go list -f '{{.Imports}}' ./when` |
+
+**Files:**
+* `internal/conformance/charmfree_test.go`: `narrow` gains
+  `{core: "safetext", allow: []string{"glyph", "internal/enum"}, record:
+  "0020-MADR D9, 0021-MADR A1"}`, after `termkey`'s, in the order the
+  records came; `narrow`'s comment names `safetextstd` beside
+  `termkeystd`.
+* `.golangci.yml`: `safetextstd`, after `termkeystd`, its comment citing
+  0020-MADR D9 and 0021-MADR A1:
+
+  ```yaml
+          safetextstd:
+            list-mode: strict
+            files:
+              - "**/safetext/*.go"
+              - "!$test"
+            allow:
+              - $gostd
+              - github.com/maccavelli/go-tui-lib/v2/glyph
+              - github.com/maccavelli/go-tui-lib/v2/internal/enum
+  ```
+
+  (A1.2's recommended list. If the owner picks 0009-MADR §1's, the
+  `internal/enum` line goes, and the step's records say so.)
+* `AGENTS.md`, "Dependencies": the `termkey` sentence becomes one on both:
+  "`termkey` imports the standard library and `internal/enum`, and
+  `safetext` the standard library, `glyph` and `internal/enum`, and
+  nothing else: the depguard rules `termkeystd` and `safetextstd` refuse
+  any other import, and `internal/conformance`'s `TestNarrowClosures`
+  checks their closures (`docs/decisions/0021-MADR-termkey-closure-gate.md`
+  N1 to N4, A1)."
+* `docs/architecture.md`: the `termkeystd` bullet names `safetextstd` and
+  `safetext`; the Tooling bullet says "`termkey` and `safetext` today";
+  the "Imports point downward" bullet says `when` imports the standard
+  library and `internal/enum`, with 0006-MADR's sentence recorded as
+  overtaken by 0014-MADR W0 (A1.3, its recommended option; if the owner
+  picks the other, `when` gets an entry and a `whenstd` rule as `safetext`
+  does, and the mutations a `when` pair of 1 and 3).
+* `docs/README.md`: the rows.
+
+**Checks:**
+* `GOWORK=off go test -count=1 -v -run 'TestNarrow|TestCoresAreCharmFree'
+  ./internal/conformance/`: `PASS`, for each target;
+* `make lint`: `0 issues.` for linux, darwin and windows;
+* `markdownlint-cli2` over `AGENTS.md`, `architecture.md` and the index.
+
+**Mutations** (Rule 3), two of them let-through runs that show what one
+gate alone misses:
+1. `safetext` imports and uses `x/ansi`: `TestNarrowClosures` fails,
+   naming `x/ansi` and A1;
+2. the same: `TestCoresAreCharmFree` passes (let through), the gap A1
+   closes;
+3. the same, refused by `safetextstd`, and by no other depguard rule;
+4. `glyph` imports and uses `x/ansi`: `TestNarrowClosures` fails for
+   `safetext`, with the chain `safetext → glyph →
+   github.com/charmbracelet/x/ansi`;
+5. the same: `golangci-lint run ./safetext/` passes (let through), why the
+   closure test is needed;
+6. `safetext` imports and uses `termkey`: `TestNarrowClosures` and
+   `safetextstd` fail;
+7. `safetext`'s allowance loses `internal/enum`: `TestNarrowClosures`
+   fails, `internal/enum` reached through `glyph`;
+8. `safetext`'s allowance adds `termkey`: `TestNarrowClosures` fails as a
+   stale allowance.
+
+**Gates** on every host (Rule 2); the identifier scan; the record.
+
 ## Verification
 
 * `TestNarrowClosures` and `TestNarrowChains` pass on macOS, Linux and
@@ -172,6 +253,9 @@ scan; the record.
 * Each mutation of Step 2 is killed, with its failure line in the record,
   and mutations 1 and 3 also show which gate would have missed the import.
 * `make apicheck` is clean: no exported name changes.
+* *Step 3 (A1):* `TestNarrowClosures` holds `safetext` too, `make lint`
+  passes with `safetextstd`, and each of Step 3's mutations is killed or,
+  for the two let-through runs, let through, with its line in the record.
 
 ## Rollout and Rollback
 
