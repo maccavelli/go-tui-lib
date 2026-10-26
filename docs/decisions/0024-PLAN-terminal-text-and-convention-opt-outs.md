@@ -35,7 +35,7 @@ tree, the release is tagged by the owner, and its smoke test passes.
 | 1 | `termcap/` | `WithoutQuery`, `WithoutGatedQueries`, `WithoutQueries` (and `WithDisabled` deprecated); a `Name` for every built-in query; `Env.LookupEnv` folding by the probe's GOOS |
 | 2 | `termcap/`, `termsvc/` | the view facts in `Caps`; `WithTitleCells`, `WithBodyCells`, `WithCopyRoute`, `WithLinkSchemes`, `WithoutBell`; `MaxCopyBytes` on the OSC 52 route only |
 | 3 | `palette/`, `workspace/`, `command/`, `termcap/` | each package's message IDs, `Messages()` and `WithCatalog` |
-| 4 | `workspace/`, `palette/` | `WithoutMouseFocus`, `WithoutMouseResize`, `Overlay.Bare`, `palette.WithoutClickAccept` |
+| 4 | `workspace/`, `palette/` | `WithoutMouseFocus`, `WithoutMouseResize`, `Overlay.Bare`, `palette.WithoutClickAccept`; by MADR A1, `WithFocusFallback`, `FocusFallback`, `FocusFallbackFunc`, `palette.WithoutCloseOnAccept`, `palette.WithoutPrefixList` |
 | 5 | `launch/`, `when/` | `RestorerFunc`, `ContextFunc` |
 | 6 | `docs/`, `README.md` | the guides, the inventory's rows, the release, the close-out |
 
@@ -119,10 +119,18 @@ step.
 * `Overlay.Bare`: the zero value is today's chrome; a bare overlay draws
   its pane alone, at its size.
 * `palette.WithoutClickAccept()`: a click selects the row.
+* *Added 2026-10-26, by MADR A1:* `workspace.WithFocusFallback(f)`, with
+  `FocusFallback` and `FocusFallbackFunc`: the pane focus moves to when
+  the focused pane hides, the ring's first by default;
+  `palette.WithoutCloseOnAccept()`: accepting sends `SelectedMsg` and runs
+  the hit, and the picker stays open; `palette.WithoutPrefixList()`: a
+  query of `?` is an ordinary query.
 * **Tests:** each default unchanged; each option drops its one behaviour
   alone; a bare overlay's golden.
 * **Mutations:** `WithoutMouseFocus` also drops the drag; `Bare` ignored;
-  a click still accepts.
+  a click still accepts; the fallback ignored; the picker closes under
+  `WithoutCloseOnAccept`; `?` still lists the prefixes under
+  `WithoutPrefixList`.
 
 ### Step 5: the adapters
 

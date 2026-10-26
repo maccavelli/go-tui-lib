@@ -47,6 +47,7 @@ built, as the next section lists. Reserved now, each checked with
 | `transcript` | `Transcript` | 0023-MADR D9 |
 | `command` | `GatePolicy`, `GatePolicyFunc` | [0024-MADR](decisions/0024-MADR-opt-in-and-opt-out-coverage.md) D4 |
 | `palette` | `Opener` | 0024-MADR D4 |
+| `workspace` | `FocusFallback`, `FocusFallbackFunc` | 0024-MADR A1 |
 
 Each package's options are its `Option`, the deliberate name above.
 

@@ -1,6 +1,6 @@
 ---
 status: in-progress
-date: 2026-10-25
+date: 2026-10-26
 associated-madr: "0024-MADR-opt-in-and-opt-out-coverage.md"
 ---
 # Implement API rule 12, its floors, the message catalogue and the defaults inventory, and close the command-and-control gaps
@@ -387,3 +387,70 @@ No module is added. `msgcat` imports the standard library alone.
     file(s) clean". `make lint` reports "0 issues" for `GOOS=linux`,
     `darwin` and `windows`. The identifier scan of the change and the
     untracked files is clean.
+
+### Step 3: the inventory
+
+*2026-10-26.* The owner committed Step 2 and said to proceed.
+
+* **Deviation D1, 2026-10-26: a status for settled behaviours, and three
+  gaps more.**
+  * **Found,** while classifying the audit's behaviours into the step's
+    three statuses: several a record already settled, with no control on
+    purpose (the frecency clock, 0008-MADR A3 item 7; the boost's bound,
+    0008-MADR §2; Bubble Tea asking for modes 2026 and 2027, 0020-MADR
+    A2.4; tuitest's update switch, AGENTS.md; a modal overlay's clicks,
+    0002-MADR), which are neither floors nor gaps; and three real gaps
+    neither of the MADR's PLANs closes: focus falling back to the ring's
+    first pane (`workspace/workspace.go:836-842`), the palette closing on
+    every accept (`palette/picker.go:381-396`), and `?` always listing the
+    prefixes (`palette/engine.go:26`).
+  * **Resolutions offered:** a `decided` status citing its record, and the
+    three gaps added to the second PLAN (recommended); `decided` and an
+    `open` status for the gaps; or every one filed as a floor.
+  * **Chosen by the owner,** 2026-10-26: "decided status; gaps to PLAN C
+    (Recommended)". The MADR gains A1; the second PLAN's Step 4 gains the
+    three additions, their tests and mutations.
+* **`docs/guides/defaults.md`:** rule 12 and the four statuses; the
+  floors, each with its reason and what a program may do instead; and an
+  inventory table per package or group, 15 tables and 135 rows, from the audit,
+  with every control named in backticks.
+* **`internal/conformance/defaults_test.go`, `TestDefaultsInventory`:** it
+  reads every table headed `Behaviour | Default | Control | Status`, and
+  resolves each control, `pkg.Name`, `pkg.Type.Method` or
+  `pkg.Type.Field`, through the source importer, in the module's
+  type-checked packages. A `built` row names at least one control and
+  every one exists; a `planned` row names an existing PLAN, and fails
+  when every control it names exists already, so a row cannot stay
+  `planned` once its step builds it; a `floor` row's controls exist; a
+  `decided` row cites an existing record or AGENTS.md; any other status
+  fails. A failure names the guide's line and the row's behaviour.
+* **Its first run** found five rows wrong, which were fixed: four catalogue
+  rows named `msgcat.Catalog`, which exists, where the planned control is
+  each package's `WithCatalog` (`command`, `workspace`, `palette`) or
+  `termcap.WithReportCatalog`; and `commandtea` was named without its
+  directory, `command/commandtea`. A failure now names the guide by its
+  path in the repository.
+* **Seen failing,** through `python3 -m tools.verify mutate` on scratch
+  copies of the guide, 8 killed of 8:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | a built control that does not exist | `(The mouse): built, but workspace exports no WithoutMice` |
+  | a built method that does not exist | `built, but command.Registry has no exported field or method Nope` |
+  | a built field that does not exist | `built, but launch.Config has no exported field or method OpenTTYs` |
+  | a planned row with no PLAN | `(Its own commands, on a key): planned, and names no PLAN` |
+  | a planned row whose PLAN does not exist | `planned by 0024-PLAN-no-such-plan.md, which does not exist` |
+  | a planned row already built | `(The model's epilogue): planned, but every control it names exists: mark it built` |
+  | a decided row with no record | `(The update switch): decided, and cites no record` |
+  | a status that is none of the four | `(Letter case): status "maybe"; want built, planned, floor or decided` |
+
+* **Names:** `workspace.FocusFallback` and `FocusFallbackFunc`, A1's two
+  types: "2 planned name(s), clean". `docs/glossary.md` reserves them.
+* **Gates:** `python3 -m tools.verify gates` over the step's Go file, the
+  guide and 5 records: macOS 19 passed, 0 failed, in 568 s,
+  `release-check` "334 file(s) clean in 1 module(s)", with `apicheck`
+  against `v2.1.0`; `remote linux` 18 passed, 0 failed, 1 skipped
+  (`gofmt`, which is given no files there), in 1012 s, "335 file(s)
+  clean"; `remote windows` 18 passed, 0 failed, 1 skipped, in 2207 s,
+  "335 file(s) clean". The identifier scan of the change and the
+  untracked files is clean.

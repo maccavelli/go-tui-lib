@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-25
+date: 2026-10-26
 decision-makers: the repository owner
 consulted: "an audit of every non-test Go file in the public packages at 65d437b, by package group: command, command/commandtea, keymap, keymap/keymaptea, launch, launch/launchtest and when; workspace, palette, theme, glyph, layout and tuitest; termcap, termcap/termcaptea, termcap/termcaptest, termsvc, termsvc/termsvctea, termkey, safetext, fuzzy and internal/sanitize"
 informed: gobble-cli and pi-go, the library's consumers
@@ -502,6 +502,39 @@ the `Text` struct per package that D6 first gave.
 * **Q6. The inventory's home.** Recommended: `docs/guides/defaults.md`,
   read by `TestDefaultsInventory`. The alternative is a Go table in
   `internal/conformance` that generates the guide.
+
+## Amendments
+
+### A1 (2026-10-26): a `decided` status, and three gaps more
+
+*Status: accepted (2026-10-26),* the owner's choice "decided status; gaps
+to PLAN C (Recommended)", found while
+[0024-PLAN-command-and-control-opt-outs.md](0024-PLAN-command-and-control-opt-outs.md)
+Step 3 wrote the inventory; its deviation D1 has the evidence.
+
+1. **D3's inventory gains a fourth status, `decided`:** a behaviour a
+   record chose to give no control, for a reason it states. The row cites
+   that record by file name, or AGENTS.md, and `TestDefaultsInventory`
+   checks the cited file exists. The audit's examples: the frecency
+   store's clock (0008-MADR A3 item 7), a recent hit's boost and fuzzy's
+   bound on it (0008-MADR §2), Bubble Tea asking for modes 2026 and 2027
+   in a prober's place (0020-MADR A2.4), tuitest's update switch
+   (AGENTS.md, "Pre-add checks"), and a modal overlay's clicks
+   (0002-MADR). These are neither floors, D2's safety, bounds, protocols
+   and process rules, nor gaps.
+2. **D6 gains three gaps,** closed by
+   [0024-PLAN-terminal-text-and-convention-opt-outs.md](0024-PLAN-terminal-text-and-convention-opt-outs.md):
+   * focus falls back to the ring's first pane when the focused pane hides
+     (`workspace/workspace.go:836-842`):
+     `workspace.WithFocusFallback(FocusFallback)`, with `FocusFallback
+     interface{ Fallback(lost layout.PaneID, ring []layout.PaneID)
+     layout.PaneID }` and `FocusFallbackFunc`;
+   * the palette always closes on accept (`palette/picker.go:381-396`):
+     `palette.WithoutCloseOnAccept()`;
+   * a query of `?` always lists the prefixes (`palette/engine.go:26`):
+     `palette.WithoutPrefixList()`.
+
+   Each name passed `python3 -m tools.verify names`.
 
 ## More Information
 
