@@ -49,10 +49,10 @@ tree, `v2.2.0` is tagged by the owner, and the consumer smoke test passes.
 | 1 | `docs/decisions/0023-*`, `docs/decisions/0024-*`, `docs/README.md`, `docs/glossary.md`, `AGENTS.md` | accept both MADRs; rule 12; this PLAN `in-progress` |
 | 2 | `msgcat/`, `internal/conformance/charmfree_test.go`, `.golangci.yml` | the catalogue package, a core with a narrow closure |
 | 3 | `docs/guides/defaults.md`, `internal/conformance/defaults_test.go` | the inventory and `TestDefaultsInventory` |
-| 4 | `command/` | `WithGatePolicy`, `GatePolicy`, `GatePolicyFunc`, `DefaultGatePolicy`, `Registry.Forget`, `ForgetAll`, `WithoutBuiltins`, `BuiltinList`, `BuiltinDescribe`, `BuiltinQuit` |
-| 5 | `workspace/` | `WithoutOwnCommands` |
-| 6 | `launch/` | `Config.AllowDumb`, `Config.IgnoreCI`, `ColorProfile`, `GlyphTier`, `WithoutEpilogue`, `WithEpilogueWriter` |
-| 7 | `palette/` | the picker's command IDs and scope exported, `CompletionRules`, `Opener` |
+| 4 | `command/`, `docs/guides/defaults.md` (D1 of Step 4) | `WithGatePolicy`, `GatePolicy`, `GatePolicyFunc`, `DefaultGatePolicy`, `Registry.Forget`, `ForgetAll`, `WithoutBuiltins`, `BuiltinList`, `BuiltinDescribe`, `BuiltinQuit` |
+| 5 | `workspace/`, `docs/guides/defaults.md` (D1 of Step 4) | `WithoutOwnCommands` |
+| 6 | `launch/`, `docs/guides/defaults.md` (D1 of Step 4) | `Config.AllowDumb`, `Config.IgnoreCI`, `ColorProfile`, `GlyphTier`, `WithoutEpilogue`, `WithEpilogueWriter` |
+| 7 | `palette/`, `docs/guides/defaults.md` (D1 of Step 4) | the picker's command IDs and scope exported, `CompletionRules`, `Opener` |
 | 8 | `docs/`, `README.md` | the guides, the release `v2.2.0`, the close-out |
 
 No module is added. `msgcat` imports the standard library alone.
@@ -235,7 +235,9 @@ No module is added. `msgcat` imports the standard library alone.
   `WithoutOwnCommands`; `command-palette.md` the exported IDs,
   `CompletionRules` and `Opener`; the commands guide's launch section the
   new `Config` fields, the helpers and the epilogue options; the defaults
-  guide's rows for Steps 4 to 7 move to `built`.
+  guide's rows for Steps 4 to 7 move to `built`. *Amended 2026-10-26, by
+  Step 4's deviation D1:* each of Steps 4 to 7 moves its own rows, and
+  Step 8 checks that no row names this PLAN as `planned`.
 * `docs/guides/migrating.md`: "Migrating to `v2.2.0`", additions only.
 * `README.md`: the current release, and a Status bullet.
 * **The release,** as 0008-PLAN Step 9 ran: the API listed by apidiff
@@ -454,3 +456,85 @@ No module is added. `msgcat` imports the standard library alone.
   clean"; `remote windows` 18 passed, 0 failed, 1 skipped, in 2207 s,
   "335 file(s) clean". The identifier scan of the change and the
   untracked files is clean.
+
+### Step 4: `command`
+
+*2026-10-26.* The owner committed Step 3 and said to proceed.
+
+* **Deviation D1, 2026-10-26: each step marks its own rows built.**
+  * **Found,** once the code was written: `TestDefaultsInventory`, from
+    Step 3, failed on `docs/guides/defaults.md:40`, `:43` and `:44` with
+    "planned, but every control it names exists: mark it built". Step 3's
+    test fails a `planned` row whose controls all exist, while this PLAN
+    gave Steps 4 to 7 their package paths alone, and moved their rows in
+    Step 8. The conflict is the PLAN's, not this step's code.
+  * **Resolutions offered:** each of Steps 4 to 7 adds the guide to its
+    paths and marks its own rows built, and Step 8 checks that none is
+    left `planned` for this PLAN (recommended); or Steps 4 to 7 held
+    uncommitted and landed as one change with the rows.
+  * **Chosen by the owner,** 2026-10-26: "Each step marks its rows
+    (Recommended)". The scope table's rows 4 to 7 gain
+    `docs/guides/defaults.md`, and Step 8's bullet is annotated. The MADR
+    is unchanged: D3 asks only that the guide match the code.
+* **`command/gate.go`:** `GatePolicy`, with `Asks(c Command, o Origin)
+  bool`; `GatePolicyFunc`; `DefaultGatePolicy()`, the table `asks` was,
+  now `defaultAsks`; and `WithGatePolicy(p)`, where a nil `p` keeps the
+  default. `policy.decide` asks the registry's policy, or the table when
+  there is none. A policy's panic refuses the request with an error
+  wrapping `ErrRefused` and a `*PanicError`, as a gate's does: the PLAN did
+  not say, and the registry already recovers a gate's and a handler's
+  panics, since `Run` is called from an agent's goroutine.
+* **`command/registry.go`:** `WithoutBuiltins()`, after which
+  `NewRegistry` adds none of its three commands; `Registry.Forget(id,
+  caller)` and `Registry.ForgetAll()`.
+* **`command/builtin.go`:** `BuiltinList`, `BuiltinDescribe` and
+  `BuiltinQuit`, exported `ID` constants, replacing `idList`, `idDescribe`
+  and `idQuit` there and in `builtin_test.go` and `registry_test.go`.
+* **The package comment** says `WithGatePolicy` replaces the table.
+* **Tests:**
+  * `TestDefaultGatePolicy`: with no policy, a nil policy, and
+    `DefaultGatePolicy()`, every danger and origin pair (4 by 7) asks
+    exactly 0006-MADR §7's table, and `DefaultGatePolicy().Asks` equals
+    it;
+  * `TestGatePolicy`: a policy that asks for every destructive command
+    puts a destructive key request to the gate and lets an agent's
+    mutating one run unasked; one that asks for nothing runs an agent's
+    mutating and destructive requests with no gate; one that names
+    `BuiltinQuit` gates `app.quit`; a panicking one refuses, with a
+    `*PanicError` and the gate unasked;
+  * `TestForget`: an `AllowAlways` stays remembered after `Forget` of
+    another caller or another command, and is asked again after its own;
+    `ForgetAll` after three remembered answers asks for each again;
+  * `TestWithoutBuiltins`: the IDs are `command.list`, `command.describe`
+    and `app.quit`; without the option `All`, `MCPTools` and `Manifest`
+    hold all three and `Complete` the two the shell is offered (`app.quit`
+    is not); with it, each holds only the program's command, and the
+    program may register its own `app.quit`.
+* **`docs/guides/defaults.md`,** by D1: the three rows, built-ins at
+  construction, which requests ask the gate and remembered verdicts, are
+  `built`. `TestDefaultsInventory` passes.
+* **`docs/glossary.md`:** `GatePolicy` and `GatePolicyFunc` move from
+  "Reserved" to "Built", as Step 2 moved `msgcat`'s.
+* **Names:** `GatePolicy` and `GatePolicyFunc`, through `python3 -m
+  tools.verify names`: "2 planned name(s), clean".
+* **Seen failing,** through `python3 -m tools.verify mutate` on scratch
+  copies, 6 killed of 6:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | `decide` ignores the policy | `TestGatePolicy`: `a destructive key request under a policy that asks for every destructive one: <nil>, 0 gate calls; want refused by the gate` |
+  | `DefaultGatePolicy` asks for mutating key requests | `TestDefaultGatePolicy`: `DefaultGatePolicy().Asks(mutating, key) = true, want false` |
+  | `Forget` forgets nothing | `TestForget`: `mutating for a: <nil>, 1 gate calls; want 2` |
+  | `WithoutBuiltins` is ignored | `TestWithoutBuiltins`: `WithoutBuiltins: All holds [app.quit command.describe command.list own], want only the program's own` |
+  | `ForgetAll` forgets only the first caller | `TestForget`: `mutating for b: <nil>, 5 gate calls; want 6` |
+  | a policy's panic is not recovered | `TestGatePolicy`: `panic: policy [recovered, repanicked]` |
+
+* **Gates:** `python3 -m tools.verify gates` over the step's 7 Go files,
+  the guide, the glossary and 2 records: macOS 19 passed, 0 failed, in
+  607 s, `release-check` "335 file(s) clean in 1 module(s)", with
+  `apicheck` against `v2.1.0` reporting no incompatible change;
+  `remote linux` 18 passed, 0 failed, 1 skipped (`gofmt`, which is given
+  no files there), in 1428 s, "335 file(s) clean"; `remote windows` 18
+  passed, 0 failed, 1 skipped, in 2234 s, "335 file(s) clean".
+  `make pre-add-check` on the 7 Go files is clean. The identifier scan of
+  the change is clean.

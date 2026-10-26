@@ -196,6 +196,105 @@ func TestRequestGate(t *testing.T) {
 	}
 }
 
+// TestDefaultGatePolicy: without WithGatePolicy, with a nil policy, and
+// with DefaultGatePolicy, the gate is asked about §7's table and nothing
+// else (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md D4).
+func TestDefaultGatePolicy(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		opts []RegistryOption
+	}{
+		{"no policy", nil},
+		{"a nil policy", []RegistryOption{WithGatePolicy(nil)}},
+		{"DefaultGatePolicy", []RegistryOption{WithGatePolicy(DefaultGatePolicy())}},
+	} {
+		g := answer(AllowOnce, nil)
+		r := dangerRegistry(t, append(c.opts, WithGate(g))...)
+		for _, d := range dangers {
+			for _, o := range origins {
+				ask := asked[[2]uint8{uint8(d), uint8(o)}]
+				calls := g.calls
+				if _, err := r.Run(t.Context(), Request{ID: dangerID(d), Origin: o}); err != nil {
+					t.Errorf("%s: %s from %s: %v", c.name, d, o, err)
+				}
+				if (g.calls > calls) != ask {
+					t.Errorf("%s: %s from %s: gate asked %v, want %v", c.name, d, o, g.calls > calls, ask)
+				}
+			}
+		}
+	}
+	for _, d := range dangers {
+		for _, o := range origins {
+			if got, want := DefaultGatePolicy().Asks(cmd(dangerID(d), d), o), asked[[2]uint8{uint8(d), uint8(o)}]; got != want {
+				t.Errorf("DefaultGatePolicy().Asks(%s, %s) = %v, want %v", d, o, got, want)
+			}
+		}
+	}
+}
+
+// TestGatePolicy: a program's policy decides which requests ask the gate,
+// is given the command and the origin, and refuses when it panics.
+func TestGatePolicy(t *testing.T) {
+	destructive := GatePolicyFunc(func(c Command, _ Origin) bool { return c.Danger == Destructive })
+	g := answer(RejectOnce, nil)
+	r := dangerRegistry(t, WithGatePolicy(destructive), WithGate(g))
+	if _, err := r.Run(t.Context(), Request{ID: "destructive", Origin: OriginKey}); !errors.Is(err, ErrRefused) || g.calls != 1 {
+		t.Errorf("a destructive key request under a policy that asks for every destructive one: %v, %d gate calls; want refused by the gate", err, g.calls)
+	}
+	if _, err := r.Run(t.Context(), Request{ID: "mutating", Origin: OriginAgent}); err != nil || g.calls != 1 {
+		t.Errorf("an agent's mutating request under the same policy: %v, %d gate calls; want it run unasked", err, g.calls)
+	}
+
+	none := dangerRegistry(t, WithGatePolicy(GatePolicyFunc(func(Command, Origin) bool { return false })))
+	for _, id := range []ID{"mutating", "destructive"} {
+		if _, err := none.Run(t.Context(), Request{ID: id, Origin: OriginAgent}); err != nil {
+			t.Errorf("an agent's %s request under a policy that asks for nothing, with no gate: %v", id, err)
+		}
+	}
+
+	quit := GatePolicyFunc(func(c Command, o Origin) bool { return c.ID == BuiltinQuit && o == OriginKey })
+	g = answer(RejectOnce, nil)
+	r = dangerRegistry(t, WithGatePolicy(quit), WithGate(g))
+	if res := resultOf(t, collect(r.Dispatch(t.Context(), Request{ID: BuiltinQuit, Origin: OriginKey}))); !errors.Is(res.Err, ErrRefused) || g.calls != 1 {
+		t.Errorf("app.quit under a policy that gates it: %v, %d gate calls", res.Err, g.calls)
+	}
+
+	g = answer(AllowOnce, nil)
+	r = dangerRegistry(t, WithGatePolicy(GatePolicyFunc(func(Command, Origin) bool { panic("policy") })), WithGate(g))
+	_, err := r.Run(t.Context(), Request{ID: "readonly", Origin: OriginKey})
+	pe, ok := errors.AsType[*PanicError](err)
+	if !errors.Is(err, ErrRefused) || !ok || pe.Value != "policy" || pe.ID != "readonly" || g.calls != 0 {
+		t.Errorf("a panicking policy: %v, %d gate calls; want refused with a *PanicError, the gate unasked", err, g.calls)
+	}
+}
+
+// TestForget: Forget drops one command and caller's remembered answer, and
+// ForgetAll every one.
+func TestForget(t *testing.T) {
+	g := answer(AllowAlways, nil)
+	r := dangerRegistry(t, WithGate(g))
+	run := func(id ID, caller string, calls int) {
+		t.Helper()
+		if _, err := r.Run(t.Context(), Request{ID: id, Origin: OriginAgent, Caller: caller}); err != nil || g.calls != calls {
+			t.Errorf("%s for %s: %v, %d gate calls; want %d", id, caller, err, g.calls, calls)
+		}
+	}
+	run("mutating", "a", 1)
+	run("mutating", "a", 1) // remembered
+	r.Forget("mutating", "b")
+	r.Forget("destructive", "a")
+	run("mutating", "a", 1) // another caller's, and another command's, forgotten
+	r.Forget("mutating", "a")
+	run("mutating", "a", 2) // asked again, and remembered again
+	run("mutating", "b", 3)
+	run("destructive", "a", 4)
+	run("mutating", "a", 4)
+	r.ForgetAll()
+	run("mutating", "a", 5)
+	run("mutating", "b", 6)
+	run("destructive", "a", 7)
+}
+
 func TestVerdictACPKind(t *testing.T) {
 	for d, want := range map[Verdict]string{
 		AllowOnce: "allow_once", AllowAlways: "allow_always", RejectOnce: "reject_once", RejectAlways: "reject_always", 0: "",

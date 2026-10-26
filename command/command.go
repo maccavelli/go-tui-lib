@@ -15,8 +15,9 @@
 // Before a command runs, a policy decides by its danger and the request's
 // origin: read-only and UI commands run for anyone, a mutating command
 // from an agent and a destructive one from an agent or the shell ask the
-// Gate, and with no gate they are refused. An Auditor, when set, records
-// every request.
+// Gate, and with no gate they are refused. WithGatePolicy replaces that
+// table with the program's own. An Auditor, when set, records every
+// request.
 //
 // Nothing here writes to the terminal or the process's streams. Output
 // leaves as a Result, an Effect's message, or a record on the caller's

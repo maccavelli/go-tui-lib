@@ -15,7 +15,7 @@ func TestBuiltins(t *testing.T) {
 		cmd("off", UI, func(c *Command) { c.When = "on" }),
 		cmd("shell", UI, func(c *Command) { c.Surfaces = SurfaceCLI }),
 	)
-	for _, id := range []ID{idList, idDescribe, idQuit} {
+	for _, id := range []ID{BuiltinList, BuiltinDescribe, BuiltinQuit} {
 		c, ok := r.Lookup(id)
 		if !ok || c.Slash != "" || len(c.Aliases) != 0 {
 			t.Errorf("%s: registered %v, slash %q %v; want registered with no slash name", id, ok, c.Slash, c.Aliases)
@@ -23,7 +23,7 @@ func TestBuiltins(t *testing.T) {
 	}
 	listed := func(o Origin) []ID {
 		t.Helper()
-		res, err := r.Run(t.Context(), Request{ID: idList, Origin: o})
+		res, err := r.Run(t.Context(), Request{ID: BuiltinList, Origin: o})
 		if err != nil {
 			t.Fatalf("command.list from %s: %v", o, err)
 		}
@@ -35,22 +35,22 @@ func TestBuiltins(t *testing.T) {
 		return out
 	}
 	for o, want := range map[Origin][]ID{
-		OriginAgent:   {idQuit, idDescribe, idList, "shown"},
-		OriginCLI:     {idDescribe, idList, "shell", "shown"},
-		OriginProgram: {idQuit, idDescribe, idList, "shell", "shown"},
+		OriginAgent:   {BuiltinQuit, BuiltinDescribe, BuiltinList, "shown"},
+		OriginCLI:     {BuiltinDescribe, BuiltinList, "shell", "shown"},
+		OriginProgram: {BuiltinQuit, BuiltinDescribe, BuiltinList, "shell", "shown"},
 	} {
 		if got := listed(o); !slices.Equal(got, want) {
 			t.Errorf("command.list from %s = %v, want %v", o, got, want)
 		}
 	}
 
-	res, err := r.Run(t.Context(), Request{ID: idDescribe, Args: []byte(`{"id":"workspace.x"}`), Origin: OriginAgent})
+	res, err := r.Run(t.Context(), Request{ID: BuiltinDescribe, Args: []byte(`{"id":"workspace.x"}`), Origin: OriginAgent})
 	if ae, ok := errors.AsType[*ArgError](err); !ok || ae.Path != "/id" {
 		t.Errorf("describing an unknown ID: %v", err)
 	}
-	res, err = r.Run(t.Context(), Request{ID: idDescribe, Args: []byte(`{"id":"command.describe"}`), Origin: OriginAgent})
+	res, err = r.Run(t.Context(), Request{ID: BuiltinDescribe, Args: []byte(`{"id":"command.describe"}`), Origin: OriginAgent})
 	info, _ := res.Value.(ManifestCommand)
-	if err != nil || info.ID != idDescribe || info.Danger != "read-only" || len(info.Args) == 0 {
+	if err != nil || info.ID != BuiltinDescribe || info.Danger != "read-only" || len(info.Args) == 0 {
 		t.Fatalf("command.describe: %+v, %v", info, err)
 	}
 	var schema map[string]any
@@ -58,17 +58,64 @@ func TestBuiltins(t *testing.T) {
 		t.Errorf("command.describe's schema: %s, %v", info.Args, err)
 	}
 
-	msgs := collect(r.Dispatch(t.Context(), Request{ID: idQuit, Origin: OriginKey}))
+	msgs := collect(r.Dispatch(t.Context(), Request{ID: BuiltinQuit, Origin: OriginKey}))
 	if len(msgs) != 2 || !slices.Contains(msgs, any(QuitRequestMsg{})) || resultOf(t, msgs).Err != nil {
 		t.Errorf("app.quit sent %v, want a QuitRequestMsg and its ResultMsg", msgs)
 	}
-	if _, err := r.Run(t.Context(), Request{ID: idQuit, Origin: OriginCLI}); !errors.Is(err, ErrUnavailable) {
+	if _, err := r.Run(t.Context(), Request{ID: BuiltinQuit, Origin: OriginCLI}); !errors.Is(err, ErrUnavailable) {
 		t.Errorf("app.quit from the shell: %v", err)
 	}
-	for id, d := range map[ID]Danger{idList: ReadOnly, idDescribe: ReadOnly, idQuit: UI} {
+	for id, d := range map[ID]Danger{BuiltinList: ReadOnly, BuiltinDescribe: ReadOnly, BuiltinQuit: UI} {
 		if c, _ := r.Lookup(id); c.Danger != d {
 			t.Errorf("%s is %s, want %s", id, c.Danger, d)
 		}
+	}
+}
+
+// TestWithoutBuiltins: without the option a registry holds its three
+// commands on every surface that offers them; with it, none
+// (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md D4).
+func TestWithoutBuiltins(t *testing.T) {
+	if BuiltinList != "command.list" || BuiltinDescribe != "command.describe" || BuiltinQuit != "app.quit" {
+		t.Errorf("the built-in IDs are %s, %s and %s", BuiltinList, BuiltinDescribe, BuiltinQuit)
+	}
+	builtins := []ID{BuiltinQuit, BuiltinDescribe, BuiltinList}
+	held := func(r *Registry) map[string][]ID {
+		var all, tools, manifest, complete []ID
+		for c := range r.All() {
+			all = append(all, c.ID)
+		}
+		for _, tool := range r.MCPTools(nil) {
+			tools = append(tools, ID(tool.Name))
+		}
+		for _, c := range r.Manifest().Commands {
+			manifest = append(manifest, c.ID)
+		}
+		for _, id := range r.Complete("", nil, "") {
+			complete = append(complete, ID(id))
+		}
+		return map[string][]ID{"All": all, "MCPTools": tools, "Manifest": manifest, "Complete": complete}
+	}
+	for name, got := range held(NewRegistry()) {
+		want := builtins
+		if name == "Complete" {
+			want = []ID{BuiltinDescribe, BuiltinList} // app.quit is not offered on the shell
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("NewRegistry(): %s holds %v, want %v", name, got, want)
+		}
+	}
+	bare := registryOf(t, []RegistryOption{WithoutBuiltins()}, cmd("own", ReadOnly))
+	for name, got := range held(bare) {
+		if !slices.Equal(got, []ID{"own"}) {
+			t.Errorf("WithoutBuiltins: %s holds %v, want only the program's own", name, got)
+		}
+	}
+	if bare.Version() != 1 {
+		t.Errorf("WithoutBuiltins: version %d after one Register, want 1", bare.Version())
+	}
+	if err := bare.Register(cmd(BuiltinQuit, UI)); err != nil {
+		t.Errorf("WithoutBuiltins: registering a program's own %s: %v", BuiltinQuit, err)
 	}
 }
 

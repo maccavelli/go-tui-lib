@@ -5,13 +5,14 @@ import (
 	"strings"
 )
 
-// The registry's own commands (docs/decisions/0006-MADR-command-registry.md
-// §9, A5). None has a slash name, so no built-in word clashes with a
-// program's.
+// The IDs of the registry's own commands
+// (docs/decisions/0006-MADR-command-registry.md §9, A5), which NewRegistry
+// adds unless WithoutBuiltins is given, and Remove takes out. None has a
+// slash name, so no built-in word clashes with a program's.
 const (
-	idList     ID = "command.list"
-	idDescribe ID = "command.describe"
-	idQuit     ID = "app.quit"
+	BuiltinList     ID = "command.list"     // lists the commands the caller can run now
+	BuiltinDescribe ID = "command.describe" // describes one command
+	BuiltinQuit     ID = "app.quit"         // asks the program to quit
 )
 
 // describeArgs is command.describe's argument.
@@ -22,7 +23,7 @@ type describeArgs struct {
 // builtins is the registry's own commands, closed over r. Their
 // definitions are fixed, so an error is a bug, and MustNew panics on it.
 func (r *Registry) builtins() []Command {
-	list := MustNew(idList, "List commands", func(_ context.Context, inv *Invocation, _ NoArgs) (Result, error) {
+	list := MustNew(BuiltinList, "List commands", func(_ context.Context, inv *Invocation, _ NoArgs) (Result, error) {
 		var infos []ManifestCommand
 		var text strings.Builder
 		for c := range r.Available(inv.WhenContext, inv.Origin.surface()) {
@@ -33,7 +34,7 @@ func (r *Registry) builtins() []Command {
 	},
 		WithDescription("Lists the commands the caller can run now: not hidden, offered where it asks from, and available in its context."),
 		WithDanger(ReadOnly), WithIdempotent())
-	describe := MustNew(idDescribe, "Describe a command", func(_ context.Context, _ *Invocation, a describeArgs) (Result, error) {
+	describe := MustNew(BuiltinDescribe, "Describe a command", func(_ context.Context, _ *Invocation, a describeArgs) (Result, error) {
 		c, ok := r.Lookup(ID(a.ID))
 		if !ok {
 			return Result{}, &ArgError{Path: "/id", Reason: "no command has this ID"}
@@ -51,7 +52,7 @@ func (r *Registry) builtins() []Command {
 	},
 		WithDescription("Describes one command: its ID, arguments schema and danger."),
 		WithArgHint("command id"), WithDanger(ReadOnly), WithIdempotent())
-	quit := MustNew(idQuit, "Quit", func(context.Context, *Invocation, NoArgs) (Result, error) {
+	quit := MustNew(BuiltinQuit, "Quit", func(context.Context, *Invocation, NoArgs) (Result, error) {
 		return Result{Cmd: func() any { return QuitRequestMsg{} }}, nil
 	},
 		WithDescription("Asks the program to quit; the program decides."),

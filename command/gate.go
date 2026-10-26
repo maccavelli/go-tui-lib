@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"sync"
 
 	"github.com/maccavelli/go-tui-lib/v2/internal/enum"
@@ -75,10 +76,43 @@ func AllowIf(ok bool) Gate {
 	})
 }
 
-// asks reports whether the policy asks the gate before a command of danger
-// d runs for origin o: a mutating command from an agent, and a destructive
-// one from an agent or the shell.
-func asks(d Danger, o Origin) bool {
+// GatePolicy says which requests are put to a gate before they run
+// (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md D4). Asks is
+// called for each request the registry admits, on the goroutine that calls
+// Dispatch or Run, and must not block. A policy's panic refuses the request,
+// with an error that wraps ErrRefused and a *PanicError.
+type GatePolicy interface {
+	Asks(c Command, o Origin) bool
+}
+
+// GatePolicyFunc is a function used as a GatePolicy.
+type GatePolicyFunc func(c Command, o Origin) bool
+
+// Asks calls f.
+func (f GatePolicyFunc) Asks(c Command, o Origin) bool { return f(c, o) }
+
+// DefaultGatePolicy is the policy a registry has without WithGatePolicy: a
+// mutating command from an agent, and a destructive one from an agent or
+// the shell, ask the gate (docs/decisions/0006-MADR-command-registry.md
+// §7). A program's own policy may call it, and change only what it means
+// to.
+func DefaultGatePolicy() GatePolicy {
+	return GatePolicyFunc(func(c Command, o Origin) bool { return defaultAsks(c.Danger, o) })
+}
+
+// WithGatePolicy sets the policy that says which requests ask the gate. A
+// nil policy keeps DefaultGatePolicy's.
+func WithGatePolicy(p GatePolicy) RegistryOption {
+	return registryOptionFunc(func(r *Registry) {
+		if p != nil {
+			r.policy.rule = p
+		}
+	})
+}
+
+// defaultAsks is DefaultGatePolicy's table, for a command of danger d and
+// origin o.
+func defaultAsks(d Danger, o Origin) bool {
 	switch d {
 	case Mutating:
 		return o == OriginAgent
@@ -94,19 +128,51 @@ type alwaysKey struct {
 	caller string
 }
 
-// policy holds the gate and the remembered answers.
+// policy holds the gate policy, the gate and the remembered answers.
 type policy struct {
+	rule   GatePolicy // nil: DefaultGatePolicy's table
 	gate   Gate
 	mu     sync.Mutex
 	always map[alwaysKey]Verdict
 }
 
+// asks reports whether the policy asks a gate about inv, and returns the
+// rule's panic as a *PanicError.
+func (p *policy) asks(inv *Invocation) (ask bool, err error) {
+	if p.rule == nil {
+		return defaultAsks(inv.Command.Danger, inv.Origin), nil
+	}
+	defer func() {
+		if v := recover(); v != nil {
+			ask, err = true, &PanicError{ID: inv.Command.ID, Value: v, Stack: debug.Stack(), gate: true}
+		}
+	}()
+	return p.rule.Asks(inv.Command, inv.Origin), nil
+}
+
+// forget drops the answers remembered for id and caller, or every answer
+// when all is set.
+func (p *policy) forget(id ID, caller string, all bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if all {
+		clear(p.always)
+		return
+	}
+	delete(p.always, alwaysKey{id, caller})
+}
+
 // decide is the policy's answer for inv: AllowOnce when it does not ask;
 // else the request's own gate's, when it has one; else a remembered
 // answer, or the registry's gate's. A refusal is an error wrapping
-// ErrRefused; a gate's panic is a refusal that also wraps a *PanicError.
+// ErrRefused; a policy's or a gate's panic is a refusal that also wraps a
+// *PanicError.
 func (p *policy) decide(ctx context.Context, inv *Invocation, own Gate) (Verdict, error) {
-	if !asks(inv.Command.Danger, inv.Origin) {
+	ask, err := p.asks(inv)
+	if err != nil {
+		return settle(inv, RejectOnce, err)
+	}
+	if !ask {
 		return AllowOnce, nil
 	}
 	if own != nil {
@@ -124,7 +190,7 @@ func (p *policy) decide(ctx context.Context, inv *Invocation, own Gate) (Verdict
 		return RejectOnce, fmt.Errorf("%w: %s %s from %s needs a gate, and there is none",
 			ErrRefused, inv.Command.Danger, inv.Command.ID, inv.Origin)
 	}
-	d, err := askGate(ctx, p.gate, inv)
+	d, err = askGate(ctx, p.gate, inv)
 	if err == nil && (d == AllowAlways || d == RejectAlways) {
 		p.mu.Lock()
 		p.always[key] = d

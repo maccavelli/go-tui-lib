@@ -67,7 +67,7 @@ func resultOf(t *testing.T, msgs []any) ResultMsg {
 }
 
 // builtinIDs is the registry's own commands, which ids leaves out.
-var builtinIDs = map[ID]bool{idList: true, idDescribe: true, idQuit: true}
+var builtinIDs = map[ID]bool{BuiltinList: true, BuiltinDescribe: true, BuiltinQuit: true}
 
 // ids is the IDs seq yields, but the registry's own.
 func ids(seq func(func(Command) bool)) []ID {

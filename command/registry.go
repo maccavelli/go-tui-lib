@@ -58,7 +58,8 @@ type Registry struct {
 	prefixer func(Source) string
 	loop     atomic.Pointer[loopState] // the program's loop, or nil
 	running  running
-	maxArg   int // the largest request's arguments, and slash or command line, in bytes
+	maxArg   int  // the largest request's arguments, and slash or command line, in bytes
+	bare     bool // WithoutBuiltins: NewRegistry adds none of its own commands
 }
 
 // DefaultMaxArgBytes is the largest request's arguments a registry takes,
@@ -154,8 +155,16 @@ func WithLoop(send func(any)) RegistryOption {
 	return registryOptionFunc(func(r *Registry) { r.loop.Store(&loopState{send: send}) })
 }
 
+// WithoutBuiltins makes NewRegistry add none of its own commands:
+// BuiltinList, BuiltinDescribe and BuiltinQuit. A program registers its
+// own under those IDs, or under others.
+func WithoutBuiltins() RegistryOption {
+	return registryOptionFunc(func(r *Registry) { r.bare = true })
+}
+
 // NewRegistry returns a registry at version 0 holding only its own
-// commands: command.list, command.describe and app.quit.
+// commands: command.list, command.describe and app.quit, or none under
+// WithoutBuiltins.
 func NewRegistry(o ...RegistryOption) *Registry {
 	r := &Registry{maxArg: DefaultMaxArgBytes}
 	r.policy.always = map[alwaysKey]Verdict{}
@@ -164,14 +173,24 @@ func NewRegistry(o ...RegistryOption) *Registry {
 		f.apply(r)
 	}
 	d := r.draftOf(&snapshot{}, nil)
-	for _, c := range r.builtins() {
-		if err := d.addBuiltin(c); err != nil {
-			panic(err) // the registry's own commands are fixed; this is a bug
+	if !r.bare {
+		for _, c := range r.builtins() {
+			if err := d.addBuiltin(c); err != nil {
+				panic(err) // the registry's own commands are fixed; this is a bug
+			}
 		}
 	}
 	r.snap.Store(newSnapshot(0, d.entries, nil))
 	return r
 }
+
+// Forget drops the AllowAlways or RejectAlways answer remembered for id
+// and caller, so the gate is asked again. Forgetting what was not
+// remembered does nothing.
+func (r *Registry) Forget(id ID, caller string) { r.policy.forget(id, caller, false) }
+
+// ForgetAll drops every remembered answer, for every command and caller.
+func (r *Registry) ForgetAll() { r.policy.forget("", "", true) }
 
 // Register adds built-in commands, all or none. It is an error for an ID
 // to be malformed or taken, for a slash name or alias to be malformed or

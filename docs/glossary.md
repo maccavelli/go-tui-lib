@@ -45,8 +45,7 @@ built, as the next section lists. Reserved now, each checked with
 | `lineedit` | `Composer`, `History`, `MemHistory`, `Completer`, `CompleterFunc`, `EditEvent`, `EditEventKind` | 0023-MADR D6 |
 | `stream` | `Printer`, `Markup`, `Style`, `Scanner`, beside 0009's `Doc` | 0023-MADR D7 |
 | `transcript` | `Transcript` | 0023-MADR D9 |
-| `command` | `GatePolicy`, `GatePolicyFunc` | [0024-MADR](decisions/0024-MADR-opt-in-and-opt-out-coverage.md) D4 |
-| `palette` | `Opener` | 0024-MADR D4 |
+| `palette` | `Opener` | [0024-MADR](decisions/0024-MADR-opt-in-and-opt-out-coverage.md) D4 |
 | `workspace` | `FocusFallback`, `FocusFallbackFunc` | 0024-MADR A1 |
 
 Each package's options are its `Option`, the deliberate name above.
@@ -86,7 +85,8 @@ catalogue read from a map, were reserved by
 [0024-MADR](decisions/0024-MADR-opt-in-and-opt-out-coverage.md) D9 and are
 built for `v2.2.0`
 ([0024-PLAN-command-and-control-opt-outs](decisions/0024-PLAN-command-and-control-opt-outs.md)
-Step 2).
+Step 2); and `command`'s `GatePolicy` and `GatePolicyFunc`, which say
+which requests ask the gate, by its D4, in that PLAN's Step 4.
 Each has one meaning, as its package documents it. `Terminal` is in
 "Deliberate" above; `command.Decision`, `Verdict`'s old name, was removed
 in `v0.10.0`, and `Decision` is `launch`'s alone.

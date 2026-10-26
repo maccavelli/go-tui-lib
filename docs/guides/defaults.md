@@ -37,11 +37,11 @@ record that is not there.
 | Behaviour | Default | Control | Status |
 | :--- | :--- | :--- | :--- |
 | The built-in commands, after construction | `command.list`, `command.describe` and `app.quit` in every registry | `command.Registry.Remove` | built |
-| The built-in commands, at construction | added by `NewRegistry` | `command.WithoutBuiltins`, `command.BuiltinList`, `command.BuiltinDescribe`, `command.BuiltinQuit` | planned (0024-PLAN-command-and-control-opt-outs.md) |
+| The built-in commands, at construction | added by `NewRegistry` | `command.WithoutBuiltins`, `command.BuiltinList`, `command.BuiltinDescribe`, `command.BuiltinQuit` | built |
 | The gate | none: a request the policy asks about is refused | `command.WithGate`, `command.GateFunc`, `command.AllowIf` | built |
 | A request's own gate | asked where the policy asks | `command.Request.Gate` | built |
-| Which requests ask the gate | a mutating command from an agent; a destructive one from an agent or the shell | `command.WithGatePolicy`, `command.GatePolicy`, `command.GatePolicyFunc`, `command.DefaultGatePolicy` | planned (0024-PLAN-command-and-control-opt-outs.md) |
-| Remembered verdicts | kept for the registry's life | `command.Registry.Forget`, `command.Registry.ForgetAll` | planned (0024-PLAN-command-and-control-opt-outs.md) |
+| Which requests ask the gate | a mutating command from an agent; a destructive one from an agent or the shell | `command.WithGatePolicy`, `command.GatePolicy`, `command.GatePolicyFunc`, `command.DefaultGatePolicy` | built |
+| Remembered verdicts | kept for the registry's life | `command.Registry.Forget`, `command.Registry.ForgetAll` | built |
 | The auditor | none | `command.WithAuditor`, `command.AuditorFunc`, `command.SlogAuditor` | built |
 | A request's argument bytes | 1 MiB | `command.WithMaxArgBytes` | built |
 | A loaded command's slash name when taken | `prefix:name` | `command.WithPrefixer` | built |
