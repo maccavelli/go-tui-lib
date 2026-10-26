@@ -45,8 +45,7 @@ built, as the next section lists. Reserved now, each checked with
 | `lineedit` | `Composer`, `History`, `MemHistory`, `Completer`, `CompleterFunc`, `EditEvent`, `EditEventKind` | 0023-MADR D6 |
 | `stream` | `Printer`, `Markup`, `Style`, `Scanner`, beside 0009's `Doc` | 0023-MADR D7 |
 | `transcript` | `Transcript` | 0023-MADR D9 |
-| `msgcat` | `Catalog`, `CatalogFunc`, `MessageID`, `Table` | [0024-MADR](decisions/0024-MADR-opt-in-and-opt-out-coverage.md) D9 |
-| `command` | `GatePolicy`, `GatePolicyFunc` | 0024-MADR D4 |
+| `command` | `GatePolicy`, `GatePolicyFunc` | [0024-MADR](decisions/0024-MADR-opt-in-and-opt-out-coverage.md) D4 |
 | `palette` | `Opener` | 0024-MADR D4 |
 
 Each package's options are its `Option`, the deliberate name above.
@@ -80,6 +79,13 @@ stay `termcap`'s. `command`'s `Effect`, a follow-up a host runs, in
 (0020-PLAN Step 10). So are `termkey`'s `KeyEvent`, `Mod`, `Decoder`,
 `Input` and `InputKind`: a decoded key, its modifiers, the byte decoder,
 what it yields and its kind, for `v2.0.0` (0020-PLAN Step 11).
+`msgcat`'s `Catalog`, `CatalogFunc`, `MessageID` and `Table`, a
+program's message catalogue, its adapter, a message's name and a
+catalogue read from a map, were reserved by
+[0024-MADR](decisions/0024-MADR-opt-in-and-opt-out-coverage.md) D9 and are
+built for `v2.2.0`
+([0024-PLAN-command-and-control-opt-outs](decisions/0024-PLAN-command-and-control-opt-outs.md)
+Step 2).
 Each has one meaning, as its package documents it. `Terminal` is in
 "Deliberate" above; `command.Decision`, `Verdict`'s old name, was removed
 in `v0.10.0`, and `Decision` is `launch`'s alone.

@@ -292,3 +292,98 @@ No module is added. `msgcat` imports the standard library alone.
   passed `python3 -m tools.verify names` when its record was written.
 * **`docs/README.md`:** both MADRs `accepted`, this PLAN `in-progress`.
 * Records and AGENTS.md only: no source, test, CI or configuration.
+
+### Step 2: `msgcat`
+
+*2026-10-25.* The owner committed Step 1 and said to proceed.
+
+* **`msgcat/`:** `MessageID`; `Catalog`, with `CatalogFunc` and `Table`
+  (a nil `Table` keeps every default); `Format`, which takes the
+  catalogue's text or the default and always formats it with
+  `fmt.Sprintf`, so a literal percent sign is `%%`; and `Check`, which
+  compares each translation's verbs with its default's, by argument
+  number and verb letter, so explicit indexes may reorder the arguments,
+  and joins one error per message, in ID order. Its documentation ends
+  with the stability line.
+* **The gates:** `msgcat` joins `cores` (`TestCoresAreCharmFree`), the
+  `charmfree` depguard files, and `narrow` with no allowed package
+  (`TestNarrowClosures`); depguard gains `msgcatstd`, strict, allowing
+  `$gostd` alone, beside `termkeystd` and `safetextstd`.
+* **`docs/glossary.md`:** `msgcat`'s four names move from "Reserved" to
+  "Built".
+* **Tests** (`msgcat/msgcat_test.go`): `TestFormat` (the default for a nil
+  catalogue, a nil `Table` and an ID it lacks; a translation that
+  reorders; `CatalogFunc` both ways; a literal percent); `TestCheck`
+  (matching translations, among them a reorder and a `*` width, pass; a
+  dropped verb, an added one, a verb where the default has none and
+  another verb are each reported by ID; an empty catalogue passes);
+  `TestVerbs` (eight formats, and fmt's own error marker agreeing on how
+  many integers four formats read); `ExampleFormat`.
+* **Mutations,** through `python3 -m tools.verify mutate` on scratch
+  copies, 7 killed of 7:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | `Format` ignores the catalogue | `TestFormat`: `reordered: "1 of 3"`; `ExampleFormat` |
+  | `Format` ignores a false answer | `TestFormat`: `other ID: "%!(EXTRA int=1, int=3)"; want the default, 1 of 3` |
+  | `Check` compares the count of verbs only | `TestCheck`: `t.d not reported` |
+  | an explicit index does not renumber | `TestVerbs`: `verbs("%[2]s then %[1]q") = %[1]s %[2]q; want %[1]q %[2]s` |
+  | a literal percent reads as a verb | `TestVerbs`: `verbs("100%% done") = %[1]%; want none` |
+  | `msgcat` imports `x/ansi`: the closure | `TestNarrowClosures`, on each GOOS: `msgcat (GOOS=linux) links github.com/charmbracelet/x/ansi, which 0024-MADR D9 does not allow: msgcat → github.com/charmbracelet/x/ansi` |
+  | `msgcat` imports `x/ansi`: the lint rule | `golangci-lint`: `import 'github.com/charmbracelet/x/ansi' is not allowed from list 'msgcatstd' (depguard)` |
+
+  The lint rule's first mutation, a blank import, was killed by gofmt,
+  goimports and revive's `blank-imports`, not by depguard, which did not
+  report it beside them; it was rewritten as a formatted, used import,
+  run again alone, and the depguard line above read from its output.
+* **Deviation D1, 2026-10-25: `TestResetBeforeExit` asserted an order
+  Bubble Tea does not guarantee.**
+  * **Found,** by this step's gates: on `remote linux`, `lc-all-c` failed
+    one test, which the gate now names
+    (`0018-PLAN-python-verification-tools.md` Step 8):
+    `termcaptest_test.go:181: the last sequence before exit is
+    "\x1b[?2004l", want the 2031 reset`. The test is 0005-PLAN Step 4's,
+    in `termcap/termcaptest`, which this step does not touch. It failed 0
+    of 300 runs on macOS and 0 of 300 on the Linux host, alone.
+  * **The cause,** in bubbletea v2.0.10: `tea.Raw` appends to the
+    program's `outputBuf` (`tea.go:1223-1227`), which the render ticker
+    flushes (`tea.go:1441-1443`) and `restoreTerminalState` flushes last
+    (`tty.go:33-35`), after `stopRenderer` closes the renderer, whose
+    teardown writes `CSI ?2004l` and `CSI ?25h`
+    (`cursed_renderer.go:172-209`; `tea.go:1284-1288`). So the prober's
+    reset comes after the teardown, unless a tick between its queueing and
+    the shutdown flushed it first, as under load. A passing run's last
+    sequences, printed by a scratch probe: `?25h`, `?2004l`, `?2031h`,
+    `?2031l`. The reset is written either way; that it is the last
+    sequence, as 0005-PLAN's test item says, is not Bubble Tea's promise.
+  * **Resolutions offered:** assert what Bubble Tea guarantees, the reset
+    after the set, once, and last of the prober's own sequences, with
+    tea's teardown on either side (recommended); or make the order the
+    library's, `termcaptest.Terminal.Run` writing the model's `Restore()`
+    after tea's `Run`, as `launch.Run` does, which then tests that path
+    instead; or report it upstream and keep the flaky assertion.
+  * **Chosen by the owner,** 2026-10-25: "Assert what tea guarantees
+    (Recommended)". `TestResetBeforeExit` now finds the last of the
+    prober's sequences, its queries and mode 2031's set and reset, and
+    requires the reset; the existing check of `set,reset`, once each,
+    stays. 0005-PLAN gains a dated amendment. This step's scope gains
+    `termcap/termcaptest/termcaptest_test.go` and
+    `docs/decisions/0005-PLAN-terminal-capabilities-and-services.md`.
+  * **Seen failing,** on scratch copies, 2 killed of 2: the prober
+    writing DA1 after the reset (`the prober's last sequence before exit
+    is "\x1b[c", want the 2031 reset`), and setting the mode again after
+    it (`mode 2031: set,reset,set, want set after the probe and reset
+    before exit`). Fifty runs of the changed test pass.
+* **Gates:** `python3 -m tools.verify gates` over the step's 5 Go files,
+  `.golangci.yml` and 4 records.
+  * The first run, before D1, passed every gate on macOS (19 of 19) and
+    Windows (18, `gofmt` skipped), and failed `lc-all-c` on Linux, D1's
+    finding.
+  * After D1: macOS 19 passed, 0 failed, in 514 s, `release-check` "331
+    file(s) clean in 1 module(s)", with `apicheck` against `v2.1.0`;
+    `remote linux` 18 passed, 0 failed, 1 skipped (`gofmt`, which is given
+    no files there), in 786 s, `release-check` "334 file(s) clean";
+    `remote windows` 18 passed, 0 failed, 1 skipped, in 1943 s, "334
+    file(s) clean". `make lint` reports "0 issues" for `GOOS=linux`,
+    `darwin` and `windows`. The identifier scan of the change and the
+    untracked files is clean.

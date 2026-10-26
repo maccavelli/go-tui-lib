@@ -23,6 +23,7 @@ var cores = []string{
 	"internal/sanitize",
 	"keymap",
 	"layout",
+	"msgcat",
 	"safetext",
 	"termcap",
 	"termkey",
@@ -199,6 +200,7 @@ type narrowCore struct {
 var narrow = []narrowCore{
 	{core: "termkey", allow: []string{"internal/enum"}, record: "0020-MADR D7, 0021-MADR N1"},
 	{core: "safetext", allow: []string{"glyph", "internal/enum"}, record: "0020-MADR D9, 0021-MADR A1"},
+	{core: "msgcat", record: "0024-MADR D9"},
 }
 
 // strayFrom reports, for g, whether a package is one a narrow core may not

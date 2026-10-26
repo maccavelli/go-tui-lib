@@ -176,9 +176,21 @@ func TestResetBeforeExit(t *testing.T) {
 	if got := strings.Join(modeEvents(term), ","); got != "set,reset" {
 		t.Fatalf("mode 2031: %s, want set after the probe and reset before exit", got)
 	}
-	seqs := term.Sequences()
-	if seqs[len(seqs)-1] != ansi.ResetModeLightDark {
-		t.Errorf("the last sequence before exit is %q, want the 2031 reset", seqs[len(seqs)-1])
+	// The reset is the last sequence the prober writes: no query, and no
+	// mode 2031 set, follows it. Bubble Tea's own teardown, such as 2004l
+	// and 25h, may come before or after it: tea flushes tea.Raw's bytes
+	// after its renderer's teardown, unless a render tick flushed them
+	// first (bubbletea v2.0.10 tty.go:33-35, tea.go:1441-1443;
+	// 0005-PLAN-terminal-capabilities-and-services.md, Step 4's amendment
+	// of 2026-10-25).
+	var last string
+	for _, s := range term.Sequences() {
+		if isQuery(s) || s == ansi.SetModeLightDark || s == ansi.ResetModeLightDark {
+			last = s
+		}
+	}
+	if last != ansi.ResetModeLightDark {
+		t.Errorf("the prober's last sequence before exit is %q, want the 2031 reset", last)
 	}
 
 	declined := NewTerminal(Kitty())

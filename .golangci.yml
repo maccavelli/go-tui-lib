@@ -114,6 +114,7 @@ linters:
             - "**/internal/sanitize/*.go"
             - "**/keymap/*.go"
             - "**/layout/*.go"
+            - "**/msgcat/*.go"
             - "**/safetext/*.go"
             - "**/termcap/*.go"
             - "**/termkey/*.go"
@@ -162,6 +163,18 @@ linters:
             - $gostd
             - github.com/maccavelli/go-tui-lib/v2/glyph
             - github.com/maccavelli/go-tui-lib/v2/internal/enum
+        # msgcat imports the standard library and nothing else
+        # (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md D9).
+        # internal/conformance's TestNarrowClosures checks the whole closure;
+        # this rule fails a direct import at lint. Keep its allow list and
+        # narrow's the same.
+        msgcatstd:
+          list-mode: strict
+          files:
+            - "**/msgcat/*.go"
+            - "!$test"
+          allow:
+            - $gostd
     errcheck:
       check-type-assertions: true
       check-blank: true

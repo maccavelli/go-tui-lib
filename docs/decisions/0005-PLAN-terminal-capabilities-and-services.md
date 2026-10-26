@@ -1818,3 +1818,17 @@ github.com/maccavelli/go-tui-lib@v0.3.0`, `go mod tidy` and `go build
 ./...`, each exit 0; the program ran. At the owner's request
 (2026-10-05), `README.md`'s Status names `v0.3.0` as the current release
 and the three packages as shipped in it.
+
+### Amendment, 2026-10-25: the reset is the prober's last sequence, not the program's
+
+Found by
+[0024-PLAN-command-and-control-opt-outs.md](0024-PLAN-command-and-control-opt-outs.md)
+Step 2's gates, its deviation D1, which has the evidence. Step 4's test
+item for `TestResetBeforeExit` said the reset is "the program's last
+sequence". Bubble Tea v2.0.10 flushes `tea.Raw`'s bytes after its
+renderer's teardown, or before it when a render tick comes first, so its
+own `CSI ?2004l` and `CSI ?25h` may follow the reset. The test now
+requires what Bubble Tea guarantees and a terminal needs: mode 2031 set
+and reset once each, in that order, the reset the last of the prober's
+own sequences. The owner chose this on 2026-10-25 ("Assert what tea
+guarantees (Recommended)").
