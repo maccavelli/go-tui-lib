@@ -110,6 +110,8 @@ linters:
             - "**/command/*.go"
             - "**/fuzzy/*.go"
             - "**/glyph/*.go"
+            - "**/inline/*.go"
+            - "**/inline/inlinetest/*.go"
             - "**/internal/enum/*.go"
             - "**/internal/sanitize/*.go"
             - "**/keymap/*.go"

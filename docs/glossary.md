@@ -38,9 +38,7 @@ built, as the next section lists. Reserved now, each checked with
 
 | Package | Names | Record |
 | :--- | :--- | :--- |
-| `inline` | `Region`, `Reflow`, `Reader` | [0023-MADR](decisions/0023-MADR-line-mode-components.md) D3 |
-| `inline/inlinetest` | `Screen` | 0023-MADR D3 |
-| `ask` | `Question`, `Row`, `Answer`, `Response`, `Asker`, `AskEvent`, `AskEventKind` | 0023-MADR D4 |
+| `ask` | `Question`, `Row`, `Answer`, `Response`, `Asker`, `AskEvent`, `AskEventKind` | [0023-MADR](decisions/0023-MADR-line-mode-components.md) D4 |
 | `pick` | `Chooser`, `Entry`, `PickEvent`, `PickEventKind` | 0023-MADR D5 |
 | `lineedit` | `Composer`, `History`, `MemHistory`, `Completer`, `CompleterFunc`, `EditEvent`, `EditEventKind` | 0023-MADR D6 |
 | `stream` | `Printer`, `Markup`, `Style`, `Scanner`, beside 0009's `Doc` | 0023-MADR D7 |
@@ -87,7 +85,13 @@ built for `v2.2.0`
 Step 2); `command`'s `GatePolicy` and `GatePolicyFunc`, which say
 which requests ask the gate, by its D4, in that PLAN's Step 4; and
 `palette`'s `Opener`, a provider told that the picker opened, by its D4,
-in Step 7.
+in Step 7. `inline`'s `Region`, the live rows below the scrollback,
+`Reflow`, how a terminal re-wraps them, and `Reader`, the input read only
+when asked, and `inline/inlinetest`'s `Screen`, a terminal's screen for
+tests, were reserved by
+[0023-MADR](decisions/0023-MADR-line-mode-components.md) D3 and are built
+([0023-PLAN-line-mode-components](decisions/0023-PLAN-line-mode-components.md)
+Step 1).
 Each has one meaning, as its package documents it. `Terminal` is in
 "Deliberate" above; `command.Decision`, `Verdict`'s old name, was removed
 in `v0.10.0`, and `Decision` is `launch`'s alone.

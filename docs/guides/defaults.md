@@ -236,6 +236,20 @@ record that is not there.
 | A query's length | 256 clusters | `fuzzy.NewMatcher` | floor |
 | A boost's bound | one consecutive-match bonus | `fuzzy.Matcher.RankContext` | decided (0008-MADR-command-palette.md) |
 
+## inline and inline/inlinetest
+
+| Behaviour | Default | Control | Status |
+| :--- | :--- | :--- | :--- |
+| How text is measured | `ansi.WcWidth` | `inline.WithMethod` | built |
+| Each drawing one synchronized update, the cursor hidden | on | `inline.WithSynchronized` | built |
+| A cursor query on a resize | `CSI 6 n` sent | `inline.WithoutCursorQuery` | built |
+| The wait for the cursor report | 150 ms | `inline.WithReportWait`, `inline.DefaultReportWait` | built |
+| How the terminal re-wraps, when the report does not say | a re-wrap | `inline.WithReflow` | built |
+| The rows shown | every row | `inline.WithHeight`, `inline.Region.SetHeight` | built |
+| A row wider than the width | cut to it | `inline.Region.Resize` | floor |
+| The cursor report, while a resize asks for one | taken from the input, the first row's too; a late one dropped | `termcap.ParseReply` | floor |
+| Reading the input | only when asked, one read at a time, never closed | `inline.NewReader` | decided (0023-MADR-line-mode-components.md D3) |
+
 ## msgcat
 
 | Behaviour | Default | Control | Status |

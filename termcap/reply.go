@@ -26,6 +26,8 @@ type Reply struct {
 	Flags   int         // ReplyKittyKeyboard: the flags the terminal holds
 	Dark    bool        // ReplyColorScheme: DSR 997 said dark
 	Text    string      // ReplyVersion's name; ReplyKittyGraphics's "OK" or error; ReplyNotify's keys
+	Row     int         // ReplyCursorPosition: the cursor's row, from 1
+	Col     int         // ReplyCursorPosition: the cursor's column, from 1
 }
 
 // ReplyKind is what a Reply answers. A host ignores a kind it does not
@@ -56,13 +58,20 @@ const (
 	ReplyKittyGraphics
 	// ReplyNotify is OSC 99's reply to a p=? query, with its keys in Text.
 	ReplyNotify
+	// ReplyCursorPosition is the cursor position report, CSI row ; col R,
+	// answering DSR 6 (CSI 6 n), or DECXCPR's CSI ? row ; col R, in Row and
+	// Col, each from 1 (docs/decisions/0023-MADR-line-mode-components.md
+	// D3). A decoder may read the report on the first row as a modified F3,
+	// CSI 1 ; mod R; only a host that asked for the report knows which it
+	// is.
+	ReplyCursorPosition
 )
 
 var replyKindNames = enum.Names[ReplyKind]{
 	Pkg: pkgName, Type: "ReplyKind", Unknown: ErrUnknownName,
 	Tokens: []string{
 		tokenUnknown, "primary-attributes", "secondary-attributes", "version", "mode", "color",
-		"kitty-keyboard", tokenColorScheme, "kitty-graphics", "notify",
+		"kitty-keyboard", tokenColorScheme, "kitty-graphics", "notify", "cursor-position",
 	},
 }
 
@@ -205,7 +214,7 @@ func params(raw string) int {
 }
 
 // csiReply reads the CSI replies: DA1, DA2, DECRPM, the Kitty keyboard
-// flags and DSR 997.
+// flags, DSR 997 and the cursor position report.
 func csiReply(r *Reply, c ansi.Cmd, ps ansi.Params) {
 	prefix, inter, final := c.Prefix(), c.Intermediate(), c.Final()
 	values := make([]int, len(ps))
@@ -226,6 +235,8 @@ func csiReply(r *Reply, c ansi.Cmd, ps ansi.Params) {
 		if len(values) == 1 {
 			r.Flags = values[0]
 		}
+	case (prefix == 0 || prefix == '?') && inter == 0 && final == 'R' && len(values) == 2 && values[0] >= 1 && values[1] >= 1:
+		r.Kind, r.Row, r.Col = ReplyCursorPosition, values[0], values[1]
 	case prefix == '?' && inter == 0 && final == 'n' && len(values) == 2 && values[0] == 997:
 		switch values[1] {
 		case 1:

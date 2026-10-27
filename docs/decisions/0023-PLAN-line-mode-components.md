@@ -1,6 +1,6 @@
 ---
-status: proposed
-date: 2026-10-25
+status: in-progress
+date: 2026-10-27
 associated-madr: "0023-MADR-line-mode-components.md"
 ---
 # Implement the line-mode question, picker, composer and transcript
@@ -240,3 +240,176 @@ English defaults, through `msgcat`.
   patch release fixes forward. Every change is an addition.
 
 ## Execution Record
+
+*2026-10-27.* The owner approved this PLAN: "approved to proceed", after
+[0024-PLAN-command-and-control-opt-outs.md](0024-PLAN-command-and-control-opt-outs.md)
+was released as `v2.2.0` and closed out (`9a13872`).
+
+### Step 1: `inline`, `inlinetest` and the cursor report
+
+* **Deviation D1, 2026-10-27: the facts re-read changed only by this
+  PLAN's prerequisite.**
+  * **Found,** re-reading the MADR's facts at `9a13872`: `git diff
+    65d437b` shows no change to `termkey`, `keymap` or `fuzzy`, and none
+    to `termcap` outside its tests; `palette/provider.go:87`'s `Hit.Run`
+    is still a `tea.Cmd`. A scratch program over `termkey` and `termcap`
+    gives the "Probed here" table's four results again. What changed is
+    0024-PLAN's: `msgcat` joined `TestCoresAreCharmFree`'s cores,
+    `palette`'s command IDs and `Opener` are exported, and API convention
+    12 and `docs/guides/defaults.md` exist.
+  * **Resolutions offered:** record it here, with no change to a decision
+    (recommended); or also amend the MADR's Context.
+  * **Chosen by the owner,** 2026-10-27: "Record as D1, no change
+    (Recommended)".
+* **Deviation D2, 2026-10-27: the report's wait gets a control.**
+  * **Found:** MADR D3 has the region wait "by default 150 ms" for the
+    cursor report, and this step's option list gives no control, which
+    convention 12 asks of a timeout.
+  * **Resolutions offered:** `inline.WithReportWait` (recommended); or a
+    `decided` row with no control.
+  * **Chosen by the owner,** 2026-10-27: "Add WithReportWait
+    (Recommended)". MADR A1 item 1. This step's scope gains the option,
+    its test and a mutation.
+* **Deviation D3, 2026-10-27: the height follows the terminal.**
+  * **Found:** D3 windows a region taller than its height, this step
+    gives `WithHeight` alone, and `Resize` takes the width alone.
+  * **Resolutions offered:** `Region.SetHeight` beside `WithHeight`
+    (recommended); or `WithHeight` only, a new region on a height change.
+  * **Chosen by the owner,** 2026-10-27: "Add Region.SetHeight
+    (Recommended)". MADR A1 item 2.
+* **Deviation D4, 2026-10-27: `inlinetest` imports `inline`.**
+  * **Found:** D1 has `inlinetest` import `x/ansi` alone, while this step
+    gives `Screen` a `Resize(columns, Reflow)`, and `Reflow` is `inline`'s;
+    a second exported `Reflow` would fail conformance's names check, and no
+    other name is reserved.
+  * **Resolutions offered:** `inlinetest` imports `inline` (recommended);
+    or an `inlinetest.Narrowing` of its own.
+  * **Chosen by the owner,** 2026-10-27: "inlinetest imports inline
+    (Recommended)". MADR A1 item 3.
+* **`termcap/reply.go`:** `ReplyCursorPosition`, the last kind, token
+  `cursor-position`, with `Reply.Row` and `Reply.Col`, each from 1, read
+  from `CSI row ; col R` and DECXCPR's `CSI ? row ; col R`, with exactly
+  two parameters, each at least 1. `ParseReply`'s documentation says the
+  report on the first row reads as a modified F3 to a decoder. The probe
+  ignores the kind, as it ignores every kind it does not ask for.
+* **`inline/`:**
+  * `Region` (`region.go`): `NewRegion`, `Draw`, `Print`, `Commit`,
+    `Clear`, `Resize`, `HandleInput`, `Timeout`, `HandleTimeout`,
+    `Restore`, and `SetHeight` (D3). Drawing is gobble's renderer: an
+    unchanged row skipped, a changed row rewritten from what it shares
+    with the row before, by relative moves, never erased first, each
+    drawing one synchronized update with the cursor hidden. Two things it
+    adds to gobble's: the shared part is cut between whole escape
+    sequences and grapheme clusters, under the width method, never inside
+    one; and the escape sequences in it are written again before the
+    changed text, with a reset after a styled row, so a rewrite keeps the
+    styles in force there. A row wider than the width is cut to it, by
+    `internal/sanitize.Truncate`.
+  * The resize is gobble's `lift`: the report's column decides cut or
+    re-wrap when the cursor was past the new width, and `WithReflow`'s
+    kind when it does not; a keep-row terminal is redrawn as a re-wrap.
+    While the report is awaited, `Draw` keeps its rows and `Print` its
+    text, and the report's redraw writes both; every input but a cursor
+    report goes on to the component, in order. A report that comes after
+    its wait ended is taken and dropped, until another input comes, so a
+    slow terminal's report is not a key.
+  * Options (`options.go`): `WithMethod`, `WithSynchronized`,
+    `WithReflow`, `WithoutCursorQuery`, `WithReportWait` (D2) and
+    `WithHeight`; `DefaultReportWait`, 150 ms. `Option` is opaque.
+  * `Reflow` (`reflow.go`), its tokens from `internal/enum`: `unknown`,
+    `down`, `keep-row`, `cut`.
+  * `Reader` (`reader.go`): `NewReader(io.Reader)` and `Read(ctx, p)`. Its
+    goroutine starts at the first `Read`, and makes one read of the input
+    for each `Read` that finds nothing kept, with a buffer the size of that
+    `Read`'s, where gobble's reads 512 bytes: the size is the caller's, and
+    needs no option. One `Read` waits at a time; `ctx` ends the wait, not
+    the read. Nothing in `inline` calls `Close`.
+* **`inline/inlinetest/`:** `Screen`, gobble's `termtest.Screen` rebuilt on
+  `x/ansi`'s `DecodeSequenceInString` under the screen's width method, a
+  cell per grapheme cluster, a wide one two cells and never split by a
+  wrap or a re-wrap; `NewScreen(columns, rows, method)`; pending wrap; CSI
+  A, B, C, D, H, J, 2 J, 3 J, K and 2 K; DECTCEM and mode 2026, as
+  `Hidden` and `Synchronized`; `Answer` for `CSI 6 n`; `Cooked`;
+  `Resize(columns, inline.Reflow)`, by D4; a scrollback, which a scroll
+  and a keep-row re-wrap push rows into; `Lines`, `Scrollback`, and
+  `Text`, the form a golden holds. A sequence cut between two writes
+  waits for the rest.
+* **The gates:** `inline` and `inline/inlinetest` join `cores` and the
+  `charmfree` files; `internal/conformance`'s enum table gains
+  `inline.Reflow`.
+* **`docs/guides/defaults.md`:** an `inline` table of nine rows: the
+  method, the synchronized drawing, the cursor query, the wait, the
+  re-wrap kind and the height, `built`; a row wider than the width and the
+  cursor report, `floor`; reading the input, `decided` by the MADR's D3.
+  `inline` shows no text of its own, so it has no message IDs.
+* **`docs/glossary.md`:** `inline`'s `Region`, `Reflow` and `Reader`, and
+  `inlinetest`'s `Screen`, move from "Reserved" to "Built".
+* **Tests:**
+  * `termcap`'s `TestParseReply` gains eight cases: a report, in 7-bit
+    and 8-bit CSI, the first row's, DECXCPR's, and four that are not
+    reports (one parameter, three, row 0, none).
+  * `inlinetest`: the writes, the line feed raw and cooked and the
+    scrollback, wide and ZWJ clusters, the cursor report at a pending
+    wrap, a sequence across two writes, and the three re-wrap kinds.
+  * `inline`, on a `Screen` through a host loop: `TestDrawDiff` (only the
+    changed cell written, a shorter region erased, an unchanged draw
+    writes nothing); `TestDrawBudget`, gobble's three cases, at most the
+    changed text plus 40 bytes; a styled row and a ZWJ cluster rewritten
+    from the right place; `TestPrint`; `TestCommit` and its clear;
+    `TestResize`, each re-wrap kind by the report, by a timeout and with
+    no query, and `TestResizeRowsAbove`; `TestKeysWhileAwaited`;
+    `TestRow1Report`; `TestLateReport`; `TestWithoutCursorQuery`;
+    `TestReportWait`; `TestHeight`; `TestUnsynchronized`; `TestWiderRow`;
+    `TestReader`; and `TestNoClose`, a scan of `inline`'s files for any
+    `Close` call.
+  * `FuzzRegion`: draws, prints, commits, clears, resizes, inputs,
+    timeouts and heights never panic, and no drawn row is wider than the
+    width. Its first 20 s found a property stated wrong: while a resize
+    waits for its report, the rows drawn at the old width stand until the
+    redraw; the check skips that state, and the input is kept as a seed
+    (`inline/testdata/fuzz/FuzzRegion/3af0be9c1f8f2983`). Then 60 s, 1.28
+    million runs, clean.
+  * Three tests failed on their own first expectations, and were
+    corrected: the cursor report after a raw line feed (`3;4`, not
+    `3;6`), the re-wrapped screen too short to keep its top row, and the
+    budget test's layout, which first cut rows every 80 bytes where
+    gobble's lays out whole words, and placed the old cursor at the end
+    where gobble's places it at the edit.
+* **Seen failing,** through `python3 -m tools.verify mutate` on scratch
+  copies, 12 killed of 12. Mutation 1.4's first form did not compile
+  (`rep` unused), so it was rewritten and run again, and killed by a test:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | the diff rewrites every row | `TestDrawDiff`: `an unchanged draw wrote "\x1b[?2026h\x1b[?25l\x1b[1A\r\x1b[5C\n\r\x1b[4C\r\x1b[4C…"`; `TestDrawBudget`: `59 bytes for 1 changed, more than 41` |
+  | `Print` does not redraw the region | `TestPrint`: the screen `["above" "> hel" "reply one" "reply two" …]`, want `["above" "reply one" "reply two" "> hel" "  lo"]` |
+  | the cut kind moves by the re-wrapped rows | `TestResize` (cut, by a timeout and with no query) and `TestResizeRowsAbove/cut`: `the screen and scrollback are …` |
+  | the awaited report is passed on as a key | `TestRow1Report`: `an awaited report on row 1 reached the component as [{key ctrl+f3 …}]`, and `TestResize`, `TestKeysWhileAwaited` |
+  | `Reader` starts a second read | `TestReader`: `a read of the input started before a Read asked for it` |
+  | an erase before each draw | `TestDrawBudget`: `270 bytes for 1 changed, more than 41`; `TestDrawDiff` |
+  | `WithReportWait` ignored | `TestReportWait`: `the wait ends after 150ms, true; want 300ms` |
+  | `SetHeight` ignored | `TestHeight`: `height 2: the screen is …` |
+  | the reader closes the input at its end | `TestNoClose`: `reader.go calls Close: the input is never closed` |
+  | `WithoutCursorQuery` ignored | `TestResize` (no query): `the resize wrote "\x1b[6n"` |
+  | DECXCPR's report not read | `TestParseReply`: `DECXCPR's report: ParseReply("\x1b[?12;40R") = {Kind:unknown …}` |
+  | `inline` imports Bubble Tea | `TestCoresAreCharmFree`: `inline (GOOS=linux) links charm.land/bubbletea/v2: inline → charm.land/bubbletea/v2`, and `inline/inlinetest` through `inline` |
+
+* **Names:** no type name is new beyond D3's four, which the glossary
+  reserved and `tools.verify names` checked when the MADR was written;
+  `Reflow` has one meaning, by D4.
+* **Gates:** `python3 -m tools.verify gates` over the step's 14 Go files,
+  `.golangci.yml`, the guide, the glossary, the index and 2 records. The
+  first run failed one gate on every host, `modernize`: `go fix` asked for
+  `for c := range row` in place of a counted loop in `inlinetest`'s
+  `Screen.Resize`, whose body never changes `c`; the loop was changed, and
+  every gate run again. macOS 19 passed, 0 failed, in 638 s,
+  `release-check` "335 file(s) clean in 1 module(s)", with `apicheck`
+  against `v2.2.0` reporting no incompatible change and the examples gate
+  passing (its count is the tracked files, so `inline`'s 10 untracked
+  files are outside it, but in its lint, vet and tests of `./...`, and in
+  the per-file gates); `remote linux` 18 passed, 0 failed, 1 skipped
+  (`gofmt`, which is given no files there), in 1128 s, "345 file(s)
+  clean", `inline`'s among them; `remote windows` 18 passed, 0 failed,
+  1 skipped, in 2256 s, "345 file(s) clean". `make pre-add-check` on the
+  14 Go files is clean. The identifier scan of the change, untracked files
+  included, is clean.

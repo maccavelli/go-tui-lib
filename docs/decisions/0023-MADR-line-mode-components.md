@@ -903,6 +903,29 @@ with a `Static` provider and no TUI form of `pick`.
   text by default, with gobble's submit-whole an option. The alternative
   is gobble's behaviour as the default.
 
+## Amendments
+
+### A1 (2026-10-27): the report's wait, the region's height, and the test screen's import
+
+*Status: accepted (2026-10-27),* the owner's answers to
+[0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
+Step 1's deviations D2 to D4, each "(Recommended)", found before that
+step's code:
+
+1. **D3's wait for the cursor report has a control,**
+   `inline.WithReportWait(d time.Duration)`; zero or negative keeps
+   `inline.DefaultReportWait`, 150 ms. D3 says the region waits "by
+   default 150 ms", and API convention 12 asks for a `With…` option for
+   a timeout a program may need otherwise, as over a slow link. D13's
+   controls gain it.
+2. **D3's height can change after construction:** `Region.SetHeight(rows
+   int)` beside `WithHeight`, since `Resize` takes the width alone and a
+   terminal's height changes too; 0 draws every row.
+3. **`inline/inlinetest` imports `inline`,** in D1's table, so that
+   `Screen.Resize(columns int, how inline.Reflow)` names the one `Reflow`;
+   `inline`'s own tests that draw on a `Screen` are external tests. Its
+   closure stays the cores' and `x/ansi`.
+
 ## More Information
 
 * Issues of this repository: #7, #8, #9 and #10, each with gobble's

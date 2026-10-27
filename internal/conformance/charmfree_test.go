@@ -19,6 +19,8 @@ var cores = []string{
 	"command",
 	"fuzzy",
 	"glyph",
+	"inline",
+	"inline/inlinetest",
 	"internal/enum",
 	"internal/sanitize",
 	"keymap",

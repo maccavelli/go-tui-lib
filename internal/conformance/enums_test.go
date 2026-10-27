@@ -14,6 +14,7 @@ import (
 	"github.com/maccavelli/go-tui-lib/v2/command"
 	"github.com/maccavelli/go-tui-lib/v2/fuzzy"
 	"github.com/maccavelli/go-tui-lib/v2/glyph"
+	"github.com/maccavelli/go-tui-lib/v2/inline"
 	"github.com/maccavelli/go-tui-lib/v2/keymap"
 	"github.com/maccavelli/go-tui-lib/v2/launch"
 	"github.com/maccavelli/go-tui-lib/v2/layout"
@@ -36,6 +37,7 @@ func as[T ~uint8 | ~uint16 | ~int](n int64) any { return T(n) }
 // fails, and so does an entry the scan does not find.
 var enums = map[string]func(int64) any{
 	"command.Danger":         as[command.Danger],
+	"inline.Reflow":          as[inline.Reflow],
 	"command.Format":         as[command.Format],
 	"command.Kind":           as[command.Kind],
 	"command.Mode":           as[command.Mode],

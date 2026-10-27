@@ -25,7 +25,8 @@ func sameColor(a, b color.Color) bool {
 func sameReply(got, want Reply) bool {
 	return got.Kind == want.Kind && slices.Equal(got.Params, want.Params) && got.Mode == want.Mode &&
 		got.Setting == want.Setting && got.OSC == want.OSC && got.Index == want.Index &&
-		sameColor(got.Color, want.Color) && got.Flags == want.Flags && got.Dark == want.Dark && got.Text == want.Text
+		sameColor(got.Color, want.Color) && got.Flags == want.Flags && got.Dark == want.Dark && got.Text == want.Text &&
+		got.Row == want.Row && got.Col == want.Col
 }
 
 // notifyReply is a reply to the OSC 99 query padded to n bytes.
@@ -78,6 +79,14 @@ func TestParseReply(t *testing.T) {
 		{"Kitty graphics, 8-bit APC and ST", "\x9fGi=31;OK\x9c", graphics},
 		{"Kitty graphics, an error", "\x1b_Gi=31;EINVAL:bad format\x1b\\", Reply{Kind: ReplyKittyGraphics, Text: "EINVAL:bad format"}},
 		{"OSC 99", "\x1b]99;i=termcap:p=?;a=focus\x1b\\", Reply{Kind: ReplyNotify, Text: "a=focus"}},
+		{"a cursor report", "\x1b[12;40R", Reply{Kind: ReplyCursorPosition, Row: 12, Col: 40}},
+		{"a cursor report, 8-bit CSI", "\x9b12;40R", Reply{Kind: ReplyCursorPosition, Row: 12, Col: 40}},
+		{"a cursor report on row 1, a modified F3 to a decoder", "\x1b[1;5R", Reply{Kind: ReplyCursorPosition, Row: 1, Col: 5}},
+		{"DECXCPR's report", "\x1b[?12;40R", Reply{Kind: ReplyCursorPosition, Row: 12, Col: 40}},
+		{"a cursor report with one parameter", "\x1b[12R", Reply{}},
+		{"a cursor report with three parameters", "\x1b[1;2;3R", Reply{}},
+		{"a cursor report on row 0", "\x1b[0;5R", Reply{}},
+		{"a cursor report with no parameters", "\x1b[R", Reply{}},
 		{"a reply of 1 KiB", notifyReply(maxReply), Reply{Kind: ReplyNotify, Text: notifyReply(maxReply)[len("\x1b]99;i=termcap:p=?;") : maxReply-2]}},
 		{"a reply of 1 KiB + 1", notifyReply(maxReply + 1), Reply{}},
 		{"two sequences, read as the first", "\x1b[?62;22c\x1b[?1u", da1},
