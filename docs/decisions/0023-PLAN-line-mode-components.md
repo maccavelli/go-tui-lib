@@ -668,3 +668,31 @@ was released as `v2.2.0` and closed out (`9a13872`).
   them; `remote windows` 18 passed, 0 failed, 1 skipped, in 2340 s, "361
   file(s) clean". `make pre-add-check` on the 18 Go files is clean. The
   identifier scan of the change, untracked files included, is clean.
+* **The release, `v2.3.0`,** under rule 4:
+  * The owner committed Steps 1 and 2 (`c843891`, `c73eee6`). The
+    disclosure guard passed over both, and the owner pushed `main`. CI run
+    40566281470 passed: `modules`, `gates`, and `test` on macOS 15, Ubuntu
+    24.04 and Windows 2025; Docs run 40566281383 passed.
+  * The owner tagged `c73eee6` `v2.3.0`, annotated, and pushed the tag;
+    its CI run, 40568967724, passed the same five jobs.
+  * The proxy serves `v2.3.0` at `c73eee6`. The consumer smoke test, in a
+    scratch module outside the repository with `GOWORK` empty, required it
+    by `go get`, then ran `go mod tidy`, `go vet` and `go build`, and ran a
+    program that asks gobble's permission question on an
+    `inlinetest.Screen` through `ask` and `inline`, types `x`, `f`, a
+    reason and enter, and checks the answer, `why` with "not now", and the
+    screen, ending `> reject: not now`, each line within 60 cells. Its
+    closure, listed for Linux, macOS and Windows, is seven modules, and
+    `x/ansi` alone of Charm.
+  * Its two negative controls failed as they must: the program run with
+    `-control`, which expects the answer `allow-once`, exited 1 with
+    `response &{Answer:{ID:why …} Reason:not now …}; want allow-once`; and
+    the same closure check over a program that imports `ask/asktea` found
+    `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`,
+    `charm.land/lipgloss/v2`, `colorprofile`, `ultraviolet` and three more
+    of `github.com/charmbracelet/x`, on each system.
+  * Issue #7 is to be told where the question is, with the four places the
+    library differs from its text: D9's break of a word wider than its row,
+    no width cap (D2), keys fed to an engine (D2, D3), and the reason's
+    fixed keys until `lineedit` (A2 item 1).
+* **Step 2 complete, 2026-10-27.**
