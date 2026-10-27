@@ -1,6 +1,8 @@
 package launch
 
 import (
+	"io"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/maccavelli/go-tui-lib/v2/command"
@@ -17,6 +19,8 @@ type options struct {
 	onStart   []func(*tea.Program)
 	program   []tea.ProgramOption
 	filter    func(tea.Model, tea.Msg) tea.Msg // on the program's own model
+	epilogue  io.Writer                        // WithEpilogueWriter's; nil is Out
+	noEpi     bool                             // WithoutEpilogue
 }
 
 type optionFunc func(*options)
@@ -50,6 +54,18 @@ func OnStart(f func(*tea.Program)) Option {
 // tea.WithFilter would see Run's wrapper, not the program's model.
 func WithProgramOptions(opts ...tea.ProgramOption) Option {
 	return optionFunc(func(o *options) { o.program = append(o.program, opts...) })
+}
+
+// WithoutEpilogue stops Run writing the final model's Epilogue(), for a
+// program that writes it itself, from the model Run returns
+// (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md D4). It wins
+// over WithEpilogueWriter.
+func WithoutEpilogue() Option { return optionFunc(func(o *options) { o.noEpi = true }) }
+
+// WithEpilogueWriter has Run write the epilogue to w instead of Out. A nil
+// w keeps Out.
+func WithEpilogueWriter(w io.Writer) Option {
+	return optionFunc(func(o *options) { o.epilogue = w })
 }
 
 // WithFilter is tea.WithFilter, given the program's own model. A model that

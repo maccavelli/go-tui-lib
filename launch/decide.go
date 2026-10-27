@@ -30,6 +30,15 @@ type Config struct {
 	// cannot be cancelled there, so it would take the CLI's next line
 	// (docs/decisions/0013-MADR-cli-integration-helpers.md A1.9).
 	OpenTTY bool
+	// AllowDumb lets the decision go on under TERM=dumb, for a program whose
+	// TUI draws without moving the cursor. By default TERM=dumb is plain
+	// under every choice
+	// (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md D4).
+	AllowDumb bool
+	// IgnoreCI stops CI vetoing the automatic choice, for a program whose
+	// TUI runs in a CI job's own terminal. NoInputEnv's variable still
+	// vetoes.
+	IgnoreCI bool
 }
 
 // Target is where the TUI reads or draws.
@@ -127,15 +136,19 @@ type Decision struct {
 // The rules, in order:
 //  1. ChoicePlain: plain.
 //  2. Unless ChoiceTUI, the environment can veto: Config.NoInputEnv's
-//     variable set and not empty, then CI set, not empty, and neither
-//     "false" nor "0".
-//  3. TERM=dumb: plain, whatever the choice.
+//     variable set and not empty, then, unless Config.IgnoreCI, CI set,
+//     not empty, and neither "false" nor "0".
+//  3. TERM=dumb: plain, whatever the choice, unless Config.AllowDumb.
 //  4. Input: In if it is a terminal, else the controlling terminal if
 //     allowed and it opens, else plain.
 //  5. Drawing: Out if it is a terminal, else Err if UIOnErr allows it and
 //     it is a terminal, else the controlling terminal if allowed and it
 //     opens, else plain.
 //  6. Otherwise: interactive.
+//
+// Profile is ColorProfile(s), UIProfile is ColorProfile of the stream the
+// TUI draws on, and Glyphs is GlyphTier(s), so a program that makes the
+// decision its own way gives them as Decide would.
 func Decide(s Streams, c Config) Decision { return decideWith(s, c, runtime.GOOS, openTTY) }
 
 // opener opens the controlling terminal: its input and its output, which
@@ -188,7 +201,7 @@ func (t *tty) probe() bool {
 // decideWith is Decide for goos, with open as the controlling terminal.
 func decideWith(s Streams, c Config, goos string, open opener) Decision {
 	outTerm := isTerminal(s.Out)
-	d := Decision{Profile: profile(outTerm, s.Env), Glyphs: tier(s.Env, goos)}
+	d := Decision{Profile: ColorProfile(s), Glyphs: tier(s.Env, goos)}
 	plain := func(r Reason) Decision {
 		d.Interactive, d.Reason = false, r
 		d.In, d.UI = TargetNone, TargetNone
@@ -209,11 +222,11 @@ func decideWith(s Streams, c Config, goos string, open opener) Decision {
 		if c.NoInputEnv != "" && s.Env.Getenv(c.NoInputEnv) != "" {
 			return plain(ReasonNoInputVariable)
 		}
-		if v := s.Env.Getenv("CI"); v != "" && v != "false" && v != "0" {
+		if v := s.Env.Getenv("CI"); !c.IgnoreCI && v != "" && v != "false" && v != "0" {
 			return plain(ReasonCI)
 		}
 	}
-	if s.Env.Getenv("TERM") == "dumb" {
+	if !c.AllowDumb && s.Env.Getenv("TERM") == "dumb" {
 		return plain(ReasonDumbTerminal)
 	}
 

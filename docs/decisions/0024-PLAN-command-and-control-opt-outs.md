@@ -582,3 +582,68 @@ deviation.
   in 885 s, "335 file(s) clean"; `remote windows` 18 passed, 0 failed, 1
   skipped, in 2216 s, "335 file(s) clean". `make pre-add-check` on the 3
   Go files is clean. The identifier scan of the change is clean.
+
+### Step 6: `launch`
+
+*2026-10-26.* The owner committed Step 5 and said to proceed. No
+deviation.
+
+* **`launch/decide.go`:** `Config.AllowDumb`, after which `TERM=dumb` no
+  longer makes the decision plain and the rest of it runs; and
+  `Config.IgnoreCI`, after which `CI` no longer vetoes the automatic
+  choice, while `NoInputEnv`'s variable still does. Both are false by
+  default. `Decide`'s rules say so, and that `Profile`, `UIProfile` and
+  `Glyphs` are the helpers'. `decideWith` sets `Profile` with
+  `ColorProfile(s)`; `Glyphs` stays `tier(s.Env, goos)`, since the tests
+  give `decideWith` another operating system, and `GlyphTier(s)` is
+  `tier(s.Env, runtime.GOOS)`, which `Decide` passes.
+* **`launch/colour.go`, `launch/locale.go`:** `ColorProfile(s Streams)
+  colorprofile.Profile` and `GlyphTier(s Streams) glyph.Tier`, exported.
+  For the stream the TUI draws on, a program passes that stream as `Out`.
+* **`launch/option.go`, `launch/run.go`:** `WithoutEpilogue()`, which
+  wins over a writer, and `WithEpilogueWriter(w)`, where a nil `w` keeps
+  `Out`. `Run`'s default and its documentation's order are today's.
+* **Tests:**
+  * `TestDecideRules` gains nine cases. `AllowDumb` makes the automatic
+    and TUI choices interactive under `TERM=dumb`, keeps `ChoicePlain`,
+    the `CI` veto and the input rule. `IgnoreCI` makes `CI=1`
+    interactive, and keeps the no-input variable, `TERM=dumb` and the
+    output rule. Every earlier case is unchanged, so the reasons without
+    the fields are today's.
+  * `TestHelpersMatchDecide`: for launchtest's `Terminal` and `Pipe` as
+    `Out`, under eight environments (none, a UTF-8 locale, truecolour,
+    `NO_COLOR=yes`, `FORCE_COLOR=1`, `CLICOLOR_FORCE=1` with `LANG=C`,
+    `TERM=dumb` with an `LC_CTYPE`, and `LANG=POSIX`), `ColorProfile` and
+    `GlyphTier` equal `Decide`'s `Profile` and `Glyphs`, and an
+    interactive decision's `UIProfile` equals `ColorProfile` of the
+    drawing stream.
+  * `TestRunEpilogueOptions`: the epilogue goes to the given writer and
+    not `Out`; a nil writer keeps `Out`; `WithoutEpilogue` writes it
+    nowhere, with or without a writer. `TestRunEpilogue` still holds the
+    default.
+* **`docs/guides/defaults.md`,** by Step 4's D1: the rows for `CI`,
+  `TERM=dumb`, building a decision as `Decide` does, and the epilogue are
+  `built`.
+* **Seen failing,** through `python3 -m tools.verify mutate` on scratch
+  copies, 7 killed of 7. `TestRunEpilogue`'s crash case logs a recovered
+  panic on every run; the failures quoted are the tests' own lines:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | `AllowDumb` ignored | `TestDecideRules/AllowDumb,_auto`: `decideWith = {reason:launch.dumb-terminal in:0 ui:0}, want {reason:launch.terminal in:1 ui:1}` |
+  | `IgnoreCI` also drops the program's `NoInputEnv` | `TestDecideRules/IgnoreCI_keeps_the_no-input_variable`: `decideWith = {reason:launch.terminal in:1 ui:1}, want {reason:launch.no-input-variable in:0 ui:0}` |
+  | `IgnoreCI` ignored | `TestDecideRules/IgnoreCI,_CI=1`: `decideWith = {reason:launch.ci in:0 ui:0}, want {reason:launch.terminal in:1 ui:1}` |
+  | `Decide` keeps a colour copy that skips the `NO_COLOR` rule | `TestHelpersMatchDecide`: `*launchtest.Terminal under ["TERM=xterm-256color" "NO_COLOR=yes"]: ColorProfile = Ascii, Decide's Profile ANSI256` |
+  | `Decide` keeps a glyph copy that ignores the locale | `TestHelpersMatchDecide`: `*launchtest.Terminal under ["TERM=xterm-256color" "LANG=en_US.UTF-8"]: GlyphTier = unicode, Decide's Glyphs ascii` |
+  | `WithoutEpilogue` ignored | `TestRunEpilogueOptions`: `none, with a writer: the epilogue on the writer true, want false` |
+  | `WithEpilogueWriter` ignored | `TestRunEpilogueOptions`: `a writer of its own: the epilogue on the writer false, want true` |
+
+* **Gates:** `python3 -m tools.verify gates` over the step's 7 Go files,
+  the guide and 2 records: macOS 19 passed, 0 failed, in 529 s,
+  `release-check` "335 file(s) clean in 1 module(s)", with `apicheck`
+  against `v2.1.0` reporting no incompatible change and the examples gate
+  passing; `remote linux` 18 passed, 0 failed, 1 skipped (`gofmt`, which
+  is given no files there), in 868 s, "335 file(s) clean"; `remote
+  windows` 18 passed, 0 failed, 1 skipped, in 2211 s, "335 file(s)
+  clean". `make pre-add-check` on the 7 Go files is clean. The
+  identifier scan of the change is clean.

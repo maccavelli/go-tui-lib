@@ -36,7 +36,8 @@ var newProgram = tea.NewProgram
 // puts back the terminal states it saved when the TUI did not start or
 // crashed, and closes the controlling terminal it opened. On a clean end, a
 // final model with an Epilogue() string method has the epilogue written to
-// Out, after the TUI's last byte. A failure in any of these is joined onto
+// Out, after the TUI's last byte, or to WithEpilogueWriter's writer, or
+// nowhere under WithoutEpilogue. A failure in any of these is joined onto
 // the error Run returns.
 //
 // The program is built with the decision's input and output,
@@ -128,9 +129,13 @@ func runWith[M tea.Model](ctx context.Context, s Streams, d Decision, m M, open 
 	if err := t.close(); err != nil {
 		extra = append(extra, err)
 	}
-	if end == endClean {
-		if e, ok := any(model).(interface{ Epilogue() string }); ok && s.Out != nil {
-			if _, err := io.WriteString(s.Out, e.Epilogue()); err != nil {
+	if end == endClean && !o.noEpi {
+		w := s.Out
+		if o.epilogue != nil {
+			w = o.epilogue
+		}
+		if e, ok := any(model).(interface{ Epilogue() string }); ok && w != nil {
+			if _, err := io.WriteString(w, e.Epilogue()); err != nil {
 				extra = append(extra, fmt.Errorf("launch: writing the epilogue: %w", err))
 			}
 		}

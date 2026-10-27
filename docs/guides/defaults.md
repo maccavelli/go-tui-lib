@@ -80,14 +80,14 @@ record that is not there.
 | :--- | :--- | :--- | :--- |
 | A program's own variable that forbids the TUI | none | `launch.Config.NoInputEnv` | built |
 | `CI` forbids the automatic choice | read by name | `launch.ChoiceTUI` | built |
-| `CI`, without forcing the TUI | read by name | `launch.Config.IgnoreCI` | planned (0024-PLAN-command-and-control-opt-outs.md) |
-| `TERM=dumb` | plain output, under every choice | `launch.Config.AllowDumb` | planned (0024-PLAN-command-and-control-opt-outs.md) |
-| Building a decision as `Decide` does | its colour and glyph helpers are unexported | `launch.ColorProfile`, `launch.GlyphTier` | planned (0024-PLAN-command-and-control-opt-outs.md) |
+| `CI`, without forcing the TUI | read by name | `launch.Config.IgnoreCI` | built |
+| `TERM=dumb` | plain output, under every choice | `launch.Config.AllowDumb` | built |
+| Building a decision as `Decide` does | its colour and glyph helpers are unexported | `launch.ColorProfile`, `launch.GlyphTier` | built |
 | The controlling terminal | not opened | `launch.Config.OpenTTY` | built |
 | Drawing on standard error | not | `launch.Config.UIOnErr` | built |
 | Bubble Tea's program options | the streams, the profile, the size, no signal handler | `launch.WithProgramOptions` | built |
 | Bubble Tea's signal handler | off | `launch.WithProgramOptions` | floor |
-| The model's epilogue | written to `Out` on a clean end | `launch.WithoutEpilogue`, `launch.WithEpilogueWriter` | planned (0024-PLAN-command-and-control-opt-outs.md) |
+| The model's epilogue | written to `Out` on a clean end | `launch.WithoutEpilogue`, `launch.WithEpilogueWriter` | built |
 | Modes to reset at the end | none | `launch.WithRestorer` | built |
 | A registry for the run | none | `launch.WithRegistry` | built |
 | A message filter | none | `launch.WithFilter` | built |

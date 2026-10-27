@@ -428,6 +428,71 @@ func TestRunEpilogue(t *testing.T) {
 	}
 }
 
+// TestRunEpilogueOptions: WithEpilogueWriter moves the epilogue off Out,
+// a nil writer keeps Out, and WithoutEpilogue writes it nowhere
+// (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md D4).
+func TestRunEpilogueOptions(t *testing.T) {
+	const epi = "resume with --continue\n"
+	m := model{quitOnSize: true, epilogue: epi}
+	for _, c := range []struct {
+		name          string
+		opts          func(w io.Writer) []launch.Option
+		toOut, toElse bool
+	}{
+		{"a writer of its own", func(w io.Writer) []launch.Option { return []launch.Option{launch.WithEpilogueWriter(w)} }, false, true},
+		{"a nil writer", func(io.Writer) []launch.Option { return []launch.Option{launch.WithEpilogueWriter(nil)} }, true, false},
+		{"none", func(io.Writer) []launch.Option { return []launch.Option{launch.WithoutEpilogue()} }, false, false},
+		{"none, with a writer", func(w io.Writer) []launch.Option {
+			return []launch.Option{launch.WithEpilogueWriter(w), launch.WithoutEpilogue()}
+		}, false, false},
+	} {
+		out, elsewhere := launchtest.NewTerminal(80, 24), launchtest.NewPipe("")
+		r := run(t, t.Context(), launch.Streams{In: idle(t), Out: out}, interactive(), m, c.opts(elsewhere)...)
+		if r.err != nil {
+			t.Fatalf("%s: %v", c.name, r.err)
+		}
+		if got := strings.HasSuffix(out.Output(), epi); got != c.toOut {
+			t.Errorf("%s: the epilogue on Out %v, want %v: %q", c.name, got, c.toOut, out.Output())
+		}
+		if got := elsewhere.Output() == epi; got != c.toElse {
+			t.Errorf("%s: the epilogue on the writer %v, want %v: %q", c.name, got, c.toElse, elsewhere.Output())
+		}
+	}
+}
+
+// TestHelpersMatchDecide: ColorProfile and GlyphTier give what Decide puts
+// in its decision, for launchtest's terminal and pipe under each
+// environment, so a program's own decision matches Decide's.
+func TestHelpersMatchDecide(t *testing.T) {
+	envs := [][]string{
+		nil,
+		{"TERM=xterm-256color", "LANG=en_US.UTF-8"},
+		{"TERM=xterm-256color", "COLORTERM=truecolor", "LC_ALL=C.UTF-8"},
+		{"TERM=xterm-256color", "NO_COLOR=yes"},
+		{"TERM=xterm", "FORCE_COLOR=1"},
+		{"TERM=xterm-256color", "CLICOLOR_FORCE=1", "LANG=C"},
+		{"TERM=dumb", "LC_CTYPE=en_GB.utf8"},
+		{"TERM=screen", "LANG=POSIX"},
+	}
+	for _, env := range envs {
+		for _, out := range []io.Writer{launchtest.NewTerminal(80, 24), launchtest.NewPipe("")} {
+			s := launchtest.Streams(launchtest.NewTerminal(80, 24), out, nil, env...)
+			d := launch.Decide(s, launch.Config{Choice: launch.ChoiceTUI, AllowDumb: true})
+			if got := launch.ColorProfile(s); got != d.Profile {
+				t.Errorf("%T under %q: ColorProfile = %s, Decide's Profile %s", out, env, got, d.Profile)
+			}
+			if got := launch.GlyphTier(s); got != d.Glyphs {
+				t.Errorf("%T under %q: GlyphTier = %s, Decide's Glyphs %s", out, env, got, d.Glyphs)
+			}
+			if d.Interactive {
+				if got := launch.ColorProfile(launch.Streams{Out: out, Env: s.Env}); got != d.UIProfile {
+					t.Errorf("%T under %q: ColorProfile of the drawing stream = %s, Decide's UIProfile %s", out, env, got, d.UIProfile)
+				}
+			}
+		}
+	}
+}
+
 func TestWithFilterSeesTheModel(t *testing.T) {
 	var sawModel atomic.Bool
 	in := idle(t)

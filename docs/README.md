@@ -62,7 +62,7 @@ it was when they were written
 | 0023 | MADR | [Give a line-mode CLI an inline question, a picker, a composer and a streamed transcript, as I/O-free Charm-free cores on one live region](decisions/0023-MADR-line-mode-components.md) | accepted |
 | 0023 | PLAN | [Implement the line-mode question, picker, composer and transcript](decisions/0023-PLAN-line-mode-components.md) | proposed |
 | 0024 | MADR | [Let a program with its own CLI refuse, replace or opt into every behaviour the library imposes, with the floors stated and an inventory the tests hold](decisions/0024-MADR-opt-in-and-opt-out-coverage.md) | accepted; A1 accepted |
-| 0024 | PLAN | [Implement API rule 12, its floors, the message catalogue and the defaults inventory, and close the command-and-control gaps](decisions/0024-PLAN-command-and-control-opt-outs.md) | in-progress (Steps 1–5 done) |
+| 0024 | PLAN | [Implement API rule 12, its floors, the message catalogue and the defaults inventory, and close the command-and-control gaps](decisions/0024-PLAN-command-and-control-opt-outs.md) | in-progress (Steps 1–6 done) |
 | 0024 | PLAN | [Close the terminal, text and convention gaps, and adopt the message catalogue](decisions/0024-PLAN-terminal-text-and-convention-opt-outs.md) | proposed |
 
 ## I want to…

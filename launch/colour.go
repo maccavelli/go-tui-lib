@@ -29,6 +29,14 @@ func colourEnv(env termcap.Env) []string {
 	return out
 }
 
+// ColorProfile is the colour profile Decide gives s.Out: NoTTY when Out is
+// not a terminal, else the profile s.Env's TERM, COLORTERM, NO_COLOR,
+// FORCE_COLOR and CLICOLOR_FORCE give, under
+// docs/decisions/0013-MADR-cli-integration-helpers.md §5's rules. It opens
+// no file and starts no process. For the stream the TUI draws on, pass
+// that stream as Out.
+func ColorProfile(s Streams) colorprofile.Profile { return profile(isTerminal(s.Out), s.Env) }
+
 // profile is the colour profile of a stream: NoTTY when it is not a
 // terminal, else colorprofile.Env of the adjusted environment (A1.3). Env
 // reads the environment and, on Windows with TERM unset, empty or dumb,

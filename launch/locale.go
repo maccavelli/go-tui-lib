@@ -1,11 +1,16 @@
 package launch
 
 import (
+	"runtime"
 	"strings"
 
 	"github.com/maccavelli/go-tui-lib/v2/glyph"
 	"github.com/maccavelli/go-tui-lib/v2/termcap"
 )
+
+// GlyphTier is the glyph tier Decide gives s: the one s.Env's locale
+// allows, on the operating system the program runs on.
+func GlyphTier(s Streams) glyph.Tier { return tier(s.Env, runtime.GOOS) }
 
 // tier is the glyph tier env's locale allows
 // (docs/decisions/0013-MADR-cli-integration-helpers.md §6). The first set,

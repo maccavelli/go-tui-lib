@@ -115,6 +115,26 @@ func TestDecideRules(t *testing.T) {
 			cfg: Config{OpenTTY: true}, ttyFails: true, want: plainIs(ReasonInputNotTerminal), wantTTYOpened: true},
 		{name: "OpenTTY fails, output", in: terminal(80, 24), out: pipe(), err: pipe(), env: base,
 			cfg: Config{OpenTTY: true}, ttyFails: true, want: plainIs(ReasonOutputNotTerminal), wantTTYOpened: true},
+
+		// AllowDumb and IgnoreCI (0024-MADR D4): each lifts its one rule.
+		{name: "AllowDumb, auto", in: terminal(80, 24), out: terminal(80, 24), env: []string{"TERM=dumb"},
+			cfg: Config{AllowDumb: true}, want: both},
+		{name: "AllowDumb, tui", in: terminal(80, 24), out: terminal(80, 24), env: []string{"TERM=dumb"},
+			cfg: Config{Choice: ChoiceTUI, AllowDumb: true}, want: both},
+		{name: "AllowDumb, plain", in: terminal(80, 24), out: terminal(80, 24), env: []string{"TERM=dumb"},
+			cfg: Config{Choice: ChoicePlain, AllowDumb: true}, want: plainIs(ReasonRequestedPlain)},
+		{name: "AllowDumb keeps CI", in: terminal(80, 24), out: terminal(80, 24), env: []string{"TERM=dumb", "CI=true"},
+			cfg: Config{AllowDumb: true}, want: plainIs(ReasonCI)},
+		{name: "AllowDumb still needs an input", in: pipe(), out: terminal(80, 24), env: []string{"TERM=dumb"},
+			cfg: Config{AllowDumb: true}, want: plainIs(ReasonInputNotTerminal)},
+		{name: "IgnoreCI, CI=1", in: terminal(80, 24), out: terminal(80, 24), env: with("CI=1"),
+			cfg: Config{IgnoreCI: true}, want: both},
+		{name: "IgnoreCI keeps the no-input variable", in: terminal(80, 24), out: terminal(80, 24), env: with("CI=1", "PROG_NO_TUI=1"),
+			cfg: Config{IgnoreCI: true, NoInputEnv: "PROG_NO_TUI"}, want: plainIs(ReasonNoInputVariable)},
+		{name: "IgnoreCI keeps TERM=dumb", in: terminal(80, 24), out: terminal(80, 24), env: []string{"TERM=dumb", "CI=1"},
+			cfg: Config{IgnoreCI: true}, want: plainIs(ReasonDumbTerminal)},
+		{name: "IgnoreCI still needs a terminal", in: terminal(80, 24), out: pipe(), env: with("CI=1"),
+			cfg: Config{IgnoreCI: true}, want: plainIs(ReasonOutputNotTerminal)},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			o := oneTTY()
