@@ -83,9 +83,27 @@ and `zoom`, and two commands with one slash name cannot both register.
 - **When the policy asks,** it asks the registry's `Gate`
   (`command.WithGate`), typically your permission dialog. Without one, the
   request is refused. `AllowAlways` and `RejectAlways` are remembered per
-  command and caller. A `Request` with its own `Gate` is asked instead,
+  command and caller, until `r.Forget(id, caller)` drops one or
+  `r.ForgetAll()` drops every one, for a "forget my choices" command or a
+  new session. A `Request` with its own `Gate` is asked instead,
   for that request only (A9); that is how your CLI's `--yes` approves
   one command (see "Run commands from your own CLI").
+- **The table is a default.** `command.WithGatePolicy(p)` replaces it: a
+  `command.GatePolicy`'s `Asks(c, o)` says whether the gate is asked
+  before command `c` runs for origin `o`, and `command.GatePolicyFunc`
+  makes one of a function. `command.DefaultGatePolicy()` is the table, for
+  a policy that changes only what it means to; a nil policy keeps it. A
+  policy's panic refuses the request, as a gate's does
+  ([0024-MADR](../decisions/0024-MADR-opt-in-and-opt-out-coverage.md)
+  D4):
+
+  ```go
+  strict := command.GatePolicyFunc(func(c command.Command, o command.Origin) bool {
+      return c.Danger == command.Destructive || command.DefaultGatePolicy().Asks(c, o)
+  })
+  r := command.NewRegistry(command.WithGate(dialog), command.WithGatePolicy(strict))
+  ```
+
 - **Every request is audited** when you pass `command.WithAuditor`.
   `command.SlogAuditor(logger)` writes a record per request to your
   logger, with `secret` values masked; `command.AuditorFunc` makes an
@@ -168,7 +186,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 - **The registry's own commands,** registered by `NewRegistry`:
   `command.list` and `command.describe`, so an agent can find what it may
   call, and `app.quit`, which only sends `QuitRequestMsg`. None has a
-  slash name, so none clashes with yours (A5).
+  slash name, so none clashes with yours (A5). `command.WithoutBuiltins()`
+  leaves all three out, for a program that brings its own; their IDs are
+  `command.BuiltinList`, `BuiltinDescribe` and `BuiltinQuit`, for
+  `r.Remove` and for a replacement. A policy that names `BuiltinQuit` gates
+  `app.quit`.
 
 ## Availability
 
@@ -330,6 +352,12 @@ TUI:
 - **A pane or split the workspace does not have** is a
   `*command.ArgError`. The workspace's key bindings keep working beside
   the commands.
+- **The workspace runs its keys' commands itself,** past your registry,
+  unless it is built `workspace.WithoutOwnCommands()`. Then a key bound to
+  a `workspace.*` command comes back as a `RequestMsg`, as any other
+  command does, and a registry holding `workspace.Commands(ws)` runs it
+  through your gate policy, gate and auditor. An overlay that consumes esc
+  still takes it first.
 
 ## Run commands from your own CLI
 
@@ -637,10 +665,11 @@ func tui(ctx context.Context, s launch.Streams, r *command.Registry, m session) 
   `Reason` token. Its rules, in order:
   1. `ChoicePlain`: plain, `launch.requested-plain`.
   2. Unless `ChoiceTUI`: the variable `Config.NoInputEnv` names, set and
-     not empty (`launch.no-input-variable`), then `CI` set, not empty, and
-     neither `false` nor `0` (`launch.ci`). A flag outranks the
-     environment, so `--tui` skips both.
-  3. `TERM=dumb`, whatever the choice: `launch.dumb-terminal`.
+     not empty (`launch.no-input-variable`), then, unless
+     `Config.IgnoreCI`, `CI` set, not empty, and neither `false` nor `0`
+     (`launch.ci`). A flag outranks the environment, so `--tui` skips both.
+  3. `TERM=dumb`, whatever the choice, unless `Config.AllowDumb`:
+     `launch.dumb-terminal`.
   4. The input: `In` if it is a terminal (`launch.input-not-terminal`
      otherwise).
   5. The drawing stream: `Out` if it is a terminal
@@ -653,6 +682,14 @@ func tui(ctx context.Context, s launch.Streams, r *command.Registry, m session) 
   or `false`, raises them. On Windows with no `TERM`, the system's build
   number counts too
   ([0013-MADR](../decisions/0013-MADR-cli-integration-helpers.md) A1.7).
+- **The rules are defaults.** `Config.AllowDumb` lets the decision go on
+  under `TERM=dumb`, for a TUI that draws without moving the cursor, and
+  `Config.IgnoreCI` stops `CI` vetoing, for a TUI in a CI job's own
+  terminal; both are false by default. A program that decides its own way
+  builds its `Decision` with `launch.ColorProfile(s)` and
+  `launch.GlyphTier(s)`, the helpers `Decide` gives `Profile` and `Glyphs`
+  from; `ColorProfile` of the stream the TUI draws on, passed as `Out`, is
+  `UIProfile`.
 - **`Run`** starts Bubble Tea on the decision's streams, with no signal
   handler: cancel `ctx` from your own `signal.NotifyContext`. It returns
   the final model as your type.
@@ -666,7 +703,9 @@ func tui(ctx context.Context, s launch.Streams, r *command.Registry, m session) 
     Bubble Tea's error as it is: the user or the program ended it.
 - **`Run` never sets the alternate screen;** your `View` does. A final
   model with an `Epilogue() string` method has it printed to `Out` after
-  a clean end, for a resume hint.
+  a clean end, for a resume hint. `launch.WithEpilogueWriter(w)` writes it
+  to `w` instead, and `launch.WithoutEpilogue()` writes it nowhere, for a
+  program that prints it itself from the model `Run` returns.
 
 ### The flags in each framework
 

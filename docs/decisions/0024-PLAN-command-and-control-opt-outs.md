@@ -710,3 +710,125 @@ deviation.
   passed, 0 failed, 1 skipped, in 2214 s, "335 file(s) clean".
   `make pre-add-check` on the 8 Go files is clean. The identifier scan of
   the change is clean.
+
+### Step 8: documentation, the release `v2.2.0`, and the close-out
+
+*2026-10-26.* The owner committed Step 7 and said to proceed. No
+deviation.
+
+#### Up to the push
+
+* **The API, listed:** apidiff, at the Makefile's pin, over `v2.1.0` with
+  compatible changes included, gives 28 additions under "Compatible
+  changes" and no incompatible section: `command`'s `(*Registry).Forget`,
+  `(*Registry).ForgetAll`, `BuiltinDescribe`, `BuiltinList`,
+  `BuiltinQuit`, `DefaultGatePolicy`, `GatePolicy`, `GatePolicyFunc`,
+  `WithGatePolicy` and `WithoutBuiltins`; `launch`'s `ColorProfile`,
+  `Config.AllowDumb`, `Config.IgnoreCI`, `GlyphTier`, `WithEpilogueWriter`
+  and `WithoutEpilogue`; `palette`'s `AcceptID`, `CompleteID`,
+  `CompletionRules`, `OpenID`, `Opener`, `PageNextID`, `PagePrevID`,
+  `PickerScope`, `SelectNextID` and `SelectPrevID`;
+  `workspace.WithoutOwnCommands`; and "package
+  github.com/maccavelli/go-tui-lib/v2/msgcat: added". `make apicheck`:
+  "against v2.1.0, 0 incompatible change(s)"; `scripts/apicheck.allow` is
+  empty. No default changes. The one change a program could see without
+  a new option is `Opener`'s: a provider of its own that already has a
+  method `Opened(when.Context)` is now called when the picker opens; the
+  migration guide says so.
+* **The guides:**
+  * `docs/guides/commands.md`: under "Kinds, danger and the gate",
+    `Forget` and `ForgetAll`, and the gate policy, with an example that
+    adds every destructive command to `DefaultGatePolicy`; the registry's
+    own commands gain `WithoutBuiltins` and the exported IDs; the
+    workspace's commands gain `WithoutOwnCommands`; the launch section's
+    rules 2 and 3 name `IgnoreCI` and `AllowDumb`, a bullet gives both
+    fields and the helpers, and the epilogue bullet the two options;
+  * `docs/guides/building-workspaces.md`: `WithoutOwnCommands` under "Keys
+    and the mouse";
+  * `docs/guides/command-palette.md`: the opening example registers
+    `OpenCommand(palette.OpenID, …)`, and the keys bullet names the
+    exported IDs and `PickerScope`; `Opener` among a provider's optional
+    capabilities, with a wrapper that forwards it; a pop-up under another
+    ID takes `CompletionRules(id)`;
+  * `docs/guides/defaults.md`: every row of Steps 4 to 7 was marked
+    `built` in its own step, by Step 4's D1; four of their `Default`
+    cells, which described the gap, now describe the default: building a
+    decision, the palette's IDs and scope, a pop-up's keys under another
+    ID, and a wrapper of a built-in provider.
+* **The check of Step 4's D1:** a search of `docs/guides/defaults.md` for
+  `planned (0024-PLAN-command-and-control-opt-outs.md` finds no row; the
+  same search for `planned (0024-PLAN-terminal-text-and-convention-opt-outs.md`
+  finds 20, every `planned` row the guide has, so the search reads the
+  rows. `TestDefaultsInventory` passes.
+* **`docs/guides/migrating.md`:** "Migrating to `v2.2.0`", with *Added*
+  only: the inventory, `msgcat`, and each package's additions.
+* **`README.md`:** the current release is `v2.2.0`; a Status bullet,
+  "Defaults are the program's to refuse, since `v2.2.0`"; an "I want to"
+  row for the defaults guide. **`docs/README.md`:** three "I want to"
+  rows, the defaults guide, the gate policy and the workspace's commands
+  through a registry.
+* **`docs/architecture.md`,** within the step's `docs/` path though the
+  step's bullets do not name it: `msgcat` in the package list, with its
+  imports, and in the table; `command`'s, `launch`'s, `palette`'s and
+  `workspace`'s rows gain this PLAN's names; the Charm-free cores gain
+  `msgcat`, and the depguard bullet `msgcatstd`; the directory list gains
+  `msgcat/`, and `guides/` the defaults guide.
+* **Checks on the docs:** `markdownlint` "0 issues"; `python3
+  scripts/go-examples.py --check-guide` "10 excerpt(s) checked", clean;
+  a scratch link check over the seven documents edited found every file
+  and anchor but one false hit, Go code in a code block
+  (`ws.PaneAs[*logPane]("logs")`, in `building-workspaces.md` before this
+  step), after it was seen to report a bad anchor planted in a scratch
+  copy of the docs tree: "no anchor defaults.md#no-such-heading".
+* **Release notes, `v2.2.0`,** for the owner's release:
+
+  > **`v2.2.0`** makes the library's defaults the program's to refuse,
+  > and removes or retypes nothing: a program on `v2.1.0` builds
+  > unchanged, and behaves as before until it sets a new option.
+  >
+  > *Added*
+  >
+  > * The defaults inventory, `docs/guides/defaults.md`: every default
+  >   the library applies, with the control that refuses or changes it,
+  >   and the floors that have none, each with its reason; AGENTS.md's API
+  >   convention 12, and `internal/conformance`'s `TestDefaultsInventory`,
+  >   which resolves every control the guide names.
+  > * `msgcat`, a message catalogue: `MessageID`, `Catalog`, `CatalogFunc`,
+  >   `Table`, `Format` and `Check`. The standard library alone.
+  > * `command`: `WithGatePolicy`, with `GatePolicy`, `GatePolicyFunc`
+  >   and `DefaultGatePolicy`, which says which requests ask the gate;
+  >   `Registry.Forget` and `ForgetAll`; `WithoutBuiltins`; and
+  >   `BuiltinList`, `BuiltinDescribe` and `BuiltinQuit`.
+  > * `workspace.WithoutOwnCommands`: a key's `workspace.*` command comes
+  >   back as a `RequestMsg`, for the program's registry, gate and
+  >   auditor.
+  > * `launch`: `Config.AllowDumb` and `Config.IgnoreCI`; `ColorProfile`
+  >   and `GlyphTier`, the helpers `Decide` uses; `WithoutEpilogue` and
+  >   `WithEpilogueWriter`.
+  > * `palette`: the picker's command IDs (`OpenID`, `SelectNextID`,
+  >   `SelectPrevID`, `PageNextID`, `PagePrevID`, `AcceptID`,
+  >   `CompleteID`) and `PickerScope`; `CompletionRules`; and `Opener`. A
+  >   provider that already has a method `Opened(when.Context)` is now
+  >   called when the picker opens.
+  >
+  > [The defaults guide](docs/guides/defaults.md) and
+  > [the migration guide](docs/guides/migrating.md#migrating-to-v220).
+  > Records: `0024-MADR-opt-in-and-opt-out-coverage.md` (D1 to D4, D9,
+  > A1).
+* **The disclosure guard** over the 9 commits ahead of `origin/main`
+  (`08129ea` to `ae2d222`, against `65d437b`) passed, exit 0, with no
+  finding, and `main` is not behind `origin/main`. It runs again over this
+  step's commit before the push.
+* **Gates:** `python3 -m tools.verify gates` over the step's 9
+  documents, no Go file among them: macOS 18 passed, 0 failed, 1 skipped
+  (`gofmt`, "no Go files"), in 712 s, `release-check` "335 file(s) clean
+  in 1 module(s)", with `apicheck` against `v2.1.0` and the examples gate;
+  `remote linux` 18 passed, 0 failed, 1 skipped (`gofmt`), in 824 s, "335
+  file(s) clean"; `remote windows` 18 passed, 0 failed, 1 skipped, in
+  2210 s, "335 file(s) clean". The identifier scan of the change is
+  clean.
+* **Not done yet, the owner's and then the close-out's:** this step's
+  commit; the guard over it; the push; CI green on `main`; the annotated
+  tag `v2.2.0` and CI green on it; the consumer smoke test, with a
+  negative control; and this PLAN `complete`, with its `docs/README.md`
+  row and the MADR's More Information.

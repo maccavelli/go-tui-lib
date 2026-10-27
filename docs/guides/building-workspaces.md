@@ -282,7 +282,11 @@ n}`, `workspace.resize.direction` with `{"direction": "left"}`, and the
 rest. The workspace runs its own; any other command a key matches comes
 back to your `Update` as a `RequestMsg`, for your registry. A key no
 binding takes goes to the focused pane, or the top modal overlay, and an
-overlay that is an `EscConsumer` gets esc first.
+overlay that is an `EscConsumer` gets esc first. Built
+`WithoutOwnCommands()`, the workspace sends its own back too, so your
+registry runs them, with its gate policy, gate and auditor, once it holds
+`workspace.Commands(ws)`
+([the workspace's commands](commands.md#the-workspaces-commands)).
 
 A matched command that is not the workspace's own is offered first to
 whoever has the keyboard: the top modal overlay alone, when one is open;

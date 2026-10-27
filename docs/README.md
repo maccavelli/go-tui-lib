@@ -62,7 +62,7 @@ it was when they were written
 | 0023 | MADR | [Give a line-mode CLI an inline question, a picker, a composer and a streamed transcript, as I/O-free Charm-free cores on one live region](decisions/0023-MADR-line-mode-components.md) | accepted |
 | 0023 | PLAN | [Implement the line-mode question, picker, composer and transcript](decisions/0023-PLAN-line-mode-components.md) | proposed |
 | 0024 | MADR | [Let a program with its own CLI refuse, replace or opt into every behaviour the library imposes, with the floors stated and an inventory the tests hold](decisions/0024-MADR-opt-in-and-opt-out-coverage.md) | accepted; A1 accepted |
-| 0024 | PLAN | [Implement API rule 12, its floors, the message catalogue and the defaults inventory, and close the command-and-control gaps](decisions/0024-PLAN-command-and-control-opt-outs.md) | in-progress (Steps 1–7 done) |
+| 0024 | PLAN | [Implement API rule 12, its floors, the message catalogue and the defaults inventory, and close the command-and-control gaps](decisions/0024-PLAN-command-and-control-opt-outs.md) | in-progress (Steps 1–7 done; Step 8 to the push) |
 | 0024 | PLAN | [Close the terminal, text and convention gaps, and adopt the message catalogue](decisions/0024-PLAN-terminal-text-and-convention-opt-outs.md) | proposed |
 
 ## I want to…
@@ -80,6 +80,7 @@ it was when they were written
 | know which Charm version to use | [0001-MADR, §3](decisions/0001-MADR-scaffold-charm-tui-library.md#3-toolchain-and-dependencies) |
 | know what this module may import, and what it never may | [AGENTS.md, Dependencies](../AGENTS.md#dependencies) |
 | name an exported type, option, error or hook, deprecate a name, or read a package's stability line | [AGENTS.md, API conventions](../AGENTS.md#api-conventions) |
+| find every default the library applies, and the control that refuses it | [guides/defaults.md](guides/defaults.md) |
 | know what a type name means, and which names are shared or reserved | [glossary.md](glossary.md) |
 | know who owns the screen, the output and ctrl+c | [AGENTS.md, TUI conventions](../AGENTS.md#tui-conventions) |
 | test a component across colour, charset and width | [AGENTS.md, TUI conventions](../AGENTS.md#tui-conventions), rule 6 |
@@ -102,6 +103,8 @@ it was when they were written
 | see the candidate packages after [0009-MADR-streaming-content-engine.md](decisions/0009-MADR-streaming-content-engine.md), and the modules they would need | [0003-REPORT, §11](reports/0003-REPORT-agent-tui-ecosystem-research.md#11-candidates-from-the-second-pass) |
 | add a command, with its arguments, danger and availability | [guides/commands.md](guides/commands.md#define-a-command) |
 | run a command from a key or `Update`, and react to its result | [guides/commands.md](guides/commands.md#run-commands-from-your-program) |
+| choose which commands ask the gate, or forget a remembered answer | [guides/commands.md](guides/commands.md#kinds-danger-and-the-gate) |
+| run the workspace's own commands through my registry, gate and auditor | [guides/commands.md](guides/commands.md#the-workspaces-commands) |
 | let an agent drive the TUI over MCP, safely | [guides/commands.md](guides/commands.md#let-an-agent-drive-the-program) |
 | load the user's and the project's command files, or an agent's commands | [guides/commands.md](guides/commands.md#command-files) |
 | run the same commands from my own CLI (`flag`, Cobra, Kong) | [guides/commands.md](guides/commands.md#run-commands-from-your-own-cli) |

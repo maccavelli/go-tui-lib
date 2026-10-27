@@ -7,6 +7,46 @@ needs a major version, at a new module path
 ([AGENTS.md, API conventions](../../AGENTS.md#api-conventions), rule 1).
 Up to `v0.12.0`, a deprecated name was removed in the next minor release.
 
+## Migrating to `v2.2.0`
+
+`v2.2.0` adds a package, options, helpers and exported names, removes or
+retypes nothing, and changes no default: `make apicheck` against `v2.1.0`
+reports 0 incompatible changes
+([0024-PLAN-command-and-control-opt-outs](../decisions/0024-PLAN-command-and-control-opt-outs.md)
+Steps 2 to 8). A program on `v2.1.0` needs no change to build, and behaves
+as it did until it sets one of the new options:
+
+```bash
+go get github.com/maccavelli/go-tui-lib/v2@v2.2.0
+```
+
+### Added
+
+- **The defaults inventory,** [the defaults guide](defaults.md): every
+  default the library applies, with the control that refuses or changes
+  it, and the floors that have none, each with its reason
+  ([AGENTS.md, API conventions](../../AGENTS.md#api-conventions), rule
+  12).
+- **`msgcat`,** a message catalogue: `MessageID`, `Catalog`,
+  `CatalogFunc`, `Table`, `Format` and `Check`. It imports the standard
+  library alone. The packages' own text moves onto it in a later release.
+- **`command`:** `WithGatePolicy`, with `GatePolicy`, `GatePolicyFunc` and
+  `DefaultGatePolicy`, which says which requests ask the gate;
+  `Registry.Forget` and `Registry.ForgetAll`, which drop remembered
+  answers; `WithoutBuiltins`, a registry without its three commands; and
+  their IDs, `BuiltinList`, `BuiltinDescribe` and `BuiltinQuit`.
+- **`workspace.WithoutOwnCommands`,** which sends a key's `workspace.*`
+  command back as a `RequestMsg`, for the program's registry.
+- **`launch`:** `Config.AllowDumb` and `Config.IgnoreCI`; `ColorProfile`
+  and `GlyphTier`, the helpers `Decide` uses; and `WithoutEpilogue` and
+  `WithEpilogueWriter`.
+- **`palette`:** the picker's command IDs, `OpenID`, `SelectNextID`,
+  `SelectPrevID`, `PageNextID`, `PagePrevID`, `AcceptID` and
+  `CompleteID`, and `PickerScope`; `CompletionRules`, a pop-up's bindings
+  under its own ID; and `Opener`, which `Open` calls on each provider that
+  has it. A provider of your own that already has a method
+  `Opened(when.Context)` is now called when the picker opens.
+
 ## Migrating to `v2.1.0`
 
 `v2.1.0` adds a package and a message, and removes or retypes nothing:

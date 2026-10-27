@@ -21,7 +21,7 @@ ws := workspace.New(root, panes, workspace.WithBindings(km))
 p := palette.NewPicker(ws)
 if err := p.Register(palette.FromRegistry(reg), palette.Availability{}); err != nil { … }
 if err := p.Register(palette.Panes(ws), palette.Availability{}); err != nil { … }
-if err := reg.Register(p.OpenCommand("palette.open", "Command palette")); err != nil { … }
+if err := reg.Register(p.OpenCommand(palette.OpenID, "Command palette")); err != nil { … }
 ```
 
 - **One keymap holds both sets of keys.** `palette.DefaultRules()` binds
@@ -31,7 +31,10 @@ if err := reg.Register(p.OpenCommand("palette.open", "Command palette")); err !=
   complete. The user's `keybindings.json` rebinds them all, as it rebinds
   the workspace's ([the keymaps guide](keymaps.md)). Without the
   palette's rules nothing moves the selection: the keys reach the input as
-  text.
+  text. The commands' IDs are exported, `palette.OpenID`, `SelectNextID`,
+  `SelectPrevID`, `PageNextID`, `PagePrevID`, `AcceptID` and
+  `CompleteID`, and the scope, `palette.PickerScope`, so a program that
+  writes its own defaults names them rather than spelling them.
 - **`ctrl+p` comes to your `Update`** as a `workspace.RequestMsg`, since
   no picker is open to take it, and your registry runs `OpenCommand`'s
   command, which opens the picker:
@@ -131,8 +134,21 @@ func (b bookmarks) Search(ctx context.Context, s palette.Search, yield func(pale
 - **Optional capabilities,** found by type assertion: `Discoverer`, hits
   for an empty query; `Starter`, work before the first search of each
   opening, such as a walk; `Stopper`, a release when the picker closes;
-  `Prefixed`; and `Debouncer`, a wait after a keystroke, so a burst of keys
-  searches once.
+  `Prefixed`; `Debouncer`, a wait after a keystroke, so a burst of keys
+  searches once; and `Opener`, told on the event loop when the picker
+  opens, before any search.
+- **A wrapper of a built-in provider forwards `Opened`.** `FromRegistry`
+  keeps the when values for its listing of an empty `>`, and `Panes` reads
+  the panes, which only the loop may, so both are `Opener`s, as `Recents`
+  is, which forwards it. A wrapper that does not lists nothing for them:
+
+  ```go
+  func (w logged) Opened(c when.Context) {
+      if o, ok := w.inner.(palette.Opener); ok {
+          o.Opened(c)
+      }
+  }
+  ```
 
 The picker closes by any means, `enter`, `esc`, `workspace.Close` or a
 program's `Pop`, through the workspace, which sends it
@@ -245,8 +261,9 @@ if err := complete.Register(palette.Files(walker), palette.Availability{}); err 
 - **Its keys** are `palette.DefaultRules()`' `overlay:completion`
   bindings: `up` and `ctrl+p`, `down` and `ctrl+n`, and `tab` and `enter`
   to accept. While it is open they shadow the editor's own `enter`; every
-  other key reaches the editor. A pop-up opened `WithID` under another ID
-  needs its own bindings in `overlay:<id>`.
+  other key reaches the editor. A pop-up opened `WithID("notes")` takes
+  its keys from `palette.CompletionRules("notes")`, the same bindings in
+  `overlay:notes`, among the keymap's defaults beside `DefaultRules()`.
 - **Accepting a hit** sends `palette.SelectedMsg{ID: "completion", Hit: …}`
   and closes the pop-up. It runs nothing, and asks for no arguments: the
   pane inserts `Hit.Text`. `esc` closes it.

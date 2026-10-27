@@ -18,7 +18,7 @@ pattern, used by every program that needs it.
 
 ## Status
 
-- **The current release is `v2.1.0`,** at the module path
+- **The current release is `v2.2.0`,** at the module path
   `github.com/maccavelli/go-tui-lib/v2`
   ([0020-MADR](docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
   A4.1). `v2.0.0` follows `v1.13.0`, which a `v1` user keeps; `v1.13.0` follows
@@ -106,6 +106,16 @@ pattern, used by every program that needs it.
   keys are commands in the program's one keymap, run in the order they
   were pressed
   ([the command palette guide](docs/guides/command-palette.md)).
+- **Defaults are the program's to refuse, since `v2.2.0`.** Each default
+  the library applies has a control a program uses without forking, and
+  [the defaults guide](docs/guides/defaults.md) lists them, with the few
+  floors that have none. A program sets its own gate policy, forgets
+  remembered answers, builds a registry without the built-ins, runs the
+  workspace's own commands through its registry, makes `launch`'s decision
+  with its helpers, puts the epilogue where it wants it, and binds the
+  palette's commands under its own keys. `msgcat` is the message catalogue
+  the packages' text will come from
+  ([0024-MADR](docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md)).
 - **The stack is Charm v2:** `charm.land/bubbletea/v2`,
   `charm.land/lipgloss/v2` and `charm.land/bubbles/v2`, with
   `github.com/charmbracelet/colorprofile` and
@@ -136,6 +146,7 @@ repository as it is now.
 | start the TUI from my CLI with `--tui`, and fall back when it cannot run | [Start the TUI from your CLI](docs/guides/commands.md#start-the-tui-from-your-cli) |
 | know which Charm version to use, and what may be imported | [AGENTS.md, Dependencies](AGENTS.md#dependencies) |
 | know the rules every TUI package follows | [AGENTS.md, TUI conventions](AGENTS.md#tui-conventions) |
+| refuse or change a default the library applies | [the defaults guide](docs/guides/defaults.md) |
 | know what a type name means across the packages | [the glossary](docs/glossary.md) |
 | contribute: checks, records and commit rules | [AGENTS.md](AGENTS.md) |
 | move to a new release's names | [the migration guide](docs/guides/migrating.md) |

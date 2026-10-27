@@ -48,6 +48,7 @@ below).
  theme         palettes, roles, styles    → glyph, internal/enum; lipgloss, colorprofile
  fuzzy         match and rank candidates  → internal/enum; x/ansi
  safetext      untrusted text, made safe  → glyph; standard library
+ msgcat        message catalogue          → standard library
  glyph         Unicode and ASCII glyphs   → internal/enum
  internal/enum  enum names and text forms → standard library
  internal/teamsg  the one-message command → bubbletea
@@ -60,19 +61,20 @@ below).
 | Package | What it holds |
 | :--- | :--- |
 | `when` | `Parse` and `MustParse` → `Expr` (`Eval`, `String`, `Keys`), VS Code's when-clause grammar with RE2 regexes, or a `SyntaxError` with its offset; `Check` against `Keys`; `Context`, `Map`, `Layered`, `Value`; typed `Key[T]` |
-| `command` | `Command`, `ID`, `New[A]` and `MustNew[A]` and their options, `SchemaOf` (JSON Schema 2020-12 from Kong-aligned tags), `ArgsOf`, `ArgError`; `Registry` (`NewRegistry` with `WithGate`, `WithAuditor`, `WithPrefixer` and `WithLoop`; `Attach`, a loop that can be detached; `Register`, `ReplaceSource`, `Lookup`, `Slash`, `ParseSlash`, `ParseArgs`, `Complete`, `All`, `Available`, `Watch`, `Dispatch`, `Run`, `Cancel`, `CancelAll`, `Remove`, `Version`); `Params` and `Param`; `Format` and `WriteResult`; the policy, `Gate`, `GateFunc`, `AllowIf`, `Verdict`, `Auditor`, `AuditorFunc`, `SlogAuditor`; a `Request`'s `WhenContext`; the errors, each with its exit status, and `PanicError`; `LoadDir` and `LoadDirWith`, with its limits; `WithMaxArgBytes`; `FromMCPPrompts`, `FromACP`; `MCPTools`, `CallMCP`, `ACPCommands`, `Manifest`; `WithLoop` and `LoopMsg`; `Effect`, the follow-up a host runs, and the messages |
+| `command` | `Command`, `ID`, `New[A]` and `MustNew[A]` and their options, `SchemaOf` (JSON Schema 2020-12 from Kong-aligned tags), `ArgsOf`, `ArgError`; `Registry` (`NewRegistry` with `WithGate`, `WithGatePolicy`, `WithAuditor`, `WithPrefixer`, `WithLoop` and `WithoutBuiltins`; `Attach`, a loop that can be detached; `Register`, `ReplaceSource`, `Lookup`, `Slash`, `ParseSlash`, `ParseArgs`, `Complete`, `All`, `Available`, `Watch`, `Dispatch`, `Run`, `Cancel`, `CancelAll`, `Remove`, `Forget`, `ForgetAll`, `Version`); the built-in IDs, `BuiltinList`, `BuiltinDescribe` and `BuiltinQuit`; `Params` and `Param`; `Format` and `WriteResult`; the policy, `GatePolicy`, `GatePolicyFunc`, `DefaultGatePolicy`, `Gate`, `GateFunc`, `AllowIf`, `Verdict`, `Auditor`, `AuditorFunc`, `SlogAuditor`; a `Request`'s `WhenContext`; the errors, each with its exit status, and `PanicError`; `LoadDir` and `LoadDirWith`, with its limits; `WithMaxArgBytes`; `FromMCPPrompts`, `FromACP`; `MCPTools`, `CallMCP`, `ACPCommands`, `Manifest`; `WithLoop` and `LoopMsg`; `Effect`, the follow-up a host runs, and the messages |
 | `command/commandtea` | `Cmd` and `Effect`, between `command.Effect` and `tea.Cmd`; `Dispatch`, `Watch`, `WatchContext`, `RunLoop`, `Attach` and `WithLoop`, the registry's forms for a program's `Update` and `Send` |
 | `glyph` | `Set` (4 border styles, separators with a cross and four tees, focus marker, ellipsis, scroll, bullet, badge brackets, `Prompt` and `Mask`, the states `Done`, `Failed`, `Running` and `Pending`, `Heading`, `MeterFill` and `MeterTrack`, `Control`, and `Keys`, a `KeyGlyphs` of the macOS modifier and arrow labels), `Unicode()`, `ASCII()`, `For(utf8)`; `Tier` (`TierUnicode`, `TierLegacy`, `TierASCII`) and `Tier.Set`; every glyph one cell, except `Keys`' ASCII twins, which are words such as `opt+` and `up` |
 | `fuzzy` | `Matcher`, from `NewMatcher(query)` with `WithCase`, `WithDelimiters`, `WithExtended`, `WithMaxAlign` and `WithNormalizer`: grapheme-cluster matching with smart case, a `Grade` (`Exact`, `Prefix`, `Boundary`, `Subsequence`) and a `Score`; `Match`, `Range`, `Ranked[T]`; `Cells`, a match's ranges in cells; `Index`, a lossy candidate index for large lists, with `WithMaxCandidates` and `WithMinOverlap` |
 | `safetext` | `Rules` and the presets `Text`, `Strict`, `Line`, `Command` and `StatusLine`; `Clean`, `IsClean`; `Sanitizer`, a streaming `io.Writer` with `Close`; `SafeURL` and `URLs`: ECMA-48 with the DEC parser's recovery, C1 code points read as their 7-bit forms, invalid UTF-8 as one U+FFFD per maximal subpart, and the Bidi_Control set removed unless kept ([0020-MADR](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md) D9, A3) |
-| `launch` | `Choice` and `Flags` (`--mode`, `--tui`, bound natively in each framework); `Streams`, `StreamSource`, `FromSource`; `Config`, `Decide` → `Decision` with `Target`s and a `Reason` token; `Run[M]` with `WithRegistry`, `WithRestorer`, `OnStart`, `WithProgramOptions`, `WithFilter`; `ErrNotStarted`, `ErrCrashed`; `Frame`; `ExitCode`, `ExitError`; `Restorer` |
+| `msgcat` | `MessageID`, `Catalog`, `CatalogFunc` and `Table`, a program's message catalogue; `Format`, a message from it or its English default; `Check`, a catalogue's fmt verbs against the defaults' ([0024-MADR](decisions/0024-MADR-opt-in-and-opt-out-coverage.md) D9) |
+| `launch` | `Choice` and `Flags` (`--mode`, `--tui`, bound natively in each framework); `Streams`, `StreamSource`, `FromSource`; `Config`, with `AllowDumb` and `IgnoreCI`, `Decide` → `Decision` with `Target`s and a `Reason` token; `ColorProfile` and `GlyphTier`, its helpers; `Run[M]` with `WithRegistry`, `WithRestorer`, `OnStart`, `WithProgramOptions`, `WithFilter`, `WithoutEpilogue`, `WithEpilogueWriter`; `ErrNotStarted`, `ErrCrashed`; `Frame`; `ExitCode`, `ExitError`; `Restorer` |
 | `launch/launchtest` | `Terminal` (a fake terminal stream with a size and typed keys), `Pipe`, `Streams`, `Env` |
-| `palette` | `Picker`, from `NewPicker(ws)` with `WithLimit`, `WithGrouping`, `WithPlaceholder`, `WithLogger`, `WithGOOS`, `WithRecents` and `WithoutInput`: an overlay pane that streams hits from its providers off the event loop, ranks them with `fuzzy`, asks for a hit's arguments, and runs it on the loop; `Register`, `Open` with `WithID`, `WithAnchor` and `WithSize`, `OpenCommand`, `DefaultRules`, `SetQuery` and `SelectedMsg`; `Provider` and its optional `Discoverer`, `Starter`, `Stopper`, `Prefixed` and `Debouncer`; `Search`, `Hit`, `Availability`, `Grouping`; the providers `FromRegistry`, `Static` with `Item`, `Panes`, `Files` with `FileOption`, `Walker`, `WalkerFunc`, `FSWalker`, `PathFilter` and `PathFilterFunc`, and `Recents`; `Frecency`, with `FrecencyOption`, its JSON form and `ErrRecentsVersion` |
+| `palette` | `Picker`, from `NewPicker(ws)` with `WithLimit`, `WithGrouping`, `WithPlaceholder`, `WithLogger`, `WithGOOS`, `WithRecents` and `WithoutInput`: an overlay pane that streams hits from its providers off the event loop, ranks them with `fuzzy`, asks for a hit's arguments, and runs it on the loop; `Register`, `Open` with `WithID`, `WithAnchor` and `WithSize`, `OpenCommand`, `DefaultRules`, `CompletionRules`, the command IDs `OpenID` to `CompleteID` and `PickerScope`, `SetQuery` and `SelectedMsg`; `Provider` and its optional `Discoverer`, `Starter`, `Stopper`, `Prefixed`, `Debouncer` and `Opener`; `Search`, `Hit`, `Availability`, `Grouping`; the providers `FromRegistry`, `Static` with `Item`, `Panes`, `Files` with `FileOption`, `Walker`, `WalkerFunc`, `FSWalker`, `PathFilter` and `PathFilterFunc`, and `Recents`; `Frecency`, with `FrecencyOption`, its JSON form and `ErrRecentsVersion` |
 | `internal/enum` | `Names`, an enum's tokens, on `uint8` or `int`, and `Bits`, a bit set's, on `uint8` or `uint16`, for an enum's `String`, `MarshalText` and `UnmarshalText`; `Name`, `Marshal` and `Unmarshal` over a bare table |
 | `internal/teamsg` | `Cmd`, the `tea.Cmd` that delivers one message |
 | `theme` | `Palette` for dark, light and unknown backgrounds; `LightDarkColor` and `ProfileColor`; `Styles`; `New(profile, background, glyphs)` with `WithPalette` and `WithPaletteFor`; `FromDark`; `Border(style)`; text forms for `Background` and `BorderStyle` |
 | `layout` | `Rect`, `Size` (fixed, percent, ratio, fill; min, max, shrink order), `Node` (`Pane`, `Split`, `Responsive`, or a custom node), `Solve` → `Plan`; `State` (JSON); the sidebar presets and their `With…` options |
-| `workspace` | `Pane` and its optional interfaces, `PlainViewer` among them; `Workspace` (routing, focus, chrome, resize, zoom, hide, overlays, cursor, `View`, `RenderPlain`, `help.KeyMap` and `Help`, the width method, a following theme with `WithGlyphs`, `WithProfile`, `WithBackground` and `GlyphThemeBuilder`, `WithSize`, clamped to `MaxSide` and `MaxCells`, `SetBackground`, `Panes`, `PaneAs`, `WhenContext`); `Wrap`; its keys through a keymap: `DefaultRules`, `WithBindings`, `SetBindings`, `KeyPath`, `KeyContexter`, `PushMode` and `RequestMsg`; `Bindings` and `Theme`, for a pane to show a key and draw alike; `CommandConsumer` and `CommandMsg`, for a pane or overlay that runs some commands itself; `Close`, an overlay's request to close, and `OverlayClosedMsg`, what an overlay is sent when it closes; `Commands` and the context keys, `FocusedPaneKey()` to `HeightKey()` |
+| `workspace` | `Pane` and its optional interfaces, `PlainViewer` among them; `Workspace` (routing, focus, chrome, resize, zoom, hide, overlays, cursor, `View`, `RenderPlain`, `help.KeyMap` and `Help`, the width method, a following theme with `WithGlyphs`, `WithProfile`, `WithBackground` and `GlyphThemeBuilder`, `WithSize`, clamped to `MaxSide` and `MaxCells`, `SetBackground`, `Panes`, `PaneAs`, `WhenContext`); `Wrap`; its keys through a keymap: `DefaultRules`, `WithBindings`, `SetBindings`, `KeyPath`, `KeyContexter`, `PushMode`, `RequestMsg` and `WithoutOwnCommands`; `Bindings` and `Theme`, for a pane to show a key and draw alike; `CommandConsumer` and `CommandMsg`, for a pane or overlay that runs some commands itself; `Close`, an overlay's request to close, and `OverlayClosedMsg`, what an overlay is sent when it closes; `Commands` and the context keys, `FocusedPaneKey()` to `HeightKey()` |
 | `keymap` | the notation: `Stroke`, `Sequence`, `ParseStroke`, `ParseSequence`, `Event`, `Normalize`, `Label`, `ParseAliases`, `DisplayAliases` and `CopyStrokes`; `Keymap`, from `New(Settings, defaults, layers…)`, with `Rebuild`, `Lookup`, `Bindings`, `Reachable`, `Shortcut`, `Conflicts` and `Rules`; `Binding`, `Default` and `Alternative`, `Layer`, `Location`, `Path`; `BindingConflict` and `ConflictKind`; `Features`, `FeaturesFrom`, `KeyFacts` and `FactsFrom`; `Shown`, the bindings help shows; `Dispatcher` (`Key` and `Expire`, over `termkey` keys; `SetKeymap`, `Pending`, `ActiveKeys`, `Explain`) with `Outcome`, whose `Wait` and `Timeout` a host times, and `TimeoutMsg`; `LoadVSCode`, `LoadError`, `ExportVSCode` and `Schema`; `Describer`, `DescriberFunc` and `FromRegistry` |
 | `keymap/keymaptea` | `Update`, the `Dispatcher` driven by tea's key messages with `tea.Tick` for a pending sequence; `FromTea` and `ToTea`, between `tea.Key` and `termkey.KeyEvent`, field for field; `KeyBinding`, `Help` and `BubblesKeys`, for bubbles |
 | `internal/cells` | `Frame`: a reused cell buffer that draws strings into rectangles with a chosen width method |
@@ -90,8 +92,8 @@ below).
 
 - **`layout` has no Charm import,** so its solver can serve any front end.
 - **The Charm-free cores** are `command`, `fuzzy`, `glyph`,
-  `internal/enum`, `internal/sanitize`, `keymap`, `layout`, `safetext`,
-  `termcap`, `termkey`, `termsvc` and `when`: none links a Charm
+  `internal/enum`, `internal/sanitize`, `keymap`, `layout`, `msgcat`,
+  `safetext`, `termcap`, `termkey`, `termsvc` and `when`: none links a Charm
   module but `x/ansi`, so a line-mode CLI can use them without Bubble Tea
   ([0020-MADR](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
   D1, D11). `internal/conformance` checks their whole import closure, and
@@ -226,6 +228,7 @@ when/ command/ fuzzy/       the packages; goldens under testdata/golden/
 safetext/                   where a package renders
 termkey/                    keys and their decoder; its corpus golden is
                             replayed by internal/termevent's differential test
+msgcat/                     the message catalogue
 termcap/termcaptea/         the probe's Bubble Tea host
 termcap/termcaptest/        fake terminals for tests
 termsvc/termsvctea/         termsvc's Bubble Tea commands
@@ -259,7 +262,8 @@ docs/
   decisions/                MADR and PLAN records
   reports/                  REPORT records
   guides/                   how-to guides: workspaces, terminal
-                            capabilities, commands, releasing
+                            capabilities, commands, releasing, the
+                            defaults and their controls
 ```
 
 ## Dependencies
@@ -299,12 +303,13 @@ docs/
   checks what they link through other packages
   ([0020-MADR](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
   D11).
-- **Kept to what their records allow by `depguard`'s `termkeystd` and
-  `safetextstd`:** `termkey` to the standard library and `internal/enum`,
-  and `safetext` to the standard library, `glyph` and `internal/enum`, in
-  their non-test files, as `internal/conformance` checks their whole
-  closures ([0021-MADR](decisions/0021-MADR-termkey-closure-gate.md) N3,
-  A1).
+- **Kept to what their records allow by `depguard`'s `termkeystd`,
+  `safetextstd` and `msgcatstd`:** `termkey` to the standard library and
+  `internal/enum`, `safetext` to the standard library, `glyph` and
+  `internal/enum`, and `msgcat` to the standard library, in their non-test
+  files, as `internal/conformance` checks their whole closures
+  ([0021-MADR](decisions/0021-MADR-termkey-closure-gate.md) N3, A1;
+  [0024-MADR](decisions/0024-MADR-opt-in-and-opt-out-coverage.md) D9).
 
 ## Tooling
 

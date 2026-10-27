@@ -82,7 +82,7 @@ record that is not there.
 | `CI` forbids the automatic choice | read by name | `launch.ChoiceTUI` | built |
 | `CI`, without forcing the TUI | read by name | `launch.Config.IgnoreCI` | built |
 | `TERM=dumb` | plain output, under every choice | `launch.Config.AllowDumb` | built |
-| Building a decision as `Decide` does | its colour and glyph helpers are unexported | `launch.ColorProfile`, `launch.GlyphTier` | built |
+| Building a decision as `Decide` does | `Decide` sets the profiles and the glyph tier | `launch.ColorProfile`, `launch.GlyphTier` | built |
 | The controlling terminal | not opened | `launch.Config.OpenTTY` | built |
 | Drawing on standard error | not | `launch.Config.UIOnErr` | built |
 | Bubble Tea's program options | the streams, the profile, the size, no signal handler | `launch.WithProgramOptions` | built |
@@ -132,9 +132,9 @@ record that is not there.
 | Behaviour | Default | Control | Status |
 | :--- | :--- | :--- | :--- |
 | Its keys | `palette.DefaultRules` | `palette.DefaultRules` | built |
-| Its commands' IDs and scope | unexported | `palette.OpenID`, `palette.SelectNextID`, `palette.PickerScope` | built |
-| A completion pop-up's keys under another ID | none | `palette.CompletionRules` | built |
-| A wrapper of a built-in provider | loses its opening | `palette.Opener` | built |
+| Its commands' IDs and scope | `palette.open` and the picker's moves, in `kind:picker` | `palette.OpenID`, `palette.SelectNextID`, `palette.PickerScope` | built |
+| A completion pop-up's keys under another ID | bound in `overlay:completion` only | `palette.CompletionRules` | built |
+| A wrapper of a built-in provider | `Open` tells each provider that has `Opened` | `palette.Opener` | built |
 | The overlay | `palette`, 72 by 16, centred | `palette.WithID`, `palette.WithAnchor`, `palette.WithSize` | built |
 | Hits kept | 200 | `palette.WithLimit` | built |
 | A provider's error | dropped | `palette.WithLogger` | built |
