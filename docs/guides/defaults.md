@@ -109,7 +109,7 @@ record that is not there.
 | Behaviour | Default | Control | Status |
 | :--- | :--- | :--- | :--- |
 | Its keys | `workspace.DefaultRules` | `workspace.WithBindings`, `workspace.Workspace.SetBindings` | built |
-| Its own commands, on a key | run in place, past the program's registry | `workspace.WithoutOwnCommands` | planned (0024-PLAN-command-and-control-opt-outs.md) |
+| Its own commands, on a key | run in place, past the program's registry | `workspace.WithoutOwnCommands` | built |
 | Esc closes the top overlay | always | `workspace.EscConsumer` | built |
 | Its commands for a registry | given only when asked | `workspace.Commands` | built |
 | The background colour query | sent at start | `workspace.WithoutBackgroundQuery` | built |

@@ -538,3 +538,47 @@ No module is added. `msgcat` imports the standard library alone.
   passed, 0 failed, 1 skipped, in 2234 s, "335 file(s) clean".
   `make pre-add-check` on the 7 Go files is clean. The identifier scan of
   the change is clean.
+
+### Step 5: `workspace`
+
+*2026-10-26.* The owner committed Step 4 and said to proceed. No
+deviation.
+
+* **`workspace/workspace.go`:** `WithoutOwnCommands()`, and the field it
+  sets. **`workspace/bindings.go`:** `run` takes the workspace's own
+  commands in place only without the option; under it a `workspace.*`
+  command is offered to a `CommandConsumer`, else it comes back as a
+  `RequestMsg`, as any other command does. The esc binding's offer to an
+  `EscConsumer` stays first. `RequestMsg`'s documentation says so.
+* **Tests,** in `workspace/bindings_test.go`:
+  * `TestWithoutOwnCommands`: without the option `alt+.`
+    (`workspace.focus.next`) moves focus with no `RequestMsg`, as today;
+    with it, focus stays and one `RequestMsg` comes back, with
+    `OriginKey` and the workspace's when values. A registry holding
+    `Commands(w)`, with a recording gate and auditor, runs it: focus
+    moves, the auditor holds the request, and the gate is not asked; one
+    whose `GatePolicy` asks for every UI command puts it to the gate,
+    which refuses, and focus stays.
+  * `TestWithoutOwnCommandsEsc`: under the option an overlay that
+    consumes esc still takes it, with no `RequestMsg`; a plain overlay's
+    esc comes back as a `RequestMsg` for `workspace.overlay.close`, and
+    the overlay stays open until the program runs it.
+* **`docs/guides/defaults.md`,** by Step 4's D1: the row "Its own
+  commands, on a key" is `built`.
+* **Seen failing,** through `python3 -m tools.verify mutate` on scratch
+  copies of `workspace/bindings.go`, 3 killed of 3:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | the option is ignored | `TestWithoutOwnCommands`: `under the option alt+. gave [], focus side from main; want one RequestMsg and focus unmoved` |
+  | the option drops the esc consumer's offer | `TestWithoutOwnCommandsEsc`: `esc on an EscConsumer: [{{workspace.overlay.close …` |
+  | the request loses its when values | `TestWithoutOwnCommands`: `the request is {ID:workspace.focus.next … WhenContext:<nil> Gate:<nil>}; want workspace.focus.next from a key, with the workspace's when values` |
+
+* **Gates:** `python3 -m tools.verify gates` over the step's 3 Go files,
+  the guide and 2 records: macOS 19 passed, 0 failed, in 559 s,
+  `release-check` "335 file(s) clean in 1 module(s)", with `apicheck`
+  against `v2.1.0` reporting no incompatible change; `remote linux` 18
+  passed, 0 failed, 1 skipped (`gofmt`, which is given no files there),
+  in 885 s, "335 file(s) clean"; `remote windows` 18 passed, 0 failed, 1
+  skipped, in 2216 s, "335 file(s) clean". `make pre-add-check` on the 3
+  Go files is clean. The identifier scan of the change is clean.

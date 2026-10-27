@@ -40,8 +40,9 @@ type KeyContexter interface {
 	KeyContexts() []command.Scope
 }
 
-// RequestMsg is a matched key's command that is not the workspace's own:
-// the program passes Request to its registry's Dispatch. Request has
+// RequestMsg is a matched key's command that is not the workspace's own,
+// or any under WithoutOwnCommands: the program passes Request to its
+// registry's Dispatch. Request has
 // Origin command.OriginKey and the workspace's WhenContext
 // (docs/decisions/0007-MADR-keymap-engine.md A11).
 type RequestMsg struct {
@@ -247,7 +248,8 @@ func (w *Workspace) deliver(msg tea.Msg) tea.Cmd {
 
 // run runs a matched command: the workspace's own through its handler,
 // with an error as a command.ResultMsg; any other through the
-// CommandConsumer that takes it, or else as a RequestMsg for the program.
+// CommandConsumer that takes it, or else as a RequestMsg for the program;
+// under WithoutOwnCommands, the workspace's own as any other.
 // workspace.overlay.close's key goes to a top overlay that is an
 // EscConsumer consuming esc, instead.
 func (w *Workspace) run(o keymap.Outcome, msg tea.Msg, ctx when.Context) tea.Cmd {
@@ -258,7 +260,7 @@ func (w *Workspace) run(o keymap.Outcome, msg tea.Msg, ctx when.Context) tea.Cmd
 	}
 	req := command.Request{ID: o.Command, Args: o.Args, Origin: command.OriginKey, WhenContext: ctx}
 	c, ok := w.own()[o.Command]
-	if !ok {
+	if !ok || w.noOwn {
 		if cmd, taken := w.offer(req); taken {
 			return cmd
 		}

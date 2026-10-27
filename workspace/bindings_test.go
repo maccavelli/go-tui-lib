@@ -1,8 +1,11 @@
 package workspace
 
 import (
+	"context"
 	"encoding/json/jsontext"
+	"errors"
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -264,6 +267,74 @@ func TestEscConsumerThroughTheEngine(t *testing.T) {
 	run(r.w.Update(press("esc")))
 	if len(r.w.Overlays()) != 0 {
 		t.Errorf("esc did not close the overlay")
+	}
+}
+
+// TestWithoutOwnCommands: by default a workspace.* key runs in place; under
+// the option it comes back as a RequestMsg, which a registry holding
+// Commands runs through its gate policy, gate and auditor
+// (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md D4).
+func TestWithoutOwnCommands(t *testing.T) {
+	r := newRig(t, 120, 40)
+	was := r.w.Focused()
+	if reqs := requests(run(r.w.Update(press("alt+.")))); len(reqs) != 0 || r.w.Focused() == was {
+		t.Fatalf("by default alt+. gave %v, focus %s from %s; want focus moved and no RequestMsg", reqs, r.w.Focused(), was)
+	}
+
+	r = newRig(t, 120, 40, WithoutOwnCommands())
+	was = r.w.Focused()
+	ctx := r.w.WhenContext()
+	reqs := requests(run(r.w.Update(press("alt+."))))
+	if len(reqs) != 1 || r.w.Focused() != was {
+		t.Fatalf("under the option alt+. gave %v, focus %s from %s; want one RequestMsg and focus unmoved", reqs, r.w.Focused(), was)
+	}
+	req := reqs[0].Request
+	if req.ID != "workspace.focus.next" || req.Origin != command.OriginKey || !reflect.DeepEqual(req.WhenContext, ctx) {
+		t.Fatalf("the request is %+v; want workspace.focus.next from a key, with the workspace's when values", req)
+	}
+
+	var audited []command.Record
+	var asked []command.ID
+	gate := command.GateFunc(func(_ context.Context, inv *command.Invocation) (command.Verdict, error) {
+		asked = append(asked, inv.Command.ID)
+		return command.RejectOnce, nil
+	})
+	reg := command.NewRegistry(command.WithGate(gate), command.WithAuditor(command.AuditorFunc(func(rec command.Record) { audited = append(audited, rec) })))
+	if err := reg.Register(Commands(r.w)...); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := reg.Run(t.Context(), req); err != nil || r.w.Focused() == was {
+		t.Fatalf("the registry ran the request: %v, focus %s; want focus moved from %s", err, r.w.Focused(), was)
+	}
+	if len(audited) != 1 || audited[0].ID != req.ID || audited[0].Origin != command.OriginKey || len(asked) != 0 {
+		t.Errorf("the auditor holds %+v, and the gate was asked about %v; want the one request, the gate unasked", audited, asked)
+	}
+
+	ui := command.GatePolicyFunc(func(c command.Command, _ command.Origin) bool { return c.Danger == command.UI })
+	gated := command.NewRegistry(command.WithGate(gate), command.WithGatePolicy(ui))
+	if err := gated.Register(Commands(r.w)...); err != nil {
+		t.Fatal(err)
+	}
+	was = r.w.Focused()
+	if _, err := gated.Run(t.Context(), req); !errors.Is(err, command.ErrRefused) || r.w.Focused() != was || !slices.Equal(asked, []command.ID{req.ID}) {
+		t.Errorf("under a policy that gates every UI command: %v, focus %s from %s, the gate asked about %v; want it refused by the gate", err, r.w.Focused(), was, asked)
+	}
+}
+
+// TestWithoutOwnCommandsEsc: under the option an EscConsumer still takes
+// esc first, and a plain overlay's esc comes back as a RequestMsg for
+// workspace.overlay.close.
+func TestWithoutOwnCommandsEsc(t *testing.T) {
+	r := newRig(t, 120, 40, WithoutOwnCommands())
+	eater := &fake{id: "eater", esc: true}
+	r.w.Push(Overlay{ID: "eater", Pane: eater, Width: 20, Height: 6})
+	if reqs := requests(run(r.w.Update(press("esc")))); len(reqs) != 0 || len(r.w.Overlays()) != 1 || len(eater.keys()) != 1 {
+		t.Fatalf("esc on an EscConsumer: %v, overlays %v, its keys %v; want it delivered to the overlay", reqs, r.w.Overlays(), eater.keys())
+	}
+	eater.esc = false
+	reqs := requests(run(r.w.Update(press("esc"))))
+	if len(reqs) != 1 || reqs[0].Request.ID != cmdOverlayClose || len(r.w.Overlays()) != 1 {
+		t.Errorf("esc on a plain overlay: %v, overlays %v; want a RequestMsg for %s and the overlay open", reqs, r.w.Overlays(), cmdOverlayClose)
 	}
 }
 

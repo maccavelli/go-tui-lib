@@ -179,6 +179,7 @@ type Workspace struct {
 	bg       theme.Background // the background the terminal last reported
 	pinnedBg theme.Background // SetBackground's choice; Unknown follows bg
 	noQuery  bool             // WithoutBackgroundQuery
+	noOwn    bool             // WithoutOwnCommands
 	regions  []region         // the last frame's regions, top first, for hit testing
 	last     string           // the last frame
 	dirty    bool             // something changed since the last frame
@@ -313,6 +314,16 @@ func clampSize(w, h int) (int, int) { return limits.Clamp(w, h) }
 // Init asks, so a following theme learns whether the background is light or
 // dark.
 func WithoutBackgroundQuery() Option { return optionFunc(func(w *Workspace) { w.noQuery = true }) }
+
+// WithoutOwnCommands stops a matched key running the workspace's own
+// commands in place: a workspace.* command is offered to a
+// CommandConsumer, else it comes back as a RequestMsg, as any other
+// command does. A program that registers Commands(w) in its registry then
+// runs them through its gate, auditor and middleware
+// (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md D4). An
+// overlay that is an EscConsumer still takes workspace.overlay.close's key
+// first.
+func WithoutOwnCommands() Option { return optionFunc(func(w *Workspace) { w.noOwn = true }) }
 
 // WithChrome sets what is drawn around panes (default Borders).
 func WithChrome(c Chrome) Option { return optionFunc(func(w *Workspace) { w.chrome = c }) }
