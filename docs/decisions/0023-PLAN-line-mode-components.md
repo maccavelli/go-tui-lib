@@ -413,3 +413,258 @@ was released as `v2.2.0` and closed out (`9a13872`).
   1 skipped, in 2256 s, "345 file(s) clean". `make pre-add-check` on the
   14 Go files is clean. The identifier scan of the change, untracked files
   included, is clean.
+
+### Step 2: `ask` and `ask/asktea` (issue #7), and a release
+
+*2026-10-27.* The owner committed Step 1 (`c843891`) and said
+"committed, proceed".
+
+* **Deviation D5, 2026-10-27: `ask` needs a line editor before
+  `lineedit` is built.**
+  * **Found,** before any code: the MADR's D1 has `ask` and `pick` import
+    `lineedit`, and D4 reads a reason "through a one-row
+    `lineedit.Composer`", while D12 and this PLAN build `lineedit` in
+    Step 4, after `ask`'s release (Step 2) and `pick`'s (Step 3). The
+    conflict is in the record as written; Step 1 did not cause it.
+  * **Resolutions offered:** an unexported one-row editor under
+    `internal/`, used by `ask` now and `pick` in Step 3, on which Step 4
+    builds `lineedit`, the two moving to the `Composer` with no exported
+    change (recommended; until Step 4 the reason's keys are fixed, not the
+    keymap's); building `lineedit` first, moving every later step and
+    release and gobble's order; or releasing a partial
+    `lineedit.Composer` in this step, its shape frozen in `v2` before its
+    design is built.
+  * **Chosen by the owner,** 2026-10-27: "Internal editor now
+    (Recommended)". MADR A2 item 1. This step's scope gains
+    `internal/lineinput/`, a core.
+* **Deviation D6, 2026-10-27: the host ends an engine's wait.**
+  * **Found:** D4 has "the cancel key, ctrl+c or the end of input" cancel,
+    but D2's contract takes `HandleInput`, `Resize` and `HandleTimeout`
+    alone, and `termkey` has no input for the end of input; gobble's
+    `askPermission` also cancels when its context ends
+    (`internal/cli/permission.go:209`, at `5fb6928`).
+  * **Resolutions offered:** `Cancel()` in D2's contract, the end of input
+    or the host's own reason, ask and pick ending canceled, `lineedit`
+    sending `EditEOF` (recommended); `HandleEOF(now)`, the end of input
+    alone; or `Asker.Cancel()` alone, each later engine deciding its own.
+  * **Chosen by the owner,** 2026-10-27: "Cancel() in the contract
+    (Recommended)". MADR A2 item 2.
+* **Deviation D7, 2026-10-27: the Asker draws in the host's region.**
+  * **Found:** D4 says "the region commits the question" and does not say
+    whose region; gobble asks its permission question while its composer
+    is live, so a region is on the screen already.
+  * **Resolutions offered:** `ask.WithRegion(*inline.Region)`, the host's
+    region, shared among its components, the Asker building
+    `inline.NewRegion(inline.WithMethod(m))` without it (recommended); or
+    an Asker always building its own, with `WithRegionOptions`, a second
+    region under a live composer.
+  * **Chosen by the owner,** 2026-10-27: "ask.WithRegion (Recommended)".
+    MADR A2 item 3.
+* **Deviation D8, 2026-10-27: `asktea` draws the Asker's own rows.**
+  * **Found:** D4 has `asktea` draw `Layout` and drive the same `Asker`,
+    whose only output is the terminal's bytes, so an overlay has no rows
+    for a reason being typed. `asktea`'s type names were not among the
+    MADR's 31: `python3 -m tools.verify names` over `ask`'s eight,
+    `asktea`'s `Dialog`, `AnsweredMsg` and `Option`, and
+    `internal/lineinput`'s `Line` reports "12 planned name(s), clean".
+  * **Resolutions offered:** `Asker.View(width int) (rows []string, row,
+    col int)`, the rows and the cursor the Asker draws, read without a
+    change, which the line mode draws through too (recommended); or
+    `Asker.Chosen` and `Asker.Reason`, `asktea` drawing the reason row
+    itself.
+  * **Chosen by the owner,** 2026-10-27: "Asker.View (Recommended)".
+    MADR A2 item 4.
+* **Deviation D9, 2026-10-27: a word or an answer wider than its row.**
+  * **Found:** D4 leaves "a word wider than a row … whole" and never
+    breaks inside an answer, while D11's fuzz property has `Layout` never
+    split an answer and never write a row wider than the width; both
+    cannot hold for a word or an answer wider than the width. Step 1's
+    region cuts a row wider than the width, a floor, so a long path in a
+    command would be cut on the screen; gobble's 0029-PLAN P2 asks for
+    "the whole command, no word cut", which its terminal's own hard wrap
+    gives it.
+  * **Resolutions offered:** a word wider than the whole row broken at the
+    width by grapheme cluster, its pieces on rows of their own, and an
+    answer too wide for any row on a row of its own, broken alike, so no
+    row is wider than the width and the whole text shows (recommended); or
+    D4 as written, the region cutting the row.
+  * **Chosen by the owner,** 2026-10-27: "Break it at the width
+    (Recommended)". MADR A2 item 5.
+* **Deviation D10, 2026-10-27: the events are named for their engines.**
+  * **Found,** by `make pre-add-check`'s lint of the first build: revive's
+    `exported` rule at `ask/event.go:9` and `:37`, "type name will be used
+    as ask.AskEventKind by other packages, and that stutters; consider
+    calling this EventKind", and the same of `AskEvent`; D5's `PickEvent`
+    and `PickEventKind` would fail alike, and `lineedit`'s `EditEvent`
+    does not. `ask.Event` clashes: `python3 -m tools.verify names` reports
+    "ask.Event: also in keymap". No file of the repository suppresses a
+    revive finding.
+  * **Resolutions offered:** each event named for its engine,
+    `ask.AskerEvent` and `AskerEventKind`, `pick.ChooserEvent` and
+    `ChooserEventKind`, `lineedit.ComposerEvent` and `ComposerEventKind`,
+    the kind constants and `NextEvent` unchanged ("6 planned name(s),
+    clean") (recommended); or one shared `Output` and `OutputKind` in every
+    engine, with `NextOutput`. A per-line suppression was not offered: it
+    silences a gate.
+  * **Chosen by the owner,** 2026-10-27: "Named for the engine
+    (Recommended)". MADR A2 item 6.
+* **`internal/lineinput/`** (D5): `Line`, one row of grapheme clusters
+  under the width method (`ansi.FirstGraphemeCluster`, which keeps a ZWJ
+  sequence and a flag whole under both methods, by a probe); `Insert`,
+  cleaned by `internal/sanitize.Line`, cut by whole clusters at its bound,
+  and re-segmented, so a mark typed after its base joins its cluster;
+  `Key`, the fixed set: text, backspace and ctrl+h, delete and ctrl+d,
+  left and ctrl+b, right and ctrl+f, home and ctrl+a, end and ctrl+e,
+  ctrl+u, ctrl+k, ctrl+w and alt+backspace; `View(width)`, the part around
+  the cursor that fits, its cell counted. A core.
+* **`ask/`:**
+  * `Question`, `Row`, `Answer`, `Response` (`question.go`). An answer's
+    `Key` matches a key as a binding names it, `shift+n`, or, held with no
+    modifier but shift and the locks, the text it types, `N`.
+  * `Layout` (`layout.go`), pure: the notes, the title and the lines after
+    it wrapped at spaces, continuations indented two; each row's label
+    padded to the widest, two cells before its answers; answers `[k]
+    label`, two cells apart, broken between answers, continuations under
+    the first; the cancel answer ending the last row three cells after the
+    answer before it, as gobble's sketch draws it; then `glyph.Set.Prompt`.
+    A word or an answer wider than its whole row is broken at the width by
+    cluster, onto rows of its own, by D9; a cluster wider than the room the
+    hang leaves goes to the row's first column. Every string is cleaned by
+    `internal/sanitize.Line`.
+  * `Asker` (`asker.go`): `NewAsker`, `Resize` (the first draws),
+    `HandleInput`, `Timeout`, `HandleTimeout`, `Cancel` (D6), `NextEvent`
+    and `View` (D8). The question is cleaned once, at `NewAsker`, by
+    `WithRules`' rules and then `Line`'s; the response carries the caller's
+    `Answer` as given. A reason is read through a `lineinput.Line`, its
+    lead the answer's label in `MsgReasonPrompt`, cut to half the width
+    when wider; enter gives it, its spaces trimmed. The answer is committed
+    with the question: the prompt and the echo, `Echo` or `Label`, with the
+    reason in `MsgReasonEcho`, wrapped at the width; a cancel's is the
+    cancel answer's echo, its label, or `MsgCanceled`.
+  * `AskerEvent` and `AskerEventKind` (`event.go`, D10): `AskNone`,
+    `AskWrite`, `AskDone`, tokens `none`, `write`, `done`, from
+    `internal/enum`.
+  * Options (`options.go`): `WithMethod`, `WithGlyphs` (`glyph.Unicode()`
+    by default), `WithRegion` (D7), `WithReasonLimit` with
+    `DefaultReasonLimit`, 2048 bytes, `WithCatalog`, `WithRules`. `Option`
+    is opaque.
+  * Messages (`messages.go`): `MsgReasonPrompt` (`%s: `), `MsgReasonEcho`
+    (`%[1]s: %[2]s`), `MsgCanceled` (`cancel`), and `Messages()`.
+* **`ask/asktea/`:** `Dialog`, from `NewDialog(ws, q, …)`: `Open` builds a
+  fresh `Asker` with the workspace's width method and its theme's glyphs,
+  then `WithAsk`'s options, and pushes a modal overlay as wide as the
+  workspace or `WithWidth`'s and as tall as the question is there;
+  `Update` gives the `Asker` the keys, through `keymaptea.FromTea`, and the
+  pastes, drops its bytes, and on its answer closes the overlay and sends
+  `AnsweredMsg`; `OverlayClosedMsg`, esc's among them, cancels; `View`
+  draws `Asker.View` at the pane's width; `Cursor` places the cursor.
+  `DefaultID`, `WithID`, `WithAnchor`, `WithWidth`, `WithAsk`. Not a core.
+* **The gates:** `ask` and `internal/lineinput` join `cores` and the
+  `charmfree` files; the enum table gains `ask.AskerEventKind`.
+* **`docs/guides/defaults.md`:** an `ask` table of twelve rows: the method,
+  the glyphs, the region, the reason's bound, the words, the rules and the
+  overlay's ID, place, width and question, `built`; what cancels, the
+  reason's keys and a word wider than its row, `decided` by the MADR's D4
+  and A2; esc in the overlay, `decided` by
+  [0008-MADR-command-palette.md](0008-MADR-command-palette.md), the
+  workspace's rule for every overlay. An `ask/asktea` control is named by
+  its path, as `command/commandtea`'s is: the inventory's first run failed
+  on `asktea.WithID`, "no package asktea".
+* **`docs/glossary.md`:** `ask`'s seven names move to "Built", with
+  `asktea`'s `Dialog` and `AnsweredMsg`; `pick`'s and `lineedit`'s
+  reserved events take D10's names.
+* **The release's notes:** `docs/guides/migrating.md`, "Migrating to
+  `v2.3.0`", Steps 1 and 2's additions; `README.md`'s Status, the release
+  and a bullet for the question; `docs/architecture.md`, `inline`,
+  `inline/inlinetest`, `ask`, `ask/asktea` and `internal/lineinput` in the
+  package map, the table, the cores and the tree, as `v2.2.0`'s close-out
+  did for its packages.
+* **Tests:**
+  * `lineinput`: `TestKeys`, each key as a terminal sends it, through
+    `termkey.Decoder`; `TestClusters`, a ZWJ sequence, a flag and a
+    combining mark one step each under both methods; `TestLimit`;
+    `TestView`; `FuzzLine`.
+  * `ask`: `TestSketch`, the permission question at 66 columns, gobble's
+    0029-MADR D1 sketch row for row; `TestLayoutGolden`, drawn by an
+    `Asker` on an `inlinetest.Screen`, each line within its width, the
+    permission question at 60, 100 and 177, and the trust, plan-mode,
+    grant and tool-call questions at 60 and 100, across colour and
+    charset: 44 files, 18 distinct, each read before it was kept. `ask`
+    draws no colour, so a case's colour and no-colour files are the same.
+    `TestLayoutBreaks`, `TestLayoutCleaned`, `TestLayoutWide`;
+    `TestAnswer`, `TestEchoLabel`, `TestUnknownKey`, `TestCancel` (the
+    cancel key, ctrl+c, `Cancel`, ctrl+c in a reason, and no cancel
+    answer), `TestShiftKey`, `TestReason`, `TestReasonLimit`,
+    `TestReasonView`, `TestView`, `TestResize`, `TestWithRegion`,
+    `TestCatalog`, `TestRules`, `TestRow1Report`; `FuzzLayout`: no row
+    wider than the width but one cluster alone, and an answer that fits a
+    row never split.
+  * `asktea`: `TestDialog`, `TestDialogReason`, `TestDialogCancel` (esc
+    and ctrl+c), `TestDialogWidth`, on a workspace in a `synctest` bubble,
+    as `palette`'s tests drive one.
+  * My expectations were wrong on review, before a first run, and were
+    corrected: in `lineinput`'s tests, a ctrl+u case that typed a stray
+    `u`, and two view cases that left out the space at the row's end; the
+    long title's pieces in `TestLayoutBreaks`, which carry the
+    continuation indent; and in `ask`'s tests, a reason edit whose ctrl+w
+    deleted the whole word, a catalogue test at a width that cut its lead,
+    an `Asker.Question` that does not exist, a region check that could not
+    tell two regions apart, and a first-row report test that left the
+    screen's own reply to be fed. The same review found two faults in
+    `flow`, fixed before the first run: the pieces of a first word wider
+    than the row overran by the indent, and a blank lead could leave an
+    empty row.
+  * Fuzzing, 60 s each, clean: `FuzzLayout` 781,371 runs, `FuzzLine`
+    5,112,265; an earlier 30 s of `FuzzLayout`, 291,932 runs, clean too.
+    No input was kept.
+* **Lint,** at the first pre-add check: the stuttering names (D10);
+  gocritic's `evalOrder` in `Dialog.Update`; revive's `confusing-naming`,
+  an unexported `cancel` beside `Cancel`, renamed `endCanceled`;
+  staticcheck's ST1018, a literal ZWJ in a test, written `\u200d`.
+  `make modernize` then asked for `strings.FieldsSeq`, a `strings.Builder`
+  in `flow`'s unbounded row, `slices.Backward` and `strings.SplitSeq`;
+  `go fix ./ask/...` applied them.
+* **Seen failing,** through `python3 -m tools.verify mutate` on scratch
+  copies, 15 killed of 15. Two needed a second run: 2.1's first form did
+  not compile (`flush` unused), and was rewritten to keep it; 2.7
+  survived, since `Layout`, `words` and `Line` each clean by `Line` again,
+  so the floor showed only in the lead before a reason, which `View` draws
+  as it is: `TestRules` gained that case, a label and a translation
+  holding escapes under weaker rules, and it killed 2.7:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | a row breaks inside an answer | `TestLayoutGolden`: `permission color.utf8.60: line 1 differs`, and the other three charset and colour cases at 60 |
+  | a continuation is not indented | `TestSketch`: `at 66 columns: …`; `TestLayoutGolden`: `permission color.utf8.60: line 2 differs` |
+  | an unknown key answers | `TestUnknownKey`: `answered &{Answer:{ID:yes …}} by keys no answer shows`; `TestEchoLabel`, `TestCancel` |
+  | the echo is the label, not `Echo` | `TestAnswer`: `left: "Go on?\n  [y] yes  [n] no   [c] cancel\n> yes\n"; want the echo after the prompt`; `TestReason`, `TestCatalog` |
+  | `Cancel` ignored | `TestCancel`: `Cancel: response <nil>; want canceled`; `TestDialogCancel`: `esc: answers []; want one, canceled` |
+  | `WithReasonLimit` ignored | `TestReasonLimit`: `reason of 2048 bytes; want 5` |
+  | `WithRules` replaces the floor | `TestRules`: `the lead under weaker rules: "> say\x1b[31m why\n: "; want it cleaned to the floor` |
+  | a word wider than its row left whole | `TestLayoutBreaks`: `"/home/<user>/a-very-long-path-that-is-wider-than-the-row/file.txt" is 65 cells, in 30`; `TestLayoutWide` |
+  | the line steps by rune, not by cluster | `TestClusters`: `"a👨\u200d👩\u200d👧🇫🇷éb" is 11 clusters; want 5` |
+  | esc in the overlay does not cancel | `TestDialogCancel`: `esc: answers []; want one, canceled` |
+  | the overlay draws at another width | `TestDialogWidth`: `"  [y] allow  [f] reject and say why   [c] cancel" is 48 cells, in 22` |
+  | `WithRegion` ignored | `TestWithRegion`: `the host's region, made WithoutCursorQuery, asked for the cursor: "\x1b[3;3R"` |
+  | `WithCatalog` ignored | `TestCatalog`: `while typed: "> reject and say why: non"` |
+  | the awaited report is passed on as a key | `TestRow1Report`: `the awaited report answered as a key: &{Answer:{ID:f3 Key:ctrl+f3 …}}` |
+  | `ask` imports Bubble Tea | `TestCoresAreCharmFree`: `ask (GOOS=linux) links charm.land/bubbletea/v2: ask → charm.land/bubbletea/v2`, and darwin and windows |
+
+* **Names:** `python3 -m tools.verify names` over the step's twelve, "12
+  planned name(s), clean", then over D10's six, "6 planned name(s),
+  clean"; conformance's names check passes with `Dialog` and
+  `AnsweredMsg`.
+* **The API:** `make apicheck`, "against v2.2.0, 0 incompatible
+  change(s)".
+* **Gates:** `python3 -m tools.verify gates` over the step's 18 Go files,
+  `.golangci.yml`, the README, the index, the glossary, three guides,
+  `docs/architecture.md` and 2 records: macOS 19 passed, 0 failed, in
+  549 s, `release-check` "345 file(s) clean in 1 module(s)", with
+  `apicheck` against `v2.2.0` and the examples gate (its count is the
+  tracked files, so this step's 16 untracked Go files are outside it, but
+  in its lint, vet and tests of `./...`, and in the per-file gates);
+  `remote linux` 18 passed, 0 failed, 1 skipped (`gofmt`, which is given
+  no files there), in 1193 s, "361 file(s) clean", this step's among
+  them; `remote windows` 18 passed, 0 failed, 1 skipped, in 2340 s, "361
+  file(s) clean". `make pre-add-check` on the 18 Go files is clean. The
+  identifier scan of the change, untracked files included, is clean.

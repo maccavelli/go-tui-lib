@@ -1,0 +1,7 @@
+ 57|Run echo '=== staged ==='; git diff --cached --stat; echo
+ 38|  '=== log ==='; git log --oneline -5?
+ 39|Patterns: echo *, git diff *, git log *
+ 60|  Allow   [1] once  [2] session  [3] project  [4] everywhere
+ 60|  Reject  [5] once  [6] session  [7] project  [8] everywhere
+ 37|  [f] reject and say why   [c] cancel
+  1|❯

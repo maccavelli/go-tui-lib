@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/maccavelli/go-tui-lib/v2/ask"
 	"github.com/maccavelli/go-tui-lib/v2/command"
 	"github.com/maccavelli/go-tui-lib/v2/fuzzy"
 	"github.com/maccavelli/go-tui-lib/v2/glyph"
@@ -36,6 +37,7 @@ func as[T ~uint8 | ~uint16 | ~int](n int64) any { return T(n) }
 // the test build values, so an enum the scan finds and the table lacks
 // fails, and so does an entry the scan does not find.
 var enums = map[string]func(int64) any{
+	"ask.AskerEventKind":     as[ask.AskerEventKind],
 	"command.Danger":         as[command.Danger],
 	"inline.Reflow":          as[inline.Reflow],
 	"command.Format":         as[command.Format],

@@ -29,6 +29,10 @@ below).
 ```text
  launch        start the TUI from a CLI   → command, glyph, termcap, internal/enum, internal/limits; bubbletea, colorprofile, x/term
  launch/launchtest  fake streams for tests → launch, termcap (tests)
+ ask           an inline question         → inline, internal/lineinput, glyph, msgcat, safetext, termkey, internal/enum, internal/sanitize; x/ansi
+ ask/asktea    the question in an overlay → ask, workspace, keymap/keymaptea, termkey; bubbletea
+ inline        live rows below the scrollback → termcap, termkey, internal/enum, internal/sanitize; x/ansi
+ inline/inlinetest  a terminal screen for tests → inline; x/ansi
  palette       the command palette        → workspace, command, command/commandtea, keymap, fuzzy, layout, when, internal/enum, internal/sanitize; bubbletea, bubbles/textinput, lipgloss, x/ansi
  workspace     Bubble Tea pane host       → layout, theme, glyph, keymap, keymap/keymaptea, internal/cells, internal/enum, internal/limits, internal/sanitize, command, when; bubbletea, bubbles/key, bubbles/help, colorprofile, x/ansi
  keymap        keys to command IDs        → command, when, glyph, termcap, termkey, internal/enum; x/ansi
@@ -51,6 +55,7 @@ below).
  msgcat        message catalogue          → standard library
  glyph         Unicode and ASCII glyphs   → internal/enum
  internal/enum  enum names and text forms → standard library
+ internal/lineinput  one row of typed text → termkey, internal/sanitize; x/ansi
  internal/teamsg  the one-message command → bubbletea
  internal/sanitize  untrusted display text → safetext; x/ansi
  internal/limits  the window clamp        → standard library
@@ -70,6 +75,11 @@ below).
 | `launch` | `Choice` and `Flags` (`--mode`, `--tui`, bound natively in each framework); `Streams`, `StreamSource`, `FromSource`; `Config`, with `AllowDumb` and `IgnoreCI`, `Decide` → `Decision` with `Target`s and a `Reason` token; `ColorProfile` and `GlyphTier`, its helpers; `Run[M]` with `WithRegistry`, `WithRestorer`, `OnStart`, `WithProgramOptions`, `WithFilter`, `WithoutEpilogue`, `WithEpilogueWriter`; `ErrNotStarted`, `ErrCrashed`; `Frame`; `ExitCode`, `ExitError`; `Restorer` |
 | `launch/launchtest` | `Terminal` (a fake terminal stream with a size and typed keys), `Pipe`, `Streams`, `Env` |
 | `palette` | `Picker`, from `NewPicker(ws)` with `WithLimit`, `WithGrouping`, `WithPlaceholder`, `WithLogger`, `WithGOOS`, `WithRecents` and `WithoutInput`: an overlay pane that streams hits from its providers off the event loop, ranks them with `fuzzy`, asks for a hit's arguments, and runs it on the loop; `Register`, `Open` with `WithID`, `WithAnchor` and `WithSize`, `OpenCommand`, `DefaultRules`, `CompletionRules`, the command IDs `OpenID` to `CompleteID` and `PickerScope`, `SetQuery` and `SelectedMsg`; `Provider` and its optional `Discoverer`, `Starter`, `Stopper`, `Prefixed`, `Debouncer` and `Opener`; `Search`, `Hit`, `Availability`, `Grouping`; the providers `FromRegistry`, `Static` with `Item`, `Panes`, `Files` with `FileOption`, `Walker`, `WalkerFunc`, `FSWalker`, `PathFilter` and `PathFilterFunc`, and `Recents`; `Frecency`, with `FrecencyOption`, its JSON form and `ErrRecentsVersion` |
+| `inline` | `Region`, from `NewRegion` with `WithMethod`, `WithSynchronized`, `WithReflow`, `WithoutCursorQuery`, `WithReportWait` and `WithHeight`: a component's live rows below the scrollback, an I/O-free engine (`Draw`, `Print`, `Commit`, `Clear`, `Resize`, `HandleInput`, `Timeout`, `HandleTimeout`, `SetHeight`, `Restore`) that rewrites a changed row from what it shares with the row before, by relative moves, and on a resize reads the cursor report to follow the terminal's re-wrap; `Reflow`; `Reader`, the host's input read only when asked, one read at a time, never closed ([0023-MADR](decisions/0023-MADR-line-mode-components.md) D3, A1) |
+| `inline/inlinetest` | `Screen`, from `NewScreen(columns, rows, method)`: a terminal's grid by grapheme cluster, with pending wrap, the moves and erases, DECTCEM and mode 2026, an answered cursor report, `Resize(columns, inline.Reflow)` and a scrollback; `Lines`, `Scrollback` and `Text`, the form a golden holds |
+| `ask` | `Question`, `Row`, `Answer`, `Response`; `Layout`, the question at a width, a pure function; `Asker`, from `NewAsker` with `WithMethod`, `WithGlyphs`, `WithRegion`, `WithReasonLimit`, `WithCatalog` and `WithRules`: the question as an I/O-free engine (`Resize`, `HandleInput`, `Timeout`, `HandleTimeout`, `Cancel`, `NextEvent`, `View`), its events `AskerEvent` and `AskerEventKind`; `Messages` and the `Msg…` IDs ([0023-MADR](decisions/0023-MADR-line-mode-components.md) D4, A2) |
+| `ask/asktea` | `Dialog`, from `NewDialog(ws, question)` with `WithID`, `WithAnchor`, `WithWidth` and `WithAsk`: the question in a modal overlay, drawn by the same `Asker`; `Open`; `AnsweredMsg`; `DefaultID` |
+| `internal/lineinput` | `Line`: one row of typed text by grapheme cluster, bounded in bytes, edited by a fixed set of keys, shown as a window around the cursor; `ask` reads a reason through it, and `lineedit` is to be built on it (0023-MADR A2) |
 | `internal/enum` | `Names`, an enum's tokens, on `uint8` or `int`, and `Bits`, a bit set's, on `uint8` or `uint16`, for an enum's `String`, `MarshalText` and `UnmarshalText`; `Name`, `Marshal` and `Unmarshal` over a bare table |
 | `internal/teamsg` | `Cmd`, the `tea.Cmd` that delivers one message |
 | `theme` | `Palette` for dark, light and unknown backgrounds; `LightDarkColor` and `ProfileColor`; `Styles`; `New(profile, background, glyphs)` with `WithPalette` and `WithPaletteFor`; `FromDark`; `Border(style)`; text forms for `Background` and `BorderStyle` |
@@ -91,9 +101,10 @@ below).
 | `tuitest` | `Golden` across {colour, no colour} × {UTF-8, ASCII} × widths; `Case.Profile` and `Case.Glyphs`; `Fits`; `Text` for a single file; `Annotate` |
 
 - **`layout` has no Charm import,** so its solver can serve any front end.
-- **The Charm-free cores** are `command`, `fuzzy`, `glyph`,
-  `internal/enum`, `internal/sanitize`, `keymap`, `layout`, `msgcat`,
-  `safetext`, `termcap`, `termkey`, `termsvc` and `when`: none links a Charm
+- **The Charm-free cores** are `ask`, `command`, `fuzzy`, `glyph`,
+  `inline`, `inline/inlinetest`, `internal/enum`, `internal/lineinput`,
+  `internal/sanitize`, `keymap`, `layout`, `msgcat`, `safetext`,
+  `termcap`, `termkey`, `termsvc` and `when`: none links a Charm
   module but `x/ansi`, so a line-mode CLI can use them without Bubble Tea
   ([0020-MADR](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
   D1, D11). `internal/conformance` checks their whole import closure, and
@@ -229,6 +240,10 @@ safetext/                   where a package renders
 termkey/                    keys and their decoder; its corpus golden is
                             replayed by internal/termevent's differential test
 msgcat/                     the message catalogue
+inline/ ask/                the line mode's live region and its question;
+                            ask's goldens under testdata/golden/
+inline/inlinetest/          a terminal's screen for tests
+ask/asktea/                 the question in a workspace overlay
 termcap/termcaptea/         the probe's Bubble Tea host
 termcap/termcaptest/        fake terminals for tests
 termsvc/termsvctea/         termsvc's Bubble Tea commands
@@ -241,6 +256,7 @@ launch/launchtest/          fake streams for a program's tests
 internal/enum/              enum names and text forms
 internal/teamsg/            the one-message command
 internal/sanitize/          the one sanitizer for untrusted display text
+internal/lineinput/         one row of typed text
 internal/limits/            the window clamp
 internal/cells/             the reused frame buffer, an ultraviolet importer
 internal/termevent/         pass-through events, the other ultraviolet importer

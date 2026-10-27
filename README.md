@@ -18,7 +18,7 @@ pattern, used by every program that needs it.
 
 ## Status
 
-- **The current release is `v2.2.0`,** at the module path
+- **The current release is `v2.3.0`,** at the module path
   `github.com/maccavelli/go-tui-lib/v2`
   ([0020-MADR](docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
   A4.1). `v2.0.0` follows `v1.13.0`, which a `v1` user keeps; `v1.13.0` follows
@@ -116,6 +116,14 @@ pattern, used by every program that needs it.
   palette's commands under its own keys. `msgcat` is the message catalogue
   the packages' text will come from
   ([0024-MADR](docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md)).
+- **A line-mode question, since `v2.3.0`.** `ask` asks a question inline,
+  below a CLI's scrollback: rows of answers, each chosen by one key, a
+  reason read after one, and the answer left in the scrollback in words.
+  It draws through `inline`, which redraws a component's live rows in
+  place and follows the terminal's re-wrap on a resize; both link no Charm
+  module but `x/ansi`. `ask/asktea` asks the same question in a workspace
+  overlay
+  ([0023-MADR](docs/decisions/0023-MADR-line-mode-components.md)).
 - **The stack is Charm v2:** `charm.land/bubbletea/v2`,
   `charm.land/lipgloss/v2` and `charm.land/bubbles/v2`, with
   `github.com/charmbracelet/colorprofile` and

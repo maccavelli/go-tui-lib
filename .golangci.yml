@@ -107,12 +107,14 @@ linters:
         charmfree:
           list-mode: lax
           files:
+            - "**/ask/*.go"
             - "**/command/*.go"
             - "**/fuzzy/*.go"
             - "**/glyph/*.go"
             - "**/inline/*.go"
             - "**/inline/inlinetest/*.go"
             - "**/internal/enum/*.go"
+            - "**/internal/lineinput/*.go"
             - "**/internal/sanitize/*.go"
             - "**/keymap/*.go"
             - "**/layout/*.go"

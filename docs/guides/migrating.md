@@ -7,6 +7,44 @@ needs a major version, at a new module path
 ([AGENTS.md, API conventions](../../AGENTS.md#api-conventions), rule 1).
 Up to `v0.12.0`, a deprecated name was removed in the next minor release.
 
+## Migrating to `v2.3.0`
+
+`v2.3.0` adds packages and a reply kind, removes or retypes nothing, and
+changes no default: `make apicheck` against `v2.2.0` reports 0
+incompatible changes
+([0023-PLAN-line-mode-components](../decisions/0023-PLAN-line-mode-components.md)
+Steps 1 and 2). A program on `v2.2.0` needs no change to build, and
+behaves as it did:
+
+```bash
+go get github.com/maccavelli/go-tui-lib/v2@v2.3.0
+```
+
+### Added
+
+- **`inline`,** the live rows below a line-mode CLI's scrollback:
+  `Region`, which draws and redraws them in place by relative moves and
+  follows the terminal's re-wrap on a resize, with `Reflow`, and `Reader`,
+  which reads the input only when asked and never closes it; the options
+  `WithMethod`, `WithSynchronized`, `WithReflow`, `WithoutCursorQuery`,
+  `WithReportWait` with `DefaultReportWait`, and `WithHeight`. It links no
+  Charm module but `x/ansi`.
+- **`inline/inlinetest`,** `Screen`, a terminal's screen for tests, by
+  grapheme cluster, with the three re-wrap kinds and a cursor report.
+- **`ask`,** a question asked inline (issue #7): `Question`, `Row`,
+  `Answer` and `Response`; `Layout`, the question laid out at a width; and
+  `Asker`, the question as an engine that does no I/O, with `AskerEvent`,
+  `AskerEventKind`, `Cancel` and `View`; the options `WithMethod`,
+  `WithGlyphs`, `WithRegion`, `WithReasonLimit` with `DefaultReasonLimit`,
+  `WithCatalog` and `WithRules`; its messages, `Messages`,
+  `MsgReasonPrompt`, `MsgReasonEcho` and `MsgCanceled`. It links no Charm
+  module but `x/ansi`.
+- **`ask/asktea`,** the same question in a workspace overlay: `Dialog`,
+  `AnsweredMsg`, `DefaultID`, and the options `WithID`, `WithAnchor`,
+  `WithWidth` and `WithAsk`.
+- **`termcap`:** `ReplyCursorPosition`, a cursor position report, with
+  `Reply.Row` and `Reply.Col`.
+
 ## Migrating to `v2.2.0`
 
 `v2.2.0` adds a package, options, helpers and exported names, removes or

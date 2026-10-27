@@ -926,6 +926,52 @@ step's code:
    `inline`'s own tests that draw on a `Screen` are external tests. Its
    closure stays the cores' and `x/ansi`.
 
+### A2 (2026-10-27): a line editor before `lineedit`, the host's cancel and region, the Asker's view, a word wider than a row, and the events' names
+
+*Status: accepted (2026-10-27),* the owner's answers to
+[0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
+Step 2's deviations D5 to D10, each "(Recommended)", found before that
+step's code:
+
+1. **`ask` and `pick` read a line through `internal/lineinput`** until
+   `lineedit` is built: one row of grapheme clusters under the width
+   method, bounded in bytes, with a fixed set of editing keys, drawn as a
+   window around the cursor. It is a core. D1's import column for `ask`
+   and `pick` reads `internal/lineinput` in place of `lineedit` until
+   [0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
+   Step 4, which builds `lineedit.Composer` on it and moves `ask` and
+   `pick` to the `Composer` with no exported change; D4's reason keys are
+   that fixed set until then, and the keymap's after.
+2. **D2's contract gains `Cancel()`:** the host ends the engine's wait, at
+   the end of its input or for a reason of its own, such as a request
+   withdrawn. `ask` and `pick` end canceled, their echo committed as for
+   the cancel key; `lineedit` sends `EditEOF`.
+3. **An Asker draws in the host's region,** `ask.WithRegion(*inline.Region)`,
+   which the host shares among its components and sets `inline`'s options
+   on; one engine draws a region at a time. Without it the Asker builds
+   `inline.NewRegion(inline.WithMethod(m))`.
+4. **`Asker.View(width int) (rows []string, row, col int)`** gives the
+   rows the Asker draws, and the cursor, at a width, without a change. The
+   line mode draws through it, and `ask/asktea`'s `Dialog`, the overlay's
+   pane, draws it at the overlay's width; the answer reaches the program
+   as `asktea.AnsweredMsg`.
+5. **A word wider than its whole row is broken at the width,** by
+   grapheme cluster, its pieces on rows of their own with the row's
+   continuation indent, as a terminal hard-wraps it; an answer too wide
+   for any row is on a row of its own, broken alike. Every word and answer
+   that fits a row stays whole. D4's "left whole" and D11's "never splits
+   an answer" read so, and `Layout` never writes a row wider than the
+   width.
+6. **Each engine's event is named for its engine,** since revive's
+   `exported` rule refuses a type that repeats its package's name, and
+   `ask.Event` is `keymap`'s: `ask.AskerEvent` and `AskerEventKind` in
+   place of D4's `AskEvent` and `AskEventKind`; `pick.ChooserEvent` and
+   `ChooserEventKind` in place of D5's `PickEvent` and `PickEventKind`;
+   `lineedit.ComposerEvent` and `ComposerEventKind` in place of D6's
+   `EditEvent` and `EditEventKind`. D2's examples read so. The kinds'
+   constants, such as `AskWrite` and `EditSubmit`, and `NextEvent` keep
+   their names.
+
 ## More Information
 
 * Issues of this repository: #7, #8, #9 and #10, each with gobble's

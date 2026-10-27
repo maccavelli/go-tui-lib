@@ -236,6 +236,23 @@ record that is not there.
 | A query's length | 256 clusters | `fuzzy.NewMatcher` | floor |
 | A boost's bound | one consecutive-match bonus | `fuzzy.Matcher.RankContext` | decided (0008-MADR-command-palette.md) |
 
+## ask and ask/asktea
+
+| Behaviour | Default | Control | Status |
+| :--- | :--- | :--- | :--- |
+| How text is measured | `ansi.WcWidth` | `ask.WithMethod` | built |
+| The glyphs, the prompt among them | Unicode | `ask.WithGlyphs` | built |
+| The region the question is drawn in | its own, measured as the question is | `ask.WithRegion` | built |
+| A reason's bound | 2048 bytes | `ask.WithReasonLimit`, `ask.DefaultReasonLimit` | built |
+| Its own words: the label before a reason, the reason's echo, a cancel's word | English | `ask.WithCatalog`, `ask.Messages` | built |
+| How the question's text and a reason are cleaned | `safetext.Line`, never less | `ask.WithRules` | built |
+| What cancels | the cancel answer's key, ctrl+c, and the host's `Cancel` | `ask.Question`, `ask.Asker.HandleInput` | decided (0023-MADR-line-mode-components.md D4) |
+| A reason's editing keys | a fixed set, not the keymap's, until `lineedit` | `ask.Asker.HandleInput` | decided (0023-MADR-line-mode-components.md A2) |
+| A word or an answer wider than its whole row | broken at the width | `ask.Layout` | decided (0023-MADR-line-mode-components.md A2) |
+| The overlay: its ID, place and width | `ask/asktea.DefaultID`, centred, the workspace's width | `ask/asktea.WithID`, `ask/asktea.WithAnchor`, `ask/asktea.WithWidth` | built |
+| The overlay's question: its method and glyphs | the workspace's | `ask/asktea.WithAsk` | built |
+| Esc in the overlay | closes it, the question canceled | `workspace.EscConsumer` | decided (0008-MADR-command-palette.md) |
+
 ## inline and inline/inlinetest
 
 | Behaviour | Default | Control | Status |

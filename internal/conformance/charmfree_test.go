@@ -16,12 +16,14 @@ import (
 // D11). A package joins in the commit that makes it clean, and leaves only
 // by a record.
 var cores = []string{
+	"ask",
 	"command",
 	"fuzzy",
 	"glyph",
 	"inline",
 	"inline/inlinetest",
 	"internal/enum",
+	"internal/lineinput",
 	"internal/sanitize",
 	"keymap",
 	"layout",
