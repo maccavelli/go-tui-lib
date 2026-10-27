@@ -972,6 +972,340 @@ step's code:
    constants, such as `AskWrite` and `EditSubmit`, and `NextEvent` keep
    their names.
 
+### A3 (2026-10-27): what the prior art and the standards say, for Steps 3 to 6
+
+*Status: accepted (2026-10-27),* with the owner's answers to Q8 to Q11
+below, each "(Recommended)". The owner asked, after `v2.3.0`:
+"proceed to step 3. do some research on the best, most idiomatic,
+compatible, standards adherent, and flexible way to implement these units
+of work and improve the grounding in facts and research to update the
+madr." Every fact below was read on 2026-10-27 from the primary source at
+the tag, commit or revision named; a fact read from source code names the
+file. The two that decide the most, CommonMark's setext rule and fzf's
+default keys, were read a second time, verbatim, from the published page.
+The repository's own facts were read at `699ecb4`.
+
+#### A3.1 The picker (D5, issue #8)
+
+**This repository.**
+
+* `fuzzy.Matcher.Rank` "scores items by key and returns the best limit,
+  best first, stable on ties", and "an empty query … matches every
+  candidate with the zero Score": so an empty query keeps the input order
+  with no code of its own (`go doc ./fuzzy`).
+* `fuzzy.Index` "is lossy on purpose", and `Candidates` yields "at most
+  the maximum", `DefaultMaxCandidates`, 2000; a candidate that equals the
+  query, or whose word or path element starts with it, is yielded first.
+* `palette`'s engine keeps hits "by score, then by arrival"
+  (`palette/engine.go:446-456`), keeps at most its limit, 200 by default,
+  and keeps one hit per `ID` (`:420-444`). One provider that yields its
+  entries in order is therefore ranked as `Rank` ranks them, through the
+  first 200, when the IDs are distinct.
+* `palette.Static` is the template for `FromEntries`: `Search` scores
+  `Text` with the shared matcher, `Discover` lists every item, first best,
+  so they keep their order (`palette/static.go:38-61`).
+* The palette draws a row as `glyph.Set.Focus` on the selected row, spaces
+  on the others, the text cut to fit, and the hint right-aligned; the hint
+  is dropped when it would leave the text fewer than 8 cells (`minText`,
+  `palette/view.go:16-18`, `:80-149`). Its count reads "3 of 40", or "no
+  results" (`:201-238`).
+* `palette.DefaultRules` binds, in `kind:picker`, up and ctrl+p, down and
+  ctrl+n, pgup, pgdown, enter and tab; esc stays the workspace's; "None is
+  ctrl+c, which is the program's" (`palette/keys.go:45-72`).
+* `keymap.Dispatcher` is "a state machine driven by Key and Expire, with
+  no goroutine and no clock"; an `Outcome`'s `Wait` is what the host times
+  (`go doc ./keymap Dispatcher`, `Outcome`). An engine can fold that wait
+  into its own `Timeout`.
+
+**Prior art,** each at its latest tag: fzf v0.74.5, gum v2.0.2, huh
+v2.0.3, promptkit v0.12.0, inquire v0.9.4, survey v2.3.7 (archived: "This
+project is no longer maintained").
+
+* **fzf draws inline below the cursor** with `--height`: "Display fzf
+  window below the cursor with the given height instead of using the full
+  screen" (`man/man1/fzf.1`). It takes the alternate screen only when full
+  screen (`src/tui/light.go`, `Init`), makes room with line feeds and moves
+  back by relative moves, wraps each frame in mode 2026, queries the cursor
+  (`CSI 6 n`) only for its starting column and the mouse, and on a resize
+  clears its rows and draws again (`src/terminal.go`, `fullRedraw`). On
+  exit it erases its rows and prints the choice to stdout.
+* **Layout.** `--layout`: "default: Display from the bottom of the
+  screen; reverse: Display from the top of the screen; reverse-list:
+  Display from the top of the screen, prompt at the bottom" (man page,
+  read twice). Its README's inline example, and its shell bindings, use
+  `--height … --layout reverse`: the query on top, the list below.
+* **Keys.** fzf: up "ctrl-k up", down "ctrl-j down", page-up "pgup",
+  page-down "pgdn", accept "enter double-click", abort "ctrl-c ctrl-g
+  ctrl-q esc" (man page, AVAILABLE ACTIONS, read twice); ctrl-n and ctrl-p
+  are `down-match` and `up-match`, the same as down and up unless raw mode
+  is on (`src/terminal.go`, `defaultKeymap`). gum filter: down "down
+  ctrl+j ctrl+n", up "up ctrl+k ctrl+p", esc quits, ctrl+c aborts, enter
+  and ctrl+q submit. huh: up "up k ctrl+k ctrl+p", down "down j ctrl+j
+  ctrl+n", j and k ignored while filtering. inquire: Up or Ctrl-P, Down or
+  Ctrl-N, PageUp, PageDown, Home, End; Enter or Ctrl-J submits; Esc,
+  Ctrl-G or Ctrl-D cancel, Ctrl-C interrupts. The keys every one of them
+  shares are up, down, ctrl+p, ctrl+n, pgup, pgdown, enter, esc and
+  ctrl+c; ctrl+j (down in fzf, gum and huh, submit in inquire) and ctrl+q
+  (abort in fzf, submit in gum) disagree.
+* **Height.** gum choose `--height` 10; huh `defaultHeight = 10`; fzf
+  `--min-height` 10; survey and inquire a page of 7.
+* **Order.** fzf's empty query keeps the input order (`src/matcher.go`,
+  `passMerger`), and its ties break by length, then index ("Default is
+  length (or equivalently length,index)"). inquire sorts with
+  `sort_unstable_by_key`, so its ties are not in input order.
+* **Fields shown but not matched:** fzf's `--nth` limits the search
+  scope, "because fzf doesn't allow searching against the hidden fields":
+  D5's `Detail`.
+* **What is left after the answer.** fzf and gum leave nothing and print
+  to stdout; survey leaves "? <message> <answer>"; promptkit's result
+  template is the prompt and the choice; inquire leaves its prefix, the
+  prompt and the answer, and "<canceled>" on a cancel.
+* **Cancel and interrupt.** fzf exits 130 for both ctrl-c and esc; gum
+  130 for ctrl+c and 1 for esc; inquire reports `OperationCanceled` and
+  `OperationInterrupted` apart.
+* **Scrolling.** fzf: "Number of screen lines to keep above or below when
+  scrolling to the top or to the bottom (default: 3)", capped at half the
+  height (`constrain`). The palette keeps the selected row on the screen,
+  with no margin (`palette/picker.go:451-466`).
+* **Large lists.** fzf stores items in chunks of 1024, scans them on
+  every CPU, abandons a scan when the query changes, and caches each
+  chunk's result for the next, longer query (`src/constants.go`,
+  `matcher.go`, `cache.go`). None of the tools states a size at which an
+  index pays: a threshold here is this repository's own number.
+* **Colour never carries the selection alone.** WCAG 2.2 SC 1.4.1
+  (Recommendation, 2024-12-12): "Color is not used as the only visual
+  means of conveying information, indicating an action, prompting a
+  response, or distinguishing a visual element." Every tool above draws
+  a pointer glyph on the selected row: fzf `▌` or `>`, gum `•`, survey
+  `>`, promptkit `▸`, inquire `>`. no-color.org: `NO_COLOR` "prevents the
+  addition of ANSI color", and does not turn off bold or underline.
+* **A prompt is never required:** "Only use prompts or interactive
+  elements if stdin is an interactive terminal" and "Never require a
+  prompt" (clig.dev); fzf's `--filter` is its non-interactive mode. Which
+  mode to run is the host's, as D10 says.
+
+#### A3.2 The composer (D6, issue #9)
+
+* **GNU Readline 8.3's emacs keys** (its user manual): C-a, C-e, C-f,
+  C-b; M-f and M-b, where "Words are composed of letters and digits"; M-d
+  and M-DEL by the same words; C-w, unix-word-rubout, "using white space
+  as a word boundary"; C-k, C-u, C-d; C-p and C-n; C-t; C-l; undo "C-_ or
+  C-x C-u", "separately remembered for each line"; C-y and M-y on a kill
+  ring. golang.org/x/term v0.47.0's `Terminal` binds a subset (^A ^B ^E ^F
+  ^H ^K ^L ^T ^W ^N ^P ^U ^D), with no undo and no kill ring.
+* **Words.** UAX #29 (Unicode 18.0.0, revision 49, 2026-09-01) names
+  "cursor movement ('move to next word' control-arrow keys)" among its
+  uses, and lets implementations "tailor" it; zsh's `WORDCHARS` and
+  PSReadLine's `WordDelimiters` each tailor a word by a character set.
+  Readline's "letters and digits" is the tailoring a standard-library
+  test of a cluster's first rune (`unicode.IsLetter`, `unicode.IsDigit`)
+  implements, with no module beyond the root's; a UAX #29 segmenter would
+  be a module of its own (`github.com/clipperhouse/uax29/v2`, which
+  `x/ansi` requires, is not on the root's list).
+* **Bracketed paste** (xterm ctlseqs, patch #411, 2026-08-23): `CSI 2 0 0
+  ~`, the text, `CSI 2 0 1 ~`. xterm's own note: "The terminating marker
+  might be embedded in the pasted text"; KDE bug 392554 and oss-security
+  (2023-10-19) show the end marker injected where a terminal did not
+  filter it, and a 2025 suckless thread reports st still unfiltered.
+  Readline's bracketed paste inserts each character "as if each one was
+  bound to self-insert"; x/term returns `ErrPasteIndicator` so a program
+  "may wish to interpret pasted data more literally". The application
+  cleans the paste itself, whatever the terminal does.
+* **Shift+Enter.** Under the Kitty protocol's flag 1 a modified Enter is
+  `CSI 13 ; 2 u` (kitty `key_encoding.c`, master 4f7dea34); in the legacy
+  encoding Enter and Shift+Enter are both `0x0d`, and Alt+Enter is `ESC
+  CR`. A newline key that every terminal can send is needed beside
+  Shift+Enter: alt+enter, as fish binds it, or a trailing `\`, which D6
+  has.
+* **History.** x/term v0.47.0's `History`: `Add(entry string)`, "a new,
+  most recent entry", "It is allowed to drop any entry, including the
+  entry being added"; `Len() int`; `At(idx int) string`, "Index 0 is the
+  most-recently added entry and index Len()-1 is the least-recently added
+  entry. If index is < 0 or >= Len(), it panics." D6's interface is that
+  shape. Bounds elsewhere: x/term 100, linenoise 100, bash's `HISTSIZE`
+  500, PSReadLine 4096 (its `Cmdlets.cs`); duplicates: bash's
+  `ignoredups`, zsh's `HIST_IGNORE_DUPS` and linenoise drop a line equal
+  to the previous one. fish writes an entry's newlines as `\n` and its
+  backslashes as `\\` (`src/history/yaml_backend.rs`): D6's `MemHistory`
+  file form.
+* **Undo and a kill ring** are Readline's, zsh's (a ring of eight), fish's
+  and PSReadLine's (ten), and not x/term's: D6 leaving them out has
+  precedent.
+
+#### A3.3 The streamed reply and the transcript (D7 to D9, issue #10)
+
+* **CommonMark 0.31.2 (2024-01-28)** decides some lines by a later one:
+  * §4.3: "A setext heading consists of one or more lines of text, not
+    interrupted by a blank line, … followed by a setext heading
+    underline"; example 95, `Foo`, `Bar`, `---`, is `<h2>Foo\nBar</h2>`
+    (read twice, verbatim). §4.1: where a line of dashes could be a
+    thematic break or an underline, "the interpretation as a setext
+    heading takes precedence". "The setext heading underline cannot be a
+    lazy continuation line in a list item or block quote" (examples 93,
+    94).
+  * §4.7: "Link reference definitions can come either before or after the
+    links that use them."
+  * §5.3: "A list is loose if any of its constituent list items are
+    separated by blank lines": known only after the items.
+  * The appendix's parsing strategy has two phases, the blocks and then
+    the inlines, "Once all of the input has been parsed"; emphasis (example
+    405) and code spans (example 337) may cross a line.
+  * What is known on its own line: a fence's opening and its close, "of
+    the same type as the code block began with … and with at least as many
+    backticks or tildes" (§4.5); an unclosed fence runs to the end; an
+    indented code block "cannot interrupt a paragraph" (§4.4); a lazy
+    continuation line is read by looking back at the open paragraph
+    (§5.1, example 233); an HTML block's start (§4.6).
+* **GFM 0.29-gfm (2019-04-06) §4.10:** a table is "a single header row, a
+  delimiter row separating the header from the data, and zero or more data
+  rows"; "The header row must match the delimiter row in the number of
+  cells. If not, a table will not be recognized"; "The table is broken at
+  the first empty line, or beginning of another block-level structure"; a
+  row of fewer cells is padded and a longer one cut. A header is known
+  only when the second line arrives; cmark-gfm 0.29.0.gfm.13
+  (`extensions/table.c`) takes the delimiter row only while a paragraph is
+  open.
+* **Prior art.** Codex CLI rust-v0.164.0: `MarkdownStreamCollector`
+  "exposes a commit boundary at each newline", and a table's header "no
+  delimiter row has followed yet. Hold back" (`codex-rs/tui/src/
+  markdown_stream.rs`, `streaming/table_holdback.rs`), with a re-rendered
+  tail. aider v0.86.0 re-renders the last six lines and prints the lines
+  above once (`aider/mdstream.py`). gemini-cli v0.65.0 splits at the last
+  blank line outside a fence (`utils/markdownUtilities.ts`). Streamdown
+  v0.36.9 holds one chunk and rewrites it as a heading when an underline
+  follows (`streamdown/sdlib.py`). mods v1.8.1 (archived) re-renders the
+  whole reply on each chunk. None prints a setext heading's text before it
+  knows the next line, except by re-rendering it.
+* **The reprint.** xterm ctlseqs: "CSI Ps J … Ps = 3 ⇒ Erase Saved
+  Lines". VTE and Windows Terminal v1.25.2733.0 move the page into the
+  scrollback on `CSI 2 J` (`vteseq.cc`, `adaptDispatch.cpp`), so `CSI 2 J`
+  comes before `CSI 3 J`, as D9 orders them. kitty v0.49.2 implements `CSI
+  3 J` but leaves `E3` out of its terminfo on purpose; iTerm2 may ask the
+  user before it clears. Codex resets with `CSI r`, `SGR 0`, `CSI H`,
+  `CSI 2 J`, `CSI 3 J`, `CSI H`, after 75 ms of quiet; gemini-cli after
+  100 ms. The synchronized-output spec (contour vt-extensions, 05050a1):
+  `CSI ? 2026 h` and `l`, detected by DECRQM `CSI ? 2026 $ p`.
+* **OSC 8** (the specification gist, 2026-10-20): `OSC 8 ; params ; URI
+  ST`; "Simple utilities that 'just' print stuff on their standard output
+  should not assign an id."
+* **UAX #14** (revision 57, 2026-09-01) §3.1: "Western: spaces and hyphens
+  are used to determine breaks; East Asian: lines can break anywhere,
+  unless prohibited; South East Asian: line breaks require morphological
+  analysis." Breaking at spaces alone, as gobble's 0028-MADR does, leaves
+  a run of CJK or Thai text one word.
+
+#### A3.4 What changes
+
+For Step 3, by the owner's answers to Q8 and Q9 below:
+
+1. **The layout is fzf's reverse layout:** the query row first, the prompt
+   (`WithPrompt`, `glyph.Set.Prompt` by default) before it and the count
+   right-aligned after it, dropped when it would leave the query fewer
+   than 8 cells; then the rows, each the palette's: `glyph.Set.Focus` on
+   the selected row, the `Text` cut to fit, the `Detail` right-aligned,
+   dropped below 8 cells of text. The list is as tall as `WithHeight`
+   rows, or the entries when fewer, for the whole question, so the region
+   does not change height as the query narrows.
+2. **The default height is 10 rows** (Q8), fewer when there are fewer
+   entries, `WithHeight` to change it.
+3. **The keys are commands in the program's keymap** (Q9):
+   `pick.DefaultRules()` binds `pick.select.prev` to up and ctrl+p,
+   `pick.select.next` to down and ctrl+n, `pick.page.prev` and
+   `pick.page.next` to pgup and pgdown, `pick.accept` to enter, and
+   `pick.cancel` to esc and ctrl+g, in `kind:chooser`. Esc and ctrl+g
+   cancel, as in fzf and inquire, and the host's `Cancel` (A2 item 2)
+   does too; ctrl+c cancels outside the keymap, as in `ask`, since the
+   palette's bindings leave it "the program's"; ctrl+j and ctrl+q are left
+   unbound, since the tools disagree on them. The query is edited by `internal/lineinput`'s fixed keys (A2 item
+   1), its bound 1024 bytes, room for `fuzzy.MaxQuery` clusters of one
+   four-byte rune each.
+4. **The order is the matcher's:** `Rank`, its grade, its value, then the
+   input order; fzf's length tie-break is not taken, so `pick` and the
+   palette order one list alike. An empty query keeps the input order. The
+   selection returns to the first row when the query changes, as in fzf
+   and the palette, and the window keeps it on the screen, as the
+   palette's does.
+5. **An index above 5000 entries,** `palette.DefaultIndexAbove`, this
+   repository's number; Step 3 measures a keystroke at 5000 and at 100,000
+   entries and records it. Under the index the count is of the hits it
+   yields; when that is `fuzzy.DefaultMaxCandidates`, the count says so
+   ("40 of 2000+").
+6. **One line is left in the scrollback,** as #8 asks and the prompt
+   libraries do: the prompt and the chosen entry's `Text`, or the prompt
+   and the catalogue's word for a cancel. `ChooserEvent` carries the
+   `Entry` or `Canceled`, as `ask.Response` does.
+7. **No match is highlighted in Step 3.** D5 underlines matched cells
+   "when the host's Markup styles", and `stream.Markup` is Step 5's: the
+   selected row is marked by its glyph, never by colour alone. Step 5
+   adds `pick.WithMarkup`.
+8. **`FromEntries` is `Static`'s form over `pick.Entry`:** `Search` scores
+   `Text` alone, `Discover` lists the entries in order, each hit's `Hint`
+   the entry's `Detail` and `Run` nil, so accepting sends `SelectedMsg`.
+   The equal ranking D5 promises is for one provider, distinct IDs, and
+   the palette's limit: the first 200 hits.
+
+For Steps 4 to 6, refinements the evidence decides, and the questions that
+remain, each put to the owner before its step:
+
+9. **`lineedit`'s words:** alt+f, alt+b, alt+d and alt+backspace move and
+   delete by Readline's words, letters and digits by a cluster's first
+   rune; ctrl+w deletes to whitespace, as Readline's unix-word-rubout and
+   x/term do. gobble's space-delimited words become ctrl+w's alone.
+10. **`lineedit`'s newline:** alt+enter inserts one, beside Shift+Enter
+    where `termkey` reads it and the trailing `\`.
+11. **`lineedit`'s paste** is inserted as typed text, cleaned by
+    `safetext` with newlines and tabs kept, whatever the terminal filtered;
+    a completion never runs on it.
+12. **`MemHistory`** keeps D6's bound, 1000, drops a line equal to the
+    previous one and an empty one, and writes fish's escapes, which are
+    gobble's.
+13. **The `Printer` holds a paragraph line until the next line** (Q10),
+    or the end: an underline after it makes it a heading, and a delimiter
+    row a table's header, each drawn as what it is.
+14. **The `Printer`'s inline constructs** resolve over the paragraph's
+    lines received so far; a delimiter still open when its line prints is
+    printed as it is, and no printed line is styled again; a reference
+    link is styled only when its definition came first.
+15. **The reprint** writes `SGR 0` first, then D9's sequence, `CSI 2 J`
+    before `CSI 3 J`. Whether it clears the scrollback by default, as
+    D13 has it with `WithoutScrollbackClear`, stays so (Q11): API rule
+    12's third clause lets a new terminal write be on where its record says
+    why, and D9's reason, a reprint that lines up, is this record's; kitty
+    and iTerm2 handle `CSI 3 J` each their own way, which the transcript's
+    documentation says.
+16. **Wrapping at spaces** stays D7's and gobble's, and its limit is
+    stated: a run of CJK or Thai text is one word (UAX #14 §3.1), which
+    the terminal wraps.
+
+#### A3.5 Owner questions
+
+*Answered 2026-10-27,* each picked from its options: Q8 "10 rows
+(Recommended)"; Q9 "pick's own keymap commands (Recommended)"; Q10 "Hold
+one line (Recommended)"; Q11 "On, WithoutScrollbackClear (Recommended)".
+
+* **Q8. The picker's height.** Recommended: 10 rows, gum's and huh's,
+  capped by the terminal. The alternative is D5's 8, or 7, survey's and
+  inquire's page.
+* **Q9. The picker's keys.** Recommended: commands in the program's one
+  keymap, as Q4 decided for the composer: `pick.DefaultRules()` binds
+  `pick.select.next`, `pick.select.prev`, `pick.page.next`,
+  `pick.page.prev`, `pick.accept` and `pick.cancel` in the scope
+  `kind:chooser`, to the keys A3.4 item 3 names, and `WithKeymap` takes
+  the program's keymap, a user's file rebinding them; without it the
+  chooser builds its defaults alone. The alternatives are the palette's
+  command IDs and scope reused, so one binding moves both pickers but
+  `pick`'s commands carry `palette`'s names; or a fixed set of keys, a
+  `decided` row, as `ask`'s are.
+* **Q10. The `Printer`'s paragraph lines** (before Step 5). Recommended:
+  each held until the next line, or the end, so a setext heading and a
+  table's header are drawn as what they are, at the cost of one line of
+  latency in prose. The alternative is gobble's: each printed as it
+  completes, an underline drawn as a dim line, a heading's text unstyled.
+* **Q11. The reprint's scrollback clear** (before Step 6). Recommended:
+  D13 as accepted, on by default with `WithoutScrollbackClear`, the
+  record's reason a reprint that lines up. The alternative is off until
+  `WithScrollbackClear`.
+
 ## More Information
 
 * Issues of this repository: #7, #8, #9 and #10, each with gobble's

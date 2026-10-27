@@ -38,7 +38,7 @@ code's at `5fb6928`; a step that relies on one cites it.
 | :--- | :--- | :--- | :--- |
 | 1 | `inline/`, `inline/inlinetest/`, `termcap/reply.go`, conformance | the live region, the reader, the test screen, `ReplyCursorPosition` | |
 | 2 | `ask/`, `ask/asktea/` | the question, and its overlay | the next minor |
-| 3 | `pick/`, `palette/entries.go` | the picker, and `palette.FromEntries` | the next minor |
+| 3 | `pick/`, `palette/entries.go`, conformance | the picker, and `palette.FromEntries` (A3) | the next minor |
 | 4 | `lineedit/`, `lineedit/lineedittea/` | the composer, and its pane | the next minor |
 | 5 | `stream/`, `stream/streamtea/`, `docs/decisions/0009-*` | the Charm-free core, `Printer`, `Markup`; 0009's amendment | |
 | 6 | `transcript/` | the bounded, reprintable conversation | the next minor |
@@ -135,18 +135,145 @@ English defaults, through `msgcat`.
 
 ### Step 3: `pick` and `palette.FromEntries` (issue #8), and a release
 
-* `pick`: `Entry`, `Chooser`, `PickEvent`, `PickEventKind`, as 0023-MADR
-  D5; ranking by `fuzzy`, with an index above `WithIndexAbove`.
-* `palette.FromEntries(name string, entries []pick.Entry) Provider`, as
-  D5 amended by Q5: `Detail` in the hint slot, no `Run`, `SelectedMsg` on
-  accept, the entries in order for an empty query.
-* **Tests:** typing filters and ranks as `fuzzy.Rank` does; up, down, page
-  up and page down; enter chooses and commits one line; esc cancels; the
-  index's best hits equal the full scan's; the same entries ranked alike
-  by the `Chooser` and by `FromEntries` for each query of a fixture.
-* **Mutations:** the index is never built; enter commits the query, not
-  the entry; `FromEntries` matches `Detail`.
-* **The release,** under rule 4.
+*Amended 2026-10-27, before the step began, to ground it on 0023-MADR A3.
+As first written, the step named `PickEvent` and `PickEventKind`
+(renamed by A2 item 6), the keys up, down, page up, page down, enter and
+esc, and three mutations; it said nothing of the layout, the count, the
+height, the line left in the scrollback, the index's count, the
+messages, the rules or the region.*
+
+**Before any code.**
+
+1. *Done 2026-10-27:* the owner answered A3's Q8 to Q11, each
+   "(Recommended)", and A3 is accepted: the height is 10 rows, and the
+   keys are `pick`'s own commands in the program's keymap.
+2. A3.1's facts about this repository are re-read at the tree the step
+   starts on: `go doc ./fuzzy` (`Rank`, `NewMatcher`, `Index`,
+   `Candidates`, `DefaultMaxCandidates`), `palette/engine.go`'s `before`
+   and `insert`, `palette/static.go`, `palette/view.go`'s `minText` and
+   `drawRow`, `palette/keys.go`, and `go doc ./keymap Dispatcher`. A
+   change is a deviation, raised before code.
+3. `python3 -m tools.verify names` over `pick`'s types (`Entry`,
+   `Chooser`, `ChooserEvent`, `ChooserEventKind`, `Option`) reports clean.
+
+**`pick/`, a core** (`inline`, `internal/lineinput`, `fuzzy`, `glyph`,
+`keymap`, `msgcat`, `safetext`, `termkey`, `internal/enum`,
+`internal/sanitize`; `x/ansi`):
+
+| File | Holds |
+| :--- | :--- |
+| `doc.go` | the package documentation: the layout, the keys, the host loop, the line left behind; its stability line |
+| `entry.go` | `Entry{ID, Text, Detail}`: `Text` matched and drawn, `Detail` drawn and not matched; IDs the caller's, distinct where `palette.FromEntries` takes the same list |
+| `event.go` | `ChooserEventKind`, `PickNone`, `PickWrite`, `PickDone`, tokens `none`, `write`, `done`, from `internal/enum`; `ChooserEvent{Kind, Data, Entry, Canceled}` |
+| `options.go` | `Option`, opaque; `WithHeight` and `DefaultHeight` (Q8), `WithPrompt`, `WithQuery`, `WithMethod`, `WithGlyphs`, `WithIndexAbove` and `DefaultIndexAbove` (5000), `WithRegion`, `WithCatalog`, `WithRules`, and, by Q9, `WithKeymap` |
+| `keys.go` | by Q9: `SelectNextID`, `SelectPrevID`, `PageNextID`, `PagePrevID`, `AcceptID`, `CancelID`, `ChooserScope` (`kind:chooser`) and `DefaultRules()` |
+| `messages.go` | `MsgCount` (`%[1]d of %[2]d`), `MsgCountMore` (`%[1]d of %[2]d+`), `MsgNoResults` (`no results`), `MsgCanceled` (`cancel`); `Messages()` |
+| `chooser.go` | `NewChooser(entries, …)`, `Resize`, `HandleInput`, `Timeout`, `HandleTimeout`, `Cancel`, `NextEvent` |
+
+**What the `Chooser` does,** each item proved by the test named after it:
+
+* **Cleaning:** each entry's `Text` and `Detail` is cleaned once, at
+  `NewChooser`, by `WithRules`' rules and then `internal/sanitize.Line`,
+  the floor; the `ChooserEvent` carries the caller's `Entry` as given
+  (`TestCleaned`, `TestRules`).
+* **The layout** (A3.4 item 1): the query row, `WithPrompt` (default
+  `glyph.Set.Prompt`), a space, the query's window from
+  `lineinput.Line.View`, and the count right-aligned, dropped when the
+  query would keep fewer than 8 cells; then `min(height, len(entries))`
+  rows, each `glyph.Set.Focus` on the selected row and its width in
+  spaces on the others, a space, the `Text` cut by
+  `internal/sanitize.Truncate` with `glyph.Set.Ellipsis`, and the `Detail`
+  right-aligned after at least one space, dropped when the `Text` would
+  keep fewer than 8 cells. Rows past the matches are blank. The cursor
+  is on the query row (`TestLayoutGolden`, `TestDetail`, `TestHeight`).
+* **Ranking** (A3.4 items 4, 5): each change of the query compiles one
+  `fuzzy.NewMatcher` and ranks with `Rank`, limit 0, over `Text`; above
+  `WithIndexAbove` entries the candidates come from one `fuzzy.Index`
+  built at `NewChooser`. The count is the selected row's place and the
+  matches', `MsgCountMore` when the index yielded
+  `fuzzy.DefaultMaxCandidates`, and `MsgNoResults` for none
+  (`TestRankLikeMatcher`, `TestEmptyQueryOrder`, `TestIndex`,
+  `TestCount`).
+* **Keys** (A3.4 item 3, Q9): through a `keymap.Dispatcher` over
+  `WithKeymap`'s keymap, or one built from `DefaultRules()` alone, on the
+  path `[ChooserScope]`: up and ctrl+p, down and ctrl+n, a row, clamped,
+  with no wrap; pgup and pgdown, a page of the visible rows; enter
+  accepts the selected entry; esc and ctrl+g cancel. A pending
+  sequence's `Wait` is folded into `Timeout`, and `HandleTimeout` gives
+  the dispatcher its `Expire`. ctrl+c cancels before the dispatcher, as
+  in `ask`. A key the dispatcher does not take goes to the query's
+  `lineinput.Line`, and a paste is inserted there. The query's bound is
+  1024 bytes. The selection returns to the first row when the query
+  changes, and the window keeps it on the screen (`TestMoves`,
+  `TestKeymap`, `TestCancel`, `TestQueryEdit`).
+* **The end** (A3.4 item 6): enter with a match commits one line, the
+  prompt, a space and the entry's cleaned `Text`, and sends `PickDone`
+  with the caller's `Entry`; enter with no match does nothing; a cancel
+  commits the prompt and `MsgCanceled`, and sends `PickDone` with
+  `Canceled`. Nothing is taken after (`TestAccept`, `TestAcceptNoMatch`,
+  `TestCancel`).
+* **The engine contract** (D2, A2 items 2, 3): `Resize` draws at once the
+  first time and through the region's cursor query after; the region is
+  `WithRegion`'s or its own, by `inline.NewRegion` and `WithMethod`'s
+  method; a cursor report awaited is the region's, never a key
+  (`TestResize`, `TestWithRegion`, `TestRow1Report`).
+* **Words:** every string through `WithCatalog` and `Messages`
+  (`TestCatalog`).
+
+**`palette/entries.go`:** `FromEntries(name string, entries []pick.Entry)
+Provider`, `Static`'s form: `Name` is name; `Search` scores each entry's
+`Text` with the search's matcher, in order; `Discover` lists every entry,
+first best; each hit is `Hit{ID, Text, Hint: Detail, Score}` with no
+`Run`, so accepting sends `SelectedMsg` (`TestFromEntries`,
+`TestFromEntriesRankedLikeChooser`: for each query of a fixture of 40
+entries with distinct IDs, the palette's hit IDs, through a picker on a
+workspace in a `synctest` bubble, equal the `Chooser`'s ranked IDs).
+
+**The gates and the docs:** `pick` joins `cores` and the `charmfree`
+files; `pick.ChooserEventKind` joins the enum table; the defaults guide
+gains a `pick` table, a row for each option, the keys (`built`, by Q9) and
+ctrl+c (`decided`, D4's rule kept), and a `palette` row for
+`FromEntries`; the glossary moves `Chooser`, `Entry`, `ChooserEvent` and
+`ChooserEventKind` to "Built".
+
+**Tests beyond those named above:**
+
+* `TestLayoutGolden` on `inlinetest.Screen`, across the matrix at 60 and
+  100, each line within its width under the method: a models list of 40
+  entries with context and prices in `Detail`, and a sessions list by
+  title and time, each with an empty query, `son`, a query with no
+  match, and the index on (`WithIndexAbove(10)`): two lists, four
+  queries and the matrix's eight cases, 64 files, read before they are
+  kept.
+* `FuzzChooser`: any key, paste and resize stream never panics, no drawn
+  row is wider than the width but a row of one cluster wider than it, and
+  the selection is always a drawn row.
+* `BenchmarkKeystroke`, one typed key and its drawing, at 5000 entries,
+  a full scan, and at 100,000, through the index; its figures are recorded
+  in the execution record, as the baseline Step 7's guide cites.
+
+**Mutations,** each killed by a named test, its failure quoted in the
+record: the index is never built (`TestIndex`); enter commits the query,
+not the entry (`TestAccept`); `FromEntries` matches `Detail`
+(`TestFromEntries`); the `Chooser` matches `Detail` (`TestDetail`); ties
+broken by length, not input order (`TestRankLikeMatcher`); the selection
+kept on a query change (`TestMoves`); esc does not cancel (`TestCancel`);
+`WithKeymap` ignored (`TestKeymap`); the count ignores the index's cap
+(`TestCount`); the list's height follows the matches (`TestHeight`);
+`WithRules` replaces the floor (`TestRules`); `pick` imports Bubble Tea
+(`TestCoresAreCharmFree`).
+
+**The release, `v2.4.0`,** under rule 4: the API listed by `make
+apicheck` against `v2.3.0`, 0 incompatible changes; "Migrating to
+`v2.4.0`", the README's Status and `docs/architecture.md`; the gates on
+macOS, Linux and Windows; the disclosure guard; the owner's push, CI, tag
+and the tag's CI; the consumer smoke test from the proxy in a scratch
+module, which picks from the models list on an `inlinetest.Screen`,
+types `son`, accepts, checks the `Entry` and the line left, lists the
+closure for Linux, macOS and Windows (`x/ansi` alone of Charm), and runs
+two negative controls, each seen failing: the program expecting another
+entry, and the closure check over a program that imports `palette`. Issue
+#8 is told, for the owner to close.
 
 ### Step 4: `lineedit` and `lineedit/lineedittea` (issue #9), and a release
 
@@ -173,6 +300,17 @@ English defaults, through `msgcat`.
 * **Mutations:** a word motion stops inside a cluster; up recalls history
   from a middle row; a duplicate is kept; a paste submits under
   `PasteInsert`; the external editor's event is sent without its option.
+* **By 0023-MADR A3 (items 9 to 12),** added 2026-10-27: alt+f, alt+b,
+  alt+d and alt+backspace by Readline's words, a cluster's first rune a
+  letter or a digit (`TestWords`, with `can't`, `32.3`, a CJK run and an
+  accented word), and ctrl+w to whitespace (`TestCtrlW`); alt+enter
+  inserts a newline, beside Shift+Enter and the trailing `\`
+  (`TestNewline`); a paste is cleaned by `safetext` with newlines and
+  tabs kept, an `ESC [ 2 0 1 ~` inside its text removed, and no
+  completion run on it (`TestPaste`); `MemHistory` drops a line equal to
+  the previous one and an empty one, and writes `\n` and `\\`
+  (`TestMemHistory`, `FuzzMemHistory`). The `History` interface's methods
+  and their doc are x/term v0.47.0's, quoted in A3.2.
 * **The release,** under rule 4.
 
 ### Step 5: `stream`'s core, `Printer` and `Markup`
@@ -195,6 +333,17 @@ English defaults, through `msgcat`.
   dropped by the styler; a row starting with a word that opens a block;
   the output depends on the split.
 
+* **By 0023-MADR A3 (items 7, 13, 14, 16),** added 2026-10-27: the
+  owner answered Q10 "Hold one line (Recommended)": the `Printer` holds a
+  paragraph line until the next line or the end, tested on every example of CommonMark 0.31.2 §4.3 (setext
+  headings) and of GFM 0.29-gfm §4.10 (tables), their numbers read from
+  the specifications at the step's start; an inline delimiter still open when
+  its line prints is printed as it is, and no printed line is styled
+  again (`TestInlineOpen`); a reference link is styled only when its
+  definition came first (`TestReferenceLater`); a CJK run is one word,
+  left whole (`TestWrapCJK`, the limit UAX #14 §3.1 names). `pick` gains
+  `WithMarkup`, its matched cells underlined, and a golden of it.
+
 ### Step 6: `transcript` (issue #10), and a release
 
 * `transcript`: `Transcript` and its options, as 0023-MADR D9, with
@@ -206,6 +355,10 @@ English defaults, through `msgcat`.
   time recorded beside gobble's (0030-MADR).
 * **Mutations:** the bound keeps the oldest; the reprint does not wait to
   settle; the notice is written when nothing was cut.
+* **By 0023-MADR A3 (item 15),** added 2026-10-27: the owner answered
+  Q11 "On, WithoutScrollbackClear (Recommended)", D13 as accepted; the
+  reprint writes `SGR 0` first, and `CSI 2 J` before `CSI
+  3 J` (`TestReprintOrder`).
 * **The release,** under rule 4; issue #10 told.
 
 ### Step 7: documentation and the close-out
@@ -222,6 +375,9 @@ English defaults, through `msgcat`.
 ## Verification
 
 * Every step's mutations are killed, each failure quoted in the record.
+* Each step from 3 re-reads, at the tree it starts on, the repository
+  facts 0023-MADR A3 cites for it, and records a change as a deviation
+  before any code.
 * `python3 -m tools.verify gates` passes on macOS, Linux and Windows for
   every step.
 * `TestCoresAreCharmFree` passes with `inline`, `inlinetest`, `ask`,
