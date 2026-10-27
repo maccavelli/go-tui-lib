@@ -1,6 +1,6 @@
 ---
-status: in-progress
-date: 2026-10-26
+status: complete
+date: 2026-10-27
 associated-madr: "0024-MADR-opt-in-and-opt-out-coverage.md"
 ---
 # Implement API rule 12, its floors, the message catalogue and the defaults inventory, and close the command-and-control gaps
@@ -832,3 +832,80 @@ deviation.
   tag `v2.2.0` and CI green on it; the consumer smoke test, with a
   negative control; and this PLAN `complete`, with its `docs/README.md`
   row and the MADR's More Information.
+
+#### The release and the close-out
+
+*2026-10-27.*
+
+* **The release.** The owner committed this step as `6084bb3`. The guard
+  passed over the 10 outgoing commits, `08129ea` to `6084bb3` against
+  `65d437b`, exit 0, with no finding, and `main` was not behind
+  `origin/main` after a fetch. The owner pushed `main`: Docs passed (run
+  `40449913515`), and CI passed on `6084bb3` (run `40449913520`:
+  `modules`, `gates`, and `test` on `macos-15`, `ubuntu-24.04` and
+  `windows-2025`). The owner then tagged `6084bb3` and pushed the tag:
+  * `git ls-remote` shows `refs/tags/v2.2.0`, an annotated tag
+    (`600fa01`), peeled to `6084bb3`;
+  * `proxy.golang.org` serves `v2.2.0` for
+    `github.com/maccavelli/go-tui-lib/v2`, and its `.info` names
+    `refs/tags/v2.2.0` at `6084bb3`;
+  * CI on the tag: passed (run `40511877828`: `modules`, `gates`, and
+    `test` on `macos-15`, `ubuntu-24.04` and `windows-2025`).
+* **The consumer smoke test,** `releasing.md`'s procedure, in a scratch
+  module outside the repository, with `GOPROXY` the default
+  `https://proxy.golang.org,direct`: `go get
+  github.com/maccavelli/go-tui-lib/v2@v2.2.0`, `go mod tidy`, an empty `go
+  env GOWORK`, the requirement `github.com/maccavelli/go-tui-lib/v2
+  v2.2.0`, then `go vet ./...`, `go build ./...`, `go run .` and
+  staticcheck (`0 issues.`), each with exit 0. The program builds a
+  registry `WithoutBuiltins`, which holds none of `BuiltinList`,
+  `BuiltinDescribe` and `BuiltinQuit`, with a `GatePolicy` that asks for
+  every UI command on top of `DefaultGatePolicy`, a gate and an auditor;
+  registers `workspace.Commands(w)` for a workspace built
+  `WithoutOwnCommands`; and presses `alt+.`, which comes back as a
+  `RequestMsg`, goes through the registry, and moves focus. Then it makes
+  `launch`'s decision its own way under `TERM=dumb` and `CI=1`, with
+  `Config.AllowDumb`, `Config.IgnoreCI`, `ColorProfile` and `GlyphTier`,
+  and compares it with `Decide`'s: "smoke: PASS (workspace.focus.next
+  gated and audited from a key, focus main to side; no built-ins;
+  launch's decision launch.terminal, NoTTY, unicode, built alike)". *The
+  negative control,* the same program with the workspace keeping its own
+  commands, builds as the first and fails: "smoke: FAIL, the gate was
+  asked about [] and the auditor holds 0 record(s); want
+  workspace.focus.next, from a key, gated and audited", exit 1. A
+  rehearsal against the tree, by a `replace`, gave the same pass and the
+  same failure first.
+* **Verification, each item:**
+  * every step's mutations killed, each failure quoted in its record: 37
+    of 37 (Step 2's 7 and D1's 2, Step 3's 8, Step 4's 6, Step 5's 3,
+    Step 6's 7, Step 7's 4);
+  * `python3 -m tools.verify gates` passed on macOS, Linux and Windows for
+    every step, each gates line in its record;
+  * `make apicheck`: "against v2.1.0, 0 incompatible change(s)" at every
+    step, with `scripts/apicheck.allow` empty; apidiff lists 28
+    additions and nothing else (Step 8);
+  * `TestDefaultsInventory` passes, with a row for every behaviour of the
+    MADR's audit (Step 3), and none left `planned` for this PLAN (Step 8);
+  * `TestCoresAreCharmFree` and `TestNarrowClosures` pass with `msgcat`
+    (Step 2, and every step's gates since);
+  * without any new option every existing test passes: no existing
+    assertion changed; Steps 4 and 7 renamed the unexported names the
+    tests used to the exported ones, with their values;
+  * the identifier scan clean at every step;
+  * CI green after the push, on all three systems, on `main` and on the
+    tag.
+* **The close-out:** this PLAN is `complete`, and its `docs/README.md`
+  row says so; the MADR's More Information names the release.
+  `scripts/apicheck.allow` had no block to remove. `make apicheck`, run on
+  the tagged commit before the close-out, still reports "against v2.1.0, 0
+  incompatible change(s)": its base is the newest tag merged into `HEAD`
+  that does not contain `HEAD` (`scripts/go-apicheck.py`), so on the
+  close-out's own commit it is `v2.2.0`. The close-out's documents pass
+  `markdownlint`, and the scratch link check finds every link but three
+  false hits in this record: the Go code quoted in Step 8, and the release
+  notes' two links, written from the repository's root for the release
+  page. The identifier scan is clean. The second PLAN,
+  [0024-PLAN-terminal-text-and-convention-opt-outs.md](0024-PLAN-terminal-text-and-convention-opt-outs.md),
+  and
+  [0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md),
+  which by the MADR's Q5 starts after this one, stay `proposed`.

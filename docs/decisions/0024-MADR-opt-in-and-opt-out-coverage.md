@@ -562,3 +562,11 @@ Step 3 wrote the inventory; its deviation D1 has the evidence.
   found one clash, `command.Policy` with `termsvc.Policy`, renamed
   `GatePolicy`; `WithCopyRoute` takes the existing `termsvc.Route`.
 * No PLAN is written yet: the owner asked for the decision first.
+  *(When this MADR was proposed; the PLANs followed.)*
+* **Released, 2026-10-27:** D1 to D4, D9's `msgcat` and A1's `decided`
+  status, by
+  [0024-PLAN-command-and-control-opt-outs.md](0024-PLAN-command-and-control-opt-outs.md),
+  in `v2.2.0` (tag at `6084bb3`). D5 to D7, A1's three gaps, and the
+  catalogue's adoption are
+  [0024-PLAN-terminal-text-and-convention-opt-outs.md](0024-PLAN-terminal-text-and-convention-opt-outs.md),
+  proposed.
