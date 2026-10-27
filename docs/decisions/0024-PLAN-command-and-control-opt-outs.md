@@ -647,3 +647,66 @@ deviation.
   windows` 18 passed, 0 failed, 1 skipped, in 2211 s, "335 file(s)
   clean". `make pre-add-check` on the 7 Go files is clean. The
   identifier scan of the change is clean.
+
+### Step 7: `palette`
+
+*2026-10-26.* The owner committed Step 6 and said to proceed. No
+deviation.
+
+* **`palette/keys.go`:** the picker's command IDs exported, `OpenID`,
+  `SelectNextID`, `SelectPrevID`, `PageNextID`, `PagePrevID`, `AcceptID`
+  and `CompleteID`, each with its value of `v2.1.0`, and its scope,
+  `PickerScope`, replacing the unexported names in the package and its
+  tests. `CompletionRules(id string) []keymap.Default`: the completion
+  pop-up's six bindings in `overlay:<id>`. `DefaultRules` builds from the
+  exported names, and takes its `overlay:completion` bindings from
+  `CompletionRules("completion")`; the unexported `completionScope` is
+  gone.
+* **`palette/picker.go`:** `Opener interface{ Opened(c when.Context) }`,
+  exported. `Open` calls it on each provider that has it, as it called the
+  unexported `opener`; `FromRegistry`'s, `Panes`'s and `Recents`'s
+  unexported types implement it, and `Recents` forwards it to the
+  provider it wraps. The rename's regular expression also capitalised
+  the word "opened" in nine comments and test messages, which were put
+  back by hand.
+* **Tests:**
+  * `TestDefaultRulesUnchanged`: `DefaultRules` equals `v2.1.0`'s, binding
+    for binding (scope, keys, command, when), as that tag's
+    `palette/keys.go` lists them, each on the default layer; and the IDs
+    and the scope keep their values. Its first run failed on its own
+    fixture, which wrote the global scope as `global` where
+    `command.Global` is the empty scope; the fixture was corrected.
+  * `TestCompletionRules`: `CompletionRules("notes")` is the six
+    `overlay:completion` bindings of `DefaultRules`, in `overlay:notes`;
+    a pop-up opened `WithID("notes")` moves on down and accepts on tab,
+    sending `SelectedMsg` from `notes`, with `CompletionRules("notes")` in
+    the keymap, and does neither without it.
+  * `TestOpenerForwarded`: `FromRegistry`, `Panes` and `Recents` are
+    `Opener`s; a program's own wrapper of `FromRegistry` that forwards
+    `Opened` lists the registry's commands for `>` alone, and one that
+    does not lists none.
+* **`docs/guides/defaults.md`,** by Step 4's D1: the rows for the
+  commands' IDs and scope, a pop-up's keys under another ID, and a
+  wrapper of a built-in provider are `built`. **`docs/glossary.md`:**
+  `Opener` moves from "Reserved" to "Built".
+* **Names:** `Opener`, through `python3 -m tools.verify names`: "1
+  planned name(s), clean".
+* **Seen failing,** through `python3 -m tools.verify mutate` on scratch
+  copies, 4 killed of 4:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | `CompletionRules` ignores its ID | `TestCompletionRules`: `CompletionRules(notes)[0] = overlay:completion up palette.select.prev; want overlay:notes up palette.select.prev` |
+  | `Open` stops calling `Opened` | `TestOpenerForwarded`: `a wrapper that forwards Opened: > lists []; want ["app.quit" "command.describe" "command.list" "db.drop" "file.open" "say.hi"]`, and `TestRegistryDiscover` |
+  | `Recents` stops forwarding `Opened` | `TestRecents`: `Recents over FromRegistry discovered [], <nil>; want the commands, after the opening` |
+  | `DefaultRules` drops the completion bindings | `TestDefaultRulesUnchanged`, `TestCompletionRules`: `CompletionRules(notes) has 6 bindings, DefaultRules 0 in overlay:completion; want 6 each`, and `TestCompletion`: `down: selection 0; want 1` |
+
+* **Gates:** `python3 -m tools.verify gates` over the step's 8 Go files,
+  the guide, the glossary and 2 records: macOS 19 passed, 0 failed, in
+  693 s, `release-check` "335 file(s) clean in 1 module(s)", with
+  `apicheck` against `v2.1.0` reporting no incompatible change;
+  `remote linux` 18 passed, 0 failed, 1 skipped (`gofmt`, which is given
+  no files there), in 1032 s, "335 file(s) clean"; `remote windows` 18
+  passed, 0 failed, 1 skipped, in 2214 s, "335 file(s) clean".
+  `make pre-add-check` on the 8 Go files is clean. The identifier scan of
+  the change is clean.

@@ -222,6 +222,125 @@ func TestRegistryDiscover(t *testing.T) {
 	})
 }
 
+// wrapper is a program's own wrapper of a built-in provider: it forwards
+// the name, the prefix, Search and Discover, and not Opened.
+type wrapper struct{ inner Provider }
+
+func (w wrapper) Name() string   { return w.inner.Name() }
+func (w wrapper) Prefix() string { return w.inner.(Prefixed).Prefix() }
+func (w wrapper) Search(ctx context.Context, s Search, yield func(Hit) bool) error {
+	return w.inner.Search(ctx, s, yield)
+}
+func (w wrapper) Discover(ctx context.Context, yield func(Hit) bool) error {
+	return w.inner.(Discoverer).Discover(ctx, yield)
+}
+
+// forwarding is a wrapper that forwards Opened too.
+type forwarding struct{ wrapper }
+
+func (f forwarding) Opened(c when.Context) {
+	if o, ok := f.inner.(Opener); ok {
+		o.Opened(c)
+	}
+}
+
+// TestOpenerForwarded: FromRegistry, Panes and Recents are Openers; a
+// program's wrapper of FromRegistry that forwards Opened lists the
+// commands for ">" alone, and one that does not lists none
+// (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md D4).
+func TestOpenerForwarded(t *testing.T) {
+	reg, _ := gated(t)
+	for name, p := range map[string]Provider{
+		"FromRegistry": FromRegistry(reg), "Panes": Panes(workspace.New(layout.Pane{ID: "main"}, nil)),
+		"Recents": Recents(NewFrecency(), FromRegistry(reg)),
+	} {
+		if _, ok := p.(Opener); !ok {
+			t.Errorf("%s is not an Opener", name)
+		}
+	}
+	var want []string
+	for c := range reg.Available(when.Map{}, command.SurfacePalette) {
+		want = append(want, string(c.ID))
+	}
+	for _, c := range []struct {
+		name string
+		p    Provider
+		want []string
+	}{
+		{"a wrapper that forwards Opened", forwarding{wrapper{FromRegistry(reg)}}, want},
+		{"a wrapper that does not", wrapper{FromRegistry(reg)}, nil},
+	} {
+		synctest.Test(t, func(t *testing.T) {
+			g := newProg(t, keys(t), nil)
+			g.register(c.p)
+			g.open()
+			g.typed(">")
+			var got []string
+			for _, r := range g.p.eng.rows() {
+				got = append(got, r.hit.ID)
+			}
+			if !slices.Equal(got, c.want) {
+				t.Errorf("%s: > lists %q; want %q", c.name, got, c.want)
+			}
+		})
+	}
+}
+
+// TestCompletionRules: CompletionRules(id) binds the completion moves in
+// "overlay:<id>", DefaultRules holds them for "completion", and a pop-up
+// opened WithID("notes") moves and accepts only with CompletionRules("notes")
+// in the keymap.
+func TestCompletionRules(t *testing.T) {
+	var defaults []keymap.Default
+	for _, d := range DefaultRules() {
+		if d.Scope == "overlay:completion" {
+			defaults = append(defaults, d)
+		}
+	}
+	notes := CompletionRules("notes")
+	if len(notes) != 6 || len(notes) != len(defaults) {
+		t.Fatalf("CompletionRules(notes) has %d bindings, DefaultRules %d in overlay:completion; want 6 each", len(notes), len(defaults))
+	}
+	for i, d := range notes {
+		if d.Scope != "overlay:notes" || d.Keys.String() != defaults[i].Keys.String() || d.Command != defaults[i].Command {
+			t.Errorf("CompletionRules(notes)[%d] = %s %s %s; want overlay:notes %s %s", i, d.Scope, d.Keys, d.Command, defaults[i].Keys, defaults[i].Command)
+		}
+	}
+	for _, c := range []struct {
+		name  string
+		extra []keymap.Default
+		moved bool
+	}{
+		{"with CompletionRules(notes)", CompletionRules("notes"), true},
+		{"without", nil, false},
+	} {
+		synctest.Test(t, func(t *testing.T) {
+			km, err := keymap.New(keymap.Settings{}, slices.Concat(workspace.DefaultRules(), DefaultRules(), c.extra))
+			if err != nil {
+				t.Fatal(err)
+			}
+			ed := &editor{}
+			g := newProgOn(t, layout.Pane{ID: "main"}, map[layout.PaneID]workspace.Pane{"main": ed}, km, nil, WithoutInput())
+			var r ran
+			var items []Item
+			for _, h := range runs(&r, 4) {
+				items = append(items, Item{ID: h.ID, Text: h.Text})
+			}
+			g.register(Static("paths", items))
+			g.open(WithID("notes"))
+			g.key("down")
+			if moved := g.p.sel == 1; moved != c.moved {
+				t.Fatalf("%s: down left the selection at %d", c.name, g.p.sel)
+			}
+			g.key("tab")
+			sel := filter[SelectedMsg](g.seen)
+			if accepted := len(sel) == 1 && sel[0].ID == "notes" && sel[0].Hit.ID == "b1"; accepted != c.moved {
+				t.Errorf("%s: tab sent %+v", c.name, sel)
+			}
+		})
+	}
+}
+
 // TestStatic: an empty query lists the items in their order; a typed one
 // matches their text; accepting one runs its Run.
 func TestStatic(t *testing.T) {

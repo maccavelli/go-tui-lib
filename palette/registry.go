@@ -32,8 +32,8 @@ type registry struct {
 func (*registry) Name() string   { return "commands" }
 func (*registry) Prefix() string { return ">" }
 
-// opened keeps the when values for Discover, which is not given them.
-func (r *registry) opened(c when.Context) { r.at.Store(&c) }
+// Opened keeps the when values for Discover, which is not given them.
+func (r *registry) Opened(c when.Context) { r.at.Store(&c) }
 
 func (r *registry) Search(ctx context.Context, s Search, yield func(Hit) bool) error {
 	for c := range r.reg.Available(s.WhenContext, command.SurfacePalette) {

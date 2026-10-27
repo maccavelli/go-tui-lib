@@ -132,9 +132,9 @@ record that is not there.
 | Behaviour | Default | Control | Status |
 | :--- | :--- | :--- | :--- |
 | Its keys | `palette.DefaultRules` | `palette.DefaultRules` | built |
-| Its commands' IDs and scope | unexported | `palette.OpenID`, `palette.SelectNextID`, `palette.PickerScope` | planned (0024-PLAN-command-and-control-opt-outs.md) |
-| A completion pop-up's keys under another ID | none | `palette.CompletionRules` | planned (0024-PLAN-command-and-control-opt-outs.md) |
-| A wrapper of a built-in provider | loses its opening | `palette.Opener` | planned (0024-PLAN-command-and-control-opt-outs.md) |
+| Its commands' IDs and scope | unexported | `palette.OpenID`, `palette.SelectNextID`, `palette.PickerScope` | built |
+| A completion pop-up's keys under another ID | none | `palette.CompletionRules` | built |
+| A wrapper of a built-in provider | loses its opening | `palette.Opener` | built |
 | The overlay | `palette`, 72 by 16, centred | `palette.WithID`, `palette.WithAnchor`, `palette.WithSize` | built |
 | Hits kept | 200 | `palette.WithLimit` | built |
 | A provider's error | dropped | `palette.WithLogger` | built |

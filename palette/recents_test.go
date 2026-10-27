@@ -134,7 +134,7 @@ func TestRecents(t *testing.T) {
 		if cmds.(Prefixed).Prefix() != ">" {
 			t.Fatalf("Recents over FromRegistry has prefix %q; want >", cmds.(Prefixed).Prefix())
 		}
-		cmds.(opener).opened(when.Map{})
+		cmds.(Opener).Opened(when.Map{})
 		var some []Hit
 		if err := cmds.(Discoverer).Discover(t.Context(), func(h Hit) bool { some = append(some, h); return true }); err != nil || len(some) == 0 {
 			t.Fatalf("Recents over FromRegistry discovered %v, %v; want the commands, after the opening", ids(some), err)

@@ -35,8 +35,8 @@ type paneEntry struct {
 
 func (*panes) Name() string { return "panes" }
 
-// opened reads the workspace's panes, which only the event loop may.
-func (p *panes) opened(when.Context) {
+// Opened reads the workspace's panes, which only the event loop may.
+func (p *panes) Opened(when.Context) {
 	var out []paneEntry
 	hidden := p.w.Plan().Hidden
 	for id, pane := range p.w.Panes() {

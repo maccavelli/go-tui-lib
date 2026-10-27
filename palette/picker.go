@@ -85,19 +85,24 @@ func (p *Picker) Open(opts ...OverlayOption) tea.Cmd {
 	}))
 	p.id, p.path = o.id, path
 	for _, src := range p.eng.sources {
-		if op, ok := src.p.(opener); ok {
-			op.opened(ctx)
+		if op, ok := src.p.(Opener); ok {
+			op.Opened(ctx)
 		}
 	}
 	p.eng.open(ctx)
 	return tea.Batch(append(cmds, p.eng.query(""))...)
 }
 
-// opener is a built-in provider that reads something on the event loop
-// when the picker opens, before any search: the when values, which its
-// Discover is not given, or the workspace's panes, which only the loop may
-// read.
-type opener interface{ opened(c when.Context) }
+// Opener is a provider that reads something on the event loop when the
+// picker opens, before any search: the when values, which its Discover is
+// not given, or the workspace's panes, which only the loop may read. Open
+// calls Opened on each registered provider that has it. FromRegistry,
+// Panes and Recents have it, so a program's own wrapper of one forwards
+// Opened, as Recents does
+// (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md D4).
+type Opener interface {
+	Opened(c when.Context)
+}
 
 // OpenCommand is a command that opens this picker, for the program's
 // registry: palette.open is the ID DefaultRules binds ctrl+p to. Since no
@@ -116,13 +121,13 @@ func (p *Picker) OpenCommand(id command.ID, title string, opts ...command.Option
 
 // KeyContexts names the picker's key scope, "kind:picker", which
 // DefaultRules binds its moves in.
-func (p *Picker) KeyContexts() []command.Scope { return []command.Scope{pickerScope} }
+func (p *Picker) KeyContexts() []command.Scope { return []command.Scope{PickerScope} }
 
 // ConsumesCommand takes the picker's own commands: the moves, accept and
 // complete, so they run in the order their keys were pressed.
 func (p *Picker) ConsumesCommand(id command.ID) bool {
 	switch id {
-	case nextID, prevID, pageNextID, pagePrevID, acceptID, completeID:
+	case SelectNextID, SelectPrevID, PageNextID, PagePrevID, AcceptID, CompleteID:
 		return true
 	}
 	return false
@@ -212,17 +217,17 @@ func (p *Picker) handle(msg tea.Msg) tea.Cmd {
 // command runs one of the picker's own commands.
 func (p *Picker) command(id command.ID) tea.Cmd {
 	switch id {
-	case nextID:
+	case SelectNextID:
 		p.move(1)
-	case prevID:
+	case SelectPrevID:
 		p.move(-1)
-	case pageNextID:
+	case PageNextID:
 		p.move(p.visible())
-	case pagePrevID:
+	case PagePrevID:
 		p.move(-p.visible())
-	case acceptID:
+	case AcceptID:
 		return p.accept()
-	case completeID:
+	case CompleteID:
 		return p.complete()
 	}
 	return nil

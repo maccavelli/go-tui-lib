@@ -273,14 +273,14 @@ func TestOpenKey(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		g := newProg(t, keys(t), nil)
 		g.key("ctrl+p")
-		if rs := g.requests(); len(rs) != 1 || rs[0].Request.ID != openID {
+		if rs := g.requests(); len(rs) != 1 || rs[0].Request.ID != OpenID {
 			t.Fatalf("ctrl+p: %v; want one RequestMsg for palette.open", rs)
 		}
 		if o := g.w.Overlays(); len(o) != 0 {
 			t.Fatalf("with no registry, ctrl+p opened %v", o)
 		}
 		g.reg = command.NewRegistry()
-		if err := g.reg.Register(g.p.OpenCommand(openID, "Open the palette")); err != nil {
+		if err := g.reg.Register(g.p.OpenCommand(OpenID, "Open the palette")); err != nil {
 			t.Fatal(err)
 		}
 		g.key("ctrl+p")
@@ -539,11 +539,50 @@ func TestEscClearsThenCloses(t *testing.T) {
 
 // TestRebind: a user binding in kind:picker moves the selection with its
 // key, and the default it removes no longer does.
+// TestDefaultRulesUnchanged: DefaultRules is v2.1.0's, binding for
+// binding, read from that tag's palette/keys.go, now that it is built from
+// the exported IDs and CompletionRules; and the IDs keep their values.
+func TestDefaultRulesUnchanged(t *testing.T) {
+	const picker, popup = "kind:picker", "overlay:completion"
+	v210 := [][4]string{
+		{string(command.Global), "ctrl+p", "palette.open", "!workspace.modal"},
+		{picker, "up", "palette.select.prev", ""},
+		{picker, "ctrl+p", "palette.select.prev", ""},
+		{picker, "down", "palette.select.next", ""},
+		{picker, "ctrl+n", "palette.select.next", ""},
+		{picker, "pgup", "palette.page.prev", ""},
+		{picker, "pgdown", "palette.page.next", ""},
+		{picker, "enter", "palette.accept", ""},
+		{picker, "tab", "palette.complete", ""},
+		{popup, "up", "palette.select.prev", ""},
+		{popup, "ctrl+p", "palette.select.prev", ""},
+		{popup, "down", "palette.select.next", ""},
+		{popup, "ctrl+n", "palette.select.next", ""},
+		{popup, "tab", "palette.accept", ""},
+		{popup, "enter", "palette.accept", ""},
+	}
+	var got [][4]string
+	for _, d := range DefaultRules() {
+		got = append(got, [4]string{string(d.Scope), d.Keys.String(), string(d.Command), d.When})
+		if d.Location.Layer != keymap.DefaultLayer {
+			t.Errorf("%s %s is on layer %v, want the default layer", d.Scope, d.Keys, d.Location.Layer)
+		}
+	}
+	if !slices.Equal(got, v210) {
+		t.Errorf("DefaultRules =\n%q\nwant v2.1.0's\n%q", got, v210)
+	}
+	ids := []command.ID{OpenID, SelectNextID, SelectPrevID, PageNextID, PagePrevID, AcceptID, CompleteID}
+	want := []command.ID{"palette.open", "palette.select.next", "palette.select.prev", "palette.page.next", "palette.page.prev", "palette.accept", "palette.complete"}
+	if !slices.Equal(ids, want) || PickerScope != picker {
+		t.Errorf("the IDs are %v and the scope %s; want %v and %s", ids, PickerScope, want, picker)
+	}
+}
+
 func TestRebind(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		km := keys(t, []keymap.Binding{
-			user(t, pickerScope, "down", nextID, true),
-			user(t, pickerScope, "ctrl+j", nextID, false),
+			user(t, PickerScope, "down", SelectNextID, true),
+			user(t, PickerScope, "ctrl+j", SelectNextID, false),
 		})
 		g := newProg(t, km, nil)
 		var r ran

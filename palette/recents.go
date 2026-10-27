@@ -291,9 +291,9 @@ func (r *recents) Stop() {
 	}
 }
 
-func (r *recents) opened(c when.Context) {
-	if op, ok := r.inner.(opener); ok {
-		op.opened(c)
+func (r *recents) Opened(c when.Context) {
+	if op, ok := r.inner.(Opener); ok {
+		op.Opened(c)
 	}
 }
 
