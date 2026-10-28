@@ -8,6 +8,7 @@ import (
 	"github.com/maccavelli/go-tui-lib/v2/keymap"
 	"github.com/maccavelli/go-tui-lib/v2/msgcat"
 	"github.com/maccavelli/go-tui-lib/v2/safetext"
+	"github.com/maccavelli/go-tui-lib/v2/stream"
 )
 
 // The defaults.
@@ -86,6 +87,12 @@ func WithCatalog(cat msgcat.Catalog) Option {
 // (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md D2).
 // safetext.Line() by default.
 func WithRules(r safetext.Rules) Option { return optionFunc(func(c *Chooser) { c.rules = r }) }
+
+// WithMarkup styles the cells of each entry's Text the query matched in m's
+// Match style, measured in the width method: the zero Markup by default,
+// which styles nothing, so a program whose output has no colour keeps it
+// (docs/decisions/0023-MADR-line-mode-components.md D5).
+func WithMarkup(m stream.Markup) Option { return optionFunc(func(c *Chooser) { c.markup = m }) }
 
 // WithKeymap resolves the Chooser's keys in k, the program's keymap, in
 // ChooserScope and then lineedit.ComposerScope, whose editing commands

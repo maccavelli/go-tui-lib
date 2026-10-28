@@ -17,6 +17,7 @@ import (
 	"github.com/maccavelli/go-tui-lib/v2/msgcat"
 	"github.com/maccavelli/go-tui-lib/v2/pick"
 	"github.com/maccavelli/go-tui-lib/v2/safetext"
+	"github.com/maccavelli/go-tui-lib/v2/stream"
 	"github.com/maccavelli/go-tui-lib/v2/tuitest"
 )
 
@@ -53,6 +54,22 @@ func TestLayoutGolden(t *testing.T) {
 				tuitest.Fits(t, text, c.Width, ansi.WcWidth)
 				return text
 			})
+		}
+	}
+}
+
+// TestMarkupKeepsLayout: WithMarkup styles the rows and moves no cell: the
+// screen shows what it shows without it, for each list and query.
+func TestMarkupKeepsLayout(t *testing.T) {
+	for _, entries := range [][]pick.Entry{models(), sessions()} {
+		for _, q := range []string{"", "son", "zzqx", "a/c"} {
+			for _, w := range []int{24, 60, 100} {
+				plain := newHost(t, w, entries, pick.WithQuery(q)).scr.Text()
+				styled := newHost(t, w, entries, pick.WithQuery(q), pick.WithMarkup(stream.DefaultMarkup())).scr.Text()
+				if styled != plain {
+					t.Errorf("query %q at %d: styled\n%s\nplain\n%s", q, w, styled, plain)
+				}
+			}
 		}
 	}
 }

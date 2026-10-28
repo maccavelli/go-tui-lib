@@ -122,6 +122,7 @@ linters:
             - "**/msgcat/*.go"
             - "**/pick/*.go"
             - "**/safetext/*.go"
+            - "**/stream/*.go"
             - "**/termcap/*.go"
             - "**/termkey/*.go"
             - "**/termsvc/*.go"

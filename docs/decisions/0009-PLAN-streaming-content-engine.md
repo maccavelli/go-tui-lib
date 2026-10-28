@@ -59,6 +59,20 @@ subpart, `Flatten` collapses runs, `Escape` keeps what `Tabs` and
 `Interpret` and nothing else. This PLAN stays proposed; its Step 2 is
 not run from here.
 
+*2026-10-28, for
+[0009-MADR-streaming-content-engine.md](0009-MADR-streaming-content-engine.md)
+A5, by
+[0023-MADR-line-mode-components.md](0023-MADR-line-mode-components.md)
+D7 and A6:* `stream` is a Charm-free core. Step 5 builds `Doc`, `Renderer`,
+`RendererFunc`, `Plain` and the cut scanner in `stream`, on the block
+scanner
+[0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
+Step 5 builds there first, unexported, and exports it as `Scanner` once
+`Doc` uses it; `Buffer` and `Doc.Pull` are built in `stream/streamtea`, and
+so is Step 6's `Pane`, which imports `workspace`, `frame` and Bubble Tea.
+`stream` joins `TestCoresAreCharmFree` in 0023-PLAN's Step 5, before this
+PLAN's Step 5 runs. This PLAN stays proposed.
+
 ## Goal
 
 Ship `safetext`, `frame`, `inputfilter`, `stream` and `stream/glamourmd`,

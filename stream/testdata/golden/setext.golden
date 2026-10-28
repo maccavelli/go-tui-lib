@@ -1,0 +1,273 @@
+ 13|## example 80
+  9|Foo *bar*
+  9|=========
+  0|
+  9|Foo *bar*
+  9|---------
+  2|--
+ 25|<ESC>[1mFoo *bar*<ESC>[0m
+ 25|<ESC>[1m=========<ESC>[0m
+  0|
+ 25|<ESC>[1mFoo *bar*<ESC>[0m
+ 25|<ESC>[1m---------<ESC>[0m
+  0|
+ 13|## example 81
+  8|Foo *bar
+  4|baz*
+  4|====
+  2|--
+  8|Foo *bar
+ 20|<ESC>[1mbaz*<ESC>[0m
+ 20|<ESC>[1m====<ESC>[0m
+  0|
+ 13|## example 82
+ 10|  Foo *bar
+  4|baz*	
+  4|====
+  2|--
+ 10|  Foo *bar
+ 20|<ESC>[1mbaz*	<ESC>[0m
+ 20|<ESC>[1m====<ESC>[0m
+  0|
+ 13|## example 83
+  3|Foo
+ 25|-------------------------
+  0|
+  3|Foo
+  1|=
+  2|--
+ 19|<ESC>[1mFoo<ESC>[0m
+ 41|<ESC>[1m-------------------------<ESC>[0m
+  0|
+ 19|<ESC>[1mFoo<ESC>[0m
+ 17|<ESC>[1m=<ESC>[0m
+  0|
+ 13|## example 84
+  6|   Foo
+  3|---
+  0|
+  5|  Foo
+  5|-----
+  0|
+  5|  Foo
+  5|  ===
+  2|--
+ 22|<ESC>[1m   Foo<ESC>[0m
+ 19|<ESC>[1m---<ESC>[0m
+  0|
+ 21|<ESC>[1m  Foo<ESC>[0m
+ 21|<ESC>[1m-----<ESC>[0m
+  0|
+ 21|<ESC>[1m  Foo<ESC>[0m
+ 21|<ESC>[1m  ===<ESC>[0m
+  0|
+ 13|## example 85
+  7|    Foo
+  7|    ---
+  0|
+  7|    Foo
+  3|---
+  2|--
+  7|    Foo
+  7|    ---
+  0|
+  7|    Foo
+  3|---
+  0|
+ 13|## example 86
+  3|Foo
+ 13|   ----      
+  2|--
+ 19|<ESC>[1mFoo<ESC>[0m
+ 29|<ESC>[1m   ----      <ESC>[0m
+  0|
+ 13|## example 87
+  3|Foo
+  7|    ---
+  2|--
+  3|Foo
+  7|    ---
+  0|
+ 13|## example 88
+  3|Foo
+  3|= =
+  0|
+  3|Foo
+  5|--- -
+  2|--
+  3|Foo
+  3|= =
+  0|
+  3|Foo
+  5|--- -
+  0|
+ 13|## example 89
+  5|Foo  
+  5|-----
+  2|--
+ 21|<ESC>[1mFoo  <ESC>[0m
+ 21|<ESC>[1m-----<ESC>[0m
+  0|
+ 13|## example 90
+  4|Foo\
+  4|----
+  2|--
+ 20|<ESC>[1mFoo\<ESC>[0m
+ 20|<ESC>[1m----<ESC>[0m
+  0|
+ 13|## example 91
+  4|`Foo
+  4|----
+  1|`
+  0|
+ 15|<a title="a lot
+  3|---
+ 12|of dashes"/>
+  2|--
+ 20|<ESC>[1m`Foo<ESC>[0m
+ 20|<ESC>[1m----<ESC>[0m
+  1|`
+  0|
+ 31|<ESC>[1m<a title="a lot<ESC>[0m
+ 19|<ESC>[1m---<ESC>[0m
+ 12|of dashes"/>
+  0|
+ 13|## example 92
+  5|> Foo
+  3|---
+  2|--
+ 22|<ESC>[36m><ESC>[0m Foo
+  3|---
+  0|
+ 13|## example 93
+  5|> foo
+  3|bar
+  3|===
+  2|--
+ 22|<ESC>[36m><ESC>[0m foo
+  3|bar
+  3|===
+  0|
+ 13|## example 94
+  5|- Foo
+  3|---
+  2|--
+ 22|<ESC>[36m-<ESC>[0m Foo
+  3|---
+  0|
+ 13|## example 95
+  3|Foo
+  3|Bar
+  3|---
+  2|--
+  3|Foo
+ 19|<ESC>[1mBar<ESC>[0m
+ 19|<ESC>[1m---<ESC>[0m
+  0|
+ 13|## example 96
+  3|---
+  3|Foo
+  3|---
+  3|Bar
+  3|---
+  3|Baz
+  2|--
+  3|---
+ 19|<ESC>[1mFoo<ESC>[0m
+ 19|<ESC>[1m---<ESC>[0m
+ 19|<ESC>[1mBar<ESC>[0m
+ 19|<ESC>[1m---<ESC>[0m
+  3|Baz
+  0|
+ 13|## example 97
+  0|
+  4|====
+  2|--
+  0|
+  4|====
+  0|
+ 13|## example 98
+  3|---
+  3|---
+  2|--
+  3|---
+  3|---
+  0|
+ 13|## example 99
+  5|- foo
+  5|-----
+  2|--
+ 22|<ESC>[36m-<ESC>[0m foo
+  5|-----
+  0|
+ 14|## example 100
+  7|    foo
+  3|---
+  2|--
+  7|    foo
+  3|---
+  0|
+ 14|## example 101
+  5|> foo
+  5|-----
+  2|--
+ 22|<ESC>[36m><ESC>[0m foo
+  5|-----
+  0|
+ 14|## example 102
+  6|\> foo
+  6|------
+  2|--
+ 22|<ESC>[1m\> foo<ESC>[0m
+ 22|<ESC>[1m------<ESC>[0m
+  0|
+ 14|## example 103
+  3|Foo
+  0|
+  3|bar
+  3|---
+  3|baz
+  2|--
+  3|Foo
+  0|
+ 19|<ESC>[1mbar<ESC>[0m
+ 19|<ESC>[1m---<ESC>[0m
+  3|baz
+  0|
+ 14|## example 104
+  3|Foo
+  3|bar
+  0|
+  3|---
+  0|
+  3|baz
+  2|--
+  3|Foo
+  3|bar
+  0|
+  3|---
+  0|
+  3|baz
+  0|
+ 14|## example 105
+  3|Foo
+  3|bar
+  5|* * *
+  3|baz
+  2|--
+  3|Foo
+  3|bar
+  5|* * *
+  3|baz
+  0|
+ 14|## example 106
+  3|Foo
+  3|bar
+  4|\---
+  3|baz
+  2|--
+  3|Foo
+  3|bar
+  4|\---
+  3|baz
+  0|

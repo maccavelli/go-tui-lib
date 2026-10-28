@@ -26,7 +26,7 @@ it was when they were written
 | 0007 | PLAN | [Implement the keymap engine](decisions/0007-PLAN-keymap-engine.md) | complete |
 | 0008 | MADR | [Find and run anything from one command palette, built on an in-repository fuzzy matcher and asynchronous, scoped providers](decisions/0008-MADR-command-palette.md) | accepted; A1 accepted; A2 recorded; A3 accepted; A4 accepted (item 2 by A5.3); A5 accepted; A6 accepted; built: `fuzzy` in `v1.13.0`, `palette` in `v2.1.0` |
 | 0008 | PLAN | [Implement the command palette and the fuzzy matcher](decisions/0008-PLAN-command-palette.md) | complete |
-| 0009 | MADR | [Stream agent output through a stable-prefix Markdown engine, a frame scheduler, an input filter and a safe-text sanitizer](decisions/0009-MADR-streaming-content-engine.md) | accepted; A1–A3 accepted; A4 recorded; Q9 open |
+| 0009 | MADR | [Stream agent output through a stable-prefix Markdown engine, a frame scheduler, an input filter and a safe-text sanitizer](decisions/0009-MADR-streaming-content-engine.md) | accepted; A1–A3 accepted; A4 recorded; A5 accepted (by 0023-MADR D7); Q9 open |
 | 0009 | PLAN | [Implement the streaming content engine](decisions/0009-PLAN-streaming-content-engine.md) | proposed |
 | 0010 | MADR | [Ship the Cobra, Kong and glamour adapters as nested Go modules, released apart from the root and developed through a committed go.work, with every gate run per module and without the workspace](decisions/0010-MADR-nested-adapter-modules.md) | accepted; A1–A3 accepted; the command adapters superseded by 0012 |
 | 0010 | PLAN | [Implement the multi-module repository: go.work, per-module gates, and the release procedure](decisions/0010-PLAN-nested-adapter-modules.md) | complete |
@@ -59,8 +59,8 @@ it was when they were written
 | 0021 | PLAN | [Implement: hold `termkey` to the standard library and `internal/enum`](decisions/0021-PLAN-termkey-closure-gate.md) | complete |
 | 0022 | MADR | [Align docs-only CI and disclosure gates](decisions/0022-MADR-align-docs-ci-and-disclosure-gates.md) | proposed |
 | 0022 | PLAN | [Implement aligned docs-only CI and disclosure gates](decisions/0022-PLAN-align-docs-ci-and-disclosure-gates.md) | proposed |
-| 0023 | MADR | [Give a line-mode CLI an inline question, a picker, a composer and a streamed transcript, as I/O-free Charm-free cores on one live region](decisions/0023-MADR-line-mode-components.md) | accepted; A1 to A5 accepted |
-| 0023 | PLAN | [Implement the line-mode question, picker, composer and transcript](decisions/0023-PLAN-line-mode-components.md) | in-progress (Steps 1–4 done, `v2.5.0`) |
+| 0023 | MADR | [Give a line-mode CLI an inline question, a picker, a composer and a streamed transcript, as I/O-free Charm-free cores on one live region](decisions/0023-MADR-line-mode-components.md) | accepted; A1 to A7 accepted |
+| 0023 | PLAN | [Implement the line-mode question, picker, composer and transcript](decisions/0023-PLAN-line-mode-components.md) | in-progress (Steps 1–4 done, `v2.5.0`; Step 5 done, unreleased) |
 | 0024 | MADR | [Let a program with its own CLI refuse, replace or opt into every behaviour the library imposes, with the floors stated and an inventory the tests hold](decisions/0024-MADR-opt-in-and-opt-out-coverage.md) | accepted; A1 accepted |
 | 0024 | PLAN | [Implement API rule 12, its floors, the message catalogue and the defaults inventory, and close the command-and-control gaps](decisions/0024-PLAN-command-and-control-opt-outs.md) | complete (`v2.2.0`) |
 | 0024 | PLAN | [Close the terminal, text and convention gaps, and adopt the message catalogue](decisions/0024-PLAN-terminal-text-and-convention-opt-outs.md) | proposed |

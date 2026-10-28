@@ -19,6 +19,7 @@ import (
 	"github.com/maccavelli/go-tui-lib/v2/lineedit"
 	"github.com/maccavelli/go-tui-lib/v2/msgcat"
 	"github.com/maccavelli/go-tui-lib/v2/safetext"
+	"github.com/maccavelli/go-tui-lib/v2/stream"
 	"github.com/maccavelli/go-tui-lib/v2/termkey"
 	"github.com/maccavelli/go-tui-lib/v2/when"
 )
@@ -56,6 +57,7 @@ type Chooser struct {
 	rules         safetext.Rules
 	keys          *keymap.Keymap
 	disp          *keymap.Dispatcher
+	markup        stream.Markup
 	prompt        string
 	initial       string
 	height        int // the list's rows, for the whole pick
@@ -64,9 +66,10 @@ type Chooser struct {
 	width         int
 
 	query    *lineinput.Line
-	matches  []int // the entries that match, by index, best first
-	capped   bool  // the index yielded as many candidates as it yields at most
-	sel, top int   // the selected match, and the first drawn
+	matcher  *fuzzy.Matcher // the query's, nil while it is empty
+	matches  []int          // the entries that match, by index, best first
+	capped   bool           // the index yielded as many candidates as it yields at most
+	sel, top int            // the selected match, and the first drawn
 
 	// pending is a key sequence the dispatcher waits on, due when its wait
 	// ends, with the timeout Expire takes.
@@ -129,7 +132,7 @@ func (c *Chooser) msg(id msgcat.MessageID, args ...any) string {
 // orders hits. Rank is not used: it puts the shorter key first on a tie
 // (docs/decisions/0023-MADR-line-mode-components.md A4).
 func (c *Chooser) rank() {
-	c.sel, c.top, c.capped = 0, 0, false
+	c.sel, c.top, c.capped, c.matcher = 0, 0, false, nil
 	c.matches = c.matches[:0]
 	q := c.query.Text()
 	if q == "" {
@@ -139,6 +142,7 @@ func (c *Chooser) rank() {
 		return
 	}
 	m := fuzzy.NewMatcher(q)
+	c.matcher = m
 	var candidates iter.Seq[int]
 	if c.index != nil {
 		ids := slices.Sorted(c.index.Candidates(m)) // the order given, so ties keep it
@@ -444,11 +448,57 @@ func (c *Chooser) row(e Entry, selected bool, width int) string {
 			text = sanitize.Truncate(e.Text, room, m, g.Ellipsis)
 		}
 	}
-	out := marker + text
+	out := marker + c.marked(e.Text, text)
 	if detail != "" {
 		out = right(m, out, detail, width)
 	}
 	return out
+}
+
+// marked is shown, an entry's text as cut to its row, with the cells the
+// query matched in full styled by the Markup's Match style: the matcher's
+// ranges, within the text the cut kept, turned into cells by fuzzy.Cells in
+// the width method, and each cluster that starts in one styled. The
+// ellipsis is not.
+func (c *Chooser) marked(full, shown string) string {
+	if c.markup.Match == 0 || c.matcher == nil {
+		return shown
+	}
+	mt, ok := c.matcher.Match(full)
+	if !ok {
+		return shown
+	}
+	kept, tail := shown, ""
+	if shown != full {
+		kept = strings.TrimSuffix(shown, c.glyphs.Ellipsis)
+		tail = shown[len(kept):]
+	}
+	var ranges []fuzzy.Range
+	for _, r := range mt.Ranges {
+		if r.Start < len(kept) {
+			ranges = append(ranges, fuzzy.Range{Start: r.Start, End: min(r.End, len(kept))})
+		}
+	}
+	cells := fuzzy.Cells(kept, ranges, c.method)
+	var b, run strings.Builder
+	cell, at := 0, 0
+	for rest := kept; rest != ""; {
+		cl, w := ansi.FirstGraphemeCluster(rest, c.method)
+		for at < len(cells) && cells[at].End <= cell {
+			at++
+		}
+		if at < len(cells) && cell >= cells[at].Start {
+			run.WriteString(cl)
+		} else {
+			b.WriteString(c.markup.Match.Apply(run.String()))
+			run.Reset()
+			b.WriteString(cl)
+		}
+		cell += w
+		rest = rest[len(cl):]
+	}
+	b.WriteString(c.markup.Match.Apply(run.String()))
+	return b.String() + tail
 }
 
 // joined is the cells a and b take drawn together beyond what they take

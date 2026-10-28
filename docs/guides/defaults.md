@@ -273,6 +273,7 @@ record that is not there.
 | The query's editing keys | `lineedit.DefaultRules`, in `kind:composer` after `kind:chooser` | `pick.WithKeymap`, `lineedit.DefaultRules` | built |
 | Equal matches | in the order given | `pick.NewChooser` | decided (0023-MADR-line-mode-components.md A4) |
 | A query's length | 1024 bytes | `pick.NewChooser` | floor |
+| The matched cells styled | none: the zero `stream.Markup` | `pick.WithMarkup`, `stream.DefaultMarkup` | built |
 
 ## lineedit and lineedit/lineedittea
 
@@ -299,6 +300,19 @@ record that is not there.
 | ctrl+c | `EditInterrupt`, outside the keymap, the text kept | `lineedit.ComposerEvent` | decided (0023-MADR-line-mode-components.md D6) |
 | The pane's name in its events | `lineedit/lineedittea.DefaultID` | `lineedit/lineedittea.WithID` | built |
 | The pane's composer: its method and glyphs | the workspace's | `lineedit/lineedittea.WithComposer` | built |
+
+## stream
+
+| Behaviour | Default | Control | Status |
+| :--- | :--- | :--- | :--- |
+| How text is measured | `ansi.WcWidth` | `stream.WithMethod` | built |
+| Styling | none: the zero `Markup`; gobble's is `DefaultMarkup` | `stream.WithMarkup`, `stream.DefaultMarkup` | built |
+| Wrapping prose | none | `stream.WithWidth`, `stream.Printer.SetWidth` | built |
+| A table's layout | its columns as wide as their widest cell, aligned as its delimiter row says | `stream.WithoutTableLayout` | built |
+| How the reply is cleaned | `safetext.Text`, never less | `stream.WithRules` | built |
+| A paragraph's line | held until the next line comes, or the reply ends | `stream.Printer.Flush` | decided (0023-MADR-line-mode-components.md A3, Q10) |
+| A table | held until a blank line or another block ends it | `stream.Printer.Flush` | decided (0023-MADR-line-mode-components.md D7, A6) |
+| A link | its text in the `Link` style and its destination in the `URL` style, no OSC 8 | `stream.Markup` | decided (0023-MADR-line-mode-components.md A6) |
 
 ## inline and inline/inlinetest
 

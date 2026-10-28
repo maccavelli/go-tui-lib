@@ -22,6 +22,7 @@ import (
 	"github.com/maccavelli/go-tui-lib/v2/lineedit"
 	"github.com/maccavelli/go-tui-lib/v2/palette"
 	"github.com/maccavelli/go-tui-lib/v2/pick"
+	"github.com/maccavelli/go-tui-lib/v2/stream"
 	"github.com/maccavelli/go-tui-lib/v2/termcap"
 	"github.com/maccavelli/go-tui-lib/v2/termkey"
 	"github.com/maccavelli/go-tui-lib/v2/termsvc"
@@ -66,6 +67,7 @@ var enums = map[string]func(int64) any{
 	"layout.Span":                as[layout.Span],
 	"palette.Grouping":           as[palette.Grouping],
 	"pick.ChooserEventKind":      as[pick.ChooserEventKind],
+	"stream.Style":               as[stream.Style],
 	"termcap.Brand":              as[termcap.Brand],
 	"termcap.ColorProfile":       as[termcap.ColorProfile],
 	"termcap.Disposition":        as[termcap.Disposition],
@@ -97,7 +99,7 @@ var enums = map[string]func(int64) any{
 
 // bitSets are the enums whose values are sets of bits, with
 // internal/enum's Bits text.
-var bitSets = map[string]bool{"command.Surface": true, "keymap.Features": true, "keymap.KeyFacts": true, "termkey.Mod": true}
+var bitSets = map[string]bool{"command.Surface": true, "keymap.Features": true, "keymap.KeyFacts": true, "stream.Style": true, "termkey.Mod": true}
 
 // enumType is one enum the scan found: its key in enums, its package's
 // name and its own, its type, and the values of its constants with the

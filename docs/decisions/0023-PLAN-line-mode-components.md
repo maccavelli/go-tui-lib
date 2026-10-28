@@ -331,7 +331,8 @@ entry, and the closure check over a program that imports `palette`. Issue
 * `docs/decisions/0009-MADR-streaming-content-engine.md` gains its
   amendment, as 0023-MADR D7 says, and its PLAN is amended to build on
   this step.
-* `stream`: `Scanner`, the block scanner of 0009 §4; `Printer`, the
+* `stream`: `Scanner`, the block scanner of 0009 §4 (*unexported, by
+  D21:* 0009's PLAN exports it when `Doc` is built on it); `Printer`, the
   line-stable printer of 0023-MADR D7; `Markup` and `Style`. `Doc`,
   `Renderer`, `RendererFunc` and `Plain` are 0009's PLAN's; this step
   builds what the line mode needs, and leaves `Doc` to that PLAN, which
@@ -341,7 +342,10 @@ entry, and the closure check over a program that imports `palette`. Issue
   input byte for byte; a table held until a blank line; a fence's lines
   printed as they complete; the output the same for any split of the
   input (property test); fuzz: never panics, never a row wider than the
-  width outside a code or table row.
+  width outside a code or table row. *Annotated 2026-10-28:* the zero
+  `Markup` is byte for byte with `WithoutTableLayout` too (D22, 0023-MADR
+  A7); the fuzz property is D7's, a wider word and a block-opening word
+  excepted (the execution record's note).
 * **Mutations:** a table row printed before the table ends; a marker
   dropped by the styler; a row starting with a word that opens a block;
   the output depends on the split.
@@ -1546,3 +1550,225 @@ was released as `v2.2.0` and closed out (`9a13872`).
     item 10), the external editor's key and event (D6, A5 item 3), ctrl+l
     (A5 item 2), and no width cap (D2).
 * **Step 4 complete, 2026-10-28.**
+
+### Step 5: `stream`'s core, `Printer` and `Markup`
+
+*2026-10-28.* The owner committed and pushed Step 4's release record
+(`919ecef`), and said "post and close. then proceed"; issue #9 has its note
+and is closed.
+
+* **Before any code:** the specifications' examples, read at the step's
+  start: CommonMark 0.31.2's `spec.json`, section "Setext headings", 27
+  examples, 80 to 106, example 95 `Foo\nBar\n---` giving
+  `<h2>Foo\nBar</h2>`; and cmark-gfm 0.29.0.gfm.13's `test/spec.txt`, 672
+  examples, "Tables (extension)" examples 198 to 205. gobble's renderer at
+  `5fb6928` read for the port: `render/mdstream.go` (the holdback),
+  `mdstyle.go` (the styling, which styles no link), `wrap.go` (the
+  wrapping), `table.go` (the layout, whose `isRow` takes only a row that
+  starts with a pipe), `term/style.go` (the SGR attributes), and their
+  order in a reply: `term.Sanitize`, `Stream.Push`, `Tables`, `Style`,
+  `Wrap.Push` (`internal/cli/view.go:132`, `:275-278`). 0009's MADR §1, §4
+  and PLAN Steps 5, 6 and A1.4 read for its amendment; 0009's PLAN is
+  `proposed`, and nothing of `stream`, `frame` or `inputfilter` is built.
+* **Deviation D20, 2026-10-28: links.**
+  * **Found:** A3 item 14 has a reference link styled only when its
+    definition came first; D7's styling, gobble's, styles no link.
+  * **Resolutions offered:** a link's text underlined and its URL dim, a
+    reference link only after its definition, no OSC 8 (recommended); or
+    no link styling, A3 item 14's clause corrected.
+  * **Chosen by the owner,** 2026-10-28: "Underline a link's text
+    (Recommended)". 0023-MADR A6 item 1.
+* **Deviation D21, 2026-10-28: the scanner's API.**
+  * **Found:** the step exports `stream.Scanner`, which only the `Printer`
+    uses here; 0009's `Doc`, its second consumer, is that PLAN's to build.
+  * **Resolutions offered:** unexported until `Doc` (recommended); or a
+    minimal exported `Scanner` now.
+  * **Chosen by the owner,** 2026-10-28: "Unexported until Doc
+    (Recommended)". 0023-MADR A6 item 2; 0009-MADR A5; 0009-PLAN's note of
+    2026-10-28.
+* **Recorded with them** (0023-MADR A6 items 3, 4), as facts the tests
+  expect: the examples' numbers; a multi-line setext heading's earlier
+  lines print as a paragraph, one line held (Q10); a table is held whole
+  until a blank line or another block, its rows with or without outer
+  pipes; an HTML block's lines print as they come, unstyled and unwrapped.
+* **Deviation D22, 2026-10-28: a table and the zero `Markup`.**
+  * **Found,** writing `TestZeroMarkup`: 0023-MADR D7 has a table "laid
+    out" and the zero `Markup`'s output "the input, byte for byte", which
+    a reply with a table cannot both satisfy. The `Printer` follows
+    gobble's order, `Tables` before `Style` (`render/table.go:76`;
+    `mdstyle.go:12`'s "byte for byte" is `Style`'s alone), and the test
+    passed only with the table taken out of its input. New in this step.
+  * **Resolutions offered:** lay a table out under every `Markup`, with
+    `stream.WithoutTableLayout` to turn it off, rule 12's control
+    (recommended); lay out only under a `Markup` that styles; or always
+    lay out, listed as a floor.
+  * **Chosen by the owner,** 2026-10-28: "Lay out; WithoutTableLayout".
+    0023-MADR A7. Added to the step: `WithoutTableLayout` in
+    `stream/options.go`, its test, its defaults row and a mutation.
+* **Note, 2026-10-28: the fuzz property's form.** The step's "never a row
+  wider than the width outside a code or table row" cannot hold beside
+  D7's own "a wider word whole" and "no row beginning with a word that
+  would open a block". The owner chose "Record D7's form": `FuzzPrinter`
+  asserts, when every line of the cleaned source is prose, that each word
+  on a row but its first ends within the width or would open a block
+  there.
+* **Code:**
+  * `stream`, a Charm-free core of ten Go files: `printer.go`, the
+    `Printer` (`NewPrinter`, `Write`, `Flush`, `SetWidth`, `Source`,
+    `Idle`), which cleans each chunk through the rules' `safetext.Sanitizer`
+    and then the floor's, `safetext.Text`, and prints each source line once
+    it is stable; `scan.go`, the unexported block scanner (D21): fences,
+    indented code, ATX headings, setext underlines, thematic breaks, list
+    and quote markers, HTML blocks by CommonMark §4.6's seven kinds and
+    their end conditions, reference definitions, and what starts a block;
+    `table.go`, GFM §4.10's rows with or without outer pipes, the delimiter
+    row, a header of as many cells, and the layout; `inline.go`, code spans,
+    then links (inline, images, and full, collapsed and shortcut references
+    once defined), then gobble's emphasis; `wrap.go`, gobble's whole-word
+    wrapping on one styled line; `style.go`, `Style` (an `internal/enum`
+    bit set, with `Apply`), `Markup` and `DefaultMarkup`; `options.go`,
+    `WithMarkup`, `WithWidth`, `WithMethod`, `WithRules` and, by D22,
+    `WithoutTableLayout`; `doc.go`, with its stability line.
+  * `pick`: `WithMarkup(stream.Markup)`. The `Chooser` keeps the query's
+    `fuzzy.Matcher`; a row's `Text`, once cut to its room, has the cells the
+    query matched in the whole text styled in the `Match` style: the
+    matcher's ranges, within the bytes the cut kept, turned into cells by
+    `fuzzy.Cells` in the width method, and each cluster that starts in one
+    styled. The ellipsis is not.
+  * The gates and the docs: `stream` joins `cores` and the `charmfree`
+    files; the enum table gains `stream.Style`, a bit set, whose absence its
+    test reported first: `stream.Style is an enum the table lacks: add it to
+    enums`, and then, before it was listed in `bitSets`,
+    `stream.Style(2049).String() = "bold|white", want "Style(2049)"`. `docs/guides/defaults.md` gains a
+    `stream` table of eight rows and `pick`'s row for `WithMarkup`;
+    `docs/glossary.md` moves `Printer`, `Markup` and `Style` to "Built",
+    `Scanner` still reserved; `docs/architecture.md`, the package map, the
+    table and the cores; `pick`'s and `stream`'s package documentation. No
+    release: Step 6 releases, and its notes take this step's changes.
+* **Found by the fuzz, fixed in the step's code** (before any commit, so
+  not deviations from the PLAN):
+  * A marker's reset taken for a word: a list marker followed by a tab,
+    `0)\t000`, cut by `cutPlain` before the marker's `SGR 0`, so the wrapper
+    placed the reset as a word of no width and broke the row after it; the
+    styled output differed from the plain. `cutPlain` keeps the escapes
+    right after the prefix with it. The input is kept as a seed,
+    `stream/testdata/fuzz/FuzzPrinter/e336175f3f1a9887`.
+  * A table that ends the reply gained a line break: `endTable` gave every
+    row one. The `Printer` keeps whether the table's last row had one
+    (`tableNL`). The seed `cbf9b04895404c98` is `0|0\n-|-`. The golden
+    `TestTableLayout` writes is a row per line and cannot show a last line
+    break, so the test checks the end of the output itself: gobble's own
+    golden ends `| no   | newline |` with none.
+* **Lint,** at the first run of the step's lint on a scratch copy: errcheck
+  on the three discarded results of the sanitizers' `Write` and `Close`,
+  marked `//nolint:errcheck` with the reason, since `cleaned`'s `Write`
+  never fails, as the repository marks other impossible results
+  (`keymap/keymaptea/keymaptea.go:54`); revive's `redefines-builtin-id` at
+  `close`, renamed `shut`; staticcheck's QF1001 and QF1002, a `letter`
+  helper and a tagged switch. `make modernize` then asked for
+  `strings.SplitSeq` in three loops of `printer_test.go`.
+* **Found, not changed (outside the step):** depguard does not report a
+  blank import, `import _ "charm.land/bubbletea/v2"`: on a scratch copy it
+  passed lint in `lineedit` and in `stream`, and a used, named import of the
+  same package failed it, `import 'charm.land/bubbletea/v2' is not allowed
+  from list 'charmfree'`, in both. `TestCoresAreCharmFree` reports a blank
+  import through the closure, as mutation 5.21 shows, so no core can ship
+  one; the gap is only lint's.
+* **Tests** (`stream/printer_test.go`, `stream/examples_test.go`, written by
+  a script from the specifications' JSON and text):
+  * gobble's styling cases, 24, and five of links, through the `Printer`
+    with `DefaultMarkup` (`TestStyleCases`); gobble's styling input as a
+    golden (`TestStyleGolden`), which matches gobble's `style.golden` line
+    for line but for its table, now laid out; gobble's 30 wrapping cases
+    (`TestWrap`), the table case laid out; gobble's table golden
+    (`TestTableLayout`), which matches gobble's `tables.golden` line for
+    line, and its other text left alone (`TestNotTables`); `TestApply`;
+  * the zero `Markup` byte for byte under `WithoutTableLayout`, a table laid
+    out without it, its rows as they came and styled with it, and
+    `DefaultMarkup` less its escapes the zero `Markup`'s
+    (`TestZeroMarkup`);
+  * any split: every split in two at a rune's start and 20 random splits of
+    every input, plain and styled (`TestAnySplit`);
+  * every setext example, 80 to 106, and every table example, 198 to 205,
+    as goldens with ESC as `<ESC>` (`TestSetext`, `TestTables`), each read
+    against the specification's HTML: 81, 82 and 95 draw only their last
+    line as the heading (A6 item 4); the examples the spec gives no
+    heading, 85, 87, 88, 92, 93's lazy line, 94, 97 to 101 and 104 to 106,
+    print as the paragraph, code or rule they are; 91's code span and HTML
+    lines as the spec has them; 199's alignment; 201 ended by a quote and
+    202 by a blank line, its row of one cell padded; 203 no table; 204 a
+    short row padded and a long one cut;
+  * `TestHoldOneLine`, `TestTableHeld`, `TestFenceLines`, `TestInlineOpen`,
+    `TestReferenceLater`, `TestWrapCJK`, `TestRules` (weaker rules than the
+    floor, and stricter), `TestSource`, `TestHTML` (an HTML block to its
+    end, by kind, and a kind 7 tag that does not interrupt a paragraph),
+    `TestParagraphContinues`;
+  * `FuzzPrinter`: no panic; a split in two at any byte gives the whole's
+    output; `DefaultMarkup`'s less its escapes is the plain; the zero
+    `Markup` with no width and `WithoutTableLayout` gives the cleaned
+    source; and, when every line is prose, D7's form of the width (the
+    note above). Its run, after the two fixes and the lint's: 300 s, 15.9
+    million inputs, clean.
+  * `pick`: `TestMarkupGolden`, the rows the `Chooser` gives its region
+    across the matrix at 30 and 60, underlined under colour and plain
+    without, each within its width; `TestMarkupKeepsLayout`, the screen the
+    same with and without the `Markup`, for both lists, four queries and
+    three widths; `FuzzChooser` now draws with `DefaultMarkup`, so its check
+    of the screen against each row covers the styled rows. Its run:
+    120 s, 743 thousand inputs, clean.
+* **Seen failing,** through `python3 -m tools.verify mutate` on scratch
+  copies, 22 killed of 22: the four the step names, setext, links, lazy
+  continuation and HTML, D22's control, the two bugs the fuzz found, and the
+  rest of the `Printer`, `pick`'s styling and the core's closure. 5.11 and
+  5.12 first failed to build, which is no kill, and were rewritten and
+  killed. Every new test fails under one of them:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | 5.1 a table row printed before the table ends | `printer_test.go:103: tuitest: style color.utf8.0: line 25 differs` |
+  | 5.2 a marker dropped by the styler | `printer_test.go:91: list marker: "- item\n" gives " item\n"; want "\x1b[36m-\x1b[0m item\n"` |
+  | 5.3 a row starts with a word that opens a block | `printer_test.go:191: a lone dash does not start a row:` |
+  | 5.4 the output depends on the split | `TestAnySplit`, on gobble's styling input; `TestHoldOneLine`, `TestFenceLines`, `TestSource`; `FuzzPrinter`'s seeds: `split at 13: "aaaa bbbb cccc dddd, eeee\n"; whole: "aaaa bbbb cccc dddd,\neeee\n"` |
+  | 5.5 an underline does not make a heading | `printer_test.go:250: tuitest: setext color.utf8.0: line 8 differs` |
+  | 5.6 a reference link styled before its definition | `printer_test.go:91: an undefined reference is text: "[a][b] and [c]\n" gives "\x1b[4m[a]\x1b[0m\x1b[2m[b]\x1b[0m and [c]\n"; want "[a][b] and [c]\n"` |
+  | 5.7 a lazy line is taken for a setext heading's text | `printer_test.go:250: tuitest: setext color.utf8.0: line 148 differs` |
+  | 5.8 a kind 7 tag interrupts a paragraph | `printer_test.go:484: "text\n<div>\n*a*\n\ntext\n<span>\n*a*\n"` |
+  | 5.9 an HTML block never ends by its condition | `printer_test.go:477: "<div class=\"x\">\n**not styled** and a long line here\n</div>\n\n<!-- a\n**not** -->\n*yes*\n"` |
+  | 5.10 WithoutTableLayout ignored (D22) | `printer_test.go:116: the zero Markup without table layout changed the text:` |
+  | 5.11 a table that ends the reply gains a line break | `printer_test.go:280: a table that ends the reply with no line break: "\\|\n\\| ---- \\| ------- \\|\n\\| no   \\| newline \\|\n"` |
+  | 5.12 a marker's reset taken for a word | `printer_test.go:432: styled less its escapes: "0)\n  000"; plain: "0)\t000"` |
+  | 5.13 indented code interrupts a paragraph | `printer_test.go:494: "Foo\n    bar\n===\n"; want "Foo\n\x1b[1m    bar\x1b[0m\n\x1b[1m===\x1b[0m\n"` |
+  | 5.14 the floor is the rules | `printer_test.go:379: under weaker rules: "ab \x1b[31mred\x1b[0m\n"; want the floor's` |
+  | 5.15 a Style applies every colour | `printer_test.go:82: red\\|cyan.Apply("x") = "\x1b[31;36mx\x1b[0m"; want "\x1b[31mx\x1b[0m"` |
+  | 5.16 a table's delimiter of another cell count starts it | `printer_test.go:260: tuitest: tables color.utf8.0: line 61 differs` |
+  | 5.17 a held line is lost at the end | `printer_test.go:91: not a heading: "#hashtag\n" gives ""; want "#hashtag\n"` |
+  | 5.18 pick's WithMarkup ignored | `internal_test.go:31: tuitest: markup color.utf8.30: line 2 differs` |
+  | 5.19 pick styles the text before the cut | `internal_test.go:40: tuitest: line 3 is 47 cells wide, over 30: "  a long session name about \x1b[4mson\x1b[0mnets and the sea"` |
+  | 5.20 pick styles the ellipsis | `internal_test.go:31: tuitest: markup color.utf8.30: line 3 differs` |
+  | 5.21 stream imports Bubble Tea | `charmfree_test.go:186: pick (GOOS=linux) links charm.land/bubbletea/v2: pick → stream → charm.land/bubbletea/v2` |
+  | 5.22 pick drops a match that ends the text | `internal_test.go:31: tuitest: markup color.utf8.30: line 3 differs` |
+
+  `TestDefaultsInventory` reads the new rows: on a scratch copy, a
+  misspelt control in each fails it, `docs/guides/defaults.md:311 (A table's
+  layout): built, but stream exports no WithoutTableLayouts`, and the same
+  of `pick.WithMarkups`. depguard's `charmfree` entry for `stream`, on a
+  scratch copy with a used import, `stream/zz_dg.go:3:8: import
+  'charm.land/bubbletea/v2' is not allowed from list 'charmfree'`.
+* **Names:** `python3 -m tools.verify names`, "4 planned name(s), clean",
+  before any code; conformance's names check passes with them.
+* **The API:** `make apicheck`, "against v2.5.0, 0 incompatible
+  change(s)".
+* **Gates:** `python3 -m tools.verify gates` over the step's 27 files but
+  its goldens and its fuzz seeds: macOS 19 passed, 0 failed, in 648 s,
+  `release-check` "391 file(s) clean in 1 module(s)", with `apicheck`
+  against `v2.5.0` and the examples gate (its count is the tracked
+  files, so `stream`'s are outside it, but in its lint, vet and tests of
+  `./...`, and in the per-file gates), markdownlint over 23 files, 0
+  issues; `remote linux` 18 passed, 0 failed, 1 skipped (`gofmt`, which
+  is given no files there), in 1166 s, "401 file(s) clean", this
+  step's among them; `remote windows` 18 passed, 0 failed, 1 skipped, in
+  2720 s, "401 file(s) clean". The identifier scan of the change,
+  untracked files included, is clean.
+* **No release:** Step 6 releases `stream` with `transcript`, and its
+  notes take this step's changes. The step is done when the owner
+  commits it.

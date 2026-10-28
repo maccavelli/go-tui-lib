@@ -1,0 +1,14 @@
+  7|Before.
+  0|
+ 32|| Name        |  Lang  | Count |
+ 32|| ----------- | :----: | ----: |
+ 32|| gobble      |   Go   |     1 |
+ 32|| 世界        | 日本語 | 12345 |
+ 32|| esc \| pipe |   x    |       |
+  0|
+  6|After.
+ 17|| not | a table |
+ 16|no delimiter row
+ 18|| last | table   |
+ 18|| ---- | ------- |
+ 18|| no   | newline |

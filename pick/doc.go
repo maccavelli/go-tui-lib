@@ -14,7 +14,10 @@
 // whole question. Each row is the palette's: the focus glyph on the
 // selected row, so the selection never rests on colour, the entry's Text,
 // and its Detail at the right, dropped when the Text would keep fewer than
-// 8 cells.
+// 8 cells. WithMarkup styles the cells of the Text the query matched in a
+// stream.Markup's Match style, underlined by stream.DefaultMarkup; by
+// default nothing is styled, and the focus glyph and the order say all the
+// rest.
 //
 // Typing edits the query, by lineedit's editing commands; each change
 // ranks the entries' Text again with fuzzy's matcher, best first, ties in

@@ -12,8 +12,35 @@ import (
 	"github.com/maccavelli/go-tui-lib/v2/inline"
 	"github.com/maccavelli/go-tui-lib/v2/inline/inlinetest"
 	"github.com/maccavelli/go-tui-lib/v2/internal/sanitize"
+	"github.com/maccavelli/go-tui-lib/v2/stream"
 	"github.com/maccavelli/go-tui-lib/v2/termkey"
+	"github.com/maccavelli/go-tui-lib/v2/tuitest"
 )
+
+// TestMarkupGolden: the rows the Chooser gives its region, the matched
+// cells underlined under colour by DefaultMarkup and left plain without,
+// each within its width; a cut text's ellipsis is not styled. The screen
+// shows no SGR, so this reads the rows, ESC shown as <ESC>.
+func TestMarkupGolden(t *testing.T) {
+	entries := []Entry{
+		{ID: "a", Text: "anthropic/claude-sonnet-5-5", Detail: "1M"},
+		{ID: "b", Text: "世界 sonar 世界"},
+		{ID: "c", Text: "a long session name about sonnets and the sea"},
+		{ID: "d", Text: "nothing here"},
+	}
+	tuitest.Golden(t, "markup", tuitest.Matrix{Widths: []int{30, 60}}, func(c tuitest.Case) string {
+		o := []Option{WithGlyphs(c.Glyphs()), WithQuery("son")}
+		if c.Color {
+			o = append(o, WithMarkup(stream.DefaultMarkup()))
+		}
+		ch := NewChooser(entries, o...)
+		ch.Resize(c.Width, time.Unix(1, 0))
+		rows, _, _ := ch.view(c.Width)
+		text := strings.Join(rows, "\n")
+		tuitest.Fits(t, text, c.Width, ansi.WcWidth)
+		return strings.ReplaceAll(text, "\x1b", "<ESC>")
+	})
+}
 
 // typeKeys decodes b and gives each input to c.
 func typeKeys(c *Chooser, b string) {
@@ -75,7 +102,7 @@ func FuzzChooser(f *testing.F) {
 		scr := inlinetest.NewScreen(width, 30, ansi.WcWidth)
 		var replies []byte
 		scr.Answer = func(r string) { replies = append(replies, r...) }
-		c := NewChooser(entries, WithHeight(3), WithIndexAbove(2), WithGlyphs(glyph.Unicode()))
+		c := NewChooser(entries, WithHeight(3), WithIndexAbove(2), WithGlyphs(glyph.Unicode()), WithMarkup(stream.DefaultMarkup()))
 		now := time.Unix(1, 0)
 		drain := func() {
 			for e := c.NextEvent(); e.Kind != PickNone; e = c.NextEvent() {

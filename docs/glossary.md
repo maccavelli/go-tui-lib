@@ -38,7 +38,7 @@ built, as the next section lists. Reserved now, each checked with
 
 | Package | Names | Record |
 | :--- | :--- | :--- |
-| `stream` | `Printer`, `Markup`, `Style`, `Scanner`, beside 0009's `Doc` | [0023-MADR](decisions/0023-MADR-line-mode-components.md) D7 |
+| `stream` | `Scanner`, beside 0009's `Doc`, unexported until `Doc` is built on it | [0023-MADR](decisions/0023-MADR-line-mode-components.md) D7, A6 item 2 |
 | `transcript` | `Transcript` | 0023-MADR D9 |
 | `workspace` | `FocusFallback`, `FocusFallbackFunc` | [0024-MADR](decisions/0024-MADR-opt-in-and-opt-out-coverage.md) A1 |
 
@@ -104,7 +104,10 @@ engine; `History`, x/term's interface of the lines it recalls, and
 D6, the events renamed by its A2 item 6, and are built in that PLAN's
 Step 4, with `PasteMode`, what a paste does, and `lineedit/lineedittea`'s
 `ComposerPane`, the composer in a workspace pane, and `EventMsg`, what it
-gives the program.
+gives the program. `stream`'s `Printer`, a streamed reply's Markdown
+printed line by line, each line once; `Markup`, the `Style` of each part of
+a reply it styles; and `Style`, a set of SGR attributes, were reserved by
+its D7 and are built in that PLAN's Step 5.
 Each has one meaning, as its package documents it. `Terminal` is in
 "Deliberate" above; `command.Decision`, `Verdict`'s old name, was removed
 in `v0.10.0`, and `Decision` is `launch`'s alone.

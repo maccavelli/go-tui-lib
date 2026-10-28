@@ -31,6 +31,7 @@ var cores = []string{
 	"msgcat",
 	"pick",
 	"safetext",
+	"stream",
 	"termcap",
 	"termkey",
 	"termsvc",

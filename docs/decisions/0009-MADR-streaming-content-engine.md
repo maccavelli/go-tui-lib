@@ -1044,6 +1044,27 @@ with a type the library exports or another record plans
 [0009-PLAN-streaming-content-engine.md](0009-PLAN-streaming-content-engine.md)
 takes these names when it is next amended, before it runs.
 
+### A5 (2026-10-28): `stream` becomes a Charm-free core
+
+*Status: accepted (2026-10-28),* as
+[0023-MADR-line-mode-components.md](0023-MADR-line-mode-components.md)
+D7, which the owner accepted, decides, with its A6 item 2:
+
+1. **`stream` is a core** (0020-MADR D1, D11): `Doc`, `Renderer`,
+   `RendererFunc`, `Plain` and the block scanner import `safetext`,
+   `internal/enum`, `internal/sanitize` and `x/ansi` alone. What names
+   Bubble Tea or `frame`, `Buffer`, `Doc.Pull` and `Pane`, moves to
+   `stream/streamtea`, by 0020-MADR D2's split rule. §1's table, §4's
+   `Doc.Pull` and §5's `Pane` read so. Nothing of `stream` is shipped, so
+   nothing breaks.
+2. **One block scanner, two consumers.** §4's cut scanner is also the
+   line mode's: 0023's `stream.Printer`, line-stable and append-only,
+   built first (0023-PLAN Step 5), and `Doc`, block-stable, re-rendered by
+   a `Renderer`. The scanner is unexported until `Doc` is built on it,
+   when this record's PLAN exports it as `Scanner` (0023-MADR A6 item 2).
+3. **`stream` gains `Printer`, `Markup` and `Style`,** 0023-MADR D7's,
+   beside `Doc`.
+
 ## More Information
 
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md):

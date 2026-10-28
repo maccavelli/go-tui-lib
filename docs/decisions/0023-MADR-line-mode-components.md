@@ -661,7 +661,9 @@ type CompleterFunc func(line string, pos int) (string, int, bool)
   quote markers in a colour, emphasis by its markers. `Markup` is data: a
   `Style` per role, each an SGR attribute set (bold, dim, italic,
   underline, and a colour of the eight, or none). The zero `Markup` styles
-  nothing, and the output is the input, byte for byte.
+  nothing, and the output is the input, byte for byte. *Amended
+  2026-10-28 by A7: but for a table's layout, which is not styling;
+  with `WithoutTableLayout` too, byte for byte.*
 * **Wrapping is gobble's** (0028-MADR D5 and D7, amended): after styling;
   prose at spaces, a wider word whole; fences, indented code, table rows
   and headings unwrapped; list continuations under their text; quotes
@@ -1413,6 +1415,65 @@ before that step's code and D19 by its fuzzing:
    measures a row's text with the marker before it; the composer a
    line's first row with its lead. The text is unchanged. *Added
    2026-10-28,* by D19.
+
+### A6 (2026-10-28): links styled, the scanner unexported, and the printer's limits
+
+*Status: accepted (2026-10-28),* the owner's answers to
+[0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
+Step 5's deviations D20 and D21, each "(Recommended)", found before that
+step's code:
+
+1. **A link's text is underlined.** D7's styling, gobble's `mdstyle.go`,
+   styles no link, so A3 item 14's reference clause had nothing to apply
+   to. An inline link's text, `[text](url)`, is drawn in `Markup`'s link
+   style, underline by default, and its URL dim, every marker kept; a
+   reference link, `[text][ref]` or `[text]`, is so styled only when its
+   definition was printed before it, and a definition after it changes
+   nothing printed. No OSC 8: a printer that only prints should not
+   assign links (A3.3's OSC 8 note).
+2. **The block scanner is unexported** until 0009's `Doc`, its second
+   consumer, is built on it; 0009's amended PLAN exports it as `Scanner`
+   then, with both consumers in view. D7's "one block scanner, two
+   consumers" stands, and the glossary keeps `Scanner` reserved.
+3. **The examples the `Printer` is tested on,** read from the
+   specifications at Step 5's start (2026-10-28): CommonMark 0.31.2's
+   setext headings, examples 80 to 106 (`spec.commonmark.org/0.31.2/spec.json`,
+   section "Setext headings", 27 examples), example 95 `Foo`, `Bar`,
+   `---` being `<h2>Foo\nBar</h2>` as A3.3 read it; and GFM 0.29-gfm's
+   tables, examples 198 to 205 (cmark-gfm 0.29.0.gfm.13's
+   `test/spec.txt`, "Tables (extension)", eight examples).
+4. **What holding one line (Q10) does not do,** stated so the tests
+   expect it: a setext heading of more than one line, example 95's, has
+   only its last line drawn as the heading, the lines before it printed as
+   the paragraph they were until the underline came; a line of a
+   paragraph is never styled again. A table is held whole, its header
+   known when the delimiter row comes, until a blank line or the start of
+   another block, as GFM §4.10 ends it, its rows with or without their
+   outer pipes (examples 199 and 202); gobble's `Tables` reads only rows
+   that start with a pipe. An HTML block's lines (CommonMark §4.6) print as
+   they come, unstyled and unwrapped, as a code line does.
+
+### A7 (2026-10-28): a table's layout, and its control
+
+*Status: accepted (2026-10-28),* the owner's answer to
+[0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
+Step 5's deviation D22, "Lay out; WithoutTableLayout", found while that
+step's tests were written:
+
+1. **D7's "byte for byte" is the styler's, not the `Printer`'s.** gobble
+   lays a table out before it styles (`render/table.go:76`, `Tables`,
+   then `Style`), and its "byte for byte" with colour off is `Style`'s
+   alone (`render/mdstyle.go:12`), so its tables are laid out with colour
+   off too. D7 put both in one sentence, which a reply with a table
+   cannot satisfy.
+2. **The `Printer` lays a table out under every `Markup`,** as gobble
+   does: the columns as wide as their widest cell, in the width method,
+   aligned as the delimiter row says. The zero `Markup` styles nothing.
+3. **`stream.WithoutTableLayout` turns the layout off** (AGENTS.md "API
+   conventions" rule 12: a policy applied to the text a user is shown):
+   a table is still held until it ends, and its rows print as they came,
+   styled by the `Markup`. With it and the zero `Markup`, the output is
+   the input, byte for byte.
 
 ## More Information
 
