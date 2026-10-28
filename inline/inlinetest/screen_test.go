@@ -142,3 +142,35 @@ func TestResize(t *testing.T) {
 		t.Errorf("a wide cluster re-wrapped: %q; want it whole on the next row", got)
 	}
 }
+
+// TestWiderClusters: under WcWidth a ZWJ sequence is one cluster as wide as
+// its emoji, four or six cells, and keeps that width across a resize, and
+// text over any of its cells blanks all of it
+// (0023-PLAN-line-mode-components.md Step 3, D12).
+func TestWiderClusters(t *testing.T) {
+	const pair, family = "👨‍👩", "👨‍👩‍👧" // 4 and 6 cells under WcWidth
+	s := NewScreen(10, 3, ansi.WcWidth)
+	write(s, "a"+pair+"b")
+	s.Resize(10, inline.ReflowDown)
+	write(s, "\r\x1b[5Cc")
+	if got := s.Lines()[0]; got != "a"+pair+"c" || s.Col != 6 {
+		t.Errorf("after a resize to the same width, c at column 5: %q, column %d; want b overwritten", got, s.Col)
+	}
+	s.Resize(5, inline.ReflowDown)
+	if got := s.Lines()[:2]; !slices.Equal(got, []string{"a" + pair, "c"}) {
+		t.Errorf("re-wrapped at 5: %q; want the 4-cell pair kept whole on the first row", got)
+	}
+	for _, c := range []struct {
+		name, keys, want string
+	}{
+		{"a cell inside it", "\r\x1b[3Cz", "x  z   y"},
+		{"its first cell", "\r\x1b[1Cw", "xw     y"},
+		{"an erase from inside it", "\r\x1b[4C\x1b[K", "x"},
+	} {
+		s := NewScreen(10, 2, ansi.WcWidth)
+		write(s, "x"+family+"y"+c.keys)
+		if got := s.Lines()[0]; got != c.want {
+			t.Errorf("%s: %q; want %q, the 6-cell family blanked whole", c.name, got, c.want)
+		}
+	}
+}

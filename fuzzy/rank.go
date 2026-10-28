@@ -42,8 +42,9 @@ const maxBoost = bonusConsecutive
 // context.
 const checkEvery = 64
 
-// Rank scores items by key and returns the best limit, best first, stable
-// on ties. A limit below 1 keeps every match.
+// Rank scores items by key and returns the best limit, best first: by
+// grade, then value, then the shorter key, as fzf's default tiebreak does,
+// then the earlier item. A limit below 1 keeps every match.
 func (m *Matcher) Rank[T any](items iter.Seq[T], key func(T) string, limit int) []Ranked[T] {
 	out, err := m.RankContext(context.Background(), items, key, limit, nil)
 	if err != nil {

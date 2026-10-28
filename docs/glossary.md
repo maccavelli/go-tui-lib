@@ -38,8 +38,7 @@ built, as the next section lists. Reserved now, each checked with
 
 | Package | Names | Record |
 | :--- | :--- | :--- |
-| `pick` | `Chooser`, `Entry`, `ChooserEvent`, `ChooserEventKind` | [0023-MADR](decisions/0023-MADR-line-mode-components.md) D5, A2 item 6 |
-| `lineedit` | `Composer`, `History`, `MemHistory`, `Completer`, `CompleterFunc`, `ComposerEvent`, `ComposerEventKind` | 0023-MADR D6, A2 item 6 |
+| `lineedit` | `Composer`, `History`, `MemHistory`, `Completer`, `CompleterFunc`, `ComposerEvent`, `ComposerEventKind` | [0023-MADR](decisions/0023-MADR-line-mode-components.md) D6, A2 item 6 |
 | `stream` | `Printer`, `Markup`, `Style`, `Scanner`, beside 0009's `Doc` | 0023-MADR D7 |
 | `transcript` | `Transcript` | 0023-MADR D9 |
 | `workspace` | `FocusFallback`, `FocusFallbackFunc` | [0024-MADR](decisions/0024-MADR-opt-in-and-opt-out-coverage.md) A1 |
@@ -95,6 +94,10 @@ and how it was answered, and `Asker`, `AskerEvent` and `AskerEventKind`, the
 question's engine, an event it returns and its kind, were reserved by its
 D4, the events renamed by its A2 item 6, and are built in that PLAN's Step 2, with `ask/asktea`'s `Dialog`, the
 question in an overlay, and `AnsweredMsg`, its answer, by its A2 item 4.
+`pick`'s `Entry`, one thing to pick, and `Chooser`, `ChooserEvent` and
+`ChooserEventKind`, the picker's engine, an event it returns and its kind,
+were reserved by its D5, the events renamed by its A2 item 6, and are built
+in that PLAN's Step 3.
 Each has one meaning, as its package documents it. `Terminal` is in
 "Deliberate" above; `command.Decision`, `Verdict`'s old name, was removed
 in `v0.10.0`, and `Decision` is `launch`'s alone.

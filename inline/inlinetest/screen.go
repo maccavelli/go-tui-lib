@@ -18,8 +18,9 @@ import (
 )
 
 // Screen is a terminal's screen, enough of one to check what a component
-// draws: a grid of cells, each one grapheme cluster, a wide one taking two
-// cells, measured by the screen's width method; \r; a line feed, scrolling
+// draws: a grid of cells, each one grapheme cluster, a wide one taking as
+// many cells as the screen's width method measures it, two for 世, four for
+// a ZWJ pair under ansi.WcWidth; \r; a line feed, scrolling
 // at the bottom into the scrollback; the cursor moves up, down, forward,
 // back and to a place (CSI A, B, C, D, H); erasing below, the whole screen
 // and the scrollback (CSI J, 2 J, 3 J), and to the end of the line or the
@@ -48,7 +49,7 @@ type Screen struct {
 
 	method        ansi.Method
 	width, height int
-	cells         [][]string // each cell a cluster; "" is the second cell of a wide one
+	cells         [][]string // each cell a cluster; "" continues a wide one
 	pending       bool
 	scrolled      []string
 	rest          string // the start of a sequence a Write cut short
@@ -184,14 +185,25 @@ func (s *Screen) csi(c ansi.Cmd, ps ansi.Params) {
 	}
 }
 
-// eraseRight blanks the cursor's row from its column, and the first cell
-// of a wide cluster the column splits.
+// eraseRight blanks the cursor's row from its column, and all of a wide
+// cluster the column splits.
 func (s *Screen) eraseRight() {
 	row := s.cells[s.Row]
 	if s.Col > 0 && row[s.Col] == "" {
-		row[s.Col-1] = " "
+		blankCluster(row, s.Col)
 	}
 	for c := s.Col; c < s.width; c++ {
+		row[c] = " "
+	}
+}
+
+// blankCluster blanks every cell of the cluster that covers column c.
+func blankCluster(row []string, c int) {
+	for c > 0 && row[c] == "" {
+		c--
+	}
+	row[c] = " "
+	for c++; c < len(row) && row[c] == ""; c++ {
 		row[c] = " "
 	}
 }
@@ -219,10 +231,10 @@ func (s *Screen) put(cluster string, w int) {
 	}
 	row := s.cells[s.Row]
 	if row[s.Col] == "" && s.Col > 0 {
-		row[s.Col-1] = " " // the first cell of a wide cluster it splits
+		blankCluster(row, s.Col) // a wide cluster it splits
 	}
 	if end := s.Col + w; end < s.width && row[end] == "" {
-		row[end] = " " // the second cell of a wide cluster it covers the first of
+		blankCluster(row, end) // a wide cluster it covers the start of
 	}
 	row[s.Col] = cluster
 	for k := 1; k < w; k++ {
@@ -258,9 +270,9 @@ func (s *Screen) Resize(columns int, how inline.Reflow) {
 			if row[c] == "" {
 				continue
 			}
-			w := 1
-			if c+1 < len(row) && row[c+1] == "" {
-				w = 2
+			w := 1 // and a cell for each that continues it
+			for c+w < len(row) && row[c+w] == "" {
+				w++
 			}
 			text[i] = append(text[i], cluster{row[c], w})
 		}

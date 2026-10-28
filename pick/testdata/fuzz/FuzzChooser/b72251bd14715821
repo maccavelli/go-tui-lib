@@ -1,0 +1,4 @@
+go test fuzz v1
+[]byte("  \u200d")
+byte('I')
+byte('\x03')

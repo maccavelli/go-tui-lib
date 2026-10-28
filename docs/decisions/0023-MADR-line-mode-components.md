@@ -550,7 +550,9 @@ func NewChooser(entries []Entry, o ...Option) *Chooser // WithHeight (8), WithPr
 
 * **It filters with `fuzzy`, the palette's matcher:** each keystroke
   compiles one `fuzzy.Matcher` and ranks with `Rank`, best first, stable
-  on ties; above `WithIndexAbove` entries (5000, as `palette.Files`) it
+  on ties (A4: `Rank` breaks a tie by the shorter key, so the `Chooser`
+  scores with `Matcher.Score` and keeps ties in the input order); above
+  `WithIndexAbove` entries (5000, as `palette.Files`) it
   narrows with a `fuzzy.Index` first. Matched cells are underlined through
   `fuzzy.Cells`, in the width method, when the host's `Markup` styles.
 * **Keys:** typing edits the query in a one-row `lineedit.Composer`; up,
@@ -992,7 +994,9 @@ The repository's own facts were read at `699ecb4`.
 * `fuzzy.Matcher.Rank` "scores items by key and returns the best limit,
   best first, stable on ties", and "an empty query … matches every
   candidate with the zero Score": so an empty query keeps the input order
-  with no code of its own (`go doc ./fuzzy`).
+  with no code of its own (`go doc ./fuzzy`). *Corrected by A4 item 1:*
+  its order breaks a tie by the shorter key before the input order, so
+  "stable on ties" holds only between keys of one length.
 * `fuzzy.Index` "is lossy on purpose", and `Candidates` yields "at most
   the maximum", `DefaultMaxCandidates`, 2000; a candidate that equals the
   query, or whose word or path element starts with it, is yielded first.
@@ -1000,7 +1004,9 @@ The repository's own facts were read at `699ecb4`.
   (`palette/engine.go:446-456`), keeps at most its limit, 200 by default,
   and keeps one hit per `ID` (`:420-444`). One provider that yields its
   entries in order is therefore ranked as `Rank` ranks them, through the
-  first 200, when the IDs are distinct.
+  first 200, when the IDs are distinct. *Corrected by A4 item 1:* as its
+  matches are ranked by grade and value, ties in the input order, which
+  `Rank` is not.
 * `palette.Static` is the template for `FromEntries`: `Search` scores
   `Text` with the shared matcher, `Discover` lists every item, first best,
   so they keep their order (`palette/static.go:38-61`).
@@ -1220,7 +1226,8 @@ For Step 3, by the owner's answers to Q8 and Q9 below:
    1), its bound 1024 bytes, room for `fuzzy.MaxQuery` clusters of one
    four-byte rune each.
 4. **The order is the matcher's:** `Rank`, its grade, its value, then the
-   input order; fzf's length tie-break is not taken, so `pick` and the
+   input order (A4 item 2: by `Matcher.Score` and a stable sort, since
+   `Rank` puts the shorter key first); fzf's length tie-break is not taken, so `pick` and the
    palette order one list alike. An empty query keeps the input order. The
    selection returns to the first row when the query changes, as in fzf
    and the palette, and the window keeps it on the screen, as the
@@ -1305,6 +1312,37 @@ one line (Recommended)"; Q11 "On, WithoutScrollbackClear (Recommended)".
   D13 as accepted, on by default with `WithoutScrollbackClear`, the
   record's reason a reprint that lines up. The alternative is off until
   `WithScrollbackClear`.
+
+### A4 (2026-10-27): `Rank`'s tie order
+
+*Status: accepted (2026-10-27),* by the owner's answer to deviation D11 of
+the PLAN's Step 3, "Input order (Recommended)", found by the step's
+`TestFromEntriesRankedLikeChooser` before any release.
+
+1. **A3.1's first fact is corrected.** `fuzzy.Matcher.Rank`'s order is
+   total: the grade, the value, then the shorter key, then the input order
+   (`fuzzy/rank.go:23-35`, at `4341af2`). "Stable on ties", which A3.1
+   quoted from its documentation, holds only between keys of one length.
+   A probe at `4341af2`: for the query `gpt`, `openai/gpt-5`,
+   `openai/gpt-5-mini`, `openai/gpt-5-nano`, `openai/gpt-4.1` and
+   `openai/gpt-4.1-mini`, given in that order, each score `prefix 84`, and
+   `Rank` returns them by length, `gpt-5`, `gpt-4.1`, `gpt-5-mini`,
+   `gpt-5-nano`, `gpt-4.1-mini`, where the palette's engine, ordering by
+   score and then by arrival (`palette/engine.go:448-456`), keeps the order
+   given.
+2. **A3.4 item 4's decision stands:** ties keep the input order, so the
+   program's own order, such as a sessions list's recency, decides between
+   equal matches, and `pick` and the palette order one list alike. The
+   `Chooser` scores each candidate with `Matcher.Score` and sorts its
+   matches stably by grade and then value, as the palette's engine orders
+   hits; it does not call `Rank`.
+3. **`fuzzy.Matcher.Rank`'s documentation** says its tie order, the shorter
+   key and then the input order. Its behaviour is unchanged.
+
+The options weighed were: `Rank`'s order kept, with `FromEntries`
+yielding its matches in it, which would order a sessions list's ties by
+title length and change an accepted decision; and a tie-order option in
+`fuzzy`, new exported API for one caller.
 
 ## More Information
 

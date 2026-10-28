@@ -18,7 +18,7 @@ pattern, used by every program that needs it.
 
 ## Status
 
-- **The current release is `v2.3.0`,** at the module path
+- **The current release is `v2.4.0`,** at the module path
   `github.com/maccavelli/go-tui-lib/v2`
   ([0020-MADR](docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
   A4.1). `v2.0.0` follows `v1.13.0`, which a `v1` user keeps; `v1.13.0` follows
@@ -124,6 +124,12 @@ pattern, used by every program that needs it.
   module but `x/ansi`. `ask/asktea` asks the same question in a workspace
   overlay
   ([0023-MADR](docs/decisions/0023-MADR-line-mode-components.md)).
+- **A line-mode picker, since `v2.4.0`.** `pick` picks one entry from a
+  filtered list inline: a model with its context and prices, a session by
+  title and time. The query is ranked by `fuzzy` as it is typed, the keys
+  are commands in the program's keymap, and the choice is left in the
+  scrollback as one line. It links no Charm module but `x/ansi`, and
+  `palette.FromEntries` serves the same entries in the TUI's palette.
 - **The stack is Charm v2:** `charm.land/bubbletea/v2`,
   `charm.land/lipgloss/v2` and `charm.land/bubbles/v2`, with
   `github.com/charmbracelet/colorprofile` and

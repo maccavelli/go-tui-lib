@@ -28,6 +28,7 @@ var cores = []string{
 	"keymap",
 	"layout",
 	"msgcat",
+	"pick",
 	"safetext",
 	"termcap",
 	"termkey",

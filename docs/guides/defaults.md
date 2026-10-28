@@ -143,6 +143,7 @@ record that is not there.
 | Recents | not recorded | `palette.WithRecents` | built |
 | A completion pop-up | not | `palette.WithoutInput` | built |
 | The argument stage | for a hit with parameters | `palette.Hit.Params` | built |
+| A line-mode picker's entries | a provider of them, its hits with no `Run` | `palette.FromEntries` | built |
 | A click on a row | accepts it | `palette.WithoutClickAccept` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
 | Accepting a hit | closes the picker | `palette.WithoutCloseOnAccept` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
 | A query of `?` | lists the prefixes | `palette.WithoutPrefixList` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
@@ -252,6 +253,26 @@ record that is not there.
 | The overlay: its ID, place and width | `ask/asktea.DefaultID`, centred, the workspace's width | `ask/asktea.WithID`, `ask/asktea.WithAnchor`, `ask/asktea.WithWidth` | built |
 | The overlay's question: its method and glyphs | the workspace's | `ask/asktea.WithAsk` | built |
 | Esc in the overlay | closes it, the question canceled | `workspace.EscConsumer` | decided (0008-MADR-command-palette.md) |
+
+## pick
+
+| Behaviour | Default | Control | Status |
+| :--- | :--- | :--- | :--- |
+| How text is measured | `ansi.WcWidth` | `pick.WithMethod` | built |
+| The glyphs: the prompt, the focus marker and the ellipsis | Unicode | `pick.WithGlyphs` | built |
+| The prompt | the glyphs' | `pick.WithPrompt` | built |
+| The query it starts with | empty | `pick.WithQuery` | built |
+| The list's height | 10 rows, fewer when there are fewer entries | `pick.WithHeight`, `pick.DefaultHeight` | built |
+| An index before ranking | above 5000 entries | `pick.WithIndexAbove`, `pick.DefaultIndexAbove` | built |
+| The region it is drawn in | its own, measured as the entries are | `pick.WithRegion` | built |
+| Its keys | `pick.DefaultRules`, alone | `pick.WithKeymap`, `pick.DefaultRules` | built |
+| Its commands' IDs and scope | `pick.select.next` and the others, in `kind:chooser` | `pick.SelectNextID`, `pick.ChooserScope` | built |
+| Its own words: the count, no results and a cancel's word | English | `pick.WithCatalog`, `pick.Messages` | built |
+| How the entries' text, the prompt and the query are cleaned | `safetext.Line`, never less | `pick.WithRules` | built |
+| What cancels besides its keys | ctrl+c, outside the keymap, and the host's `Cancel` | `pick.Chooser.Cancel` | decided (0023-MADR-line-mode-components.md D4) |
+| The query's editing keys | a fixed set, not the keymap's, until `lineedit` | `pick.Chooser.HandleInput` | decided (0023-MADR-line-mode-components.md A2) |
+| Equal matches | in the order given | `pick.NewChooser` | decided (0023-MADR-line-mode-components.md A4) |
+| A query's length | 1024 bytes | `pick.NewChooser` | floor |
 
 ## inline and inline/inlinetest
 

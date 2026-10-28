@@ -119,6 +119,7 @@ linters:
             - "**/keymap/*.go"
             - "**/layout/*.go"
             - "**/msgcat/*.go"
+            - "**/pick/*.go"
             - "**/safetext/*.go"
             - "**/termcap/*.go"
             - "**/termkey/*.go"

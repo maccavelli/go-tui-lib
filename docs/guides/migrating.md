@@ -7,6 +7,45 @@ needs a major version, at a new module path
 ([AGENTS.md, API conventions](../../AGENTS.md#api-conventions), rule 1).
 Up to `v0.12.0`, a deprecated name was removed in the next minor release.
 
+## Migrating to `v2.4.0`
+
+`v2.4.0` adds a package and a palette provider, removes or retypes
+nothing, and changes no default: `make apicheck` against `v2.3.0` reports
+0 incompatible changes
+([0023-PLAN-line-mode-components](../decisions/0023-PLAN-line-mode-components.md)
+Step 3). A program on `v2.3.0` needs no change to build, and behaves as it
+did, but for the test screen's fix below:
+
+```bash
+go get github.com/maccavelli/go-tui-lib/v2@v2.4.0
+```
+
+### Added
+
+- **`pick`,** a picker drawn inline (issue #8): `Entry`, and `Chooser`,
+  the pick as an engine that does no I/O, with `ChooserEvent`,
+  `ChooserEventKind` and `Cancel`; the options `WithHeight` with
+  `DefaultHeight`, `WithPrompt`, `WithQuery`, `WithMethod`, `WithGlyphs`,
+  `WithIndexAbove` with `DefaultIndexAbove`, `WithRegion`, `WithCatalog`,
+  `WithRules` and `WithKeymap`; its keys, `DefaultRules`, the command IDs
+  `SelectNextID`, `SelectPrevID`, `PageNextID`, `PagePrevID`, `AcceptID`
+  and `CancelID`, and `ChooserScope`; its messages, `Messages`,
+  `MsgCount`, `MsgCountMore`, `MsgNoResults` and `MsgCanceled`. It links
+  no Charm module but `x/ansi`.
+- **`palette`:** `FromEntries`, a provider of the same `[]pick.Entry`,
+  ranked as a `pick.Chooser` ranks them.
+
+### Fixed
+
+- **`inline/inlinetest`:** `Screen` keeps a cluster wider than two cells,
+  such as a ZWJ sequence under `ansi.WcWidth`, as wide as it is across a
+  `Resize`, and blanks all of it when text covers one of its cells; before,
+  a resize laid it out two cells wide, and the text after it two cells
+  early (0023-PLAN Step 3, D12).
+- **`fuzzy`:** `Matcher.Rank`'s documentation states its tie order, the
+  shorter key and then the earlier item, which it has always had
+  ([0023-MADR](../decisions/0023-MADR-line-mode-components.md) A4).
+
 ## Migrating to `v2.3.0`
 
 `v2.3.0` adds packages and a reply kind, removes or retypes nothing, and

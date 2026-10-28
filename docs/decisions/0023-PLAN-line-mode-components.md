@@ -193,7 +193,11 @@ messages, the rules or the region.*
   matches', `MsgCountMore` when the index yielded
   `fuzzy.DefaultMaxCandidates`, and `MsgNoResults` for none
   (`TestRankLikeMatcher`, `TestEmptyQueryOrder`, `TestIndex`,
-  `TestCount`).
+  `TestCount`). *Amended by D11, 2026-10-27:* `Rank` breaks a tie by the
+  shorter key, so the `Chooser` scores each candidate with
+  `Matcher.Score` and sorts the matches stably by grade and value, ties
+  in the input order, and `fuzzy.Rank`'s documentation says its own tie
+  order (0023-MADR A4).
 * **Keys** (A3.4 item 3, Q9): through a `keymap.Dispatcher` over
   `WithKeymap`'s keymap, or one built from `DefaultRules()` alone, on the
   path `[ChooserScope]`: up and ctrl+p, down and ctrl+n, a row, clamped,
@@ -483,7 +487,9 @@ was released as `v2.2.0` and closed out (`9a13872`).
 * **`inline/inlinetest/`:** `Screen`, gobble's `termtest.Screen` rebuilt on
   `x/ansi`'s `DecodeSequenceInString` under the screen's width method, a
   cell per grapheme cluster, a wide one two cells and never split by a
-  wrap or a re-wrap; `NewScreen(columns, rows, method)`; pending wrap; CSI
+  wrap or a re-wrap (*corrected by Step 3's D12:* a cluster takes as many
+  cells as it is wide, a ZWJ sequence under `ansi.WcWidth` four or six, and
+  `Resize`, a cluster split and an erase each read it so); `NewScreen(columns, rows, method)`; pending wrap; CSI
   A, B, C, D, H, J, 2 J, 3 J, K and 2 K; DECTCEM and mode 2026, as
   `Hidden` and `Synchronized`; `Answer` for `CSI 6 n`; `Cooked`;
   `Resize(columns, inline.Reflow)`, by D4; a scrollback, which a scroll
@@ -852,3 +858,256 @@ was released as `v2.2.0` and closed out (`9a13872`).
     no width cap (D2), keys fed to an engine (D2, D3), and the reason's
     fixed keys until `lineedit` (A2 item 1).
 * **Step 2 complete, 2026-10-27.**
+
+### Step 3: `pick` and `palette.FromEntries` (issue #8), and a release
+
+*2026-10-27.* The owner committed the A3 records (`4341af2`) and said
+"committed, approved to proceed".
+
+* **Before any code** (items 2 and 3): `git diff --stat c73eee6 4341af2`
+  over `fuzzy`, `palette`, `keymap`, `glyph`, `msgcat`, `safetext`,
+  `inline`, `internal` and `termkey` is empty, so A3.1's facts about this
+  repository, read at `699ecb4`, stand at the tree the step starts on; they
+  were read again, `go doc -all ./fuzzy` and `./keymap`,
+  `palette/engine.go`'s `insert` and `before` (`:420-456`),
+  `palette/static.go:38-61`, `palette/view.go`'s `minText` (`:18`),
+  `drawRow` (`:72-152`) and `helpLine` (`:205-239`), `palette/keys.go:45-72`
+  and `palette/options.go`'s `DefaultLimit`, 200 (`:17`), and agree with
+  A3.1, but for its first fact, which D11 corrects. `keymap` is a core, so
+  `pick`'s closure holds `command` and `when` through it, both cores.
+  `python3 -m tools.verify names` over `pick`'s five types: "5 planned
+  name(s), clean".
+* **Deviation D11, 2026-10-27: `Rank` breaks a tie by the shorter key.**
+  * **Found** by `TestFromEntriesRankedLikeChooser`, the step's first run
+    of it: `"gpt": the palette ranks ["m06" "m07" "m08" "m09" "m10"]; the
+    Chooser ["m06" "m09" "m07" "m08" "m10"]`. A probe in a scratch module
+    showed the five score `prefix 84` alike, and `Rank` returning them by
+    length; `fuzzy/rank.go:23-35` orders by grade, value, the shorter key,
+    then the input order, while its documentation says "stable on ties",
+    which A3.1 quoted and A3.4 item 4 read as the input order. The fault is
+    in the record's fact, pre-existing at `4341af2`, not in this step's
+    code; the other eight queries of the test agreed.
+  * **Resolutions offered:** the input order, the `Chooser` scoring with
+    `Matcher.Score` and a stable sort as the palette's engine orders, with
+    A3.1 corrected and `Rank`'s documentation made to say its tie order
+    (recommended); `Rank`'s order kept and `FromEntries` yielding in it,
+    a sessions list's ties then by title length, an accepted decision
+    changed; or a tie-order option in `fuzzy`, new exported API.
+  * **Chosen by the owner,** 2026-10-27: "Input order (Recommended)".
+    0023-MADR A4. This step's scope gains `fuzzy/rank.go`'s documentation,
+    a comment only.
+* **Deviation D12, 2026-10-27: `inlinetest.Screen` takes a cluster as at
+  most two cells wide.**
+  * **Found** by `FuzzChooser`, its saved input
+    `pick/testdata/fuzz/FuzzChooser/17ead44044a2b0f6`: `width 73, row 0:
+    the screen shows "❯ 👨\u200d👩K,  7EL _👧 … no results"; want "❯
+    👨\u200d👩K,7EL _👧 … no results"`. A replay of the input through the
+    public API in a scratch module drew the row right until the screen's
+    own `Resize`, at the same width, between the input's two halves; after
+    it the `Chooser` moved to column 8, the right column, and the screen
+    put the text two cells further on. Under `ansi.WcWidth` `👨\u200d👩` is
+    one cluster four cells wide, by `StringWidth`, `FirstGraphemeCluster`
+    and `DecodeSequenceInString` alike (a probe). `Screen.Resize`
+    (`inline/inlinetest/screen.go:261-264`) reads a cluster's width as 1,
+    or 2 when the next cell continues it, so a wider one is re-laid two
+    cells wide; `put` (`:221-226`) and `eraseRight` (`:191-193`) blank one
+    cell beside a cluster they split, not all of it. The fault is Step 1's,
+    released in `v2.3.0`; the `Region` and `pick` measure as the screen
+    writes, and are not at fault. On a scratch copy of the tree, `Resize`
+    counting every continuation cell made the four saved inputs of
+    `FuzzChooser` pass, and `inline`'s and `inlinetest`'s tests too.
+  * **Resolutions offered:** the fix in this step, with a test of a four-
+    and a six-cell cluster under `ansi.WcWidth` across a resize, a split
+    and an erase, seen failing first, and a mutation, shipped in `v2.4.0`
+    as a fix (recommended); or a patch release, `v2.3.1`, before this step
+    goes on.
+  * **Chosen by the owner,** 2026-10-27: "Fix it in Step 3 (Recommended)".
+    This step's scope gains `inline/inlinetest/screen.go` and its test. No
+    decision of the MADR changes: D3 has the screen measure by the width
+    method, which the fix makes it do.
+* **`pick/`,** a core:
+  * `Entry{ID, Text, Detail}` (`entry.go`). `ChooserEvent{Kind, Data,
+    Entry, Canceled}` and `ChooserEventKind` (`event.go`): `PickNone`,
+    `PickWrite`, `PickDone`, tokens `none`, `write`, `done`, from
+    `internal/enum`.
+  * `Chooser` (`chooser.go`): `NewChooser(entries, …)`, `Resize` (the
+    first draws), `HandleInput`, `Timeout`, `HandleTimeout`, `Cancel`,
+    `NextEvent`. The entries' `Text` and `Detail`, and the prompt, are
+    cleaned once, at `NewChooser`, by `WithRules`' rules and then
+    `internal/sanitize.Line`; the event carries the caller's `Entry`. The
+    query is an `internal/lineinput.Line` of at most 1024 bytes; a typed
+    key's text and a paste are cleaned the same way before they go in.
+    Each change of the query scores the entries' `Text` with one
+    `fuzzy.Matcher`, through the index's candidates, sorted back into the
+    order given, when there are more than `WithIndexAbove` entries, and
+    sorts the matches stably by grade and then value (D11); an empty query
+    keeps every entry, in order, past the index, so the index's cap never
+    hides the list. The selection returns to the first row.
+  * The keys go through a `keymap.Dispatcher` over `WithKeymap`'s keymap,
+    or one of `DefaultRules()` alone, on the path `[ChooserScope]`, with
+    an empty `when.Map`; ctrl+c cancels before it. A key it does not take,
+    and a sequence's replayed keys, go to the query. A pending sequence's
+    `Wait` is folded into `Timeout`, the earlier of it and the region's,
+    and `HandleTimeout` gives the dispatcher its `Expire` when it is due.
+    A command of another ID in `ChooserScope` is taken and does nothing.
+  * The rows (`view`): the query row, the prompt (`WithPrompt`, or the
+    glyphs' `Prompt`), cut to half the width when wider, a space, the
+    query's window, and the count right-aligned, left out below 8 cells
+    of query; then `min(height, entries)` rows, `glyph.Set.Focus` or its
+    width in spaces, a space, the `Text` cut by `internal/sanitize.Truncate`
+    with the ellipsis, and the `Detail` right-aligned, left out below 8
+    cells of text; blank past the matches. The cursor is on the query row.
+  * The end: enter with a match commits one line, the prompt, a space and
+    the entry's cleaned `Text`, cut to the width with the ellipsis; enter
+    with none does nothing; a cancel commits the prompt and
+    `MsgCanceled`. Nothing is taken after.
+  * Options (`options.go`), opaque: `WithHeight` and `DefaultHeight` (10),
+    `WithPrompt`, `WithQuery`, `WithMethod`, `WithGlyphs`, `WithIndexAbove`
+    and `DefaultIndexAbove` (5000), `WithRegion`, `WithCatalog`,
+    `WithRules`, `WithKeymap`; a zero or nil value keeps the default.
+    Keys (`keys.go`): `SelectNextID`, `SelectPrevID`, `PageNextID`,
+    `PagePrevID`, `AcceptID`, `CancelID`, `ChooserScope` and
+    `DefaultRules()`. Messages (`messages.go`): `MsgCount`, `MsgCountMore`,
+    `MsgNoResults`, `MsgCanceled`, `Messages()`.
+  * Its closure holds `command` and `when` through `keymap`, as the facts
+    re-read said; both are cores. `pick` imports `palette` nowhere, so
+    `palette` can import it.
+* **`palette/entries.go`:** `FromEntries(name, entries)`, `Static`'s form,
+  each entry's `Text` cleaned by `internal/sanitize.Line` at construction,
+  so it is scored as the `Chooser` scores it under its default rules;
+  `Search` scores `Text` alone, `Discover` lists the entries first best,
+  each hit `Hit{ID, Text, Hint: Detail, Score}` with no `Run`.
+* **`fuzzy/rank.go`** (D11): `Rank`'s documentation says its tie order.
+* **`inline/inlinetest/screen.go`** (D12): `Resize` counts every cell that
+  continues a cluster; `put` and `eraseRight` blank all of a cluster they
+  split, by `blankCluster`; the type's documentation says a cluster takes
+  as many cells as it is wide.
+* **The gates:** `pick` joins `cores` and the `charmfree` files; the enum
+  table gains `pick.ChooserEventKind`, whose absence the table's test
+  reported first, `pick.ChooserEventKind is an enum the table lacks: add
+  it to enums`.
+* **`docs/guides/defaults.md`:** a `pick` table of fifteen rows: the
+  method, the glyphs, the prompt, the starting query, the height, the
+  index, the region, the keys, the command IDs and scope, the words and
+  the rules, `built`; what cancels besides the keys (D4), the query's
+  editing keys (A2) and equal matches in the order given (A4), `decided`;
+  the query's 1024 bytes, `floor`. `palette` gains a `FromEntries` row.
+* **`docs/glossary.md`:** `pick`'s four names move from "Reserved" to
+  "Built".
+* **The release's notes:** `docs/guides/migrating.md`, "Migrating to
+  `v2.4.0`", with `pick` and `FromEntries` added, and D12's fix and D11's
+  documentation under "Fixed"; `README.md`'s Status, the release and a
+  bullet for the picker; `docs/architecture.md`, `pick` in the package map,
+  the table and the cores, `palette`'s imports and providers, and
+  `internal/lineinput`'s row.
+* **Tests:**
+  * `pick`, on an `inlinetest.Screen` through a host loop:
+    `TestLayoutGolden`, the models list of 40 and the sessions list of 16,
+    each with an empty query, `son`, `zzqx` and `son` through the index
+    (`WithIndexAbove(10)`), across the matrix at 60 and 100: 64 files, 20
+    distinct, since `pick` draws no colour, each read before it was kept;
+    the index's files equal `son`'s, as a three-cluster query keeps every
+    candidate holding its three clusters. `TestDetail`, `TestRankLikeMatcher`
+    (an oracle of `Matcher.Score` and a stable sort over six queries, and a
+    tie of `qabzzzzzz` before `qab`, the order given), `TestEmptyQueryOrder`,
+    `TestIndex` (a sparse match, `s1o2n3n4e5t6`, that a full ranking finds
+    and the index drops, and the index's matches in the full ranking's
+    order), `TestCount`, `TestMoves`, `TestKeymap` (a user's key, a removed
+    one, a binding in another scope, and a sequence, `g g`, replayed when
+    it matches nothing and when its wait ends), `TestCancel` (esc, ctrl+g,
+    ctrl+c and `Cancel`, and nothing taken after), `TestQueryEdit`,
+    `TestAccept`, `TestAcceptNoMatch`, `TestCleaned`, `TestRules`,
+    `TestResize`, `TestWithRegion`, `TestRow1Report`, `TestCatalog`,
+    `TestDefaultRules`; and, in the package, `TestHeight`, which reads the
+    rows the `Chooser` gives its region, as a blank row and no row look
+    alike on a screen.
+  * `palette`: `TestFromEntries`; `TestFromEntriesRankedLikeChooser`, for
+    nine queries of the 40 models, the hits' IDs through a picker on a
+    workspace in a `synctest` bubble equal the IDs a `Chooser` chooses,
+    each found by moving to it and pressing enter.
+  * `inlinetest`: `TestWiderClusters`, four- and six-cell clusters under
+    `ansi.WcWidth` across a resize to the same width and a narrower one,
+    a cell inside one written over, its first cell written over, and an
+    erase from inside it; all five cases failed on the screen as it was,
+    `after a resize to the same width, c at column 5: "a👨‍👩b c"`,
+    before D12's fix.
+  * `FuzzChooser`, in the package: keys, pastes and a resize between the
+    input's halves never panic; the screen shows the `Chooser`'s rows,
+    each cut to the width, pieces of no width aside, so none is wider and
+    the redraws never drift; and the selection is a drawn row. As first
+    written it checked that no screen line was wider than the width, which
+    a screen of that width always holds; it was made the stronger check
+    before its first run. Its first runs found the check stated wrong
+    three times, each a piece of no width, a lone ZWJ, `0` and a ZWJ split
+    by the screen's decoder, and spaces before a ZWJ trimmed in the wrong
+    order, and found D12; each input is kept as a seed under
+    `pick/testdata/fuzz/FuzzChooser/`. Then 60 s, 1,040,436 runs, clean,
+    with `-fuzzminimizetime 0`: a run with minimization showed 0 runs a
+    second for 37 s, the fuzzer minimizing new inputs, which a run without
+    it did not. `FuzzRegion`, 30 s, 840,924 runs, and `FuzzLayout`, 30 s,
+    850,732, clean over the fixed screen.
+  * `BenchmarkKeystroke`, one typed key and its drawing, the query between
+    `so` and `son`, six counts on an Apple M1 Pro, Go 1.27.3: at 5000
+    entries, ranked in full, 1.59 to 1.64 ms, 84.9 KB and 80 allocations
+    a key; at 100,000, through the index, 1.03 to 1.07 ms, 304 KB and 119
+    allocations. Both are under a 16 ms frame: the baseline Step 7's guide
+    cites.
+  * My expectations were wrong, on review or at a first run, and were
+    corrected: `TestMoves`' second pgdown, `openai/o3`, and the first row
+    for a query, which the matcher decides; `TestEmptyQueryOrder` drew 41
+    rows on a screen of 40, the host's to fit by the region's height;
+    `TestCleaned`'s padding, 27 spaces, not 26; `TestRankLikeMatcher`'s tie
+    taken as the top two rows, where `ai21/jamba-large` ranks first; and
+    the smoke program's count, 3 matches of its 7 entries, not 4.
+* **Lint,** at the first pre-add check: gofmt, blank lines left at the end
+  of `pick/chooser_test.go`. `make modernize` then asked for `keymap.Default`'s
+  promoted fields in `bind`'s literal, as `palette/keys.go` writes them.
+* **Seen failing,** through `python3 -m tools.verify mutate` on scratch
+  copies, 14 killed of 14, the twelve the step names and two for D12:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | the index is never built | `TestIndex`: `through the index: ["anthropic/claude-sonnet-5-5" "anthropic/claude-sonnet-4-5" "sparse"]; want the sparse match dropped`; `TestCount` |
+  | enter commits the query, not the entry | `TestAccept`: `left "model son\n"; want the prompt and the entry's text`; `TestCleaned` |
+  | `FromEntries` matches `Detail` | `TestFromEntries`: `zulu, a Detail, matched ["a"]`; `TestFromEntriesRankedLikeChooser` |
+  | the `Chooser` matches `Detail` | `TestDetail`: `the query beta matched "> alpha                   beta"`; `TestRankLikeMatcher` |
+  | ties broken by length, not input order | `TestRankLikeMatcher`: `a tie: ["ai21/jamba-large" "short" "long" …]; want long before short, the order given`; `TestLayoutGolden`, `sessions-son`; `TestFromEntriesRankedLikeChooser` |
+  | the selection kept on a query change | `TestMoves`: `after "m": "" selected; want "mistral/mistral-large-2"` |
+  | esc does not cancel | `TestCancel`: `esc: <nil>; want canceled`; `TestCatalog`, `TestDefaultRules` |
+  | `WithKeymap` ignored | `TestKeymap`: `ctrl+t, the user's: ">  …  1 of 40"; want the selection moved`; `TestRow1Report` |
+  | the count ignores the index's cap | `TestCount`: `through a capped index: "> x  …  1 of 2000"; want 1 of 2000+` |
+  | the list's height follows the matches | `TestHeight`: `default, query "entry 01": 2 rows; want the query and 10` |
+  | `WithRules` replaces the floor | `TestRules`: `weaker: "> a", writing "…\r> a\nb\x1b[31mc\x1b[m…"; want "> a bc"` |
+  | `pick` imports Bubble Tea | `TestCoresAreCharmFree`: `pick (GOOS=linux) links charm.land/bubbletea/v2: pick → charm.land/bubbletea/v2`, and darwin and windows |
+  | the screen's re-wrap takes a cluster as at most two cells (D12) | `TestWiderClusters`: `after a resize to the same width, c at column 5: "a👨‍👩b c", column 6; want b overwritten`; `FuzzChooser`'s seed `17ead44044a2b0f6` |
+  | the screen blanks one cell of a cluster it splits (D12) | `TestWiderClusters`: `a cell inside it: "x👨‍👩‍👧 z   y"; want "x  z   y"` |
+
+* **Names:** `python3 -m tools.verify names` over `pick`'s five types, "5
+  planned name(s), clean", before any code; conformance's names check
+  passes with them.
+* **The API:** `make apicheck`, "against v2.3.0, 0 incompatible
+  change(s)".
+* **Gates:** `python3 -m tools.verify gates` over the step's 18 Go files,
+  `.golangci.yml`, the README, the index, the glossary, two guides,
+  `docs/architecture.md` and 2 records: macOS 19 passed, 0 failed, in
+  624 s, `release-check` "361 file(s) clean in 1 module(s)", with
+  `apicheck` against `v2.3.0` and the examples gate (its count is the
+  tracked files, so this step's untracked files are outside it, but in its
+  lint, vet and tests of `./...`, and in the per-file gates), markdownlint
+  over 23 files with 0 issues; `remote linux` 18 passed, 0 failed,
+  1 skipped (`gofmt`, which is given no files there), in 1207 s, "374
+  file(s) clean", this step's among them; `remote windows` 18 passed,
+  0 failed, 1 skipped, in 2366 s, "374 file(s) clean". `make pre-add-check`
+  on the 18 Go files is clean. The identifier scan of the change, untracked
+  files included, is clean.
+* **The smoke test, rehearsed** against the tree by a `replace`, before the
+  release: a program picks from seven models on an `inlinetest.Screen`
+  through `pick` and `inline`, types `son` and enter, and checks the
+  `Entry`, `perplexity/sonar-pro`, the rows while picking, "1 of 3", each
+  line within 60 cells, and the line left, `model perplexity/sonar-pro`.
+  Its closure, listed for Linux, macOS and Windows, is seven modules, and
+  `x/ansi` alone of Charm. Its two controls failed as they must: `-control`,
+  expecting `anthropic/claude-sonnet-5-5`, exited 1; and the closure check
+  over a program that imports `palette` found `charm.land/bubbletea/v2`
+  and seven more Charm modules on each system. The same test runs from the
+  proxy once `v2.4.0` is tagged.
