@@ -1517,3 +1517,32 @@ was released as `v2.2.0` and closed out (`9a13872`).
   exited 1, and the closure check over a program that imports
   `lineedit/lineedittea` found `charm.land/bubbletea/v2` and seven more
   Charm modules on Linux and macOS, six on Windows.
+* **The release, `v2.5.0`,** under rule 4:
+  * The owner committed the step (`8c0fa9c`) and pushed `main` before the
+    disclosure guard was run by hand, as this PLAN's rule 4 has it; the
+    owner's own pre-push hook runs the same guard on every push. CI run
+    40719119627 passed: `modules`, `gates`, and `test` on macOS 15, Ubuntu
+    24.04 and Windows 2025; Docs run 40719119549 passed.
+  * The owner tagged `8c0fa9c` `v2.5.0`, annotated, and pushed the tag;
+    its CI run, 40725471833, passed the same five jobs.
+  * The proxy serves `v2.5.0` at `8c0fa9c`. The consumer smoke test, the
+    rehearsal's program in a scratch module outside the repository with
+    `GOWORK` empty, required it by `go get`, then ran `go mod tidy`,
+    `go vet` and `go build`, and the program: two submissions, the first
+    wrapped with its line break after the continuation prompt, a history
+    of two with `second` newest and recalled, and the screen as the
+    rehearsal had it. Its closure, listed for Linux, macOS and Windows, is
+    seven modules, and `x/ansi` alone of Charm.
+  * Its two negative controls failed as they must: `-control` exited 1
+    with `submitted ["explain the resize redraw in the inline region\nand
+    fix it" "second"]; want ["explain the resize" "second"]`; and the
+    closure check over a program that imports `lineedit/lineedittea` found
+    `charm.land/bubbletea/v2` and seven more Charm modules on Linux and
+    macOS, six on Windows.
+  * Issue #9 is to be told where the composer is, with the eight places
+    the library differs from its text and from gobble's editor: the paste
+    (D6, A3 item 11), ctrl+c (D6), Readline's words (A3 item 9, A5 item
+    6), a word wider than its row broken (A5 item 5), the line breaks (A3
+    item 10), the external editor's key and event (D6, A5 item 3), ctrl+l
+    (A5 item 2), and no width cap (D2).
+* **Step 4 complete, 2026-10-28.**
