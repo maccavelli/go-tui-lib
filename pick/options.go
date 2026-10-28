@@ -88,7 +88,8 @@ func WithCatalog(cat msgcat.Catalog) Option {
 func WithRules(r safetext.Rules) Option { return optionFunc(func(c *Chooser) { c.rules = r }) }
 
 // WithKeymap resolves the Chooser's keys in k, the program's keymap, in
-// ChooserScope alone, so a user's file rebinds them; k holds DefaultRules
-// among its defaults. Without it, or with nil, the Chooser builds a keymap
-// of DefaultRules alone.
+// ChooserScope and then lineedit.ComposerScope, whose editing commands
+// edit the query, so a user's file rebinds them; k holds DefaultRules and
+// lineedit.DefaultRules among its defaults. Without it, or with nil, the
+// Chooser builds a keymap of the two alone.
 func WithKeymap(k *keymap.Keymap) Option { return optionFunc(func(c *Chooser) { c.keys = k }) }

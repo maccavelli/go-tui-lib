@@ -18,7 +18,7 @@ pattern, used by every program that needs it.
 
 ## Status
 
-- **The current release is `v2.4.0`,** at the module path
+- **The current release is `v2.5.0`,** at the module path
   `github.com/maccavelli/go-tui-lib/v2`
   ([0020-MADR](docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
   A4.1). `v2.0.0` follows `v1.13.0`, which a `v1` user keeps; `v1.13.0` follows
@@ -130,6 +130,12 @@ pattern, used by every program that needs it.
   are commands in the program's keymap, and the choice is left in the
   scrollback as one line. It links no Charm module but `x/ansi`, and
   `palette.FromEntries` serves the same entries in the TUI's palette.
+- **A line-mode composer, since `v2.5.0`.** `lineedit` is the line a user
+  types, below the scrollback: whole words to the width, history by row
+  then by entry, completion, bracketed paste and an external editor the
+  host opens, each key a command in the program's keymap, a reply printed
+  above it through the region. It links no Charm module but `x/ansi`, and
+  `lineedit/lineedittea` puts the same composer in a workspace pane.
 - **The stack is Charm v2:** `charm.land/bubbletea/v2`,
   `charm.land/lipgloss/v2` and `charm.land/bubbles/v2`, with
   `github.com/charmbracelet/colorprofile` and

@@ -16,6 +16,7 @@ import (
 	"github.com/maccavelli/go-tui-lib/v2/internal/lineinput"
 	"github.com/maccavelli/go-tui-lib/v2/internal/sanitize"
 	"github.com/maccavelli/go-tui-lib/v2/keymap"
+	"github.com/maccavelli/go-tui-lib/v2/lineedit"
 	"github.com/maccavelli/go-tui-lib/v2/msgcat"
 	"github.com/maccavelli/go-tui-lib/v2/safetext"
 	"github.com/maccavelli/go-tui-lib/v2/termkey"
@@ -34,8 +35,10 @@ const minText = 8
 // typing is the modifiers a key that types its text may hold.
 const typing = termkey.ModShift | termkey.ModCapsLock | termkey.ModNumLock | termkey.ModScrollLock
 
-// path is where the Chooser's keys are resolved: its scope alone.
-var path = keymap.Path{ChooserScope}
+// path is where the Chooser's keys are resolved: its own scope, then the
+// composer's, whose editing commands edit the query
+// (docs/decisions/0023-MADR-line-mode-components.md A5 item 4).
+var path = keymap.Path{lineedit.ComposerScope, ChooserScope}
 
 // Chooser picks one of a list of entries in an inline.Region, as an engine
 // that does no I/O (docs/decisions/0023-MADR-line-mode-components.md D2,
@@ -234,19 +237,13 @@ func (c *Chooser) outcome(o keymap.Outcome, now time.Time) {
 	}
 }
 
-// typed gives k to the query: text typed, cleaned, or one of its editing
-// keys. A key released does nothing.
+// typed gives the text k types to the query, cleaned. A key released, or
+// one with a modifier besides shift and the locks, types nothing.
 func (c *Chooser) typed(k termkey.KeyEvent) {
-	if k.Release || c.done {
+	if k.Release || c.done || k.Text == "" || k.Mod&^typing != 0 {
 		return
 	}
-	c.edit(func() {
-		if k.Text != "" && k.Mod&^typing == 0 {
-			c.query.Insert(c.clean(k.Text))
-			return
-		}
-		c.query.Key(k)
-	})
+	c.edit(func() { c.query.Insert(c.clean(k.Text)) })
 }
 
 // edit runs f on the query, and ranks again when it changed the text.
@@ -258,8 +255,8 @@ func (c *Chooser) edit(f func()) {
 	}
 }
 
-// command runs one of the Chooser's commands; another is taken and does
-// nothing.
+// command runs one of the Chooser's commands, or one of lineedit's that
+// edits the query; another is taken and does nothing.
 func (c *Chooser) command(id command.ID) {
 	switch id {
 	case SelectNextID:
@@ -274,6 +271,8 @@ func (c *Chooser) command(id command.ID) {
 		c.accept()
 	case CancelID:
 		c.endCanceled()
+	default:
+		c.edit(func() { c.query.Do(id) })
 	}
 }
 
@@ -383,9 +382,15 @@ func (c *Chooser) view(width int) (rows []string, row, col int) {
 		}
 	}
 	text, qc := c.query.View(avail)
+	if j := joined(m, lead, text); j > 0 && avail > 0 {
+		text, qc = c.query.View(max(avail-j, 1)) // a mark that joins the lead's space
+		if qc > 0 {
+			qc += joined(m, lead, text)
+		}
+	}
 	first := lead + text
 	if count != "" {
-		first += strings.Repeat(" ", pad(width, m.StringWidth(first)+m.StringWidth(count))) + count
+		first = right(m, first, count, width)
 	}
 	rows = append(rows, first)
 	for i := range c.height {
@@ -432,22 +437,40 @@ func (c *Chooser) row(e Entry, selected bool, width int) string {
 		if detail != "" {
 			room -= 1 + m.StringWidth(detail)
 		}
-		text = sanitize.Truncate(text, max(room, 0), m, g.Ellipsis)
+		room = max(room, 0)
+		text = sanitize.Truncate(text, room, m, g.Ellipsis)
+		for mw := m.StringWidth(marker); room > 0 && m.StringWidth(marker+text) > mw+room; {
+			room-- // a mark that joins the marker's space takes a cell of the room
+			text = sanitize.Truncate(e.Text, room, m, g.Ellipsis)
+		}
 	}
 	out := marker + text
 	if detail != "" {
-		out += strings.Repeat(" ", pad(width, m.StringWidth(out)+m.StringWidth(detail))) + detail
+		out = right(m, out, detail, width)
 	}
 	return out
 }
 
-// pad is the spaces that put what follows at the right of width cells,
-// after used, and at least one.
-func pad(width, used int) int {
+// joined is the cells a and b take drawn together beyond what they take
+// apart: a mark with no base that starts b joins the space a ends with
+// (0023-MADR A5 item 7).
+func joined(m ansi.Method, a, b string) int {
+	return max(m.StringWidth(a+b)-m.StringWidth(a)-m.StringWidth(b), 0)
+}
+
+// right is left, then right at the right of width cells, after at least
+// one space, measured as they are drawn; right is left out when it does not
+// fit. A width of 0 or less puts one space between them.
+func right(m ansi.Method, left, right string, width int) string {
 	if width <= 0 {
-		return 1
+		return left + " " + right
 	}
-	return max(width-used, 1)
+	for pad := max(width-m.StringWidth(left)-m.StringWidth(right), 1); pad >= 1; pad-- {
+		if row := left + strings.Repeat(" ", pad) + right; m.StringWidth(row) <= width {
+			return row
+		}
+	}
+	return left
 }
 
 func (c *Chooser) write(s string) {

@@ -248,7 +248,7 @@ record that is not there.
 | Its own words: the label before a reason, the reason's echo, a cancel's word | English | `ask.WithCatalog`, `ask.Messages` | built |
 | How the question's text and a reason are cleaned | `safetext.Line`, never less | `ask.WithRules` | built |
 | What cancels | the cancel answer's key, ctrl+c, and the host's `Cancel` | `ask.Question`, `ask.Asker.HandleInput` | decided (0023-MADR-line-mode-components.md D4) |
-| A reason's editing keys | a fixed set, not the keymap's, until `lineedit` | `ask.Asker.HandleInput` | decided (0023-MADR-line-mode-components.md A2) |
+| A reason's editing keys | `lineedit.DefaultRules`, in `kind:composer` | `ask.WithKeymap`, `lineedit.DefaultRules` | built |
 | A word or an answer wider than its whole row | broken at the width | `ask.Layout` | decided (0023-MADR-line-mode-components.md A2) |
 | The overlay: its ID, place and width | `ask/asktea.DefaultID`, centred, the workspace's width | `ask/asktea.WithID`, `ask/asktea.WithAnchor`, `ask/asktea.WithWidth` | built |
 | The overlay's question: its method and glyphs | the workspace's | `ask/asktea.WithAsk` | built |
@@ -270,9 +270,35 @@ record that is not there.
 | Its own words: the count, no results and a cancel's word | English | `pick.WithCatalog`, `pick.Messages` | built |
 | How the entries' text, the prompt and the query are cleaned | `safetext.Line`, never less | `pick.WithRules` | built |
 | What cancels besides its keys | ctrl+c, outside the keymap, and the host's `Cancel` | `pick.Chooser.Cancel` | decided (0023-MADR-line-mode-components.md D4) |
-| The query's editing keys | a fixed set, not the keymap's, until `lineedit` | `pick.Chooser.HandleInput` | decided (0023-MADR-line-mode-components.md A2) |
+| The query's editing keys | `lineedit.DefaultRules`, in `kind:composer` after `kind:chooser` | `pick.WithKeymap`, `lineedit.DefaultRules` | built |
 | Equal matches | in the order given | `pick.NewChooser` | decided (0023-MADR-line-mode-components.md A4) |
 | A query's length | 1024 bytes | `pick.NewChooser` | floor |
+
+## lineedit and lineedit/lineedittea
+
+| Behaviour | Default | Control | Status |
+| :--- | :--- | :--- | :--- |
+| How text is measured | `ansi.WcWidth` | `lineedit.WithMethod` | built |
+| The glyphs the prompts default to | Unicode | `lineedit.WithGlyphs` | built |
+| The prompt and the continuation prompt | the glyphs' `Prompt` and `Ellipsis`, each with a space | `lineedit.WithPrompt`, `lineedit.WithContinue` | built |
+| A header above each prompt | none | `lineedit.WithHeader` | built |
+| The history | none | `lineedit.WithHistory`, `lineedit.MemHistory` | built |
+| A `MemHistory`'s bound | 1000 entries | `lineedit.MemHistory.Max`, `lineedit.DefaultHistorySize` | built |
+| A `MemHistory`'s empty entries and repeats | dropped | `lineedit.History` | decided (0023-MADR-line-mode-components.md A3) |
+| Completion | none | `lineedit.WithCompleter`, `lineedit.CompleterFunc` | built |
+| Its keys | `lineedit.DefaultRules`, alone | `lineedit.WithKeymap`, `lineedit.DefaultRules` | built |
+| Its commands' IDs and scope | `lineedit.submit` and the others, in `kind:composer` | `lineedit.SubmitID`, `lineedit.ComposerScope` | built |
+| shift+enter's newline | bound where the keymap's features say the terminal sends it | `keymap.Settings` | built |
+| The text's bound | 4096 runes | `lineedit.WithLimit`, `lineedit.DefaultLimit` | built |
+| A bracketed paste | inserted, editable | `lineedit.WithPaste`, `lineedit.PasteSubmit` | built |
+| The external editor, on ctrl+x ctrl+e | off | `lineedit.WithExternalEditor` | built |
+| ctrl+l clearing the screen | off | `lineedit.WithClearScreen` | built |
+| The region it is drawn in | its own, measured as the text is | `lineedit.WithRegion` | built |
+| How typed text, a completion, the prompts and the header are cleaned | `safetext.Line`, never less | `lineedit.WithRules` | built |
+| A paste, an entry recalled and a text set | cleaned by the rules with line breaks and tabs kept, never below printable text, line breaks and tabs | `lineedit.WithRules` | floor |
+| ctrl+c | `EditInterrupt`, outside the keymap, the text kept | `lineedit.ComposerEvent` | decided (0023-MADR-line-mode-components.md D6) |
+| The pane's name in its events | `lineedit/lineedittea.DefaultID` | `lineedit/lineedittea.WithID` | built |
+| The pane's composer: its method and glyphs | the workspace's | `lineedit/lineedittea.WithComposer` | built |
 
 ## inline and inline/inlinetest
 

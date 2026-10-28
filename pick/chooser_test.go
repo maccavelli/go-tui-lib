@@ -13,6 +13,7 @@ import (
 	"github.com/maccavelli/go-tui-lib/v2/fuzzy"
 	"github.com/maccavelli/go-tui-lib/v2/inline"
 	"github.com/maccavelli/go-tui-lib/v2/keymap"
+	"github.com/maccavelli/go-tui-lib/v2/lineedit"
 	"github.com/maccavelli/go-tui-lib/v2/msgcat"
 	"github.com/maccavelli/go-tui-lib/v2/pick"
 	"github.com/maccavelli/go-tui-lib/v2/safetext"
@@ -226,10 +227,11 @@ func TestMoves(t *testing.T) {
 	}
 }
 
-// userKeys is a keymap of pick's defaults and the user's layer.
+// userKeys is a keymap of pick's and lineedit's defaults, as WithKeymap's
+// documentation asks, and the user's layer.
 func userKeys(t *testing.T, user ...keymap.Binding) *keymap.Keymap {
 	t.Helper()
-	k, err := keymap.New(keymap.Settings{}, pick.DefaultRules(), user)
+	k, err := keymap.New(keymap.Settings{}, append(pick.DefaultRules(), lineedit.DefaultRules()...), user)
 	if err != nil {
 		t.Fatalf("keymap.New: %v", err)
 	}
@@ -287,6 +289,14 @@ func TestKeymap(t *testing.T) {
 	}
 	if _, ok := h.c.Timeout(); ok {
 		t.Error("Timeout still due after the wait ended")
+	}
+	// The query's editing keys are the keymap's too, in lineedit's scope
+	// after pick's (0023-MADR A5 item 4).
+	q := userKeys(t, userBinding(t, lineedit.ComposerScope, "ctrl+o", lineedit.DeleteToLineStartID, false))
+	h = newHost(t, 60, models(), pick.WithKeymap(q))
+	h.typeIn("son\x0f")
+	if got := h.lines()[0]; !strings.HasSuffix(got, " 1 of 40") {
+		t.Errorf("ctrl+o, the user's lineedit command: %q; want the query emptied", got)
 	}
 }
 

@@ -118,6 +118,7 @@ linters:
             - "**/internal/sanitize/*.go"
             - "**/keymap/*.go"
             - "**/layout/*.go"
+            - "**/lineedit/*.go"
             - "**/msgcat/*.go"
             - "**/pick/*.go"
             - "**/safetext/*.go"

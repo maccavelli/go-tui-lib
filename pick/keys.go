@@ -3,6 +3,7 @@ package pick
 import (
 	"github.com/maccavelli/go-tui-lib/v2/command"
 	"github.com/maccavelli/go-tui-lib/v2/keymap"
+	"github.com/maccavelli/go-tui-lib/v2/lineedit"
 )
 
 // The commands a Chooser's keys are bound to
@@ -62,9 +63,10 @@ func DefaultRules() []keymap.Default {
 	}
 }
 
-// defaultKeymap is DefaultRules alone, which always build.
+// defaultKeymap is DefaultRules and lineedit's, for the query, which
+// always build.
 func defaultKeymap() *keymap.Keymap {
-	k, err := keymap.New(keymap.Settings{}, DefaultRules())
+	k, err := keymap.New(keymap.Settings{}, append(DefaultRules(), lineedit.DefaultRules()...))
 	if err != nil {
 		panic(err)
 	}

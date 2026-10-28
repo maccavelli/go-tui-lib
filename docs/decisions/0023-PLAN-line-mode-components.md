@@ -282,7 +282,8 @@ entry, and the closure check over a program that imports `palette`. Issue
 ### Step 4: `lineedit` and `lineedit/lineedittea` (issue #9), and a release
 
 * `lineedit`: `Composer`, `History`, `MemHistory`, `Completer`,
-  `CompleterFunc`, `EditEvent`, `EditEventKind`, as 0023-MADR D6;
+  `CompleterFunc`, `EditEvent`, `EditEventKind` (named `ComposerEvent` and
+  `ComposerEventKind` by A2 item 6), as 0023-MADR D6;
   `DefaultRules()` in `kind:composer`, gobble's bindings; `PasteInsert`
   and `PasteSubmit`.
 * `lineedit/lineedittea`: a workspace pane over the same `Composer`.
@@ -315,6 +316,14 @@ entry, and the closure check over a program that imports `palette`. Issue
   the previous one and an empty one, and writes `\n` and `\\`
   (`TestMemHistory`, `FuzzMemHistory`). The `History` interface's methods
   and their doc are x/term v0.47.0's, quoted in A3.2.
+* **By 0023-MADR A5,** added 2026-10-27, by D13 to D19 below: a word
+  wider than its row broken at the width; a forward word motion to the
+  word's end; each row measured as it is drawn (D19); the parity
+  test compares with a recorded reference of x/term v0.47.0, written by a
+  generator under `lineedit/testdata/`; ctrl+l clears only after
+  `WithClearScreen()`; ctrl+x ctrl+e sends `EditExternal` only with
+  `WithExternalEditor`; and `ask`'s reason and `pick`'s query move to
+  one-row `Composer`s, `ask` gaining `WithKeymap`.
 * **The release,** under rule 4.
 
 ### Step 5: `stream`'s core, `Printer` and `Markup`
@@ -1138,3 +1147,373 @@ was released as `v2.2.0` and closed out (`9a13872`).
     highlight until Step 5 (item 7), the query's fixed keys until
     `lineedit` (A2 item 1), and the palette as the TUI's form (D5).
 * **Step 3 complete, 2026-10-27.**
+
+### Step 4: `lineedit` and `lineedit/lineedittea` (issue #9), and a release
+
+*2026-10-27.* The owner committed and pushed Step 3's release record
+(`b37df5a`), and said "approved proceed".
+
+* **Before any code:** `git diff --stat 4341af2 b37df5a` touches no package
+  D6 cites but `fuzzy`'s documentation and `inlinetest` (D11, D12). A
+  scratch program over `termkey` and `keymap` read, at `b37df5a`: CR as
+  `enter`; LF as `ctrl+j`, so CR LF is two keys; `ESC CR` as `alt+enter`;
+  Kitty's `CSI 13 ; 2 u` and modifyOtherKeys' `CSI 27 ; 2 ; 13 ~` as
+  `shift+enter`; `ESC b`, `ESC f`, `ESC d` and `ESC DEL` as `alt+b`,
+  `alt+f`, `alt+d` and `alt+backspace`; ctrl+x then ctrl+e as two keys;
+  and `keymap.New` builds `shift+enter`, `alt+enter`, `ctrl+j` and
+  `ctrl+x ctrl+e` in `kind:composer` without an error. x/term v0.47.0's
+  `History` (`terminal.go:40-58`) is A3.2's quotation, word for word, and
+  its `go.mod` requires `golang.org/x/sys` v0.49.0. gobble's parity table
+  is 55 cases (`buffer_test.go:144-204`, at `5fb6928`), its reference
+  x/term run live (`:58-90`); its external editor opens from a slash
+  command, `/edit`, which calls `compose` (`slash.go:26`, `:105-107`), not
+  a key; its ctrl+l
+  writes `CSI 2 J CSI H` and redraws (`editor.go:214-222`).
+  `python3 -m tools.verify names` over `lineedit`'s nine types, with
+  `PasteMode` for `PasteInsert` and `PasteSubmit`, and
+  `lineedit/lineedittea`'s `ComposerPane`, `EventMsg` and `Option`: "12
+  planned name(s), clean".
+* **Deviation D13, 2026-10-27: the parity test's reference.**
+  * **Found:** the step's parity test is against x/term's `Terminal`,
+    which gobble runs live; `golang.org/x/term` is not in the root's
+    `go.mod`, D1 says no module is added, and requiring v0.47.0 would raise
+    `golang.org/x/sys` from v0.47.0 to v0.49.0 for the module. Seven of the
+    55 cases differ by D6's design: six bracketed pastes and ctrl+c.
+    *Corrected 2026-10-28, when the reference was first read:* gobble's
+    table has five paste cases, so six differ by D6's design, not the
+    seven the question put to the owner said; with D18's two, the test
+    leaves out eight by name and compares 47.
+  * **Resolutions offered:** a recorded reference, written by a generator
+    under `lineedit/testdata/` run in a temporary module, the cases D6
+    decides otherwise left out by name (recommended); x/term required for the tests by an
+    amendment; or a hand-written table.
+  * **Chosen by the owner,** 2026-10-27: "Recorded reference
+    (Recommended)". 0023-MADR A5 item 1.
+* **Deviation D14, 2026-10-27: ctrl+l.**
+  * **Found:** gobble and x/term clear the screen and redraw the line on
+    ctrl+l; D6 has no event for it, and API convention 12 keeps a terminal
+    write added after `v2.1.0` off until a `With…` option.
+  * **Resolutions offered:** `WithClearScreen()`, ctrl+l bound to
+    `ClearID` and doing nothing without it (recommended); on by default
+    with `WithoutClearScreen()`; or an `EditClear` event and a redraw
+    method for the host.
+  * **Chosen by the owner,** 2026-10-27: "WithClearScreen opt-in
+    (Recommended)". 0023-MADR A5 item 2.
+* **Deviation D15, 2026-10-27: the external editor's key.**
+  * **Found:** D6 has `WithExternalEditor` and `EditExternal` and names no
+    key; gobble opens its editor by a slash command.
+  * **Resolutions offered:** ctrl+x ctrl+e, inert without the option
+    (recommended); no default key; or alt+e, fish's. The question called
+    ctrl+x ctrl+e "Readline's edit-and-execute-command"; it is bash's
+    (bash's manual page, at bash 3.2.57), and not in the Readline user
+    manual, read afterwards; the choice stands, the attribution corrected
+    in A5 item 3.
+  * **Chosen by the owner,** 2026-10-27: "ctrl+x ctrl+e (Recommended)".
+    0023-MADR A5 item 3.
+* **Deviation D16, 2026-10-27: `ask` and `pick` move to the `Composer`.**
+  * **Found:** A2 item 1 has this step move `ask`'s reason and `pick`'s
+    query to the `Composer`, their keys the keymap's after; the step as
+    written does not list it, and `ask` has no `WithKeymap`.
+  * **Resolutions offered:** move them in this step, as one-row
+    composers, `ask` gaining `WithKeymap` (recommended); in a later step
+    of this PLAN; or leave them on `internal/lineinput`.
+  * **Chosen by the owner,** 2026-10-27: "Move them in Step 4
+    (Recommended)". 0023-MADR A5 item 4. This step's scope gains `ask/`
+    and `pick/`, with their tests.
+* **Deviation D17, 2026-10-27: a word wider than its row.**
+  * **Found,** reading gobble's layout at `5fb6928` for the port: D6 has "a
+    wider word left whole", and the MADR's Context says gobble's layout
+    "leaves a word wider than a row whole"; gobble's code cuts it at the
+    row's end (`internal/cli/editor/layout.go:30-31`, `rowEnd` at
+    `:73-88`). Left whole, the region cuts the row at the width, a floor,
+    so the rest of the word and the cursor over it are off the screen.
+  * **Resolutions offered:** break it at the width by grapheme cluster, as
+    gobble's code and A2 item 5 do, correcting D6 and the Context
+    (recommended); or leave it whole, as D6 says.
+  * **Chosen by the owner,** 2026-10-27: "Break it at the width
+    (Recommended)". 0023-MADR A5 item 5.
+* **Deviation D18, 2026-10-28: where a forward word motion stops.**
+  * **Found,** porting the word keys: A3 item 9 has alt+f and the others go
+    by Readline's words, and Readline 8.3's `forward-word` moves "to the end
+    of the next word"; x/term's Alt+Right, this step's parity reference,
+    moves to the start of the next one (gobble's `toRightWord`,
+    `buffer.go:312-323`, its port). Two of gobble's 55 cases tell them
+    apart: "Alt+Right twice" and "Alt+Right from a space". The step as
+    written asks for both.
+  * **Resolutions offered:** Readline's, the word's end, the two cases left
+    out by name (recommended); or x/term's, the next word's start, with
+    Readline's letters and digits.
+  * **Chosen by the owner,** 2026-10-28: "Readline: the word's end
+    (Recommended)". 0023-MADR A5 item 6.
+* **Deviation D19, 2026-10-28: a mark with no base joins the space before
+  it.**
+  * **Found** by `FuzzLayout`, 30 s over `ask` after its move to the
+    keymap: `a row 4 cells wide at width 3: "  ️0"`, its input kept at
+    `ask/testdata/fuzz/FuzzLayout/b7c759da2f54632c`. The same input fails
+    on a copy of `b37df5a`, so the fault is Step 2's, released in
+    `v2.3.0`, not this step's. A probe of `x/ansi` v0.11.8: U+FE0F alone
+    is 0 cells under both methods, and `" \ufe0f"`, one cluster, is 2
+    under `ansi.GraphemeWidth`; so a layout that measures a word apart and
+    draws it after a space writes a row a cell wider than it measured.
+    `ask.Layout` splits words with `strings.Fields`, which splits a space
+    and a mark after it apart; `pick`'s rows and the composer draw text
+    after a lead ending in a space. Unicode 18.0.0 says such a mark "may"
+    be presented as a base (§3.6.1, D52) and shows one in isolation on
+    U+00A0 (§2.11.4), which `strings.Fields` also splits at.
+  * **Resolutions offered:** measure each row as it is drawn, in this
+    step, `ask` breaking only at a lone space, `pick` and the composer
+    measuring their lead with the text (recommended); drop such marks when
+    cleaning; or a patch release, `v2.4.1`, first.
+  * **Chosen by the owner,** 2026-10-28: "Measure rows as drawn
+    (Recommended)". 0023-MADR A5 item 7. This step's scope gains
+    `ask/layout.go` and `pick/chooser.go`'s rows, with a test each, and
+    the release notes a "Fixed" entry for both.
+  * *Note, 2026-10-28, at the mutation proofs:* `ask`'s fix was built as
+    both halves of the resolution, words broken only at a lone space and
+    each row measured as it joins it. Mutation 4.16, the row measured by
+    its pieces again, survived; a scratch copy with the words split by
+    `strings.Fields` again and the joined measure kept passed too. Each
+    half makes the other unreachable, so neither could be seen failing.
+    `flow` keeps Step 2's arithmetic, which adds up right once no cluster
+    is split, and `words` is the fix: its mutation, a space split from the
+    mark that joins it, is killed by `TestLayoutMarks`. 0023-MADR A5 item
+    7 reads so.
+* **`internal/lineinput/`** (A2 item 1, A5): `Line` is the text of the
+  `Composer`, `ask`'s reason and `pick`'s query: grapheme clusters under the
+  width method, a line break a cluster of its own, bounded in bytes (`New`)
+  or runes (`NewRunes`); `Insert`, the caller's cleaned text, cut by whole
+  clusters at the bound and re-segmented; `SetText`, `SetPos`, `Clusters`,
+  `Pos`, `View`; and `Do(id)`, the fifteen commands it runs by `lineedit`'s
+  IDs, listed by `Commands`: the moves by cluster, by Readline's words (a
+  run of clusters whose first rune is a letter or a digit, alt+f to a
+  word's end and alt+b to its start, A5 item 6) and to the line's ends,
+  each line ending at a line break; the deletions back and forward, by
+  those words, back to white space (ctrl+w), and to the line's ends;
+  ctrl+d's deletion, its end of input the `Composer`'s; and Readline's
+  transpose. The fixed set of keys, `Key`, is gone: every key is a
+  keymap's command.
+* **`lineedit/`,** a core:
+  * `Composer` (`composer.go`): `NewComposer`, `Resize`, `HandleInput`,
+    `Timeout`, `HandleTimeout`, `Cancel`, `NextEvent`, `View`, `Text`,
+    `SetText`. A key goes through a `keymap.Dispatcher` over `WithKeymap`'s
+    keymap or `DefaultRules()` alone, on `[ComposerScope]`, with an empty
+    `when.Map`; ctrl+c sends `EditInterrupt` with the text, outside the
+    keymap; a ctrl+j right after enter's submission is dropped, so a CR LF
+    is one enter, as x/term reads it; a key the keymap does not take types
+    its text. The commands: the `Line`'s by `Do`; up and down by row, from
+    the layout's places, and from the first or the last row the history's
+    entries and the user's draft back (gobble's Q1); ctrl+d's end of input
+    on an empty line; enter's submission, or a line break for a trailing
+    backslash; alt+enter's and shift+enter's line break; tab's completion,
+    the line and the cursor's byte offset to the `Completer`, its result
+    cleaned as one line; ctrl+l's `CSI 2 J CSI H` and a redraw at the top,
+    only `WithClearScreen` (A5 item 2); ctrl+x ctrl+e's `EditExternal`, only
+    `WithExternalEditor` (A5 item 3). A submission is committed to the
+    scrollback with its header, added to the history when not empty, sent
+    as `EditSubmit`, and an empty prompt drawn below it, the header read
+    again. A paste is cleaned by the rules with line breaks and tabs kept,
+    then by the paste's floor, printable text with line breaks and tabs
+    (A3 item 11), and inserted, or submitted with the text under
+    `PasteSubmit`; no completion runs on it. A recalled entry and `SetText`'s
+    text are cleaned so too. A pending key sequence's wait is folded into
+    `Timeout`.
+  * The layout (`layout.go`), gobble's by cluster: each line after its
+    prompt, the first `WithPrompt`'s and the rest `WithContinue`'s, rows
+    broken at the last space the width reaches, the break taking the
+    space, a word wider than its row broken at the width (D17), each row
+    after a line's first indented by its prompt's width; a tab drawn as a
+    space; a row's lead and its first cluster measured together, as drawn
+    (D19); the cursor's place at each cluster, a cursor past a full last
+    row on a row below, which `View` adds while the cursor is there, and
+    one past a full row before a line break at its last column, so the
+    rows never depend on the cursor. `View` puts the header row first.
+  * `History` (`history.go`), x/term v0.47.0's interface and its
+    documentation; `MemHistory`, `Max` and `DefaultHistorySize` (1000), an
+    empty entry and a repeat of the newest dropped, `At` panicking out of
+    range, `WriteTo` and `ReadFrom` its file form, a line break `\n` and a
+    backslash `\\`, a line's `\r` ending dropped and an unknown escape
+    kept; `Completer` and `CompleterFunc`.
+  * `ComposerEvent` and `ComposerEventKind` (`event.go`): `EditNone`,
+    `EditWrite`, `EditSubmit`, `EditEOF`, `EditInterrupt`, `EditExternal`,
+    tokens `none`, `write`, `submit`, `eof`, `interrupt`, `external`.
+    `PasteMode` (`options.go`), `PasteInsert` and `PasteSubmit`, tokens
+    `insert` and `submit`.
+  * Options (`options.go`), opaque: `WithPrompt`, `WithContinue`,
+    `WithHeader`, `WithHistory`, `WithCompleter`, `WithKeymap`, `WithLimit`
+    and `DefaultLimit` (4096 runes), `WithPaste`, `WithExternalEditor`,
+    `WithClearScreen`, `WithMethod`, `WithGlyphs`, `WithRegion`,
+    `WithRules`. Keys (`keys.go`): twenty-two command IDs, `CharLeftID` to
+    `ExternalID`, `ComposerScope` (`kind:composer`) and `DefaultRules()`,
+    35 bindings; shift+enter binds where the keymap's features and facts
+    say the terminal sends it apart from enter, as `keymap` binds a default
+    it can deliver (`go doc ./keymap Default`), which `TestNewline` showed:
+    a keymap with no features left it unbound.
+* **`lineedit/lineedittea/`:** `ComposerPane`, from `NewComposerPane(ws,
+  …)`, which a program puts in its workspace with `SetPane`: the same
+  `Composer`, measured with the workspace's width method and drawn with its
+  theme's glyphs, then `WithComposer`'s options, its region asking the
+  terminal nothing; `Update` gives it the pane's size, the keys through
+  `keymaptea.FromTea` and the pastes, and sends every event but the writes
+  as an `EventMsg`, a key sequence's wait a `tea.Tick`; `View` draws the
+  rows around the cursor at the pane's size; `Cursor`; `Composer`, for
+  `SetText` after the external editor. `DefaultID`, `WithID`,
+  `WithComposer`. Not a core.
+* **`ask` and `pick`** (A5 item 4): a reason's and a query's keys go
+  through the keymap, `ask` on `[ComposerScope]` with `WithKeymap`, new,
+  and `pick` on `[ComposerScope, ChooserScope]`, its own scope first;
+  `lineedit`'s editing commands run on their `Line`, and in a reason its
+  submit gives it. Their defaults build `lineedit.DefaultRules()`, and
+  `pick`'s with its own. Every test and golden of both passes unchanged,
+  but `pick`'s `TestKeymap`, whose keymap held `pick.DefaultRules()` alone,
+  as the new documentation of `WithKeymap` says it may not. D19's fixes:
+  `ask`'s words break only at a cluster that is a space alone; `pick`
+  measures an entry's text with its marker, the query with the prompt, and
+  a count or detail placed right with `right`, which drops it when it does
+  not fit.
+* **The parity reference** (D13): `lineedit/testdata/xtermparity/main.go`
+  runs x/term v0.47.0's `Terminal` live over gobble's 55 cases, as gobble's
+  `buffer_test.go:58-90` does, from its own module file, `xterm.mod` with
+  `xterm.sum`, by `GOWORK=off GOFLAGS=-mod=mod go run
+  -modfile=lineedit/testdata/xtermparity/xterm.mod
+  ./lineedit/testdata/xtermparity > lineedit/testdata/xterm-parity.json`;
+  the root's `go.mod` and `go.sum` are unchanged. The file holds each
+  case's input and x/term's outcome.
+* **The gates:** `lineedit` joins `cores` and the `charmfree` files; the
+  enum table gains `lineedit.ComposerEventKind` and `lineedit.PasteMode`,
+  whose absence its test reported first: `lineedit.ComposerEventKind is an
+  enum the table lacks: add it to enums`, and the same of `PasteMode`.
+* **`docs/guides/defaults.md`:** a `lineedit` table of 21 rows, among them
+  shift+enter's binding, the paste's floor (`floor`), ctrl+c's
+  `EditInterrupt` and a `MemHistory`'s repeats (`decided`), and two of
+  `lineedittea`; `ask`'s and `pick`'s rows for a reason's and a query's
+  keys move from `decided` to `built`, with `WithKeymap` and
+  `lineedit.DefaultRules`.
+* **`docs/glossary.md`:** `lineedit`'s seven names move to "Built", with
+  `PasteMode`, `lineedittea`'s `ComposerPane` and `EventMsg`.
+* **The release's notes:** "Migrating to `v2.5.0`", `lineedit`,
+  `lineedittea` and `ask.WithKeymap` added; `ask`'s and `pick`'s keys
+  changed, alt+backspace by Readline's words where it deleted to a space;
+  D19's fix for both; `README.md`'s Status and a bullet for the composer;
+  `docs/architecture.md`, the package map, the table, the cores.
+* **Tests:**
+  * `internal/lineinput`: `TestDo`, each command as a terminal sends its
+    key; `TestLines`, the ends and kills at a line break; `TestCommands`;
+    `TestClusters`, `TestLimit` in bytes and runes, `TestView`, `FuzzLine`.
+  * `lineedit`: `TestKeysMatchXterm`, 47 of gobble's 55 cases at 200
+    columns and at 12 but for the nine that move between rows, against the
+    reference, eight left out by name: four pastes and the control keys
+    inside a paste by D6 and A3 item 11, ctrl+c by D6, and two of alt+right
+    by A5 item 6; `TestIDs`, the `Line`'s commands are `lineedit`'s IDs;
+    `TestDefaultRules`; `TestWords` (`can't`, `32.3`, a CJK run, an
+    accented word composed and decomposed, the arrows with alt and ctrl,
+    alt+d, alt+backspace, a ZWJ sequence one step); `TestCtrlW`;
+    `TestNewline`; `TestPaste`; `TestMemHistory`; `TestHistoryRows`;
+    `TestLayout`; `TestLayoutMarks`; `TestLayoutGolden`, an empty prompt, a
+    long text, three lines and a header above a recalled entry, across the
+    matrix at 60 and 100: 32 files, 12 distinct, each read before it was
+    kept; `TestExternal`, `TestClear`, `TestInterrupt`, `TestEOF`,
+    `TestCompleter`, `TestKeymap`, `TestRules`, `TestResize`,
+    `TestWithRegion`, `TestRow1Report`; `TestKeyDrawBudget`, gobble's three
+    cases, a key at a long text's end, in its middle and a move, each at
+    most the changed text plus 40 bytes.
+  * `lineedit/lineedittea`: `TestComposerPane`, `TestComposerPaneWindow`,
+    `TestComposerPaneExternal`, on a workspace in a `synctest` bubble.
+  * `ask`: `TestReasonKeymap`, `TestLayoutMarks`; `pick`: `TestKeymap`'s
+    user binding in `lineedit.ComposerScope`, `TestRowsMeasuredAsDrawn`.
+    `TestLayoutMarks` of `ask` and `TestRowsMeasuredAsDrawn` of `pick`
+    were run on a copy of `b37df5a` and failed there, `"a ️0" is 4 cells`
+    at width 3 and `"▸ ️0…" is 5 cells` at width 4; the first form of
+    `pick`'s passed there, its query matching no entry, and was rewritten
+    to reach an entry cut to its room and a query that fills its window.
+  * Fuzzing, with `-fuzzminimizetime 0`: `FuzzComposer`, 60 s, 891,011
+    runs, clean, after its first seed showed its own check stated wrong,
+    the screen's rows compared from the screen's first row where a
+    submission had left rows above the region; `FuzzMemHistory` 30 s,
+    4,449,160 runs; `FuzzLine` 30 s, 3,905,715; `FuzzChooser` 30 s,
+    446,727, clean over the moved `pick`; and `FuzzLayout` found D19 at
+    19 s, its input kept as a seed, clean after the fix in the step's
+    test runs.
+  * `BenchmarkKeystroke`, a typed key and a backspace in turn at the end of
+    a five-row text at 80 columns, six counts on an Apple M1 Pro, Go
+    1.27.3: 24.8 to 28.9 µs, 19.7 KB and 81 allocations a key, the layout
+    and the segmenting of the whole text in it; gobble's 1.5 µs baseline
+    on darwin (its `perf_test.go:14-18`) times the drawing alone, so the
+    two are not alike. Under a 16 ms frame: the baseline Step 7's guide
+    cites.
+  * My expectations were wrong, at a first run, and were corrected:
+    `TestDefaultRules`' count, 35 bindings, not 39; `TestWords`' ZWJ case,
+    one left, not two; `TestHistoryRows`, up from the last row stopping
+    before the space at rune 15, as gobble's own table has it; `TestLayout`,
+    a tab typed is tab's completion, so a pasted one; `TestNewline`, which
+    needed a keymap with Kitty's features for shift+enter; the pane's
+    tests, `View`'s trailing space, the pane's own size and a sleep past the
+    keymap's wait in the `synctest` bubble; and the smoke program's
+    history step, whose ctrl+u cut a recalled line's first row only, as
+    documented.
+* **Lint,** at the first pre-add check: gofmt in three files, and
+  gocritic's `evalOrder` at `lineedittea`'s `return p, p.drain(now)`,
+  split as `asktea`'s was. staticcheck's ST1018 was met before lint ran:
+  literal U+200D, U+0301 and U+FE0F in test strings, written as escapes.
+  `make modernize` asked for nothing. A first layout that measured every
+  prefix whole took the tests from 1.6 s to 16 s, quadratic over gobble's
+  4100-key case, and was replaced by measuring a row's lead and first
+  cluster together and summing the rest, as before.
+* **Seen failing,** through `python3 -m tools.verify mutate` on scratch
+  copies, 23 killed of 23, the five the step names, the ones A3 and A5 add,
+  and those of D19; 4.16 first survived, and was replaced, as D19's note
+  says; 4.23 survived until `TestRowsMeasuredAsDrawn` checked that a
+  detail is kept:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | a word motion stops inside a cluster | `TestClusters`: `"a👨\u200d👩\u200d👧🇫🇷éb" is 10 clusters; want 5`; `TestLimit` |
+  | up recalls history from a middle row | `TestHistoryRows`: `up from the last row: "the quick brown fox jumps|"; want "the quick brown| fox jumps"` |
+  | a duplicate is kept | `TestHistoryRows`: `after three submits: 3 entries, up twice gives "second"; want 2, first` |
+  | a paste submits under `PasteInsert` | `TestPaste`: `PasteInsert: "", submitted ["say a\tb\ncd"] …; want the text kept, nothing submitted`; `TestLayout`, `TestRules` |
+  | the external editor's event is sent without its option | `TestExternal`: `EditExternal sent without WithExternalEditor` |
+  | alt+f stops at the next word's start (D18) | `TestDo`: `alt+f to the word's end: … gives "one |two"; want "one| two"`; `TestWords` |
+  | ctrl+w stops at a word, not white space | `TestDo`: `ctrl+w over punctuation: … gives "a b-c.|"; want "a |"`; `TestCtrlW` |
+  | alt+enter inserts no newline | `TestNewline`: `text "onetwothree\nfour"`; `TestLayoutGolden` |
+  | a trailing backslash does not continue the text | `TestNewline`: `text "four"` |
+  | a paste is cleaned by the rules alone, below its floor | `TestRules`: `under weaker rules: "x p\x1b[32mq\nr", …` |
+  | ctrl+l clears without `WithClearScreen` | `TestClear`: `WithClearScreen false: cleared true, text "abc"` |
+  | `MemHistory` writes a line break as it is | `TestMemHistory`: `file "a\ntwo\nlines\n…"; want "a\ntwo\\nlines\n…"` |
+  | a CR LF is two enters | `TestKeysMatchXterm`: `CR LF is one Enter at 200: submitted ["ab" ""], eof false; want ["ab"], false` |
+  | a submission is not added to the history | `TestHistoryRows`: `after three submits: 0 entries, up twice gives ""; want 2, first` |
+  | the composer measures a row's lead and first cluster apart (D19) | `TestLayoutMarks`: `method 1, width 9: "> ️0 first" is 10 cells` |
+  | `ask`'s words split a space from the mark that joins it (D19) | `TestLayoutMarks`: `method 1, width 3: "a ️0" is 4 cells` |
+  | `pick` measures an entry's text apart from its marker (D19) | `TestRowsMeasuredAsDrawn`: `method 1, width 4, keys "", row 1: "▸ ️0…" is 5 cells` |
+  | `pick`'s query row ignores the join (D19) | `TestRowsMeasuredAsDrawn`: `… row 0: "❯ ️qq" is 5 cells` |
+  | `pick`'s detail placed by a sum, not as drawn (D19) | `TestRowsMeasuredAsDrawn`: plain's detail dropped |
+  | `ask`'s `WithKeymap` ignored | `TestReasonKeymap`: `response <nil>; want the reason now, backspace removed and ctrl+o submitting` |
+  | `pick`'s query takes no `lineedit` command | `TestKeymap`: `ctrl+o, the user's lineedit command: "> son … 1 of 4"; want the query emptied`; `TestEmptyQueryOrder`, `TestQueryEdit` |
+  | the pane sends no `EventMsg` | `TestComposerPane`: `events []; want one EditSubmit of hello world`; `TestComposerPaneExternal` |
+  | `lineedit` imports Bubble Tea | `TestCoresAreCharmFree`: `lineedit (GOOS=linux) links charm.land/bubbletea/v2: lineedit → charm.land/bubbletea/v2`, and `ask` and `pick` through it, on each system |
+
+* **Names:** `python3 -m tools.verify names` over the step's twelve, "12
+  planned name(s), clean", before any code; conformance's names check
+  passes with them.
+* **The API:** `make apicheck`, "against v2.4.0, 0 incompatible
+  change(s)".
+* **Gates:** `python3 -m tools.verify gates` over the step's 41 files but
+  its goldens, its fuzz seeds and the parity reference: macOS 19 passed,
+  0 failed, in 667 s, `release-check` "374 file(s) clean in 1 module(s)",
+  with `apicheck` against `v2.4.0` and the examples gate (its count is the
+  tracked files, so this step's untracked files are outside it, but in its
+  lint, vet and tests of `./...`, and in the per-file gates); `remote
+  linux` 18 passed, 0 failed, 1 skipped (`gofmt`, which is given no files
+  there), in 1834 s, "391 file(s) clean", this step's among them; `remote
+  windows` 18 passed, 0 failed, 1 skipped, in 2436 s, "391 file(s)
+  clean". `make pre-add-check` on the 32 Go files is clean. The
+  identifier scan of the change, untracked files included, is clean.
+* **The smoke test, rehearsed** against the tree by a `replace`: a program
+  on an `inlinetest.Screen` through `lineedit` and `inline` types a text,
+  alt+enter and a second line, and enter, then `second` and enter, then up,
+  and checks the two submissions, the history of two with `second` newest
+  and recalled, each line within 40 cells, and the screen, the first
+  submission wrapped and its line break after the continuation prompt. Its
+  closure, listed for Linux, macOS and Windows, is seven modules, and
+  `x/ansi` alone of Charm. Its controls failed as they must: `-control`
+  exited 1, and the closure check over a program that imports
+  `lineedit/lineedittea` found `charm.land/bubbletea/v2` and seven more
+  Charm modules on Linux and macOS, six on Windows.

@@ -160,10 +160,29 @@ func TestLayoutCleaned(t *testing.T) {
 	}
 }
 
+// TestLayoutMarks: a mark or a selector with no base, which joins the space
+// drawn before it, is measured where it lands, so no row is wider than the
+// width as the terminal draws it (0023-MADR A5 item 7).
+func TestLayoutMarks(t *testing.T) {
+	q := ask.Question{
+		Title: "a \ufe0f0 b \u0301c dd \ufe0fee \u200dff gg",
+		Rows:  []ask.Row{{Label: "\ufe0fLabel", Answers: []ask.Answer{{Key: "1", Label: "\ufe0fone"}, {Key: "2", Label: "two \ufe0f2"}}}},
+	}
+	for _, m := range []ansi.Method{ansi.WcWidth, ansi.GraphemeWidth} {
+		for width := 3; width <= 24; width++ {
+			for _, row := range ask.Layout(q, width, m, glyph.ASCII()) {
+				if w := m.StringWidth(row); w > width {
+					t.Errorf("method %d, width %d: %q is %d cells", m, width, row, w)
+				}
+			}
+		}
+	}
+}
+
 // TestLayoutWide: a wide cluster is measured as the method measures it,
 // and never split.
 func TestLayoutWide(t *testing.T) {
-	q := ask.Question{Title: "世界世界世界 👨‍👩‍👧 done?"}
+	q := ask.Question{Title: "世界世界世界 👨\u200d👩\u200d👧 done?"}
 	for _, m := range []ansi.Method{ansi.WcWidth, ansi.GraphemeWidth} {
 		for _, row := range ask.Layout(q, 7, m, glyph.ASCII()) {
 			if w := m.StringWidth(row); w > 7 {

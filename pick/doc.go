@@ -16,15 +16,16 @@
 // and its Detail at the right, dropped when the Text would keep fewer than
 // 8 cells.
 //
-// Typing edits the query, through a fixed set of editing keys; each change
+// Typing edits the query, by lineedit's editing commands; each change
 // ranks the entries' Text again with fuzzy's matcher, best first, ties in
 // the order given, and an empty query keeps that order. Above WithIndexAbove
-// entries a fuzzy.Index narrows the candidates first. The other keys are
-// commands in the program's keymap, in the scope ChooserScope: DefaultRules
-// binds up and ctrl+p, down and ctrl+n, pgup and pgdown, enter, and esc and
-// ctrl+g, and WithKeymap takes the program's keymap, a user's file among
-// its layers. ctrl+c cancels, outside the keymap, as the host's Cancel
-// does.
+// entries a fuzzy.Index narrows the candidates first. Every key but ctrl+c
+// is a command in the program's keymap, resolved in the scope ChooserScope
+// and then lineedit.ComposerScope: DefaultRules binds up and ctrl+p, down
+// and ctrl+n, pgup and pgdown, enter, and esc and ctrl+g, and
+// lineedit.DefaultRules the query's editing keys; WithKeymap takes the
+// program's keymap, a user's file among its layers. ctrl+c cancels,
+// outside the keymap, as the host's Cancel does.
 //
 // One line is left in the scrollback: the prompt and the entry chosen, or
 // the prompt and the word for a cancel. Every entry's text is cleaned once,

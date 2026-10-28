@@ -7,6 +7,61 @@ needs a major version, at a new module path
 ([AGENTS.md, API conventions](../../AGENTS.md#api-conventions), rule 1).
 Up to `v0.12.0`, a deprecated name was removed in the next minor release.
 
+## Migrating to `v2.5.0`
+
+`v2.5.0` adds a package and its adapter, and an option, and removes or
+retypes nothing: `make apicheck` against `v2.4.0` reports 0 incompatible
+changes
+([0023-PLAN-line-mode-components](../decisions/0023-PLAN-line-mode-components.md)
+Step 4). A program on `v2.4.0` needs no change to build. Two behaviours
+change, as below: `ask`'s reason and `pick`'s query are edited by
+`lineedit`'s commands in the program's keymap, the same keys by default;
+and the layouts of both are measured as they are drawn.
+
+```bash
+go get github.com/maccavelli/go-tui-lib/v2@v2.5.0
+```
+
+### Added
+
+- **`lineedit`,** the line a user types, inline (issue #9): `Composer`,
+  the line as an engine that does no I/O, laid out in whole words, with
+  `ComposerEvent`, `ComposerEventKind`, `View`, `Text` and `SetText`;
+  `History`, x/term's interface, and `MemHistory`, one in memory with its
+  file form, `DefaultHistorySize`; `Completer` and `CompleterFunc`;
+  `PasteMode`, `PasteInsert` and `PasteSubmit`; the options `WithPrompt`,
+  `WithContinue`, `WithHeader`, `WithHistory`, `WithCompleter`,
+  `WithKeymap`, `WithLimit` with `DefaultLimit`, `WithPaste`,
+  `WithExternalEditor`, `WithClearScreen`, `WithMethod`, `WithGlyphs`,
+  `WithRegion` and `WithRules`; its keys, `DefaultRules`, the command IDs
+  from `CharLeftID` to `ExternalID`, and `ComposerScope`. It links no
+  Charm module but `x/ansi`.
+- **`lineedit/lineedittea`,** the same composer in a workspace pane:
+  `ComposerPane`, `EventMsg`, `DefaultID`, and the options `WithID` and
+  `WithComposer`.
+- **`ask`:** `WithKeymap`, the program's keymap for a reason's keys.
+
+### Changed
+
+- **`ask` and `pick`:** a reason's and a query's editing keys are
+  `lineedit`'s commands, in `lineedit.ComposerScope`, resolved after
+  `pick`'s own. With the defaults, every key before does what it did,
+  but alt+backspace, which deleted back to a space and now deletes back
+  by Readline's words, letters and digits, as ctrl+w still deletes to a
+  space; alt+f, alt+b and alt+d are new, by the same words, and ctrl+t
+  transposes. A program that gives `pick` its own keymap holds
+  `lineedit.DefaultRules` in it beside `pick.DefaultRules`
+  (0023-MADR A5 item 4).
+
+### Fixed
+
+- **`ask` and `pick`:** a mark or a variation selector with no base, which
+  joins the space drawn before it, is measured where it lands, so a row of
+  `ask.Layout` or of a `pick.Chooser` is never wider than the width as the
+  terminal draws it; before, under `ansi.GraphemeWidth`, such a row could
+  be a cell too wide, and lose its last cell to the region
+  ([0023-MADR](../decisions/0023-MADR-line-mode-components.md) A5 item 7).
+
 ## Migrating to `v2.4.0`
 
 `v2.4.0` adds a package and a palette provider, removes or retypes

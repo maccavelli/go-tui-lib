@@ -1,0 +1,2 @@
+ 97|❯ Explain why the resize redraw in the inline region lands two rows low on xterm, and propose the
+ 44|  smallest fix with a test that fails first.

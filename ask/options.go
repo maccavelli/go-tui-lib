@@ -5,6 +5,7 @@ import (
 
 	"github.com/maccavelli/go-tui-lib/v2/glyph"
 	"github.com/maccavelli/go-tui-lib/v2/inline"
+	"github.com/maccavelli/go-tui-lib/v2/keymap"
 	"github.com/maccavelli/go-tui-lib/v2/msgcat"
 	"github.com/maccavelli/go-tui-lib/v2/safetext"
 )
@@ -48,6 +49,14 @@ func WithReasonLimit(n int) Option {
 		}
 	})
 }
+
+// WithKeymap resolves a reason's keys in k, the program's keymap, in
+// lineedit.ComposerScope, so a user's file rebinds them; k holds
+// lineedit.DefaultRules among its defaults. An answer's own key is its
+// Key, not the keymap's. Without it, or with nil, the Asker builds a
+// keymap of lineedit.DefaultRules alone
+// (docs/decisions/0023-MADR-line-mode-components.md A5 item 4).
+func WithKeymap(k *keymap.Keymap) Option { return optionFunc(func(a *Asker) { a.keys = k }) }
 
 // WithCatalog gives the Asker's own words in the program's: see Messages.
 func WithCatalog(c msgcat.Catalog) Option { return optionFunc(func(a *Asker) { a.catalog = c }) }

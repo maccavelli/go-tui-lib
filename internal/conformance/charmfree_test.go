@@ -27,6 +27,7 @@ var cores = []string{
 	"internal/sanitize",
 	"keymap",
 	"layout",
+	"lineedit",
 	"msgcat",
 	"pick",
 	"safetext",

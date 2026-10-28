@@ -38,8 +38,7 @@ built, as the next section lists. Reserved now, each checked with
 
 | Package | Names | Record |
 | :--- | :--- | :--- |
-| `lineedit` | `Composer`, `History`, `MemHistory`, `Completer`, `CompleterFunc`, `ComposerEvent`, `ComposerEventKind` | [0023-MADR](decisions/0023-MADR-line-mode-components.md) D6, A2 item 6 |
-| `stream` | `Printer`, `Markup`, `Style`, `Scanner`, beside 0009's `Doc` | 0023-MADR D7 |
+| `stream` | `Printer`, `Markup`, `Style`, `Scanner`, beside 0009's `Doc` | [0023-MADR](decisions/0023-MADR-line-mode-components.md) D7 |
 | `transcript` | `Transcript` | 0023-MADR D9 |
 | `workspace` | `FocusFallback`, `FocusFallbackFunc` | [0024-MADR](decisions/0024-MADR-opt-in-and-opt-out-coverage.md) A1 |
 
@@ -97,7 +96,15 @@ question in an overlay, and `AnsweredMsg`, its answer, by its A2 item 4.
 `pick`'s `Entry`, one thing to pick, and `Chooser`, `ChooserEvent` and
 `ChooserEventKind`, the picker's engine, an event it returns and its kind,
 were reserved by its D5, the events renamed by its A2 item 6, and are built
-in that PLAN's Step 3.
+in that PLAN's Step 3. `lineedit`'s `Composer`, the line a user types, as an
+engine; `History`, x/term's interface of the lines it recalls, and
+`MemHistory`, one in memory with its file form; `Completer` and
+`CompleterFunc`, what tab completes with; and `ComposerEvent` and
+`ComposerEventKind`, an event it returns and its kind, were reserved by its
+D6, the events renamed by its A2 item 6, and are built in that PLAN's
+Step 4, with `PasteMode`, what a paste does, and `lineedit/lineedittea`'s
+`ComposerPane`, the composer in a workspace pane, and `EventMsg`, what it
+gives the program.
 Each has one meaning, as its package documents it. `Terminal` is in
 "Deliberate" above; `command.Decision`, `Verdict`'s old name, was removed
 in `v0.10.0`, and `Decision` is `launch`'s alone.

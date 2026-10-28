@@ -1,0 +1,706 @@
+[
+	{
+		"name": "typing",
+		"in": "abc",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "abc",
+			"pos": 3
+		}
+	},
+	{
+		"name": "typing in the middle",
+		"in": "hello world\u001b[D\u001b[D\u001b[D\u001b[D\u001b[D\u001b[Dbig ",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "hellobig  world",
+			"pos": 9
+		}
+	},
+	{
+		"name": "left at the start stays",
+		"in": "ab\u001b[D\u001b[D\u001b[D\u001b[D\u001b[D",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "ab",
+			"pos": 0
+		}
+	},
+	{
+		"name": "right at the end stays",
+		"in": "ab\u001b[D\u001b[C\u001b[C\u001b[C\u001b[C",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "ab",
+			"pos": 2
+		}
+	},
+	{
+		"name": "Ctrl+B and Ctrl+F",
+		"in": "abcd\u0002\u0002\u0002\u0006",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "abcd",
+			"pos": 2
+		}
+	},
+	{
+		"name": "Backspace",
+		"in": "hello\u001b[D\u001b[D",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "helo",
+			"pos": 2
+		}
+	},
+	{
+		"name": "Backspace at the start",
+		"in": "ab\u001b[H",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "ab",
+			"pos": 0
+		}
+	},
+	{
+		"name": "Ctrl+H",
+		"in": "hello\b\b",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "hel",
+			"pos": 3
+		}
+	},
+	{
+		"name": "Home",
+		"in": "hello world\u001b[D\u001b[H",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "hello world",
+			"pos": 0
+		}
+	},
+	{
+		"name": "End",
+		"in": "hello world\u001b[H\u001b[C\u001b[F",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "hello world",
+			"pos": 11
+		}
+	},
+	{
+		"name": "Ctrl+A",
+		"in": "hello world\u001b[D\u0001",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "hello world",
+			"pos": 0
+		}
+	},
+	{
+		"name": "Ctrl+E",
+		"in": "hello world\u0001\u0006\u0005",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "hello world",
+			"pos": 11
+		}
+	},
+	{
+		"name": "Alt+Left twice",
+		"in": "one two  three\u001b[1;3D\u001b[1;3D",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "one two  three",
+			"pos": 4
+		}
+	},
+	{
+		"name": "Alt+Left over spaces",
+		"in": "one two   \u001b[1;3D",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "one two   ",
+			"pos": 4
+		}
+	},
+	{
+		"name": "Alt+Left at the start",
+		"in": "one\u001b[H\u001b[1;3D",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "one",
+			"pos": 0
+		}
+	},
+	{
+		"name": "Alt+Right twice",
+		"in": "one two  three\u001b[H\u001b[1;3C\u001b[1;3C",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "one two  three",
+			"pos": 9
+		}
+	},
+	{
+		"name": "Alt+Right at the end",
+		"in": "one two\u001b[1;3C",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "one two",
+			"pos": 7
+		}
+	},
+	{
+		"name": "Alt+Right from a space",
+		"in": "one   two\u001b[H\u001b[C\u001b[C\u001b[C\u001b[C\u001b[1;3C",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "one   two",
+			"pos": 6
+		}
+	},
+	{
+		"name": "Delete in the middle",
+		"in": "hello\u001b[D\u001b[D\u001b[3~",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "helo",
+			"pos": 3
+		}
+	},
+	{
+		"name": "Delete at the end",
+		"in": "hello\u001b[3~",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "hello",
+			"pos": 5
+		}
+	},
+	{
+		"name": "Ctrl+D in the middle",
+		"in": "hello\u001b[H\u0004",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "ello",
+			"pos": 0
+		}
+	},
+	{
+		"name": "Ctrl+D at the end of a line",
+		"in": "hello\u0004",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "hello",
+			"pos": 5
+		}
+	},
+	{
+		"name": "Ctrl+K",
+		"in": "hello world\u001b[D\u001b[D\u001b[D\u001b[D\u001b[D\u000b",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "hello ",
+			"pos": 6
+		}
+	},
+	{
+		"name": "Ctrl+U",
+		"in": "hello world\u001b[D\u001b[D\u001b[D\u001b[D\u001b[D\u0015",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "world",
+			"pos": 0
+		}
+	},
+	{
+		"name": "Ctrl+W",
+		"in": "one two three\u0017",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "one two ",
+			"pos": 8
+		}
+	},
+	{
+		"name": "Ctrl+W over spaces",
+		"in": "one two   \u0017",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "one ",
+			"pos": 4
+		}
+	},
+	{
+		"name": "Ctrl+W in the middle",
+		"in": "one two three\u001b[D\u001b[D\u001b[D\u0017",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "one two ree",
+			"pos": 8
+		}
+	},
+	{
+		"name": "Ctrl+T in the middle",
+		"in": "abcd\u001b[D\u001b[D\u0014",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "acbd",
+			"pos": 3
+		}
+	},
+	{
+		"name": "Ctrl+T at the end",
+		"in": "abcd\u0014",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "abdc",
+			"pos": 4
+		}
+	},
+	{
+		"name": "Ctrl+T at the start",
+		"in": "abcd\u001b[H\u0014",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "abcd",
+			"pos": 0
+		}
+	},
+	{
+		"name": "Ctrl+L",
+		"in": "hello\u001b[D\f",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "hello",
+			"pos": 4
+		}
+	},
+	{
+		"name": "Tab without completion",
+		"in": "ab\t",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "ab",
+			"pos": 2
+		}
+	},
+	{
+		"name": "unknown sequences",
+		"in": "ab\u001b[Z\u001b[15~\u001b[1;2A",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "ab",
+			"pos": 2
+		}
+	},
+	{
+		"name": "wide and accented",
+		"in": "héllo 世界\u001b[Dx",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "héllo 世x界",
+			"pos": 8
+		}
+	},
+	{
+		"name": "Enter in the middle",
+		"in": "hello world\u001b[D\u001b[D\u001b[D\rnext",
+		"rows": false,
+		"want": {
+			"lines": [
+				"hello world"
+			],
+			"pasted": [
+				false
+			],
+			"eof": false,
+			"text": "next",
+			"pos": 4
+		}
+	},
+	{
+		"name": "CR LF is one Enter",
+		"in": "ab\r\ncd",
+		"rows": false,
+		"want": {
+			"lines": [
+				"ab"
+			],
+			"pasted": [
+				false
+			],
+			"eof": false,
+			"text": "cd",
+			"pos": 2
+		}
+	},
+	{
+		"name": "LF is Enter",
+		"in": "ab\ncd",
+		"rows": false,
+		"want": {
+			"lines": [
+				"ab"
+			],
+			"pasted": [
+				false
+			],
+			"eof": false,
+			"text": "cd",
+			"pos": 2
+		}
+	},
+	{
+		"name": "Ctrl+D on an empty line",
+		"in": "\u0004",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": true,
+			"text": "",
+			"pos": -1
+		}
+	},
+	{
+		"name": "Ctrl+D after a line",
+		"in": "ab\r\u0004",
+		"rows": false,
+		"want": {
+			"lines": [
+				"ab"
+			],
+			"pasted": [
+				false
+			],
+			"eof": true,
+			"text": "",
+			"pos": -1
+		}
+	},
+	{
+		"name": "Ctrl+C",
+		"in": "ab\u0003",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": true,
+			"text": "",
+			"pos": -1
+		}
+	},
+	{
+		"name": "a paste of two lines",
+		"in": "\u001b[200~one\ntwo\u001b[201~",
+		"rows": false,
+		"want": {
+			"lines": [
+				"one"
+			],
+			"pasted": [
+				true
+			],
+			"eof": false,
+			"text": "two",
+			"pos": 3
+		}
+	},
+	{
+		"name": "a paste then Enter",
+		"in": "\u001b[200~one\ntwo\u001b[201~\r",
+		"rows": false,
+		"want": {
+			"lines": [
+				"one",
+				"two"
+			],
+			"pasted": [
+				true,
+				false
+			],
+			"eof": false,
+			"text": "",
+			"pos": 0
+		}
+	},
+	{
+		"name": "a paste of three lines",
+		"in": "\u001b[200~one\ntwo\nthree\u001b[201~\r",
+		"rows": false,
+		"want": {
+			"lines": [
+				"one",
+				"two",
+				"three"
+			],
+			"pasted": [
+				true,
+				true,
+				false
+			],
+			"eof": false,
+			"text": "",
+			"pos": 0
+		}
+	},
+	{
+		"name": "a paste into a typed line",
+		"in": "say \u001b[200~one\ntwo\u001b[201~\r",
+		"rows": false,
+		"want": {
+			"lines": [
+				"say one",
+				"two"
+			],
+			"pasted": [
+				false,
+				false
+			],
+			"eof": false,
+			"text": "",
+			"pos": 0
+		}
+	},
+	{
+		"name": "control keys inside a paste",
+		"in": "\u001b[200~a\tb\u0003c\u0004d\u001b[201~",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "a\tb\u0003c\u0004d",
+			"pos": 8
+		}
+	},
+	{
+		"name": "the line limit",
+		"in": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		"rows": false,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			"pos": 4096
+		}
+	},
+	{
+		"name": "Up recalls",
+		"in": "\u001b[A",
+		"rows": true,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "newest entry",
+			"pos": 12
+		}
+	},
+	{
+		"name": "Up twice",
+		"in": "\u001b[A\u001b[A",
+		"rows": true,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "middle",
+			"pos": 6
+		}
+	},
+	{
+		"name": "Up past the oldest",
+		"in": "\u001b[A\u001b[A\u001b[A\u001b[A\u001b[A",
+		"rows": true,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "oldest one",
+			"pos": 10
+		}
+	},
+	{
+		"name": "Up then Down",
+		"in": "draft\u001b[A\u001b[A\u001b[B",
+		"rows": true,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "newest entry",
+			"pos": 12
+		}
+	},
+	{
+		"name": "Down back to the draft",
+		"in": "draft\u001b[A\u001b[B",
+		"rows": true,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "draft",
+			"pos": 5
+		}
+	},
+	{
+		"name": "Down with nothing recalled",
+		"in": "draft\u001b[B",
+		"rows": true,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "draft",
+			"pos": 5
+		}
+	},
+	{
+		"name": "Ctrl+P and Ctrl+N",
+		"in": "draft\u0010\u0010\u000e",
+		"rows": true,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "newest entry",
+			"pos": 12
+		}
+	},
+	{
+		"name": "Up then edit",
+		"in": "\u001b[AX",
+		"rows": true,
+		"want": {
+			"lines": [],
+			"pasted": [],
+			"eof": false,
+			"text": "newest entX",
+			"pos": 11
+		}
+	},
+	{
+		"name": "Up after Enter",
+		"in": "a\r\u001b[A",
+		"rows": true,
+		"want": {
+			"lines": [
+				"a"
+			],
+			"pasted": [
+				false
+			],
+			"eof": false,
+			"text": "newest entry",
+			"pos": 12
+		}
+	}
+]

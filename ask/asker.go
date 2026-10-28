@@ -10,10 +10,21 @@ import (
 	"github.com/maccavelli/go-tui-lib/v2/inline"
 	"github.com/maccavelli/go-tui-lib/v2/internal/lineinput"
 	"github.com/maccavelli/go-tui-lib/v2/internal/sanitize"
+	"github.com/maccavelli/go-tui-lib/v2/keymap"
+	"github.com/maccavelli/go-tui-lib/v2/lineedit"
 	"github.com/maccavelli/go-tui-lib/v2/msgcat"
 	"github.com/maccavelli/go-tui-lib/v2/safetext"
 	"github.com/maccavelli/go-tui-lib/v2/termkey"
+	"github.com/maccavelli/go-tui-lib/v2/when"
 )
+
+// typing is the modifiers a key that types its text may hold.
+const typing = termkey.ModShift | termkey.ModCapsLock | termkey.ModNumLock | termkey.ModScrollLock
+
+// reasonPath is where a reason's keys are resolved: lineedit's scope,
+// whose editing commands edit it and whose submit gives it
+// (docs/decisions/0023-MADR-line-mode-components.md A5 item 4).
+var reasonPath = keymap.Path{lineedit.ComposerScope}
 
 // Asker asks one question in an inline.Region, as an engine that does no
 // I/O (docs/decisions/0023-MADR-line-mode-components.md D2, D4). The host
@@ -30,13 +41,20 @@ type Asker struct {
 	rules   safetext.Rules
 	limit   int
 	width   int
+	keys    *keymap.Keymap
+	disp    *keymap.Dispatcher
 	// reading is the answer whose reason is read, cleaned, and chosen
 	// the caller's; line is the reason.
 	reading, chosen *Answer
 	line            *lineinput.Line
-	done            bool
-	resp            Response
-	events          []AskerEvent
+	// pending is a key sequence the dispatcher waits on, due when its wait
+	// ends, with the timeout Expire takes.
+	pending bool
+	due     time.Time
+	expire  keymap.TimeoutMsg
+	done    bool
+	resp    Response
+	events  []AskerEvent
 }
 
 // NewAsker is an Asker for q.
@@ -48,6 +66,14 @@ func NewAsker(q Question, o ...Option) *Asker {
 	if a.region == nil {
 		a.region = inline.NewRegion(inline.WithMethod(a.method))
 	}
+	if a.keys == nil {
+		k, err := keymap.New(keymap.Settings{}, lineedit.DefaultRules())
+		if err != nil {
+			panic(err) // the defaults are fixed: an error is a bug
+		}
+		a.keys = k
+	}
+	a.disp = keymap.NewDispatcher(a.keys)
 	a.q = Question{Notes: a.cleanAll(q.Notes), Title: a.clean(q.Title), After: a.cleanAll(q.After), Cancel: a.cleanAnswer(q.Cancel)}
 	for _, r := range q.Rows {
 		c := Row{Label: a.clean(r.Label)}
@@ -109,11 +135,11 @@ func (a *Asker) HandleInput(in termkey.Input, now time.Time) {
 			a.draw()
 		}
 	case termkey.InputKey:
-		a.key(in.Key)
+		a.key(in.Key, now)
 	}
 }
 
-func (a *Asker) key(k termkey.KeyEvent) {
+func (a *Asker) key(k termkey.KeyEvent, now time.Time) {
 	if k.Release {
 		return
 	}
@@ -122,16 +148,14 @@ func (a *Asker) key(k termkey.KeyEvent) {
 		return
 	}
 	if a.reading != nil {
-		switch {
-		case k.Keystroke() == "enter":
-			a.finish(Response{Answer: *a.chosen, Reason: strings.TrimSpace(a.line.Text())})
-			return
-		case k.Text != "" && k.Mod&^(termkey.ModShift|termkey.ModCapsLock|termkey.ModNumLock|termkey.ModScrollLock) == 0:
-			a.line.Insert(a.clean(k.Text))
-		default:
-			a.line.Key(k)
+		o := a.disp.Key(k, reasonPath, when.Map{})
+		a.outcome(o, now)
+		if !o.Handled {
+			a.typed(k)
 		}
-		a.draw()
+		if !a.done {
+			a.draw()
+		}
 		return
 	}
 	if matches(a.q.Cancel.Key, k) {
@@ -156,15 +180,59 @@ func (a *Asker) key(k termkey.KeyEvent) {
 	}
 }
 
+// outcome acts on what the dispatcher made of a reason's key or a
+// timeout: the keys of a sequence that matched nothing are typed, a wait is
+// kept for Timeout, lineedit's submit gives the reason, and its editing
+// commands edit it; another command does nothing.
+func (a *Asker) outcome(o keymap.Outcome, now time.Time) {
+	for _, k := range o.Replay {
+		a.typed(k)
+	}
+	a.pending = o.Wait > 0
+	if a.pending {
+		a.due, a.expire = now.Add(o.Wait), o.Timeout
+	}
+	switch {
+	case o.Command == "" || a.done:
+	case o.Command == lineedit.SubmitID:
+		a.finish(Response{Answer: *a.chosen, Reason: strings.TrimSpace(a.line.Text())})
+	default:
+		a.line.Do(o.Command)
+	}
+}
+
+// typed inserts the text a key types into the reason, cleaned.
+func (a *Asker) typed(k termkey.KeyEvent) {
+	if k.Release || a.done || k.Text == "" || k.Mod&^typing != 0 {
+		return
+	}
+	a.line.Insert(a.clean(k.Text))
+}
+
 // Timeout is when HandleTimeout is next due: the end of the region's wait
-// for a cursor report.
-func (a *Asker) Timeout() (time.Time, bool) { return a.region.Timeout() }
+// for a cursor report, or of a key sequence's wait in a reason, whichever
+// is first.
+func (a *Asker) Timeout() (time.Time, bool) {
+	t, ok := a.region.Timeout()
+	if a.pending && (!ok || a.due.Before(t)) {
+		return a.due, true
+	}
+	return t, ok
+}
 
 // HandleTimeout redraws by the region's re-wrap kind when the cursor
-// report has not come.
+// report has not come, and ends a reason's key sequence whose wait has
+// passed, its keys typed.
 func (a *Asker) HandleTimeout(now time.Time) {
-	if !a.done {
-		a.write(a.region.HandleTimeout(now))
+	if a.done {
+		return
+	}
+	a.write(a.region.HandleTimeout(now))
+	if a.pending && !now.Before(a.due) {
+		a.outcome(a.disp.Expire(a.expire), now)
+		if !a.done {
+			a.draw()
+		}
 	}
 }
 
@@ -260,7 +328,7 @@ func (a *Asker) echo() string {
 // finish leaves the question and its answer in the scrollback, and gives
 // the answer.
 func (a *Asker) finish(r Response) {
-	a.resp, a.done = r, true
+	a.resp, a.done, a.pending = r, true, false
 	a.write(a.region.Commit(a.final(a.width)))
 	a.events = append(a.events, AskerEvent{Kind: AskDone, Response: r})
 }

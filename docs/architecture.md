@@ -29,9 +29,11 @@ below).
 ```text
  launch        start the TUI from a CLI   → command, glyph, termcap, internal/enum, internal/limits; bubbletea, colorprofile, x/term
  launch/launchtest  fake streams for tests → launch, termcap (tests)
- ask           an inline question         → inline, internal/lineinput, glyph, msgcat, safetext, termkey, internal/enum, internal/sanitize; x/ansi
+ ask           an inline question         → inline, lineedit, internal/lineinput, keymap, when, glyph, msgcat, safetext, termkey, internal/enum, internal/sanitize; x/ansi
  ask/asktea    the question in an overlay → ask, workspace, keymap/keymaptea, termkey; bubbletea
- pick          an inline picker           → inline, internal/lineinput, fuzzy, keymap, command, when, glyph, msgcat, safetext, termkey, internal/enum, internal/sanitize; x/ansi
+ pick          an inline picker           → inline, lineedit, internal/lineinput, fuzzy, keymap, command, when, glyph, msgcat, safetext, termkey, internal/enum, internal/sanitize; x/ansi
+ lineedit      the line a user types      → inline, internal/lineinput, keymap, command, when, glyph, safetext, termkey, internal/enum, internal/sanitize; x/ansi
+ lineedit/lineedittea  the composer in a pane → lineedit, inline, workspace, keymap/keymaptea, termkey; bubbletea
  inline        live rows below the scrollback → termcap, termkey, internal/enum, internal/sanitize; x/ansi
  inline/inlinetest  a terminal screen for tests → inline; x/ansi
  palette       the command palette        → workspace, command, command/commandtea, keymap, fuzzy, layout, pick, when, internal/enum, internal/sanitize; bubbletea, bubbles/textinput, lipgloss, x/ansi
@@ -56,7 +58,7 @@ below).
  msgcat        message catalogue          → standard library
  glyph         Unicode and ASCII glyphs   → internal/enum
  internal/enum  enum names and text forms → standard library
- internal/lineinput  one row of typed text → termkey, internal/sanitize; x/ansi
+ internal/lineinput  typed text and its editing commands → command; x/ansi
  internal/teamsg  the one-message command → bubbletea
  internal/sanitize  untrusted display text → safetext; x/ansi
  internal/limits  the window clamp        → standard library
@@ -81,7 +83,9 @@ below).
 | `ask` | `Question`, `Row`, `Answer`, `Response`; `Layout`, the question at a width, a pure function; `Asker`, from `NewAsker` with `WithMethod`, `WithGlyphs`, `WithRegion`, `WithReasonLimit`, `WithCatalog` and `WithRules`: the question as an I/O-free engine (`Resize`, `HandleInput`, `Timeout`, `HandleTimeout`, `Cancel`, `NextEvent`, `View`), its events `AskerEvent` and `AskerEventKind`; `Messages` and the `Msg…` IDs ([0023-MADR](decisions/0023-MADR-line-mode-components.md) D4, A2) |
 | `ask/asktea` | `Dialog`, from `NewDialog(ws, question)` with `WithID`, `WithAnchor`, `WithWidth` and `WithAsk`: the question in a modal overlay, drawn by the same `Asker`; `Open`; `AnsweredMsg`; `DefaultID` |
 | `pick` | `Entry`; `Chooser`, from `NewChooser(entries)` with `WithHeight`, `WithPrompt`, `WithQuery`, `WithMethod`, `WithGlyphs`, `WithIndexAbove`, `WithRegion`, `WithCatalog`, `WithRules` and `WithKeymap`: the pick as an I/O-free engine (`Resize`, `HandleInput`, `Timeout`, `HandleTimeout`, `Cancel`, `NextEvent`), fzf's reverse layout with the palette's rows, ranked by `fuzzy`'s score with ties in the order given, through a `fuzzy.Index` above `DefaultIndexAbove` entries, one line left in the scrollback; its events `ChooserEvent` and `ChooserEventKind`; `DefaultRules`, the command IDs `SelectNextID` to `CancelID` and `ChooserScope`; `Messages` and the `Msg…` IDs ([0023-MADR](decisions/0023-MADR-line-mode-components.md) D5, A3, A4) |
-| `internal/lineinput` | `Line`: one row of typed text by grapheme cluster, bounded in bytes, edited by a fixed set of keys, shown as a window around the cursor; `ask` reads a reason through it and `pick` its query, and `lineedit` is to be built on it (0023-MADR A2) |
+| `internal/lineinput` | `Line`: typed text by grapheme cluster, bounded in bytes or runes, edited by `lineedit`'s commands with Readline's words, shown as a window around the cursor; the `Composer`'s text, `ask`'s reason and `pick`'s query (0023-MADR A2 item 1, A5) |
+| `lineedit` | `Composer`, from `NewComposer` with `WithPrompt`, `WithContinue`, `WithHeader`, `WithHistory`, `WithCompleter`, `WithKeymap`, `WithLimit`, `WithPaste`, `WithExternalEditor`, `WithClearScreen`, `WithMethod`, `WithGlyphs`, `WithRegion` and `WithRules`: the line a user types as an I/O-free engine (`Resize`, `HandleInput`, `Timeout`, `HandleTimeout`, `Cancel`, `NextEvent`, `View`, `Text`, `SetText`), laid out in whole words, its keys commands in the program's keymap, `ComposerEvent` and `ComposerEventKind`; `History`, x/term's, and `MemHistory`; `Completer`, `CompleterFunc`; `PasteMode`; `DefaultRules`, the command IDs `CharLeftID` to `ExternalID` and `ComposerScope` ([0023-MADR](decisions/0023-MADR-line-mode-components.md) D6, A3, A5) |
+| `lineedit/lineedittea` | `ComposerPane`, from `NewComposerPane(ws)` with `WithID` and `WithComposer`: the same `Composer` in a workspace pane; `Composer`; `EventMsg`; `DefaultID` |
 | `internal/enum` | `Names`, an enum's tokens, on `uint8` or `int`, and `Bits`, a bit set's, on `uint8` or `uint16`, for an enum's `String`, `MarshalText` and `UnmarshalText`; `Name`, `Marshal` and `Unmarshal` over a bare table |
 | `internal/teamsg` | `Cmd`, the `tea.Cmd` that delivers one message |
 | `theme` | `Palette` for dark, light and unknown backgrounds; `LightDarkColor` and `ProfileColor`; `Styles`; `New(profile, background, glyphs)` with `WithPalette` and `WithPaletteFor`; `FromDark`; `Border(style)`; text forms for `Background` and `BorderStyle` |
@@ -105,8 +109,8 @@ below).
 - **`layout` has no Charm import,** so its solver can serve any front end.
 - **The Charm-free cores** are `ask`, `command`, `fuzzy`, `glyph`,
   `inline`, `inline/inlinetest`, `internal/enum`, `internal/lineinput`,
-  `internal/sanitize`, `keymap`, `layout`, `msgcat`, `pick`, `safetext`,
-  `termcap`, `termkey`, `termsvc` and `when`: none links a Charm
+  `internal/sanitize`, `keymap`, `layout`, `lineedit`, `msgcat`, `pick`,
+  `safetext`, `termcap`, `termkey`, `termsvc` and `when`: none links a Charm
   module but `x/ansi`, so a line-mode CLI can use them without Bubble Tea
   ([0020-MADR](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
   D1, D11). `internal/conformance` checks their whole import closure, and

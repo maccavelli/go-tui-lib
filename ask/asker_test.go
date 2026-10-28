@@ -9,9 +9,12 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/maccavelli/go-tui-lib/v2/ask"
+	"github.com/maccavelli/go-tui-lib/v2/command"
 	"github.com/maccavelli/go-tui-lib/v2/glyph"
 	"github.com/maccavelli/go-tui-lib/v2/inline"
 	"github.com/maccavelli/go-tui-lib/v2/inline/inlinetest"
+	"github.com/maccavelli/go-tui-lib/v2/keymap"
+	"github.com/maccavelli/go-tui-lib/v2/lineedit"
 	"github.com/maccavelli/go-tui-lib/v2/msgcat"
 	"github.com/maccavelli/go-tui-lib/v2/safetext"
 	"github.com/maccavelli/go-tui-lib/v2/termkey"
@@ -219,6 +222,31 @@ func TestReason(t *testing.T) {
 	}
 	if got := h.scr.Lines()[2]; got != "> reject: not tomorrow" {
 		t.Errorf("left %q; want the echo and the reason", got)
+	}
+}
+
+// TestReasonKeymap: a reason's keys are lineedit's commands in the
+// program's keymap: a user's binding submits it, and one removed does
+// nothing (0023-MADR A5 item 4).
+func TestReasonKeymap(t *testing.T) {
+	bind := func(keys string, id command.ID, remove bool) keymap.Binding {
+		q, err := keymap.ParseSequence(keys, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return keymap.Binding{Keys: q, Command: id, Scope: lineedit.ComposerScope, Remove: remove, Location: keymap.Location{Layer: keymap.UserLayer}}
+	}
+	k, err := keymap.New(keymap.Settings{}, lineedit.DefaultRules(), []keymap.Binding{
+		bind("ctrl+o", lineedit.SubmitID, false),
+		bind("backspace", lineedit.DeleteBackID, true),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := newHost(t, 60, reasonQuestion(), ask.WithKeymap(k))
+	h.typeIn("fnow\x7f\x0f")
+	if h.resp == nil || h.resp.Reason != "now" {
+		t.Errorf("response %+v; want the reason now, backspace removed and ctrl+o submitting", h.resp)
 	}
 }
 

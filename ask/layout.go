@@ -73,12 +73,28 @@ type token struct {
 	sep int
 }
 
-// words is s cleaned, as tokens one space apart.
+// words is s cleaned, as tokens one space apart: broken at each grapheme
+// cluster that is a space alone, so a space and a mark that joins it stay
+// one cluster, inside a word (0023-MADR A5 item 7).
 func words(s string) []token {
 	var toks []token
-	for w := range strings.FieldsSeq(sanitize.Line(s)) {
-		toks = append(toks, token{s: w, sep: 1})
+	var w strings.Builder
+	end := func() {
+		if w.Len() > 0 {
+			toks = append(toks, token{s: w.String(), sep: 1})
+			w.Reset()
+		}
 	}
+	for rest := sanitize.Line(s); rest != ""; {
+		c, _ := ansi.FirstGraphemeCluster(rest, ansi.GraphemeWidth)
+		rest = rest[len(c):]
+		if c == " " {
+			end()
+			continue
+		}
+		w.WriteString(c)
+	}
+	end()
 	return toks
 }
 

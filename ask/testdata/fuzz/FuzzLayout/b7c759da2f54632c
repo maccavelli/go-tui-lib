@@ -1,0 +1,8 @@
+go test fuzz v1
+string("\xe40")
+string("0")
+string("2\x1e4;\x19\x1e4;")
+string("z\xbe\xd5[︧0\n\v\x0e️0")
+string("\xed00")
+byte('\x02')
+bool(true)

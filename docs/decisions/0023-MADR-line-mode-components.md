@@ -115,7 +115,8 @@ The editor (`internal/cli/editor`):
   it for every submission (`internal/cli/line.go:202-218`).
 * **Keys** are its own decoder (`buffer.go:83-116`): no SS3, no Kitty, no
   modifyOtherKeys, and no timeout for a lone `ESC`.
-* **Layout** breaks only at spaces, leaves a word wider than a row whole,
+* **Layout** breaks only at spaces, leaves a word wider than a row whole
+  (*corrected by A5 item 5:* its code cuts such a word at the row's end),
   indents continuation rows by the prompt's width, and caps the width at
   120 (`layout.go:19-88`). It measures with `golang.org/x/text/width`, so
   a combining mark, a ZWJ sequence or an emoji modifier counts one cell
@@ -603,7 +604,8 @@ type CompleterFunc func(line string, pos int) (string, int, bool)
   combining mark, a ZWJ sequence or a flag is one cursor step and its true
   width: the defect gobble's 0032-MADR A1 names, fixed.
 * **The layout is gobble's** (0027-MADR D2): whole words to the width,
-  breaking only at spaces, a wider word left whole; continuation rows
+  breaking only at spaces, a wider word left whole (A5 item 5: broken at the
+  width, as gobble's code and A2 item 5 break it); continuation rows
   indented by the prompt's width; a cursor past the last column on a new
   row; drawn through the `Region`, so its diff, its budget and its re-wrap
   apply.
@@ -1343,6 +1345,74 @@ The options weighed were: `Rank`'s order kept, with `FromEntries`
 yielding its matches in it, which would order a sessions list's ties by
 title length and change an accepted decision; and a tie-order option in
 `fuzzy`, new exported API for one caller.
+
+### A5 (2026-10-27): the composer's parity reference, its clear, its editor key, and the move of `ask` and `pick`
+
+*Status: accepted (2026-10-27),* the owner's answers to
+[0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
+Step 4's deviations D13 to D19, each "(Recommended)", D13 to D18 found
+before that step's code and D19 by its fuzzing:
+
+1. **x/term is a recorded reference, not a requirement.** D1's "No module
+   is added" stands: a generator under `lineedit/testdata/`, which the go
+   command ignores, runs `golang.org/x/term` v0.47.0's `Terminal` in a
+   temporary module over gobble's parity cases and writes each outcome to
+   a file there; the `Composer`'s parity test compares with that file. The
+   cases D6 decides otherwise are left out by name: a bracketed paste,
+   which x/term returns a line at a time, and ctrl+c, which x/term ends
+   the input with and D6 makes `EditInterrupt`.
+2. **ctrl+l clears only after `WithClearScreen()`:** `lineedit.ClearID`,
+   bound to ctrl+l in `DefaultRules`, writes `CSI 2 J` and `CSI H` and
+   draws the composer again at the top, as x/term v0.47.0
+   (`terminal.go:632-634`) and gobble do; without
+   the option it does nothing (API convention 12's third clause).
+3. **ctrl+x ctrl+e opens the external editor,** bash's
+   `edit-and-execute-command (C-x C-e)`, "Invoke an editor on the current
+   command line" (bash's manual page, at bash 3.2.57; the Readline user
+   manual has no such command): `lineedit.ExternalID`, bound to it in
+   `DefaultRules`, sends `EditExternal` only with `WithExternalEditor`, and
+   does nothing without it.
+4. **`ask` and `pick` move to the `Composer` in Step 4,** as A2 item 1
+   says: the reason and the query are one-row composers, with no newline
+   and no history, their editing keys the keymap's in the composer's
+   scope after their own; `ask` gains `WithKeymap`, as `pick` has. Their
+   tests and goldens show the move changes nothing drawn.
+5. **A word wider than its whole row is broken at the width,** by
+   grapheme cluster, its pieces on rows of their own with the
+   continuation indent, as A2 item 5 breaks one in `ask`; every word that
+   fits stays whole. The Context's "leaves a word wider than a row whole"
+   was gobble's 0027-MADR D2 as written, not its code at `5fb6928`, which
+   cuts such a word at the row's end (`internal/cli/editor/layout.go:30-31`,
+   `rowEnd` at `:73-88`); D6's "a wider word left whole" followed it.
+   Left whole, the region would cut the row at the width, so the rest of
+   the word, and the cursor over it, could not be seen.
+6. **A forward word motion stops at the end of the next word,** as
+   Readline's `forward-word` does, "Move forward to the end of the next
+   word. Words are composed of letters and digits." (the Readline user
+   manual, `tiswww.cwru.edu/php/chet/readline/rluserman.html`, read
+   2026-10-28; the page states no version), and bash and macOS's
+   Option+Right with it:
+   alt+f, alt+right and ctrl+right; alt+d kills to there. alt+b,
+   alt+left and ctrl+left stop at the start of the current or previous
+   word, and alt+backspace kills back to there. A word is a run of
+   clusters whose first rune is a letter or a digit (A3 item 9). x/term's
+   Alt+Right stops at the start of the next word, so the parity test
+   leaves out the two of gobble's cases that tell them apart, by name.
+   *Added 2026-10-28,* by D18.
+7. **A row is measured as it is drawn.** A2 item 5's "`Layout` never
+   writes a row wider than the width" did not hold: a mark, a variation
+   selector or a joiner with no base, such as U+FE0F at a word's start, is
+   0 cells measured alone, but drawn after a space it joins the space's
+   cluster, and under `ansi.GraphemeWidth` `" \ufe0f"` is 2 cells (a probe
+   of `x/ansi` v0.11.8). Unicode 18.0.0 calls it an isolated combining
+   character, which a process "may present … as if it were a base
+   character" (§3.6.1, D52), and exhibits one in isolation on U+00A0
+   NO-BREAK SPACE (§2.11.4). `ask.Layout` breaks words only at a cluster
+   that is a space alone, so such a mark stays in its word, measured with
+   the space it joins, and its rows' widths add up as they are drawn; `pick`
+   measures a row's text with the marker before it; the composer a
+   line's first row with its lead. The text is unchanged. *Added
+   2026-10-28,* by D19.
 
 ## More Information
 

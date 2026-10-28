@@ -19,8 +19,10 @@
 //
 // A key no answer shows is ignored. The cancel answer's key, ctrl+c, and
 // the host's Cancel, at the end of its input or for a reason of its own,
-// cancel. An answer with Reason reads a line, up to enter, with a fixed
-// set of editing keys, bounded at DefaultReasonLimit bytes by default.
+// cancel. An answer with Reason reads a line, up to lineedit's submit,
+// enter by default, edited by lineedit's editing commands in the
+// program's keymap (WithKeymap), bounded at DefaultReasonLimit bytes by
+// default.
 //
 // The text shown, the caller's and a model's, is cleaned once, on the way
 // in, never below safetext's Line rules. Its own words, such as the label
