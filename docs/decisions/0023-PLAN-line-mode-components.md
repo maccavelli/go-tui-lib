@@ -1111,3 +1111,30 @@ was released as `v2.2.0` and closed out (`9a13872`).
   over a program that imports `palette` found `charm.land/bubbletea/v2`
   and seven more Charm modules on each system. The same test runs from the
   proxy once `v2.4.0` is tagged.
+* **The release, `v2.4.0`,** under rule 4:
+  * The owner committed the step (`51997cb`). The disclosure guard passed
+    over it and `4341af2`, and the owner pushed `main`. CI run
+    40609447730 passed: `modules`, `gates`, and `test` on macOS 15, Ubuntu
+    24.04 and Windows 2025; Docs run 40609447605 passed.
+  * The owner tagged `51997cb` `v2.4.0`, annotated, and pushed the tag;
+    its CI run, 40611335195, passed the same five jobs.
+  * The proxy serves `v2.4.0` at `51997cb`. The consumer smoke test, the
+    rehearsal's program in a scratch module outside the repository with
+    `GOWORK` empty, required it by `go get`, then ran `go mod tidy`,
+    `go vet` and `go build`, and the program: it chose
+    `perplexity/sonar-pro` from `son`, "1 of 3", and left `model
+    perplexity/sonar-pro`. Its closure, listed for Linux, macOS and
+    Windows, is seven modules, and `x/ansi` alone of Charm.
+  * Its two negative controls failed as they must: `-control` exited 1
+    with `chose &{Kind:done … Entry:{ID:perplexity/sonar-pro …}}; want
+    anthropic/claude-sonnet-5-5`; and the closure check over a program
+    that imports `palette` found `charm.land/bubbletea/v2`,
+    `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`, `colorprofile`,
+    `ultraviolet` and three more of `github.com/charmbracelet/x` on Linux
+    and macOS, and two more on Windows, which has no `x/termios`.
+  * Issue #8 is to be told where the picker is, with the six places the
+    library differs from its text: the keys a keymap's commands (A3.4 item
+    3), a height of 10 (item 2), ties in the order given (A4), no
+    highlight until Step 5 (item 7), the query's fixed keys until
+    `lineedit` (A2 item 1), and the palette as the TUI's form (D5).
+* **Step 3 complete, 2026-10-27.**
