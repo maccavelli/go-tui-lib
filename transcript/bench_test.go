@@ -2,6 +2,7 @@ package transcript_test
 
 import (
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -48,6 +49,49 @@ func BenchmarkReprint(b *testing.B) {
 			b.Fatal("no reprint")
 		}
 	}
+}
+
+// The reprint's budget, gobble-cli's BenchmarkReprint at ccd8aa8
+// (docs/decisions/0023-MADR-line-mode-components.md A9 item 5).
+const (
+	reprintAllocs = 49696
+	reprintBytes  = 7274618
+)
+
+// TestReprintBudget: the benchmark's reprint allocates no more, in count or
+// in bytes, than gobble-cli's.
+func TestReprintBudget(t *testing.T) {
+	if testing.Short() {
+		t.Skip("builds 4 MiB of replies")
+	}
+	tr := benchTranscript(t)
+	now := time.Unix(1, 0)
+	tr.Resize(80, now)
+	allocs, bytes := perRun(10, func() {
+		tr.Resize(61, now)
+		tr.Resize(60, now)
+		now = now.Add(transcript.DefaultSettle)
+		if tr.HandleTimeout(now, true) == "" {
+			t.Fatal("no reprint")
+		}
+	})
+	if allocs > reprintAllocs || bytes > reprintBytes {
+		t.Errorf("a reprint: %.0f allocations and %.0f bytes; want at most %d and %d", allocs, bytes, reprintAllocs, reprintBytes)
+	}
+}
+
+// perRun is f's allocations and bytes allocated a call, over runs calls
+// after one to warm it, counted as testing.AllocsPerRun counts them.
+func perRun(runs int, f func()) (allocs, bytes float64) {
+	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(1))
+	f()
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	for range runs {
+		f()
+	}
+	runtime.ReadMemStats(&after)
+	return float64(after.Mallocs-before.Mallocs) / float64(runs), float64(after.TotalAlloc-before.TotalAlloc) / float64(runs)
 }
 
 // TestBenchTranscript: the benchmark's transcript reprints, after the

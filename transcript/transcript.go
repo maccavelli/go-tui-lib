@@ -188,7 +188,8 @@ func (t *Transcript) reprint() string {
 		b.WriteString(t.notice.Apply(safetext.Clean(safetext.Clean(msg, t.rules), safetext.Line())))
 		b.WriteString("\r\n")
 	}
-	b.WriteString(crlf(text))
+	b.Grow(len(text) + len(text)/32) // the text, and room for a CR a line
+	writeCRLF(&b, text)
 	if t.sync {
 		b.WriteString("\x1b[?2026l")
 	}
@@ -198,7 +199,8 @@ func (t *Transcript) reprint() string {
 // render is the pieces drawn at width: the newest back to at most maxRows
 // rows, the oldest of them cut by its first lines to fit, and whether
 // anything earlier was left out, by the bound or by the rows. Only the
-// pieces it shows are drawn.
+// pieces it shows are drawn, and each is walked back by its lines without
+// being split.
 func (t *Transcript) render(width int) (string, bool) {
 	cut := t.dropped
 	var drawn []string
@@ -209,15 +211,16 @@ func (t *Transcript) render(width int) (string, bool) {
 			break
 		}
 		s := t.pieces[i].at(width)
-		lines := strings.SplitAfter(s, "\n")
 		n := 0
-		for j, line := range slices.Backward(lines) {
-			r := t.rowsOf(line, width)
+		for end := len(s); end > 0; {
+			start := strings.LastIndexByte(s[:end-1], '\n') + 1
+			r := t.rowsOf(s[start:end], width)
 			if rows+n+r > t.maxRows {
-				s, cut = strings.Join(lines[j+1:], ""), true
+				s, cut = s[end:], true
 				break
 			}
 			n += r
+			end = start
 		}
 		drawn = append(drawn, s)
 		rows += n
@@ -230,20 +233,36 @@ func (t *Transcript) render(width int) (string, bool) {
 }
 
 // rowsOf is the rows a line takes at width cells: one, or more when the
-// terminal wraps it; an empty last piece of a split takes none.
+// terminal wraps it; an empty last piece of a split takes none. A line no
+// longer in bytes than the width is one row unmeasured: no character is
+// wider in cells than in bytes (docs/decisions/0023-MADR-line-mode-components.md
+// A9 item 3).
 func (t *Transcript) rowsOf(line string, width int) int {
 	if line == "" {
 		return 0
 	}
-	w := t.method.StringWidth(strings.TrimSuffix(line, "\n"))
-	if width <= 0 || w <= width {
+	line = strings.TrimSuffix(line, "\n")
+	if width <= 0 || len(line) <= width {
+		return 1
+	}
+	w := t.method.StringWidth(line)
+	if w <= width {
 		return 1
 	}
 	return (w + width - 1) / width
 }
 
-// crlf is s with each line break written as CR LF, so it reads alike when
+// writeCRLF writes s with each line break as CR LF, so it reads alike when
 // the terminal is in raw mode.
-func crlf(s string) string {
-	return strings.ReplaceAll(strings.ReplaceAll(s, "\r\n", "\n"), "\n", "\r\n")
+func writeCRLF(b *strings.Builder, s string) {
+	for {
+		i := strings.IndexByte(s, '\n')
+		if i < 0 {
+			b.WriteString(s)
+			return
+		}
+		b.WriteString(strings.TrimSuffix(s[:i], "\r"))
+		b.WriteString("\r\n")
+		s = s[i+1:]
+	}
 }

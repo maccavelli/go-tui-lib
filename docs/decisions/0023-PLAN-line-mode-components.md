@@ -2088,3 +2088,103 @@ and is closed.
     it ran.
 * **Step 6 complete, 2026-10-29;** issue #10 is told after Step 6a's
   release (D27).
+
+### Step 6a: the reprint's speed, and a patch release
+
+*2026-10-29.* The owner committed the amendment (`37151bd`) and said
+"committed proceed".
+
+* **Code** (0023-MADR A9 items 2 to 4), the prototype's five changes,
+  applied to the tree by the same script that made them on the scratch
+  copy, each landing once:
+  * `stream/wrap.go`: `wrapProse` takes each word, with the escapes in it,
+    and each gap as a slice of the line; `place` measures a word once, by
+    `wordWidth`, and keeps the held word's width in `heldW`; `wordWidth`
+    is a word's length when it is printable ASCII alone, `0x20` to `0x7e`.
+  * `stream/printer.go`: `At` builds a `Printer` with this one's options
+    and no sanitizer, gives it the cleaned `Source`, and ends it with
+    `end`, which is `Flush`'s ending of the blocks, now shared.
+  * `transcript/transcript.go`: `rowsOf` gives one row, unmeasured, to a
+    line no longer in bytes than the width; `render` walks a piece back by
+    `strings.LastIndexByte` and cuts it by slicing, with no split or join;
+    `writeCRLF` writes the text's line breaks as CR LF into the reprint's
+    builder, in place of `crlf`'s two copies.
+* **Tests:**
+  * `transcript`: `TestReprintBudget` (A9 item 5), the benchmark's reprint
+    10 times after one to warm it, counted by `runtime.MemStats` as
+    `testing.AllocsPerRun` counts, at most 49,696 allocations and
+    7,274,618 bytes; skipped under `-short`. It passes under `-race`.
+    `TestRowsByBytes`: ten ASCII bytes at 10 columns one row, eleven two;
+    five CJK characters, 15 bytes and 10 cells, one row; six, two.
+  * `stream`: `TestReplyBudget`, gobble's reply in 64-byte chunks at 100
+    columns, `testing.AllocsPerRun` over 20, at most 257;
+    `BenchmarkReplyRender`; gobble's reply copied to
+    `stream/testdata/reply.txt`, the same bytes (`cmp` against gobble's
+    `internal/cli/render/testdata/reply.txt`).
+  * `TestAt` gained one input, with an OSC title, an SGR, a NUL, a BEL and
+    a `CSI 2 J`: none of its inputs had a control, so no test showed that
+    `At`, which no longer cleans, draws what was printed, cleaned. Every
+    other test of `stream` and `transcript` is unchanged and passes.
+  * `FuzzPrinter`, 120 s, 10.7 million inputs, and `FuzzTranscript`,
+    120 s, 1.7 million, clean.
+  * **The differential fuzz,** on a scratch copy of the working tree only:
+    `FuzzWrapSame` in a test file beside `v2.6.0`'s `wrapProse`, copied as
+    `wrapProseOld` with its wrapper, under both methods at widths 0 to 99:
+    120 s, 5.9 million inputs, every output byte for byte the same. Seen
+    failing first, with `wordWidth` taking bytes to `0xfe` as ASCII, at its
+    seed `"世界 世界世界 a\tb  c   d"`: new `"世界\n世界世界\na\tb\nc   d"`,
+    old `"世界\n世界世界 a\nb  c   d"`.
+* **Seen failing,** through `python3 -m tools.verify mutate` on scratch
+  copies, 8 killed of 8. Every new test fails under one of them:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | 6a.1 `v2.6.0`'s `wrap.go` | `bench_test.go:52: a streamed reply: 636 allocations; want at most 257`; `bench_test.go:79: a reprint: 180009 allocations and 8618659 bytes; want at most 49696 and 7274618` |
+  | 6a.2 `v2.6.0`'s `At` | `bench_test.go:79: a reprint: 49802 allocations and 13005666 bytes; want at most 49696 and 7274618` |
+  | 6a.3 the byte rule off by one | `transcript_test.go:129: ASCII a byte over: "old\naaaaaaaaaaa\n"; want "(earlier output is not shown again)\naaaaaaaaaaa\n", the line 2 row(s) at 10` |
+  | 6a.4 `Source` keeps each chunk as written | `printer_test.go:416:` `TestAt`'s new input, `At` giving the OSC, the NUL and the BEL that were printed cleaned; `printer_test.go:451: Source = "one\x1b[2J\ntwthree\n"` |
+  | 6a.5 the CR dropped from a CR LF | `host_test.go:29: tuitest: reprint color.utf8.60: line 4 differs` |
+  | 6a.6 the ASCII rule takes a byte above `0x7e` | `printer_test.go:191: wide characters take two columns:` |
+  | 6a.7 a cut piece keeps its first lines | `host_test.go:29: tuitest: reprint color.utf8.60: line 2 differs` |
+  | 6a.8 the held word's width not kept | `printer_test.go:191: wide characters take two columns:`, and three more of gobble's wrapping cases |
+
+* **The benchmarks,** five runs each on macOS (Apple M1 Pro), beside
+  gobble's at `ccd8aa8`, run the same hour, each after the other, with the
+  machine otherwise idle but for the remote gates:
+
+  | Benchmark | This tree | gobble |
+  | :--- | :--- | :--- |
+  | `BenchmarkReprint` | 5.18 to 5.26 ms, 6,530,580 bytes, 43,541 allocations | 9.45 to 9.77 ms, 7,274,150 bytes, 49,696 allocations |
+  | `BenchmarkReplyRender` | 20.1 to 28.1 µs, median 23.5 µs, 32,792 bytes, 200 allocations | 32.4 to 36.2 µs, median 34.9 µs, 257 allocations (its `TestPerfBudget`) |
+
+  An earlier run the same day, under load from the macOS gates, gave 5.7
+  to 6.9 ms and 22.6 to 31.4 µs here, and 10.4 to 16.8 ms and 35.9 to
+  41.2 µs for gobble; the allocation counts are the same in every run.
+  `v2.6.0`'s were 12.2 to 12.3 ms and 186,585 allocations, and 33.7 µs and
+  636 (D27). Not measured on the Linux and Windows hosts: `tools.verify
+  remote` runs the gates, which run no benchmark; `TestReprintBudget` and
+  `TestReplyBudget`, which do not depend on time, run there in the gates.
+* **The API:** `make apicheck`, "against v2.6.0, 0 incompatible
+  change(s)".
+* **The release's notes:** "Migrating to `v2.6.1`" in
+  `docs/guides/migrating.md`, nothing to change and the numbers;
+  `README.md`'s current release `v2.6.1`.
+* **Gates:** `python3 -m tools.verify gates` over the step's 10 files:
+  macOS 19 passed, 0 failed, in 754 s, `release-check` "409 file(s) clean
+  in 1 module(s)", with `apicheck` against `v2.6.0` and the examples
+  gate; `remote linux` 18 passed, 0 failed, 1 skipped (`gofmt`, which is
+  given no files there), in 1513 s, "410 file(s) clean", this step's
+  among them; `remote windows` 18 passed, 0 failed, 1 skipped, in 2420 s,
+  "410 file(s) clean". The race, shuffle and `LC_ALL=C` runs on each
+  host ran the budgets. "Migrating to `v2.6.1`" took the final numbers
+  after the macOS run, a change to its prose alone, linted again after.
+  The identifier scan of the change, untracked files included, is clean.
+* **The smoke test, rehearsed** against the tree by a `replace`, Step 6's
+  program as it is, required as `v2.6.1`: the reprint, 7 rows at 40
+  columns, the scrollback cleared; its closure, listed for Linux, macOS
+  and Windows, seven modules, and `x/ansi` alone of Charm; `-control`
+  exited 1, and the closure check over a program that imports
+  `lineedit/lineedittea` found `charm.land/bubbletea/v2` and seven more
+  Charm modules.
+* **The release,** `v2.6.1`, waits for the owner's commit, push and tag
+  under rule 4; issue #10's note waits for it (D27).

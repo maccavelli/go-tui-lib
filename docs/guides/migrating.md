@@ -7,6 +7,32 @@ needs a major version, at a new module path
 ([AGENTS.md, API conventions](../../AGENTS.md#api-conventions), rule 1).
 Up to `v0.12.0`, a deprecated name was removed in the next minor release.
 
+## Migrating to `v2.6.1`
+
+`v2.6.1` is a patch: nothing exported changes, no default changes, and
+every output is as it was: `make apicheck` against `v2.6.0` reports 0
+incompatible changes
+([0023-PLAN-line-mode-components](../decisions/0023-PLAN-line-mode-components.md)
+Step 6a). A program on `v2.6.0` needs no change:
+
+```bash
+go get github.com/maccavelli/go-tui-lib/v2@v2.6.1
+```
+
+### Changed
+
+- **`stream` and `transcript` are faster, and allocate less.** On an Apple
+  M1 Pro, a reprint of 4 MiB of replies back to 10,000 rows at 60 columns
+  takes 5.2 ms, 6.5 MB and 43,541 allocations, from `v2.6.0`'s 12.3 ms,
+  15.6 MB and 186,585; a reply streamed in 64-byte chunks at 100 columns
+  takes about 24 µs and 200 allocations, from 34 µs and 636. The word wrapper
+  takes each word as a slice of its line and measures it once;
+  `Printer.At` draws its source, which is cleaned already, without
+  cleaning it again; and a line no longer in bytes than the width is
+  counted one row without being measured
+  ([0023-MADR](../decisions/0023-MADR-line-mode-components.md) A9). Tests
+  hold each to an allocation budget.
+
 ## Migrating to `v2.6.0`
 
 `v2.6.0` adds two packages and an option, removes or retypes nothing, and

@@ -105,6 +105,32 @@ func TestWrappedRows(t *testing.T) {
 	}
 }
 
+// TestRowsByBytes: a line as long in bytes as the width is one row, and one
+// byte more is two in ASCII; a line longer in bytes than the width but not
+// in cells is one row, and one wider in cells two (A9 item 3).
+func TestRowsByBytes(t *testing.T) {
+	for _, c := range []struct {
+		name, line string
+		rows       int
+	}{
+		{"ASCII at the width", strings.Repeat("a", 10), 1},
+		{"ASCII a byte over", strings.Repeat("a", 11), 2},
+		{"CJK at the width in cells", strings.Repeat("世", 5), 1}, // 15 bytes, 10 cells
+		{"CJK a character over", strings.Repeat("世", 6), 2},      // 18 bytes, 12 cells
+	} {
+		tr := transcript.NewTranscript(transcript.WithMaxRows(2))
+		tr.AddText("old\n")
+		tr.AddText(c.line + "\n")
+		want := "old\n" + c.line + "\n"
+		if c.rows == 2 {
+			want = notice + c.line + "\n"
+		}
+		if got := body(t, reprint(t, tr, 10)); got != want {
+			t.Errorf("%s: %q; want %q, the line %d row(s) at 10", c.name, got, want, c.rows)
+		}
+	}
+}
+
 // TestDrawsOnlyWhatItShows: a reprint calls only the functions of the
 // pieces it shows (gobble-cli's TestTranscriptRenderDrawsOnlyWhatItShows).
 func TestDrawsOnlyWhatItShows(t *testing.T) {

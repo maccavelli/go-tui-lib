@@ -82,16 +82,18 @@ func (p *Printer) SetWidth(width int) { p.width = width }
 // transcript keeps to print the reply again at another width.
 func (p *Printer) Source() string { return p.source.String() }
 
-// At is the Source drawn afresh at width cells: written to a new Printer
-// with this one's options at that width, then flushed. It changes nothing
-// in this Printer. While this one is Idle, At gives what it would have
-// printed so far had its width been width all along; a transcript draws a
-// reply again so on a resize
-// (docs/decisions/0023-MADR-line-mode-components.md A8 item 2).
+// At is the Source drawn afresh at width cells: given to a new Printer with
+// this one's options at that width, with no sanitizer, since it is cleaned
+// already, then ended as Flush ends a reply. It changes nothing in this
+// Printer. While this one is Idle, At gives what it would have printed so
+// far had its width been width all along; a transcript draws a reply again
+// so on a resize (docs/decisions/0023-MADR-line-mode-components.md A8 item
+// 2, A9 item 2).
 func (p *Printer) At(width int) string {
-	q := NewPrinter(WithMarkup(p.markup), WithMethod(p.method), WithRules(p.rules), WithWidth(width))
-	q.asIs = p.asIs
-	return q.Write(p.Source()) + q.Flush()
+	q := &Printer{markup: p.markup, method: p.method, width: width, rules: p.rules, asIs: p.asIs, defs: map[string]bool{}}
+	q.clean.b.WriteString(p.Source()) // cleaned already, by the rules and then the floor
+	q.end()
+	return q.drain()
 }
 
 // Idle reports whether the Printer holds nothing back: what it printed
@@ -115,6 +117,14 @@ func (p *Printer) Write(chunk string) string {
 func (p *Printer) Flush() string {
 	p.san.Close()  //nolint:errcheck // as Write: cleaned's Write never fails
 	p.base.Close() //nolint:errcheck // as Write: cleaned's Write never fails
+	p.end()
+	p.open()
+	return p.drain()
+}
+
+// end prints what the sanitizers wrote and everything still held, and
+// closes every block.
+func (p *Printer) end() {
 	p.take()
 	if p.partial != "" {
 		p.line(p.partial, false)
@@ -123,8 +133,6 @@ func (p *Printer) Flush() string {
 	p.endHeld()
 	p.endTable()
 	p.fence, p.html, p.paragraph, p.lazy = "", 0, false, false
-	p.open()
-	return p.drain()
 }
 
 // take reads what the sanitizers wrote, and prints each line it

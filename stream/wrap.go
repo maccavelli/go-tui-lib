@@ -15,7 +15,9 @@ import (
 // open a block, the word before it moving down with it when it can; a
 // word wider than its row is left whole on a row of its own, as D7 has it,
 // and a run of CJK or Thai text is one word, which the terminal wraps
-// (A3 item 16, UAX #14 §3.1). A width of 0 or less wraps nothing.
+// (A3 item 16, UAX #14 §3.1). A width of 0 or less wraps nothing. Each
+// word and gap is a slice of the line, and each word is measured once (A9
+// item 4).
 func wrapProse(m ansi.Method, width int, line string) string {
 	if width <= 0 {
 		return line
@@ -31,31 +33,31 @@ func wrapProse(m ansi.Method, width int, line string) string {
 	}, plain[:n])
 	w := wrapper{m: m, width: width, cont: cont, col: advance(0, plain[:n])}
 	w.out.WriteString(head)
-	gap, word := "", ""
+	gs, ws, gap := 0, -1, "" // the gap's start, the word's start or -1, and the gap before the word
 	for i := 0; i < len(rest); {
-		switch rest[i] {
-		case 0x1b:
-			k := escapeLen(rest[i:])
-			word += rest[i : i+k]
-			i += k
-		case ' ', '\t':
-			if word != "" {
-				w.place(gap, word)
-				gap, word = "", ""
+		switch c := rest[i]; {
+		case c == ' ' || c == '\t':
+			if ws >= 0 {
+				w.place(gap, rest[ws:i])
+				ws, gs = -1, i
 			}
-			gap += rest[i : i+1]
 			i++
-		default:
-			word += rest[i : i+1]
+			continue
+		case ws < 0:
+			ws, gap = i, rest[gs:i]
+		}
+		if rest[i] == 0x1b {
+			i += escapeLen(rest[i:])
+		} else {
 			i++
 		}
 	}
-	if word != "" {
-		w.place(gap, word)
-		gap = ""
+	if ws >= 0 {
+		w.place(gap, rest[ws:])
+		gs = len(rest)
 	}
 	w.emitHeld()
-	if w.fits(advance(w.col, gap)) {
+	if gap = rest[gs:]; w.fits(advance(w.col, gap)) {
 		w.out.WriteString(gap)
 	}
 	return w.out.String()
@@ -70,6 +72,7 @@ type wrapper struct {
 	out       strings.Builder
 	col       int
 	held      string
+	heldW     int // held's width
 	heldGap   string
 	heldFirst bool
 }
@@ -81,22 +84,34 @@ func (w *wrapper) fits(col int) bool { return col <= w.width }
 // open a block there, when the held word moves down with it, or, when that
 // cannot be, the word stays on this row.
 func (w *wrapper) place(gap, word string) {
+	ww := wordWidth(w.m, word)
 	switch {
 	case w.held == "":
-		w.held, w.heldGap, w.heldFirst = word, gap, true
+		w.held, w.heldW, w.heldGap, w.heldFirst = word, ww, gap, true
 		return
-	case w.fits(w.m.StringWidth(word) + advance(w.m.StringWidth(w.held)+advance(w.col, w.heldGap), gap)):
+	case w.fits(ww + advance(w.heldW+advance(w.col, w.heldGap), gap)):
 	case !opensBlock(ansi.Strip(word)):
 		w.emitHeld()
 		w.newRow()
-		w.held, w.heldGap, w.heldFirst = word, "", true
+		w.held, w.heldW, w.heldGap, w.heldFirst = word, ww, "", true
 		return
 	case !w.heldFirst && !opensBlock(ansi.Strip(w.held)):
 		w.newRow()
 		w.heldGap = ""
 	}
 	w.emitHeld()
-	w.held, w.heldGap, w.heldFirst = word, gap, false
+	w.held, w.heldW, w.heldGap, w.heldFirst = word, ww, gap, false
+}
+
+// wordWidth is s's width in cells under m: its length when it is printable
+// ASCII alone, which every method measures so.
+func wordWidth(m ansi.Method, s string) int {
+	for i := 0; i < len(s); i++ {
+		if s[i] < 0x20 || s[i] > 0x7e {
+			return m.StringWidth(s)
+		}
+	}
+	return len(s)
 }
 
 func (w *wrapper) emitHeld() {
@@ -105,7 +120,7 @@ func (w *wrapper) emitHeld() {
 	}
 	w.out.WriteString(w.heldGap)
 	w.out.WriteString(w.held)
-	w.col = advance(w.col, w.heldGap) + w.m.StringWidth(w.held)
+	w.col = advance(w.col, w.heldGap) + w.heldW
 	w.held, w.heldGap = "", ""
 }
 

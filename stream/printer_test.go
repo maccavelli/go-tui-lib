@@ -385,14 +385,17 @@ func TestRules(t *testing.T) {
 
 // TestAt: whenever the Printer is idle, At at its width gives what it has
 // printed so far, for every input fed a byte at a time, plain and styled,
-// with and without table layout; after a Flush, At gives the whole output;
-// and At leaves the Printer as it was (0023-MADR A8 item 2).
+// with and without table layout, controls and escapes among them, which At
+// draws cleaned, as printed, without cleaning again; after a Flush, At
+// gives the whole output; and At leaves the Printer as it was (0023-MADR A8
+// item 2, A9 item 2).
 func TestAt(t *testing.T) {
 	in, err := os.ReadFile("testdata/style.input.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
-	inputs := []string{string(in), "see [x][r]\n\n[r]: https://x.example\n\nthen [x][r]\n", "```go\nx := 1\n"}
+	inputs := []string{string(in), "see [x][r]\n\n[r]: https://x.example\n\nthen [x][r]\n", "```go\nx := 1\n",
+		"a\x1b]0;title\x07b \x1b[31mred\x1b[0m and\x00 a bell\x07 here\n\n- \x1b[2Jitem\n"}
 	for _, c := range wrapCases {
 		inputs = append(inputs, c.in)
 	}
