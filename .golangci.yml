@@ -126,6 +126,7 @@ linters:
             - "**/termcap/*.go"
             - "**/termkey/*.go"
             - "**/termsvc/*.go"
+            - "**/transcript/*.go"
             - "**/when/*.go"
             - "!$test"
           deny:

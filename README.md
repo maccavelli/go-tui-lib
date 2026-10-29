@@ -18,7 +18,7 @@ pattern, used by every program that needs it.
 
 ## Status
 
-- **The current release is `v2.5.0`,** at the module path
+- **The current release is `v2.6.0`,** at the module path
   `github.com/maccavelli/go-tui-lib/v2`
   ([0020-MADR](docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
   A4.1). `v2.0.0` follows `v1.13.0`, which a `v1` user keeps; `v1.13.0` follows
@@ -136,6 +136,13 @@ pattern, used by every program that needs it.
   host opens, each key a command in the program's keymap, a reply printed
   above it through the region. It links no Charm module but `x/ansi`, and
   `lineedit/lineedittea` puts the same composer in a workspace pane.
+- **A streamed reply and its transcript, since `v2.6.0`.** `stream`
+  prints a reply's Markdown into the scrollback as it arrives, each line
+  once it can no longer change: styled with every marker kept, tables laid
+  out, prose wrapped at whole words. `transcript` keeps what the program
+  has shown and, once a resize settles, prints the conversation again at
+  the new width. Both link no Charm module but `x/ansi`, and `pick`
+  underlines the cells a query matched through `stream`'s `Markup`.
 - **The stack is Charm v2:** `charm.land/bubbletea/v2`,
   `charm.land/lipgloss/v2` and `charm.land/bubbles/v2`, with
   `github.com/charmbracelet/colorprofile` and

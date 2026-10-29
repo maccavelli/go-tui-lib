@@ -314,6 +314,20 @@ record that is not there.
 | A table | held until a blank line or another block ends it | `stream.Printer.Flush` | decided (0023-MADR-line-mode-components.md D7, A6) |
 | A link | its text in the `Link` style and its destination in the `URL` style, no OSC 8 | `stream.Markup` | decided (0023-MADR-line-mode-components.md A6) |
 
+## transcript
+
+| Behaviour | Default | Control | Status |
+| :--- | :--- | :--- | :--- |
+| What it keeps | 4 MiB of pieces, the oldest dropped past it | `transcript.WithMaxBytes`, `transcript.DefaultMaxBytes` | built |
+| A reprint's rows | the newest 10,000, as the terminal shows them at the width | `transcript.WithMaxRows`, `transcript.DefaultMaxRows` | built |
+| The wait after the last resize | 150 ms | `transcript.WithSettle`, `transcript.DefaultSettle` | built |
+| How a row's cells are counted | `ansi.WcWidth` | `transcript.WithMethod` | built |
+| The reprint clearing the scrollback | `CSI 3 J` written, after `CSI 2 J` | `transcript.WithoutScrollbackClear` | built |
+| The reprint as one synchronized update | mode 2026 set and reset | `transcript.WithSynchronized` | built |
+| How `AddText`'s text and the notice are cleaned | `safetext.Text`, never less | `transcript.WithRules` | built |
+| The notice when a reprint left output out | "(earlier output is not shown again)", unstyled | `transcript.WithCatalog`, `transcript.Messages`, `transcript.WithNoticeStyle` | built |
+| When a reprint is made | once the last resize has settled and the host says its output is idle | `transcript.Transcript.HandleTimeout` | decided (0023-MADR-line-mode-components.md D9, A8) |
+
 ## inline and inline/inlinetest
 
 | Behaviour | Default | Control | Status |

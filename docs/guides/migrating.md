@@ -7,6 +7,51 @@ needs a major version, at a new module path
 ([AGENTS.md, API conventions](../../AGENTS.md#api-conventions), rule 1).
 Up to `v0.12.0`, a deprecated name was removed in the next minor release.
 
+## Migrating to `v2.6.0`
+
+`v2.6.0` adds two packages and an option, removes or retypes nothing, and
+changes no default: `make apicheck` against `v2.5.0` reports 0
+incompatible changes
+([0023-PLAN-line-mode-components](../decisions/0023-PLAN-line-mode-components.md)
+Steps 5 and 6). A program on `v2.5.0` needs no change to build, and
+behaves as it did:
+
+```bash
+go get github.com/maccavelli/go-tui-lib/v2@v2.6.0
+```
+
+### Added
+
+- **`stream`,** a streamed reply's Markdown printed line by line, each
+  line once (issue #10): `Printer`, from `NewPrinter` with `WithMarkup`,
+  `WithWidth`, `WithMethod`, `WithRules` and `WithoutTableLayout`, and
+  its `Write`, `Flush`, `SetWidth`, `Source`, `Idle` and `At`, its source
+  drawn again at another width; `Markup`, a `Style` for each part of a
+  reply, and `DefaultMarkup`, gobble-cli's; `Style`, a set of SGR
+  attributes, with `Apply`. A paragraph's line is held until the next, so
+  a setext heading and a table's header are drawn as what they are; a
+  table is held until it ends, and laid out; prose is wrapped at whole
+  words, every Markdown marker kept. The zero `Markup` styles nothing. It
+  links no Charm module but `x/ansi`
+  ([0023-MADR](../decisions/0023-MADR-line-mode-components.md) D7, A3,
+  A6 to A8). 0009-MADR's `Doc`, `Buffer` and `Pane` are still to come,
+  `Buffer` and `Pane` in `stream/streamtea` (its A5).
+- **`transcript`,** what a line-mode CLI has shown, printed again at the
+  new width once a resize settles (issue #10): `Transcript`, from
+  `NewTranscript` with `WithMaxBytes`, `WithMaxRows`, `WithSettle`,
+  `WithMethod`, `WithoutScrollbackClear`, `WithSynchronized`, `WithRules`,
+  `WithCatalog` and `WithNoticeStyle`; `AddText`, `AddDrawn`,
+  `AddReply`, `Resize`, `Timeout` and `HandleTimeout`; the defaults
+  `DefaultMaxBytes` (4 MiB), `DefaultMaxRows` (10,000) and
+  `DefaultSettle` (150 ms); `Messages` and `MsgEarlierOutput`. A reprint
+  clears the terminal's scrollback, and with it what came before the
+  program, unless `WithoutScrollbackClear`
+  ([0023-MADR](../decisions/0023-MADR-line-mode-components.md) D9, D13,
+  A8). It links no Charm module but `x/ansi`.
+- **`pick`:** `WithMarkup`, a `stream.Markup` whose `Match` style marks
+  the cells of each entry the query matched; nothing is styled by
+  default.
+
 ## Migrating to `v2.5.0`
 
 `v2.5.0` adds a package and its adapter, and an option, and removes or

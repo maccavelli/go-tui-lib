@@ -1,0 +1,31 @@
+ 35|(earlier output is not shown again)
+ 37|precise, courteous, and to the point.
+  0|
+ 60|## A heading that is longer than sixty columns, which is kep
+ 18|t whole on its row
+  0|
+ 58|- A list item with enough words in it to need a second row
+ 45|  at sixty columns, continued under its text.
+ 22|- Another item, short.
+  0|
+ 59|> A quote that is long enough to wrap at sixty columns, its
+ 43|> rows each starting with the marker again.
+  0|
+  5|```go
+ 60|func main() { fmt.Println("a long line of code that is wider
+ 50| than sixty columns and stays exactly as it is") }
+  3|```
+  0|
+  6|| name
+ 15|      | value |
+ 60|| ----------------------------------------------------------
+ 15|----- | ----- |
+ 60|| a cell that is long enough to pass sixty columns on its ow
+ 15|n row | b     |
+  0|
+  3|See
+ 60|https://example.com/a/very/long/path/that/is/wider/than/the/
+ 31|row/at/sixty/columns/index.html
+ 59|for more. Done, with **some bold words across a break** and
+ 18|`inline code` too.
+ 40|----------------------------------------

@@ -35,6 +35,7 @@ var cores = []string{
 	"termcap",
 	"termkey",
 	"termsvc",
+	"transcript",
 	"when",
 }
 

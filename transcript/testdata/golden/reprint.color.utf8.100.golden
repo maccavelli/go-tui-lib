@@ -1,0 +1,27 @@
+ 33|the program's banner, shown first
+ 21|> summarise the reply
+ 92|Hello again. If you have a specific task—whether it’s writing code, reviewing documentation,
+100|debugging, or anything else—please describe it in your own words. I’ll be precise, courteous, and to
+ 10|the point.
+  0|
+ 78|## A heading that is longer than sixty columns, which is kept whole on its row
+  0|
+ 96|- A list item with enough words in it to need a second row at sixty columns, continued under its
+  7|  text.
+ 22|- Another item, short.
+  0|
+ 94|> A quote that is long enough to wrap at sixty columns, its rows each starting with the marker
+  8|> again.
+  0|
+  5|```go
+100|func main() { fmt.Println("a long line of code that is wider than sixty columns and stays exactly as
+ 10| it is") }
+  3|```
+  0|
+ 75|| name                                                            | value |
+ 75|| --------------------------------------------------------------- | ----- |
+ 75|| a cell that is long enough to pass sixty columns on its own row | b     |
+  0|
+ 99|See https://example.com/a/very/long/path/that/is/wider/than/the/row/at/sixty/columns/index.html for
+ 74|more. Done, with **some bold words across a break** and `inline code` too.
+ 40|----------------------------------------

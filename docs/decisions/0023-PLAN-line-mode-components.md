@@ -364,7 +364,10 @@ entry, and the closure check over a program that imports `palette`. Issue
 ### Step 6: `transcript` (issue #10), and a release
 
 * `transcript`: `Transcript` and its options, as 0023-MADR D9, with
-  `WithoutScrollbackClear` (D13).
+  `WithoutScrollbackClear` (D13). *Annotated 2026-10-28, by 0023-MADR A8
+  (D23 to D26):* `stream.Printer.At` draws a reply again;
+  `WithSynchronized` and `WithNoticeStyle` join the options; a reprint
+  still due waits for the host's next `HandleTimeout(now, true)`.
 * **Tests:** the bound drops the oldest pieces; a reprint draws the newest
   back to the row limit, after the notice when it cut; the settle waits
   for the last resize and for the host's idle; `WithoutScrollbackClear`
@@ -1772,3 +1775,204 @@ and is closed.
 * **No release:** Step 6 releases `stream` with `transcript`, and its
   notes take this step's changes. The step is done when the owner
   commits it.
+* **Step 5 complete, 2026-10-28:** the owner committed it (`5b713cf`).
+
+### Step 6: `transcript` (issue #10), and a release
+
+*2026-10-28.* The owner said "committed, approved to proceed".
+
+* **Before any code:** gobble's `internal/cli/transcript.go`,
+  `transcript_test.go` and `view.go` at `5fb6928`, and its
+  `0030-MADR-resize-and-performance.md` (D3 to D5) and PLAN (P3, P4):
+  the pieces, each a source and a function of the width; the 4 MiB bound,
+  oldest first; the render back to 10,000 rows, the oldest piece cut, a
+  dim notice when anything was left out; the reprint at a line's start
+  with both wrappers idle, 150 ms after the last resize, as `CSI ?2026h
+  CSI 2J CSI 3J CSI H`, the text, `CSI ?2026l`; and `BenchmarkReprint`, a
+  4 MB transcript of its 921-byte reply drawn back to 10,000 rows at 60
+  columns, 9.4 ms on macOS, 29 ms on the Linux machine and 12 ms on the
+  Windows laptop (0030-PLAN, P4's baselines).
+* **Deviation D23, 2026-10-28: A7's fact.**
+  * **Found,** reading `view.go`: gobble runs `Tables` and `Style` only
+    when colour is on (`:269-276`, `:508-513`), so A7 item 1's "its tables
+    are laid out with colour off too", written in Step 5, is false, and
+    D22 rested partly on it. Nothing is released.
+  * **Resolutions offered:** keep D22 and correct the fact
+    (recommended); or follow gobble, a table laid out only under a
+    `Markup` that styles, `WithoutTableLayout` removed before `v2.6.0`.
+  * **Chosen by the owner,** 2026-10-28: "Keep D22, correct A7". 0023-MADR
+    A8 item 1.
+* **Deviation D24, 2026-10-28: drawing a reply again.**
+  * **Found:** D9's `AddReply(p *stream.Printer)` draws a reply at each
+    reprint's width, and `stream` exports no way to draw a `Printer`'s
+    source with its options at another width.
+  * **Resolutions offered:** `stream.Printer.At(width)` (recommended); or
+    no `AddReply`, the host passing `AddDrawn` a function of its own.
+  * **Chosen by the owner,** 2026-10-28: "Printer.At(width)". 0023-MADR A8
+    item 2. Added to the step: `stream/printer.go`'s `At`, and its test.
+* **Deviation D25, 2026-10-28: the controls rule 12 asks for.**
+  * **Found:** the reprint writes mode 2026 and a notice line, which D9
+    and D13 give no control.
+  * **Resolutions offered:** `WithSynchronized(on bool)` and the notice in
+    `WithNoticeStyle(stream.Style)`, from the catalogue (recommended); or
+    `WithSynchronized` alone, the notice unstyled.
+  * **Chosen by the owner,** 2026-10-28: "Synchronized + style".
+    0023-MADR A8 item 3.
+* **Deviation D26, 2026-10-28: a reprint due while output is mid-line.**
+  * **Found:** a `Timeout` that kept the passed settle deadline would make
+    a host spin while its output is not idle.
+  * **Resolutions offered:** `Timeout` gives nothing once the deadline has
+    passed, and the host calls `HandleTimeout(now, true)` at each idle
+    point (recommended); or a `Due()` method as well.
+  * **Chosen by the owner,** 2026-10-28: "Call it when idle". 0023-MADR
+    A8 item 4.
+* **Code:**
+  * `transcript`, a Charm-free core: `transcript.go`, the `Transcript`
+    (`NewTranscript`, `AddText`, `AddDrawn`, `AddReply`, `Resize`,
+    `Timeout`, `HandleTimeout`): pieces of text cleaned by the rules and
+    then the floor, `safetext.Text`; functions of the width, written as
+    drawn, as `inline.Region` writes a host's rows; and replies, drawn by
+    `stream.Printer.At`. The bound drops the oldest pieces past
+    `WithMaxBytes`, the newest always kept, a reply counted by its source
+    as it grows, checked as pieces are added and at a reprint. The render
+    walks back from the newest piece to `WithMaxRows` rows, counted as the
+    terminal shows them at the width under `WithMethod`, cuts the oldest
+    piece it shows by its first lines, and draws no piece it does not
+    show. The reprint is `SGR 0`, then mode 2026 set, `CSI 2 J`, `CSI 3 J`,
+    `CSI H`, the notice when anything was left out, the text with CR LF
+    line breaks, and mode 2026 reset. The first `Resize` sets the width; a
+    later one with another width starts the settle. `options.go`, the nine
+    options and `DefaultMaxBytes`, `DefaultMaxRows` and `DefaultSettle`;
+    `messages.go`, `MsgEarlierOutput` and `Messages`; `doc.go`, the host's
+    part, kitty's and iTerm2's handling of `CSI 3 J`, and the stability
+    line.
+  * `stream`: `Printer.At` (D24).
+  * The gates and the docs: `transcript` joins `cores` and the `charmfree`
+    files; `docs/guides/defaults.md` gains a `transcript` table of nine
+    rows; `docs/glossary.md` moves `Transcript` to "Built";
+    `docs/architecture.md`, the package map, the table and the cores, and
+    `At` in `stream`'s row.
+  * The release's notes: "Migrating to `v2.6.0`", `stream` (Step 5),
+    `transcript` and `pick.WithMarkup` added, nothing changed;
+    `README.md`'s Status, the current release `v2.6.0` and a bullet for
+    the streamed reply and its transcript.
+* **Rows, not line breaks:** gobble's render counts line breaks against its
+  10,000; this one counts the rows each line takes at the width, as D9's
+  `WithMethod` is for, so a line kept whole and wider than the width, a
+  heading, a code line or a table row, counts as the rows the terminal
+  wraps it into. The benchmark's 10,000 rows at 60 columns are 8,123 lines.
+* **Found while writing the tests, fixed in the step's code:** `FuzzTranscript`'s
+  first form read an op's argument byte only for a resize, so its seeds
+  never reached a reprint, and no mutation failed it; every op now takes
+  its argument, both seeds reach a reprint, and the mutations below fail
+  them. `TestHostReprint` showed the reprint waiting while the reply's
+  last paragraph line is held (Q10), as D26 has it, and now checks that it
+  comes at the host's idle call after the reply ends.
+* **Lint:** ineffassign in `fuzz_test.go`'s `check`, and `make modernize`'s
+  `slices.Backward` in the render's loop.
+* **Tests** (`transcript`):
+  * gobble's four, through the public API: `TestRendersAtAWidth`,
+    `TestNewestRows`, `TestDrawsOnlyWhatItShows` (10 functions called for
+    10 rows of 100 pieces), `TestBound` (and the newest piece kept alone
+    past the bound);
+  * `TestCutPiece`, `TestWrappedRows` (a 30-cell line takes three rows at
+    10), `TestReplyGrows`, `TestReprintOrder`, `TestWithoutScrollbackClear`,
+    `TestWithSynchronized`, `TestSettle` (three resizes reprint once, at the
+    last one's settle; not before it; not while the host is not idle, with
+    no deadline meanwhile; then at its idle call; and once), `TestNoNotice`,
+    `TestNotice` (the catalogue's, cleaned to one line, styled, and
+    `msgcat.Check`), `TestRules`, `TestCRLF`;
+  * `TestReprintGolden`, across the matrix at 60 and 100, read: at 60 the
+    banner and the prompt are left out, the notice first, the reply cut by
+    its first lines and wrapped at 60, its heading, code line, table rows
+    and URL wrapped by the screen, 30 rows; at 100 nothing is cut and there
+    is no notice. The colour and plain goldens are alike, the screen
+    showing no SGR;
+  * `TestHostReprint`: a host on `inlinetest.Screen` streams a reply above
+    a one-row `inline.Region`, the screen narrows from 60 to 40, the
+    reprint waits for the reply's held line, and after the host's
+    `Clear`, the reprint and `Draw`, the screen holds the conversation at
+    40, the prompt row below it, and no scrollback;
+  * `FuzzTranscript`: any ops never panic, no passed deadline is given,
+    and each reprint is framed, CR LF, at most the row limit after the
+    notice. Its run: 120 s, 2.7 million inputs,
+    clean.
+  * `stream`: `TestAt`, every input fed a byte at a time under three
+    option sets, `At` equal to what was printed at each idle point and
+    after the `Flush`, and the `Printer` unchanged by it.
+* **The benchmark:** `BenchmarkReprint`, 4 MiB of gobble's 921-byte reply,
+  4,554 replies each a `Printer` with `DefaultMarkup`, reprinted at 60
+  columns back to 10,000 rows, five runs on macOS (Apple M1 Pro): 12.28 to
+  12.45 ms, 15.6 MB and 186,585 allocations a reprint, beside gobble's
+  9.4 ms, 7.3 MB and 49,696 allocations on macOS (0030-PLAN P4). Each reply
+  shown is drawn by a fresh `Printer` through `At`, with its sanitizers.
+  `TestBenchTranscript` checks the reprint: the notice, then 10,000 rows at
+  60 columns. Not measured on the Linux and Windows hosts: `tools.verify
+  remote` runs the gates, which run no benchmark.
+* **Seen failing,** through `python3 -m tools.verify mutate` on scratch
+  copies, 22 killed of 22: the three the step names, A3 item 15's order,
+  D13's and A8's controls, the settle and the idle, the render, the
+  cleaning, `At`, and the core's closure. 6.3 first failed to build, which
+  is no kill, and was rewritten and killed. Every new test fails under one
+  of them; `TestReprintGolden`, written after the run, fails under 6.3,
+  6.12 and 6.18 run against it alone:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | 6.1 the bound keeps the oldest | `transcript_test.go:136: the oldest piece kept past 100 bytes, or not said to be gone: "(earlier output is not shown again)\nthe very first\nyyyyyyy…` |
+  | 6.2 the reprint does not wait to settle | `transcript_test.go:215: reprinted before the last resize settled: "\x1b[0m\x1b[?2026h\x1b[2J\x1b[3J\x1b[Hx\r\n\x1b[?2026l"` |
+  | 6.3 the notice written when nothing was cut | `host_test.go:87: row 0: "(earlier output is not shown again)"; want "> explain the reprint"` |
+  | 6.4 CSI 3 J before CSI 2 J | `bench_test.go:63: reprint "\x1b[0m\x1b[?2026h\x1b[3J\x1b[2J\x1b[H(earlier output is not shown again)\r\nfunc main() { fmt.Println(\"a long line of …` |
+  | 6.5 no SGR 0 first | `bench_test.go:63: reprint "\x1b[?2026h\x1b[2J\x1b[3J\x1b[H(earlier output is not shown again)\r\nfunc main() { fmt.Println(\"a long line of code th…` |
+  | 6.6 WithoutScrollbackClear ignored | `transcript_test.go:180: "\x1b[0m\x1b[?2026h\x1b[2J\x1b[3J\x1b[Hx\r\n\x1b[?2026l"` |
+  | 6.7 WithSynchronized ignored | `transcript_test.go:189: "\x1b[0m\x1b[?2026h\x1b[2J\x1b[3J\x1b[Hx\r\n"` |
+  | 6.8 the reprint does not wait for idle | `host_test.go:64: reprinted with the reply's line held: "\x1b[0m\x1b[?2026h\x1b[2J\x1b[3J\x1b[H> explain the reprint\r\nThe transcript keeps every p…` |
+  | 6.9 Timeout keeps a passed deadline (D26) | `transcript_test.go:221: a deadline, passed, while the reprint waits for idle` |
+  | 6.10 the first Resize starts a settle | `transcript_test.go:200: the first Resize, which only sets the width, reprinted` |
+  | 6.11 every piece drawn, shown or not | `transcript_test.go:122: 100 pieces drawn for 10 rows; want 10` |
+  | 6.12 rows counted by line breaks, not cells | `bench_test.go:73: 12309 rows at 60 columns, in 10000 lines; want at most 10000, and close to it` |
+  | 6.13 line breaks left LF | `host_test.go:87: row 1: "                     The transcript keep"; want "The transcript keeps every piece the"` |
+  | 6.14 AddText cleaned by the rules alone, below its floor | `transcript_test.go:261: "ab \x1b[31mred\x1b[0m\n\x1b[2mdim\x1b[0m\n"` |
+  | 6.15 a reply's size fixed when added | `transcript_test.go:161: the grown reply not counted against the bound: "before\nfirst line\na second line, longer\n"` |
+  | 6.16 the notice not styled | `transcript_test.go:247: "(plus tôt )\nb\n"` |
+  | 6.17 the catalogue ignored | `transcript_test.go:247: "\x1b[2m(earlier output is not shown again)\x1b[0m\nb\n"` |
+  | 6.18 a cut piece keeps its first lines | `transcript_test.go:92: "(earlier output is not shown again)\none\ntwo\nthree\nfive\n"` |
+  | 6.19 At ignores the table setting | `TestAt`, under `WithoutTableLayout`: At's output differs from what was printed, at an idle point |
+  | 6.20 At ignores the Markup | `TestAt`, under `DefaultMarkup`: At's output differs from what was printed, at an idle point |
+  | 6.21 At does not flush | `TestAt`: after the `Flush`, At's output lacks the held last line |
+  | 6.22 transcript imports Bubble Tea | `charmfree_test.go:187: transcript (GOOS=linux) links charm.land/bubbletea/v2: transcript → charm.land/bubbletea/v2` |
+
+  `TestDefaultsInventory` reads the new rows: on a scratch copy a misspelt
+  control fails it, `docs/guides/defaults.md:326 (The reprint as one
+  synchronized update): built, but transcript exports no
+  WithSynchronised`, and a `decided` row citing no record that exists,
+  `decided by 0099-MADR-line-mode-components.md, which does not exist`; a
+  `decided` row's control is not resolved, by that test's design
+  (`internal/conformance/defaults_test.go:103-107`). depguard's `charmfree`
+  entry for `transcript`, on a scratch copy with a used import,
+  `transcript/zz_dg.go:3:8: import 'charm.land/bubbletea/v2' is not allowed
+  from list 'charmfree'`.
+* **Names:** `python3 -m tools.verify names` over `Transcript` and `Option`,
+  "2 planned name(s), clean", before any code.
+* **The API:** `make apicheck`, "against v2.5.0, 0 incompatible
+  change(s)".
+* **Gates:** `python3 -m tools.verify gates` over the step's 21 files but
+  its goldens: macOS 19 passed, 0 failed, in 755 s, `release-check`
+  "401 file(s) clean in 1 module(s)", with `apicheck` against `v2.5.0`
+  and the examples gate; `remote linux` 18 passed, 0 failed, 1 skipped
+  (`gofmt`, which is given no files there), in 1259 s, "409 file(s)
+  clean", this step's among them; `remote windows` 18 passed, 0 failed,
+  1 skipped, in 2435 s, "409 file(s) clean". A first run on the three
+  hosts was stopped part way to add `TestReprintGolden`, which rule 2
+  asks for, and run again whole. The identifier scan of the change,
+  untracked files included, is clean.
+* **The smoke test, rehearsed** against the tree by a `replace`: a program
+  on an `inlinetest.Screen` streams a reply with a table through a
+  `Printer` with `DefaultMarkup`, keeps it in a `Transcript`, narrows the
+  screen from 60 to 40, and checks the reprint, the reply wrapped at 40
+  and the table laid out, and the scrollback cleared. Its closure, listed
+  for Linux, macOS and Windows, is seven modules, and `x/ansi` alone of
+  Charm. Its controls failed as they must: `-control`, expecting the rows
+  at 60, exited 1, and the closure check over a program that imports
+  `lineedit/lineedittea` found `charm.land/bubbletea/v2` and seven more
+  Charm modules on Linux and macOS, six on Windows.

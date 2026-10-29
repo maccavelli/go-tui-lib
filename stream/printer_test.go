@@ -383,6 +383,54 @@ func TestRules(t *testing.T) {
 	}
 }
 
+// TestAt: whenever the Printer is idle, At at its width gives what it has
+// printed so far, for every input fed a byte at a time, plain and styled,
+// with and without table layout; after a Flush, At gives the whole output;
+// and At leaves the Printer as it was (0023-MADR A8 item 2).
+func TestAt(t *testing.T) {
+	in, err := os.ReadFile("testdata/style.input.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	inputs := []string{string(in), "see [x][r]\n\n[r]: https://x.example\n\nthen [x][r]\n", "```go\nx := 1\n"}
+	for _, c := range wrapCases {
+		inputs = append(inputs, c.in)
+	}
+	for _, e := range setextExamples {
+		inputs = append(inputs, e.md)
+	}
+	for _, e := range tableExamples {
+		inputs = append(inputs, e.md)
+	}
+	for _, o := range [][]Option{{WithWidth(20)}, {WithWidth(20), WithMarkup(DefaultMarkup())}, {WithWidth(12), WithoutTableLayout()}} {
+		for _, s := range inputs {
+			p := NewPrinter(o...)
+			var out strings.Builder
+			for i := range len(s) {
+				out.WriteString(p.Write(s[i : i+1]))
+				if p.Idle() {
+					if got := p.At(p.width); got != out.String() {
+						t.Fatalf("%q after %d bytes, idle: At gives %q; printed %q", s, i+1, got, out.String())
+					}
+				}
+			}
+			out.WriteString(p.Flush())
+			if got := p.At(p.width); got != out.String() {
+				t.Fatalf("%q flushed: At gives %q; printed %q", s, got, out.String())
+			}
+		}
+	}
+	p := NewPrinter(WithWidth(10))
+	first := p.Write("one two three four\n\n")
+	_ = p.At(40)
+	if rest := p.Write("five six seven\n") + p.Flush(); first+rest != "one two\nthree four\n\nfive six\nseven\n" {
+		t.Errorf("At changed the Printer: %q", first+rest)
+	}
+	if got := p.At(40); got != "one two three four\n\nfive six seven\n" {
+		t.Errorf("At(40) = %q", got)
+	}
+}
+
 // TestSource: Source is the cleaned source, across a Flush; Idle is true
 // only at a line's start with nothing held.
 func TestSource(t *testing.T) {

@@ -82,6 +82,18 @@ func (p *Printer) SetWidth(width int) { p.width = width }
 // transcript keeps to print the reply again at another width.
 func (p *Printer) Source() string { return p.source.String() }
 
+// At is the Source drawn afresh at width cells: written to a new Printer
+// with this one's options at that width, then flushed. It changes nothing
+// in this Printer. While this one is Idle, At gives what it would have
+// printed so far had its width been width all along; a transcript draws a
+// reply again so on a resize
+// (docs/decisions/0023-MADR-line-mode-components.md A8 item 2).
+func (p *Printer) At(width int) string {
+	q := NewPrinter(WithMarkup(p.markup), WithMethod(p.method), WithRules(p.rules), WithWidth(width))
+	q.asIs = p.asIs
+	return q.Write(p.Source()) + q.Flush()
+}
+
 // Idle reports whether the Printer holds nothing back: what it printed
 // ends a line, and no line, table or part of one waits.
 func (p *Printer) Idle() bool {

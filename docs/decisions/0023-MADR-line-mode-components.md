@@ -711,6 +711,10 @@ func (t *Transcript) HandleTimeout(now time.Time, idle bool) string // the repri
   the program, as gobble's does (0030-MADR:139): the price of a reprint
   that lines up. A terminal's own re-wrap of a styled table, a diff or a
   code block cannot line up.
+* *Amended 2026-10-28 by A8 items 2 to 4:* a reply is drawn again by
+  `stream.Printer.At`; `WithSynchronized` and `WithNoticeStyle` join the
+  options; a reprint still due after the settle waits for the host's
+  next `HandleTimeout(now, true)`.
 
 ### D10. What stays the host's, and what is not built
 
@@ -1465,15 +1469,52 @@ step's tests were written:
    then `Style`), and its "byte for byte" with colour off is `Style`'s
    alone (`render/mdstyle.go:12`), so its tables are laid out with colour
    off too. D7 put both in one sentence, which a reply with a table
-   cannot satisfy.
+   cannot satisfy. *Corrected 2026-10-28 by A8 item 1: gobble lays a
+   table out only when colour is on, so with colour off its tables come
+   as they came.*
 2. **The `Printer` lays a table out under every `Markup`,** as gobble
-   does: the columns as wide as their widest cell, in the width method,
+   does *(with colour on; A8 item 1)*: the columns as wide as their widest cell, in the width method,
    aligned as the delimiter row says. The zero `Markup` styles nothing.
 3. **`stream.WithoutTableLayout` turns the layout off** (AGENTS.md "API
    conventions" rule 12: a policy applied to the text a user is shown):
    a table is still held until it ends, and its rows print as they came,
    styled by the `Markup`. With it and the zero `Markup`, the output is
    the input, byte for byte.
+
+### A8 (2026-10-28): A7's fact corrected, and the transcript's API
+
+*Status: accepted (2026-10-28),* the owner's answers to
+[0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
+Step 6's deviations D23 to D26, each "(Recommended)", found before that
+step's code:
+
+1. **A7 item 1's fact is corrected (D23).** gobble styles a reply and
+   lays its tables out only when colour is on: `text` runs `Tables` and
+   `Style` inside `if v.caps.Out.Color`, "styled when colour is on, raw
+   when it is off (D7)" (`internal/cli/view.go:269-276` at `5fb6928`),
+   and its reprint's `replyAt` does the same (`:508-513`). With colour
+   off, gobble prints a table as it came. D22's choice stands: the
+   `Printer` lays a table out under every `Markup`, on purpose unlike
+   gobble, so plain output keeps aligned columns; `WithoutTableLayout`
+   gives gobble's colour-off output.
+2. **`stream.Printer.At(width)` draws a reply again (D24).** D9's
+   `AddReply(p)` keeps the `Printer`; a reprint draws `At(width)`: its
+   `Source` written to a new `Printer` with its options at that width,
+   then flushed. At a reprint the live `Printer` is idle, nothing held,
+   so `At` gives what it would have printed at that width.
+3. **The transcript's further controls (D25),** by API convention 12:
+   `WithSynchronized(on bool)`, the reprint one synchronized update (mode
+   2026), on by default as `inline`'s is; and the notice line, the
+   catalogue's `MsgEarlierOutput` with its English default "(earlier
+   output is not shown again)", through `WithCatalog`, drawn in
+   `WithNoticeStyle(stream.Style)`, unstyled by default, as `stream`'s
+   zero `Markup` is.
+4. **The reprint waits for idle at the host's call (D26).** `Timeout`
+   gives the settle deadline until it passes, and then nothing, so a host
+   never waits on a passed deadline. A reprint still due is given by the
+   next `HandleTimeout(now, true)`, which the host calls whenever its
+   output becomes idle; it gives "" when nothing is due. This is gobble's
+   `tryReprint` at each line end (`view.go:470-493`).
 
 ## More Information
 
