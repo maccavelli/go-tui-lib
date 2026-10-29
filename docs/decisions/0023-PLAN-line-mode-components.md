@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-10-29
 associated-madr: "0023-MADR-line-mode-components.md"
 ---
@@ -43,7 +43,7 @@ code's at `5fb6928`; a step that relies on one cites it.
 | 5 | `stream/`, `stream/streamtea/`, `docs/decisions/0009-*` | the Charm-free core, `Printer`, `Markup`; 0009's amendment | |
 | 6 | `transcript/` | the bounded, reprintable conversation | the next minor |
 | 6a | `stream/`, `transcript/` | the reprint's and the printer's speed, and their budgets (D27, 0023-MADR A9) | a patch, `v2.6.1` |
-| 7 | `docs/`, `README.md` | the guide, the close-out | |
+| 7 | `docs/`, `README.md`; *annotated 2026-10-29:* the four examples' `example_test.go` in `ask/`, `pick/`, `lineedit/` and `stream/`, which the step names | the guide, the close-out | |
 
 Each step's package joins `cores` and the `charmfree` files in the commit
 that builds it; the `<pkg>tea` packages are not cores. Each step adds its
@@ -2210,3 +2210,138 @@ and is closed.
     and macOS, six on Windows.
 * **Step 6a complete, 2026-10-29;** issue #10's note, with `v2.6.1`'s
   numbers, is posted when the owner asks (D27).
+
+### Step 7: documentation and the close-out
+
+*2026-10-29.* The owner committed and pushed Step 6a's release record
+(`185fb67`) and said "post #10 and close. proceed with step 7". The note
+on issue #10, with `v2.6.1`'s numbers, is posted, and the issue is closed
+as completed. Issues #7, #8 and #9 have their notes, the ones Steps 2 to 4
+drafted, and were closed on 2026-10-27, 2026-10-28 and 2026-10-28
+(`gh issue view`), so nothing is left for the owner to close.
+
+* **Before any writing:** the seven packages' documentation read again at
+  `185fb67`, `go doc -all` of `inline`, `ask`, `pick`, `lineedit`,
+  `stream`, `transcript` and `termkey`, and their host tests,
+  `lineedit/host_test.go` and `transcript/host_test.go`; the guide says
+  only what these say. 0023-MADR A3 cites no repository fact for this
+  step.
+* **The examples,** one `example_test.go` in each package, in its `_test`
+  package, each run by `go test` against its `// Output:`:
+  * `ExampleComposer` is the host loop, `run`, whole: it drains the
+    Composer's events, writing what it asks; reads an `inline.Reader`
+    only when asked, until the Composer's deadline, the escape timeout
+    while the decoder holds bytes, or the next look at the width, 200 ms;
+    flushes the decoder when the input goes quiet; feeds each input in;
+    cancels at `io.EOF`; and resizes when the width changes. The example
+    types two lines on an `inlinetest.Screen` and ends at the input's end.
+  * `ExampleAsker`: a question of two rows, the reason typed after `3`;
+    `ExampleChooser`: three models, the query `son`, then enter;
+    `ExamplePrinter`: a heading, a paragraph wrapped at 32 columns and a
+    table laid out at the reply's end, chunk by chunk.
+  * The step's row in "In scope" names `docs/` and `README.md`; the
+    examples the step names are Go example functions, which live in their
+    packages, so the step's Go files are these four, all tests.
+* **The guide,** `docs/guides/line-mode.md`: what is the program's (D10);
+  the host loop, `ExampleComposer`'s `run`; raw mode with
+  `golang.org/x/term`, which the library does not require, and the
+  region's `Restore`; one reader and one region, `Print`, the re-wrap
+  kinds and the width method; the question, the picker, the composer, the
+  printer and the transcript, each with its options and defaults; testing
+  on `inlinetest.Screen`; and the defaults guide's rows. Its four output
+  blocks are the examples' `// Output:`.
+* **The guide's code, checked in a scratch module** outside the
+  repository, requiring the tree by a `replace` with `GOWORK` off: `run`
+  copied from `lineedit/example_test.go` by a script, the guide's
+  `session` over `golang.org/x/term` v0.47.0, and its transcript `host`.
+  `go vet` and `go build` passed for macOS, and `go build` for Linux and
+  Windows. Its tests passed under `-race`: the guide's `host` on a test
+  screen, a line submitted, a reply streamed above the composer, the
+  screen narrowed from 60 to 40, and the reprint once the reply ended,
+  the reply at 40 columns and no scrollback; and two of the loop, each
+  seen failing on a scratch copy of `run`:
+  * a lone ESC, then 300 ms of quiet, then enter submits `ab`; with the
+    flush removed, `run = [], <nil>; want [ab] <nil>`;
+  * the width changed from 40 to 12 while the loop waits draws the line
+    again at 12; with the resize removed, `the line was not drawn again
+    at 12 columns`.
+
+  The binary ran on a pseudo-terminal (`script`), typed `hello there`,
+  enter, a left arrow, `x`, enter and ctrl+d: "2 line(s)", the region's
+  `Restore` and `CSI ?2004l` written last.
+* **The guide's blocks against their sources:** a script read each of the
+  guide's eight code blocks and found each, line for line, in a source
+  that compiled and ran, the four Go blocks in the examples and the
+  scratch host, and the four text blocks in an example's `// Output:`:
+  "8 block(s), 0 failed". On a scratch copy of the guide with one Go line
+  and one output line changed it gave `FAIL block 1 (go, 73 lines)` and
+  `FAIL block 4 (text, 4 lines)`, and exited 1. No gate in the repository
+  runs this check: the guide's excerpts can drift from the examples
+  unless a later record adds the guide to `scripts/go-examples.py`, as
+  the commands guide is.
+* **Seen failing,** through `python3 -m tools.verify mutate` on scratch
+  copies, 5 killed of 5:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | 7.1 the Asker given `2` in place of `3` | `ExampleAsker`: got `session ""` and `> allowed for this session` |
+  | 7.2 the Chooser given the query `o` | `ExampleChooser`: got `> o … 1 of 3`, three rows, and `chose opus` |
+  | 7.3 the loop drops each submission | `ExampleComposer`: got `[] <nil>` |
+  | 7.4 the loop writes what the Composer asks to `io.Discard` | `ExampleComposer`: got the submissions and no screen rows |
+  | 7.5 the reply's end not printed | `ExamplePrinter`: got `-- flush` and no table |
+
+* **The other documents:**
+  * `docs/architecture.md`: "Thirty-one packages, and ten internal ones",
+    counted by `go list ./...` with `GOWORK=off`, in place of "Ten
+    packages, and five internal ones", stale since before `v1`; the line
+    mode among what they are for; `ask`'s row gains `WithKeymap`; the
+    tree gains `pick/`, `lineedit/`, `lineedit/lineedittea/`, `stream/`
+    and `transcript/`, and the guides' line lists all nine; "What is not
+    here" no longer lists a line-mode picker, built in `v2.4.0`, or
+    `inline`, built in `v2.3.0`, and says a line-mode CLI sets raw mode
+    itself.
+  * `docs/README.md`: seven rows in "I want to…", for the host loop,
+    what the program owns, the question and the picker, the composer, the
+    reply and its reprint, testing on a screen, and 0023-MADR; this
+    PLAN's row `complete (v2.6.1)`.
+  * `README.md`: the `v2.6.0` bullet says what `v2.6.1` changed and links
+    the guide; a row in "I want to…".
+  * `docs/glossary.md` needed no change: every name 0023-MADR reserved is
+    under "Built from those records", and `stream`'s `Scanner` stays
+    reserved, unexported.
+* **Gates:** `python3 -m tools.verify gates` over the step's eight files:
+  macOS 19 passed, 0 failed, in 826 s, `release-check` "410 file(s) clean
+  in 1 module(s)", with `apicheck` and the examples gate; the four
+  examples, untracked then, by `make pre-add-check FILES=…`, "4 file(s)
+  clean"; `remote linux` 18 passed, 0 failed, 1 skipped (`gofmt`, which
+  is given no files there), in 1309 s, "414 file(s) clean", the examples
+  among them; `remote windows` 18 passed, 0 failed, 1 skipped, in 2453 s,
+  "414 file(s) clean". markdownlint over the guide, `architecture.md` and
+  both READMEs: 0 issues; its globs leave the records out. The identifier
+  scan of the change, untracked files included, is clean.
+* **Verification,** each item, from this record:
+  * every step's mutations killed, each failure quoted: 12, 15, 14, 23,
+    22 and 22 in Steps 1 to 6, 8 in Step 6a and 5 in Step 7;
+  * each step from 3 re-read its facts before any code ("Before any
+    code" in Steps 3 to 6; above for Step 7), and recorded a change as a
+    deviation (D11, D23 among them);
+  * `tools.verify gates` passed on macOS, Linux and Windows for every
+    step;
+  * `TestCoresAreCharmFree` passes with `inline`, `inlinetest`, `ask`,
+    `pick`, `lineedit`, `stream` and `transcript`, and failed on a scratch
+    copy that imported Bubble Tea into each (Steps 1 to 6);
+  * `TestDefaultsInventory` passes with every component's rows;
+  * `make apicheck` reported 0 incompatible changes at each release,
+    `v2.3.0` to `v2.6.1`;
+  * each release's smoke test passed from the proxy, its closure `x/ansi`
+    alone of Charm: `v2.3.0`, `v2.4.0`, `v2.5.0`, `v2.6.0` and `v2.6.1`.
+    0023-MADR's Confirmation asks for a smoke test that asks, picks,
+    edits and streams: the releases' tests did each in turn, its own
+    component, and no one program did all four;
+  * the identifier scan found nothing, at every step.
+* **This PLAN is complete, 2026-10-29,** once CI passes on this step's
+  push, which the handoff reports. Done as its Goal says: every
+  Verification item holds, CI passed on each pushed tree, the owner
+  tagged each release, `v2.3.0` to `v2.6.0` and the patch `v2.6.1`, and
+  each release's smoke test passed. Left as the PLAN left it: what D10
+  leaves out, and `stream/glamourmd`, which 0009's PLAN builds.

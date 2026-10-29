@@ -60,7 +60,7 @@ it was when they were written
 | 0022 | MADR | [Align docs-only CI and disclosure gates](decisions/0022-MADR-align-docs-ci-and-disclosure-gates.md) | proposed |
 | 0022 | PLAN | [Implement aligned docs-only CI and disclosure gates](decisions/0022-PLAN-align-docs-ci-and-disclosure-gates.md) | proposed |
 | 0023 | MADR | [Give a line-mode CLI an inline question, a picker, a composer and a streamed transcript, as I/O-free Charm-free cores on one live region](decisions/0023-MADR-line-mode-components.md) | accepted; A1 to A9 accepted |
-| 0023 | PLAN | [Implement the line-mode question, picker, composer and transcript](decisions/0023-PLAN-line-mode-components.md) | in-progress (Steps 1–6a done, `v2.6.1`) |
+| 0023 | PLAN | [Implement the line-mode question, picker, composer and transcript](decisions/0023-PLAN-line-mode-components.md) | complete (`v2.6.1`) |
 | 0024 | MADR | [Let a program with its own CLI refuse, replace or opt into every behaviour the library imposes, with the floors stated and an inventory the tests hold](decisions/0024-MADR-opt-in-and-opt-out-coverage.md) | accepted; A1 accepted |
 | 0024 | PLAN | [Implement API rule 12, its floors, the message catalogue and the defaults inventory, and close the command-and-control gaps](decisions/0024-PLAN-command-and-control-opt-outs.md) | complete (`v2.2.0`) |
 | 0024 | PLAN | [Close the terminal, text and convention gaps, and adopt the message catalogue](decisions/0024-PLAN-terminal-text-and-convention-opt-outs.md) | proposed |
@@ -130,6 +130,13 @@ it was when they were written
 | drive an editor's `@` or `/` completion pop-up | [guides/command-palette.md](guides/command-palette.md#completion-pop-ups) |
 | run some matched commands in my own pane, in key order | [guides/command-palette.md](guides/command-palette.md#any-pane-can-consume-a-command) |
 | rank candidates by fuzzy match, without Bubble Tea | `fuzzy`, and `ExampleMatcher_Rank` in `fuzzy/example_test.go` |
+| write a line-mode CLI's loop without Bubble Tea: read, decode, feed, drain, write, wake | [guides/line-mode.md](guides/line-mode.md#the-host-loop) |
+| know what a line-mode program owns: raw mode, the size, paste, the editor | [guides/line-mode.md](guides/line-mode.md#what-is-yours) |
+| ask an inline question with keyed answers, or pick from a filtered list | [guides/line-mode.md](guides/line-mode.md#ask-a-question), [guides/line-mode.md](guides/line-mode.md#pick-an-entry) |
+| edit and submit a line, with history, completion and paste | [guides/line-mode.md](guides/line-mode.md#edit-and-submit-a-line) |
+| stream a reply's Markdown into the scrollback, and print it again on a resize | [guides/line-mode.md](guides/line-mode.md#stream-a-reply), [guides/line-mode.md](guides/line-mode.md#print-the-conversation-again-on-a-resize) |
+| test a line-mode component on a fake screen | [guides/line-mode.md](guides/line-mode.md#test-on-a-screen) |
+| know why the line-mode components are built this way | [0023-MADR](decisions/0023-MADR-line-mode-components.md) |
 | know why the command palette and fuzzy matcher are built this way | [0008-MADR](decisions/0008-MADR-command-palette.md) |
 | see how streamed Markdown, frames and untrusted text will be handled | [0009-MADR](decisions/0009-MADR-streaming-content-engine.md) |
 | know why terminal capabilities are detected this way | [0005-MADR](decisions/0005-MADR-terminal-capabilities-and-services.md) |

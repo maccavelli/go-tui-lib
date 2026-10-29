@@ -16,10 +16,11 @@ below).
   package named after it. There is no root package. Helpers shared between
   packages go under `internal/`.
 - **Go 1.27.2**, with no `toolchain` line.
-- **Ten packages,** and five internal ones, for multi-pane terminal
-  workspaces, terminal capabilities and services, a command registry run
-  from keys, slash lines, agents and the program's own CLI, and the
-  foundations every package uses.
+- **Thirty-one packages,** and ten internal ones, for multi-pane terminal
+  workspaces, a line-mode CLI's components without Bubble Tea, terminal
+  capabilities and services, a command registry run from keys, slash
+  lines, agents and the program's own CLI, and the foundations every
+  package uses.
 - **No CLI front end.** The program brings its own command line, and the
   library imports no CLI framework
   ([0012-MADR](decisions/0012-MADR-bring-your-own-cli.md)).
@@ -82,7 +83,7 @@ below).
 | `palette` | `Picker`, from `NewPicker(ws)` with `WithLimit`, `WithGrouping`, `WithPlaceholder`, `WithLogger`, `WithGOOS`, `WithRecents` and `WithoutInput`: an overlay pane that streams hits from its providers off the event loop, ranks them with `fuzzy`, asks for a hit's arguments, and runs it on the loop; `Register`, `Open` with `WithID`, `WithAnchor` and `WithSize`, `OpenCommand`, `DefaultRules`, `CompletionRules`, the command IDs `OpenID` to `CompleteID` and `PickerScope`, `SetQuery` and `SelectedMsg`; `Provider` and its optional `Discoverer`, `Starter`, `Stopper`, `Prefixed`, `Debouncer` and `Opener`; `Search`, `Hit`, `Availability`, `Grouping`; the providers `FromRegistry`, `Static` with `Item`, `FromEntries`, a line-mode picker's `[]pick.Entry` ranked as `pick` ranks it, `Panes`, `Files` with `FileOption`, `Walker`, `WalkerFunc`, `FSWalker`, `PathFilter` and `PathFilterFunc`, and `Recents`; `Frecency`, with `FrecencyOption`, its JSON form and `ErrRecentsVersion` |
 | `inline` | `Region`, from `NewRegion` with `WithMethod`, `WithSynchronized`, `WithReflow`, `WithoutCursorQuery`, `WithReportWait` and `WithHeight`: a component's live rows below the scrollback, an I/O-free engine (`Draw`, `Print`, `Commit`, `Clear`, `Resize`, `HandleInput`, `Timeout`, `HandleTimeout`, `SetHeight`, `Restore`) that rewrites a changed row from what it shares with the row before, by relative moves, and on a resize reads the cursor report to follow the terminal's re-wrap; `Reflow`; `Reader`, the host's input read only when asked, one read at a time, never closed ([0023-MADR](decisions/0023-MADR-line-mode-components.md) D3, A1) |
 | `inline/inlinetest` | `Screen`, from `NewScreen(columns, rows, method)`: a terminal's grid by grapheme cluster, with pending wrap, the moves and erases, DECTCEM and mode 2026, an answered cursor report, `Resize(columns, inline.Reflow)` and a scrollback; `Lines`, `Scrollback` and `Text`, the form a golden holds |
-| `ask` | `Question`, `Row`, `Answer`, `Response`; `Layout`, the question at a width, a pure function; `Asker`, from `NewAsker` with `WithMethod`, `WithGlyphs`, `WithRegion`, `WithReasonLimit`, `WithCatalog` and `WithRules`: the question as an I/O-free engine (`Resize`, `HandleInput`, `Timeout`, `HandleTimeout`, `Cancel`, `NextEvent`, `View`), its events `AskerEvent` and `AskerEventKind`; `Messages` and the `Msg…` IDs ([0023-MADR](decisions/0023-MADR-line-mode-components.md) D4, A2) |
+| `ask` | `Question`, `Row`, `Answer`, `Response`; `Layout`, the question at a width, a pure function; `Asker`, from `NewAsker` with `WithMethod`, `WithGlyphs`, `WithRegion`, `WithReasonLimit`, `WithCatalog`, `WithRules` and `WithKeymap`, a reason's editing keys in the program's keymap: the question as an I/O-free engine (`Resize`, `HandleInput`, `Timeout`, `HandleTimeout`, `Cancel`, `NextEvent`, `View`), its events `AskerEvent` and `AskerEventKind`; `Messages` and the `Msg…` IDs ([0023-MADR](decisions/0023-MADR-line-mode-components.md) D4, A2) |
 | `ask/asktea` | `Dialog`, from `NewDialog(ws, question)` with `WithID`, `WithAnchor`, `WithWidth` and `WithAsk`: the question in a modal overlay, drawn by the same `Asker`; `Open`; `AnsweredMsg`; `DefaultID` |
 | `pick` | `Entry`; `Chooser`, from `NewChooser(entries)` with `WithHeight`, `WithPrompt`, `WithQuery`, `WithMethod`, `WithGlyphs`, `WithIndexAbove`, `WithRegion`, `WithCatalog`, `WithRules`, `WithKeymap` and `WithMarkup`, a `stream.Markup` whose `Match` style marks the matched cells: the pick as an I/O-free engine (`Resize`, `HandleInput`, `Timeout`, `HandleTimeout`, `Cancel`, `NextEvent`), fzf's reverse layout with the palette's rows, ranked by `fuzzy`'s score with ties in the order given, through a `fuzzy.Index` above `DefaultIndexAbove` entries, one line left in the scrollback; its events `ChooserEvent` and `ChooserEventKind`; `DefaultRules`, the command IDs `SelectNextID` to `CancelID` and `ChooserScope`; `Messages` and the `Msg…` IDs ([0023-MADR](decisions/0023-MADR-line-mode-components.md) D5, A3, A4) |
 | `internal/lineinput` | `Line`: typed text by grapheme cluster, bounded in bytes or runes, edited by `lineedit`'s commands with Readline's words, shown as a window around the cursor; the `Composer`'s text, `ask`'s reason and `pick`'s query (0023-MADR A2 item 1, A5) |
@@ -254,6 +255,10 @@ inline/ ask/                the line mode's live region and its question;
                             ask's goldens under testdata/golden/
 inline/inlinetest/          a terminal's screen for tests
 ask/asktea/                 the question in a workspace overlay
+pick/ lineedit/             the line mode's picker and composer
+lineedit/lineedittea/       the composer in a workspace pane
+stream/ transcript/         a streamed reply's Markdown, and the
+                            conversation printed again on a resize
 termcap/termcaptea/         the probe's Bubble Tea host
 termcap/termcaptest/        fake terminals for tests
 termsvc/termsvctea/         termsvc's Bubble Tea commands
@@ -288,8 +293,9 @@ docs/
   decisions/                MADR and PLAN records
   reports/                  REPORT records
   guides/                   how-to guides: workspaces, terminal
-                            capabilities, commands, releasing, the
-                            defaults and their controls
+                            capabilities, commands, the command palette,
+                            keymaps, the line mode, releasing, migrating,
+                            the defaults and their controls
 ```
 
 ## Dependencies
@@ -495,14 +501,14 @@ docs/
   Markdown), **overlay widgets** (dialog, toast), a help-footer pane
   beyond `workspace`'s `help.KeyMap`, and **`updatetea`.** Each is its own
   record. The command palette is `palette`, above.
-- **A which-key panel** over `keymap`'s `ActiveKeys`, and **a line-mode
-  picker** for a CLI without Bubble Tea, which may build on `fuzzy`
-  (issue #8).
-- **Terminal modes and inline scrollback** (`termmode`, `inline`): mode
-  plans, teardown, restore bytes and the Windows console helpers, and the
-  per-terminal scrollback strategy. Each is a later record; until then tea
-  still asks for Kitty disambiguation everywhere
+- **A which-key panel** over `keymap`'s `ActiveKeys`.
+- **Terminal modes** (`termmode`): mode plans, teardown, restore bytes and
+  the Windows console helpers. It is a later record; until then tea still
+  asks for Kitty disambiguation everywhere
   ([0005-MADR](decisions/0005-MADR-terminal-capabilities-and-services.md) A4).
+  A line-mode CLI sets raw mode itself, and `inline`, above, draws its live
+  rows and follows each terminal's re-wrap
+  ([0023-MADR](decisions/0023-MADR-line-mode-components.md) D3, D10).
 - **Image protocols** (Kitty placeholders, Sixel, iTerm2), which add
   `Query` values to `termcap`.
 - **A CLI front end,** by design

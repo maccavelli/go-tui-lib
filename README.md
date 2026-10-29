@@ -143,6 +143,10 @@ pattern, used by every program that needs it.
   has shown and, once a resize settles, prints the conversation again at
   the new width. Both link no Charm module but `x/ansi`, and `pick`
   underlines the cells a query matched through `stream`'s `Markup`.
+  `v2.6.1` makes the reprint and the printer faster, within gobble's
+  allocation budgets, which the tests hold.
+  [The line-mode guide](docs/guides/line-mode.md) shows the loop that
+  drives every line-mode component.
 - **The stack is Charm v2:** `charm.land/bubbletea/v2`,
   `charm.land/lipgloss/v2` and `charm.land/bubbles/v2`, with
   `github.com/charmbracelet/colorprofile` and
@@ -171,6 +175,7 @@ repository as it is now.
 | define commands once, for keys, slash lines, agents and your own CLI | [the commands guide](docs/guides/commands.md) |
 | find and run anything from a command palette, or complete `@` and `/` in an editor | [the command palette guide](docs/guides/command-palette.md) |
 | start the TUI from my CLI with `--tui`, and fall back when it cannot run | [Start the TUI from your CLI](docs/guides/commands.md#start-the-tui-from-your-cli) |
+| ask, pick, edit a line and stream a reply in a line-mode CLI, without Bubble Tea | [the line-mode guide](docs/guides/line-mode.md) |
 | know which Charm version to use, and what may be imported | [AGENTS.md, Dependencies](AGENTS.md#dependencies) |
 | know the rules every TUI package follows | [AGENTS.md, TUI conventions](AGENTS.md#tui-conventions) |
 | refuse or change a default the library applies | [the defaults guide](docs/guides/defaults.md) |
