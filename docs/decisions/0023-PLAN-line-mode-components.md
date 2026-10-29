@@ -2186,5 +2186,27 @@ and is closed.
   exited 1, and the closure check over a program that imports
   `lineedit/lineedittea` found `charm.land/bubbletea/v2` and seven more
   Charm modules.
-* **The release,** `v2.6.1`, waits for the owner's commit, push and tag
-  under rule 4; issue #10's note waits for it (D27).
+* **The release, `v2.6.1`,** under rule 4:
+  * The owner committed the step (`1af21f0`) and pushed `main`, with the
+    amendment (`37151bd`), before the disclosure guard was run by hand;
+    the owner's own pre-push hook runs the same guard on every push, and
+    run by hand afterwards over `140ca44..1af21f0` it exited 0 with
+    nothing to report. CI run 40912691677 passed: `modules`, `gates`, and
+    `test` on macOS 15, Ubuntu 24.04 and Windows 2025; Docs run
+    40912691492 passed.
+  * The owner tagged `1af21f0` `v2.6.1`, annotated, and pushed the tag;
+    its CI run, 40921640410, passed the same five jobs.
+  * The proxy serves `v2.6.1` at `1af21f0`. The consumer smoke test,
+    the rehearsal's program in a scratch module outside the repository
+    with `GOWORK` empty, required it by `go get`, then ran `go mod tidy`,
+    `go vet` and `go build`, and the program: the reprint, 7 rows at 40
+    columns, the scrollback cleared. Its closure, listed for Linux, macOS
+    and Windows, is seven modules, and `x/ansi` alone of Charm.
+  * Its two negative controls failed as they must: `-control` exited 1
+    with `row 0: "The **transcript** keeps every piece the"; want "The
+    **transcript** keeps every piece the program has shown,"`; and the
+    closure check over a program that imports `lineedit/lineedittea`
+    found `charm.land/bubbletea/v2` and seven more Charm modules on Linux
+    and macOS, six on Windows.
+* **Step 6a complete, 2026-10-29;** issue #10's note, with `v2.6.1`'s
+  numbers, is posted when the owner asks (D27).
