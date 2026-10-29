@@ -1,6 +1,6 @@
 ---
 status: in-progress
-date: 2026-10-27
+date: 2026-10-29
 associated-madr: "0023-MADR-line-mode-components.md"
 ---
 # Implement the line-mode question, picker, composer and transcript
@@ -42,6 +42,7 @@ code's at `5fb6928`; a step that relies on one cites it.
 | 4 | `lineedit/`, `lineedit/lineedittea/` | the composer, and its pane | the next minor |
 | 5 | `stream/`, `stream/streamtea/`, `docs/decisions/0009-*` | the Charm-free core, `Printer`, `Markup`; 0009's amendment | |
 | 6 | `transcript/` | the bounded, reprintable conversation | the next minor |
+| 6a | `stream/`, `transcript/` | the reprint's and the printer's speed, and their budgets (D27, 0023-MADR A9) | a patch, `v2.6.1` |
 | 7 | `docs/`, `README.md` | the guide, the close-out | |
 
 Each step's package joins `cores` and the `charmfree` files in the commit
@@ -379,7 +380,53 @@ entry, and the closure check over a program that imports `palette`. Issue
   Q11 "On, WithoutScrollbackClear (Recommended)", D13 as accepted; the
   reprint writes `SGR 0` first, and `CSI 2 J` before `CSI
   3 J` (`TestReprintOrder`).
-* **The release,** under rule 4; issue #10 told.
+* **The release,** under rule 4; issue #10 told. *Annotated 2026-10-29
+  (D27):* issue #10 is told after Step 6a's release, with its numbers.
+
+### Step 6a: the reprint's speed, and a patch release
+
+*Added 2026-10-29 by deviation D27, 0023-MADR A9.* Nothing exported
+changes.
+
+* **Code:**
+  * `stream/wrap.go`: `wrapProse` takes each word and gap as a slice of
+    its line, not a byte at a time; `place` measures each word once and
+    keeps the held word's width; a word of printable ASCII alone is as wide
+    as it is long (A9 item 4).
+  * `stream/printer.go`: `At` gives the cleaned `Source` to a new
+    `Printer`'s line reader at the width, with no sanitizer, and ends it;
+    `Flush`'s ending of the blocks becomes the `end` both share (A9 item
+    2).
+  * `transcript/transcript.go`: a line no longer in bytes than the width
+    takes one row (A9 item 3); `render` walks a piece's lines back without
+    splitting it; the reprint writes CR LF as it is built.
+* **Tests:**
+  * `transcript`: `TestReprintBudget`, the benchmark's reprint at most
+    49,696 allocations and 7,274,618 bytes (A9 item 5), skipped under
+    `-short`; `TestRowsByBytes`, lines of exactly the width and one more in
+    ASCII, a CJK line longer in bytes than the width but not in cells, and
+    one wider in cells, each its rows.
+  * `stream`: `TestReplyBudget`, gobble's reply in 64-byte chunks at 100
+    columns at most 257 allocations; `BenchmarkReplyRender`, gobble's
+    `benchReplyRender`.
+  * Every existing test of `stream` and `transcript` passes unchanged,
+    `TestAt` among them; `FuzzPrinter` and `FuzzTranscript` run 120 s
+    each.
+  * On a scratch copy only, not committed: a differential fuzz of the new
+    `wrapProse` against `v2.6.0`'s, kept beside it in a test file, 120 s,
+    every output byte for byte the same.
+* **Mutations:** both budgets fail on `v2.6.0`'s `wrap.go` alone, and the
+  reprint's on `v2.6.0`'s `At` alone; the byte rule off by one; `Source` keeping
+  each chunk as written, before the sanitizers, so that `At`, which no
+  longer cleans, would draw what was never cleaned; the CR dropped from a
+  CR LF; the ASCII rule taking a byte above `0x7e`.
+* **The benchmarks:** `BenchmarkReprint` and `BenchmarkReplyRender`, five
+  runs each on macOS, recorded beside gobble's, run the same day.
+* **The release,** `v2.6.1`, under rule 4: notes in
+  `docs/guides/migrating.md` ("Migrating to `v2.6.1`": nothing to change,
+  the numbers); `README.md`'s current release; the smoke test of Step 6,
+  against `v2.6.1`; issue #10 told, with the numbers, for the owner to
+  close.
 
 ### Step 7: documentation and the close-out
 
@@ -411,7 +458,8 @@ entry, and the closure check over a program that imports `palette`. Issue
 ## Rollout and Rollback
 
 * **Rollout.** Four releases, after Steps 2, 3, 4 and 6, in gobble's
-  order; gobble takes each as it lands.
+  order; gobble takes each as it lands. *Added 2026-10-29 (D27):* and a
+  patch, `v2.6.1`, after Step 6a.
 * **Rollback.** Before a push, each step is one local commit. After it, a
   patch release fixes forward. Every change is an addition.
 
@@ -1976,3 +2024,67 @@ and is closed.
   at 60, exited 1, and the closure check over a program that imports
   `lineedit/lineedittea` found `charm.land/bubbletea/v2` and seven more
   Charm modules on Linux and macOS, six on Windows.
+* **The release, `v2.6.0`,** under rule 4:
+  * The owner committed the step (`140ca44`), which carried Step 5's
+    commit (`5b713cf`) with it, and pushed `main` before the disclosure
+    guard was run by hand, as this PLAN's rule 4 has it; the owner's own
+    pre-push hook runs the same guard on every push, and run by hand
+    afterwards over `919ecef..140ca44` it exited 0 with nothing to report.
+    CI run 40812722310 passed: `modules`, `gates`, and `test` on macOS 15,
+    Ubuntu 24.04 and Windows 2025; Docs run 40812722271 passed.
+  * The owner tagged `140ca44` `v2.6.0`, annotated, and pushed the tag;
+    its CI run, 40882028238, passed the same five jobs.
+  * The proxy serves `v2.6.0` at `140ca44`. The consumer smoke test, the
+    rehearsal's program in a scratch module outside the repository with
+    `GOWORK` empty, required it by `go get`, then ran `go mod tidy`,
+    `go vet` and `go build`, and the program: a reply with a table
+    streamed through a `Printer` with `DefaultMarkup` and kept in a
+    `Transcript`, the screen narrowed from 60 to 40, and the reprint, 7
+    rows at 40 columns, the reply wrapped and the table laid out, the
+    scrollback cleared. Its closure, listed for Linux, macOS and Windows,
+    is seven modules, and `x/ansi` alone of Charm.
+  * Its two negative controls failed as they must: `-control` exited 1
+    with `row 0: "The **transcript** keeps every piece the"; want "The
+    **transcript** keeps every piece the program has shown,"`; and the
+    closure check over a program that imports `lineedit/lineedittea`
+    found `charm.land/bubbletea/v2` and seven more Charm modules on Linux
+    and macOS, six on Windows.
+* **Deviation D27, 2026-10-29: the reprint's speed.**
+  * **Found,** after the tag, when the owner read the draft note for
+    issue #10 ("The benchmark comparison is not flattering") and asked
+    "assess how gobble does it, we need to get these numbers down": the
+    reprint is slower than gobble's and allocates about 3.8 times as much,
+    and a streamed reply allocates 2.5 times as much. The profiles of both
+    benchmarks, the four causes and the numbers are 0023-MADR A9 item 1.
+    No web research was needed: the profiles answered the question. New
+    in Steps 5 and 6.
+  * **Prototyped** on a scratch export of `140ca44`, each change on the one
+    before, `stream`'s and `transcript`'s tests passing at each, five runs
+    of `BenchmarkReprint` each:
+
+    | Change | Reprint | Allocations | Bytes |
+    | :--- | :--- | :--- | :--- |
+    | `v2.6.0` | 12.2 to 12.3 ms | 186,585 | 15,604,126 |
+    | the wrapper's words and gaps as slices, each word measured once | 7.6 to 7.8 ms | 50,117 | 13,515,654 |
+    | `At` with no sanitizer | 6.0 ms | 43,856 | 7,040,030 |
+    | one row for a line no longer in bytes than the width; no split | 5.8 to 5.9 ms | 43,542 | 6,899,217 |
+    | CR LF written as the reprint is built | 5.7 to 5.8 ms | 43,541 | 6,530,575 |
+    | a word of printable ASCII as wide as it is long | 5.3 to 5.4 ms | 43,541 | 6,530,575 |
+
+    gobble's, the same day: 9.6 to 11.9 ms, 49,696 allocations, 7,274,618
+    bytes. A reply streamed in 64-byte chunks at 100 columns: `v2.6.0`
+    33.7 µs and 636 allocations, the prototype 18.2 µs and 200, gobble's
+    32.9 µs and 257.
+  * **Resolutions offered:** a step of its own, Step 6a, with budgets and
+    a patch release, `v2.6.1` (recommended); the same code released with
+    Step 7; or the wrapper's fix alone, in `v2.6.1`. And for issue #10's
+    note: held for the fix (recommended), or posted now with `v2.6.0`'s
+    numbers.
+  * **Chosen by the owner,** 2026-10-29: "Step 6a, v2.6.1 (Recommended)"
+    and "After the fix (Recommended)". 0023-MADR A9. Added to the PLAN:
+    Step 6a, its row in "In scope", and its patch in "Rollout".
+  * **Rule breaches while investigating, told to the owner:** one `grep`,
+    read-only, over gobble's tree; one heredoc, blocked by the hook before
+    it ran.
+* **Step 6 complete, 2026-10-29;** issue #10 is told after Step 6a's
+  release (D27).

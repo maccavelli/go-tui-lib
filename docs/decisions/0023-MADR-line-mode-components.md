@@ -740,6 +740,8 @@ func (t *Transcript) HandleTimeout(now time.Time, idle bool) string // the repri
   input; `MemHistory.ReadFrom` writes back what it read.
 * **Budgets:** a one-key change at most the changed text plus 40 bytes;
   per-key benchmarks with recorded baselines, as gobble's 0030-MADR D5.
+  *Amended 2026-10-29 by A9 item 5:* the reprint and a streamed reply
+  have budgets of allocations and bytes, gobble's numbers, tested.
 * **Re-wrap tests** for each of the three kinds, with and without a
   cursor report, and keys typed while the report is awaited.
 * **The Windows edge:** a test that `Reader` holds one read in flight at
@@ -1497,7 +1499,8 @@ step's code:
    `Printer` lays a table out under every `Markup`, on purpose unlike
    gobble, so plain output keeps aligned columns; `WithoutTableLayout`
    gives gobble's colour-off output.
-2. **`stream.Printer.At(width)` draws a reply again (D24).** D9's
+2. **`stream.Printer.At(width)` draws a reply again (D24).** *Amended
+   2026-10-29 by A9 item 2: with no sanitizer, from the cleaned source.* D9's
    `AddReply(p)` keeps the `Printer`; a reprint draws `At(width)`: its
    `Source` written to a new `Printer` with its options at that width,
    then flushed. At a reprint the live `Printer` is idle, nothing held,
@@ -1515,6 +1518,61 @@ step's code:
    next `HandleTimeout(now, true)`, which the host calls whenever its
    output becomes idle; it gives "" when nothing is due. This is gobble's
    `tryReprint` at each line end (`view.go:470-493`).
+
+### A9 (2026-10-29): the reprint's and the printer's speed, and their budgets
+
+*Status: accepted (2026-10-29),* the owner's answer to
+[0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
+Step 6's deviation D27, "Step 6a, v2.6.1 (Recommended)", found after
+`v2.6.0` was tagged, when the owner asked how gobble does it and for the
+numbers to come down:
+
+1. **The fact.** On one Apple M1 Pro, the same day, five runs each:
+   `v2.6.0`'s `BenchmarkReprint` takes 12.2 to 12.3 ms, 15.6 MB and
+   186,585 allocations a reprint; gobble's, at `ccd8aa8` (its
+   `transcript.go`, `view.go` and `render` unchanged since `5fb6928`), 9.6
+   to 11.9 ms, 7.3 MB and 49,696. A reply streamed in 64-byte chunks at 100
+   columns, gobble's `benchReplyRender`, takes 33.7 µs and 636 allocations
+   through `v2.6.0`'s `Printer`, and 32.9 µs and 257 through gobble's
+   `render`. gobble's work is the same in kind and order; the profiles put
+   the difference in four places of this repository's code:
+   * `stream`'s wrapper builds each word a byte at a time by string
+     concatenation (`stream/wrap.go:49`), 59% of the reprint's
+     allocations, and measures each word's width three times; gobble's
+     `Wrap` reuses byte buffers and swaps them (its 0030-MADR D5, as
+     amended);
+   * `Printer.At` builds a `NewPrinter`, so each reply drawn is cleaned
+     again by two sanitizers and its `Flush` opens two more, about 6.7 KB
+     each, 22% of the reprint's bytes, though `Source` is cleaned already;
+     gobble's `replyAt` draws the released source and cleans nothing;
+   * the row count measures every line's width (`transcript.go:238`),
+     where gobble counts line breaks;
+   * the line breaks are made CR LF by two copies of the whole reprint.
+2. **`At` draws the source it keeps, with no sanitizer.** `Source` is the
+   rules' and the floor's output, the bytes the `Printer` printed from;
+   `At` gives those bytes to a new `Printer`'s line reader at the width and
+   ends it, so its output is what the `Printer` printed, A8 item 2's
+   promise, from bytes cleaned once. *This amends A8 item 2's "written to
+   a new Printer".*
+3. **A line no longer in bytes than the width takes one row.** No
+   character is wider in cells than in bytes under either width method: a
+   character two cells wide is at least three bytes, every other is at
+   most one cell, and an escape sequence is none. The count is the same,
+   and a line is measured only when it is longer in bytes than the width.
+4. **The wrapper takes each word and gap as a slice of its line,**
+   measures each word once, and takes a word of printable ASCII alone as
+   wide as it is long, which every method measures so. Its output is
+   unchanged, byte for byte.
+5. **Budgets** (D11's "per-key benchmarks with recorded baselines"): the
+   benchmark's reprint has a budget of allocations and of bytes, and the
+   streamed reply one of allocations, gobble's numbers, held by a test on
+   every host: at most 49,696 allocations and 7,274,618 bytes a reprint,
+   and 257 allocations a reply. An allocation count is the same on every run, and
+   `v2.6.0`'s code fails each budget. Time is recorded beside gobble's, as
+   before, and is not gated: it varies by host and load, which gobble's own
+   gate allows for with a slack of three times its baseline (its
+   `perf_test.go`), and `v2.6.0`'s 12.3 ms passed that.
+6. **A patch release, `v2.6.1`:** nothing exported changes.
 
 ## More Information
 
