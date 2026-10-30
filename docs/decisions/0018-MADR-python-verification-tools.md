@@ -366,6 +366,31 @@ so the gate could also lint at a version CI does not use.
    `markdownlint-cli2`.
 3. What is not changed: the other gates, and what the gate checks.
 
+### A5 (2026-10-30): a `perf` gate, run only by name
+
+*Status: accepted (2026-10-30),* with
+[0023-MADR-line-mode-components.md](0023-MADR-line-mode-components.md)
+A12, whose item 7 names it: the owner's "approve A12 and 7c, issue 13 first, proceed". Implemented by
+[0018-PLAN-python-verification-tools.md](0018-PLAN-python-verification-tools.md)
+Step 10.
+
+**Found.** A12 holds a key's time to three times gobble's baseline on each
+host, as gobble's own gate does (its `0030-MADR-resize-and-performance.md`
+D5). Time varies by host and load, so CI does not run such a test, and no
+gate here runs Go tests built with a tag. `remote` passes the arguments
+after `--` to `gates` on the host, so a gate run by name reaches macOS,
+Linux and Windows alike.
+
+**Decided.**
+
+1. A gate `perf` runs `go test -tags perf -run ^TestPerf -count=1 -v ./...`
+   with `GOWORK=off`, and quotes each line that holds "per op".
+2. It is not in the default list. A step runs it with `--only perf`, here
+   and through `remote <host> -- --only perf`.
+3. A test it runs is built with the `perf` tag, is named `TestPerf…`, and
+   logs its time and allocations a line, as gobble's `perfCheck` does.
+4. What is not changed: the default gates, and CI.
+
 ## More Information
 
 * The scratch tools named above are the ones

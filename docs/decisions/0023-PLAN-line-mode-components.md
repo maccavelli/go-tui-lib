@@ -1,5 +1,5 @@
 ---
-status: complete
+status: in-progress
 date: 2026-10-30
 associated-madr: "0023-MADR-line-mode-components.md"
 ---
@@ -46,6 +46,7 @@ code's at `5fb6928`; a step that relies on one cites it.
 | 7 | `docs/`, `README.md`; *annotated 2026-10-29:* the four examples' `example_test.go` in `ask/`, `pick/`, `lineedit/` and `stream/`, which the step names | the guide, the close-out | |
 | 7a | `internal/sanitize/`, `termcap/reply.go`, `inline/inlinetest/`, `docs/`, `README.md` | a reply's parameters counted on every path to them (D28, 0023-MADR A10) | a patch, `v2.6.2` |
 | 7b | `scripts/go-examples.py`, `scripts/go-precheck.py` and their tests, `testdata/frameworks/`, the examples of `ask/`, `lineedit/` and `transcript/`, `docs/`, `AGENTS.md` | the line-mode guide's excerpts held to the examples (0023-MADR A11) | none |
+| 7c | `internal/sanitize/`, `internal/lineinput/`, `lineedit/`, `inline/`, `safetext/clean.go`, `keymap/`, `docs/`; *approved 2026-10-30* | a key's cost, issue #13 (0023-MADR A12) | the next minor, `v2.7.0` |
 
 Each step's package joins `cores` and the `charmfree` files in the commit
 that builds it; the `<pkg>tea` packages are not cores. Each step adds its
@@ -522,6 +523,88 @@ exported changes, and nothing is released.
 * **Gates:** `python3 -m tools.verify gates` on macOS, Linux and Windows;
   `go-examples_test.py` and `go-precheck_test.py`; markdownlint; the
   identifier scan.
+
+### Step 7c: a key's cost (issue #13)
+
+*Added 2026-10-30, for 0023-MADR A12, and approved the same day:*
+"approve A12 and 7c, issue 13 first, proceed". Nothing exported changes, and no output byte changes. Its
+prerequisite is the `perf` gate of A12 item 7, which
+[0018-MADR-python-verification-tools.md](0018-MADR-python-verification-tools.md)
+A5 and
+[0018-PLAN-python-verification-tools.md](0018-PLAN-python-verification-tools.md)
+Step 10 add first, as their own commit.
+
+* **Code,** in this order, each part's tests passing before the next, as
+  A12 item 4 numbers them:
+  1. `internal/sanitize`: `StringWidth`; `Truncate` checks its fit with it.
+  2. `internal/lineinput`:
+     * `splice`, by `slices.Replace`, with its window widened on the right
+       until the last cluster cut stays apart from the next;
+     * the kept size; `Insert`'s bound counted once;
+     * `Widths`, measured as a cluster enters;
+     * `Edited() (from, tail int)`;
+     * `transpose`'s `set` keeps the three in step.
+  3. to 6. `lineedit`:
+     * `layout.go`: `laid` with `starts`, `bases` and `reach`; `relay`,
+       its resync and `sync`; rows of one allocation; `headWidth`; the
+       indents made once;
+     * `composer.go`: `laid()` relays from `Edited`; `draw` through a
+       reused rows slice, `View` a new one; `NextEvent`'s queue kept;
+       `noValues`.
+  7. `inline/region.go`: the rows kept and the two drawn slices taking
+     turns; `window` cutting only the rows shown; `shared`'s ASCII prefix;
+     `csi`; `paintTo` and the synchronized update in one builder.
+  8. `safetext/clean.go`: printable ASCII returned before the parser.
+  9. `keymap`: `entry.may`, its fields made in the keymap's build,
+     `keyEvent.name`, `matchName`; `decide` skips with it.
+* **Tests:**
+  * The fuzz targets of A12 item 5, each with the seeds the prototype
+    found: `FuzzStringWidth`, `FuzzSplice`, `FuzzRelay`,
+    `FuzzRegionBytes`, with `v2.6.2`'s region in `inline/oldregion_test.go`,
+    and `FuzzMay`.
+  * `TestSpliceJoinsPastOne`: deleting the line break in "👨", "\n",
+    ZWJ, "👩" gives one cluster under both methods. On the prototype,
+    without the window's widening, it gave two, `"👨‍"` and `"👩"`.
+  * Benchmarks: `lineedit`'s `BenchmarkKeyDraw`, the issue's own;
+    `BenchmarkKeyStart`, `BenchmarkKeyLong` and `BenchmarkUpDown`;
+    `inline`'s `BenchmarkRegionDraw`. The existing `BenchmarkKeystroke`
+    is kept.
+  * `TestKeyBudget`: each of the four key benchmarks at most 8 allocations
+    and 808 bytes a key (A12 item 7), skipped under `-short`.
+  * `TestPerfBudget`, built with the `perf` tag: the issue's key within
+    three times gobble's baseline for the GOOS, its time and allocations
+    logged.
+  * Every existing test, golden and fuzz target of the packages A12 item 5
+    names passes. Each fuzz target of this step, and `FuzzComposer`,
+    `FuzzLine` and `FuzzChooser`, runs 5 minutes.
+* **Mutations,** each killing a named test:
+  * `StringWidth` taking 0x7f as printable;
+  * the splice's window not widened;
+  * the size or a width not kept on `transpose`;
+  * `Edited`'s tail past the last change;
+  * reach as `fit` alone;
+  * a line's last row not reaching the line's end;
+  * resync without the lead's check;
+  * resync moving its own line's start;
+  * `relay` keeping a row whose reach is the edit;
+  * `headWidth` adding the width for a cluster that starts with a mark;
+  * `View` returning the reused slice;
+  * `shared` without its back-off;
+  * `window` cutting to the width after it takes the height;
+  * `Clean`'s return taking 0x7f;
+  * `may` refusing a match by text.
+* **Gates:** `python3 -m tools.verify gates` on macOS, and through `remote
+  linux` and `remote windows`, each with the `perf` gate; `make apicheck`
+  0 incompatible changes; the identifier scan.
+* **The benchmarks,** five runs each on the three hosts, recorded beside
+  `d234bfa`'s and gobble's `6c5eb02`'s, run the same day.
+* **The release,** `v2.7.0`, under rule 4, or whichever the owner names
+  (A12 item 9):
+  * notes in `docs/guides/migrating.md`, "Migrating to `v2.7.0`": nothing
+    to change; the numbers;
+  * `README.md`'s current release;
+  * the smoke test of Step 6, against the tag;
+  * issue #13 told, with the three hosts' numbers, for the owner to close.
 
 ## Verification
 

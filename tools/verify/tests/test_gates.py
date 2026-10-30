@@ -180,7 +180,7 @@ DEFAULT = {
     "vuln", "release-check", "shellcheck", "markdownlint", "actionlint", "tools-tests",
 }
 #: The gates whose checks release-check runs, by name only.
-REPEATS = ["pre-add-check", "lint", "workspace-mode", "tidy", "modules", "apicheck", "examples"]
+REPEATS = ["pre-add-check", "lint", "workspace-mode", "tidy", "modules", "apicheck", "examples", "perf"]
 
 
 class TestDefaultGates(unittest.TestCase):
@@ -213,6 +213,15 @@ class TestDefaultGates(unittest.TestCase):
     def test_no_gate_runs_a_shell(self) -> None:
         for g in self.gates.values():
             self.assertNotIn(os.path.basename(g.args[0]), {"sh", "bash", "zsh", "cmd", "powershell"}, g.name)
+
+    def test_perf_runs_the_tagged_tests(self) -> None:
+        # The timed tests, built with the perf tag, run only by name, here and
+        # through remote (docs/decisions/0018-MADR-python-verification-tools.md A5).
+        g = self.gates["perf"]
+        self.assertEqual(g.args, ("go", "test", "-tags", "perf", "-run", "^TestPerf", "-count=1", "-v", "./..."))
+        self.assertEqual(g.env, {"GOWORK": "off"})
+        self.assertFalse(g.default)
+        self.assertEqual(g.quote, (r"per op",))
 
     def test_markdownlint_runs_the_makefiles_pin(self) -> None:
         # The gate runs make's pinned markdownlint-cli2, never the newest

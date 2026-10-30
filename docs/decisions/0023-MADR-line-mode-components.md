@@ -1673,6 +1673,251 @@ the line-mode guide's Go blocks to code that compiles and runs.
    item 5's "the owner's call" is withdrawn. Neither this record nor its
    PLAN carries it as a step or an open item.
 
+### A12 (2026-10-30): a key's cost, issue #13
+
+*Status: accepted (2026-10-30),* the owner's "approve A12 and 7c, issue 13 first, proceed", after the ask on
+issue #13: "analyze
+the efficiency of the code as relates to issue 13. evaluate and appraise
+the full solution, keeping it as idiomatic and deterministic as possible.
+we need to get those benchmark numbers way down. speed and efficiency are
+high priority." Issue #13 was filed for gobble-cli's
+`0035-PLAN-pin-current-sibling-releases-and-remove-gobble-copies.md` P17,
+which that PLAN's deviation 11 holds until a tag carries the fix.
+
+1. **The ask.** gobble holds a key to three times a baseline per host
+   (its `0030-MADR-resize-and-performance.md` D5; `perfSlack = 3`,
+   `internal/cli/perf_test.go:18`). The baselines are its own editor's
+   `BenchmarkKeyDraw`: 1.5 µs on darwin, 5.0 µs on linux and 1.4 µs on
+   windows (`internal/cli/editor/perf_test.go:14-18`). The issue asks the
+   Composer's whole key, `HandleInput` and draining its events, within
+   4.5 µs, 15 µs and 4.2 µs. Until a tag carries that, gobble keeps its
+   own editor, as its AGENTS.md rule says: it waits for the library rather
+   than copying the behaviour.
+2. **The facts,** measured on 2026-10-30 on one Apple M1 Pro, Go 1.27.3,
+   five runs each, as medians:
+   * **The library.** The issue's benchmark, against `d234bfa` (`v2.6.2`,
+     and 0024's terminal Step 1, which touches no package on the path):
+     14.53 µs, 52 allocations and 10,092 bytes a key. `View` alone is
+     6.57 µs and 42 allocations; `inline.Region.Draw` alone, 2.02 µs and 5.
+     The issue's numbers are 14.3 µs and 53 allocations. A key at the
+     start of a 20-row text takes 82.7 µs and 228 allocations; one at the
+     end of a text near the 4,096-rune bound, 228.5 µs and 552; up and
+     down, 14.9 µs and 91.
+   * **gobble's editor.** gobble's `BenchmarkKeyDraw` at `6c5eb02`, its
+     editor before P17, run from an export of that commit: 1.55 µs, 8
+     allocations and 808 bytes a key. It times the whole key:
+     `HandleInput`, then draining the events to a builder
+     (`internal/cli/editor/bench_test.go`). At gobble's `61f7115`, whose
+     editor P17 already hosts on `lineedit`, the same benchmark gives
+     15.0 µs, 53 allocations and 10,140 bytes: the issue's number, through
+     gobble's own harness.
+   * **Two records corrected.** 0023-PLAN Step 2's execution record says
+     gobble's 1.5 µs baseline "times the drawing alone, so the two are not
+     alike". It times the whole key, so the two are alike, and the ask is
+     a fair one. The issue's second table gives gobble's whole key as
+     4.24 µs and 17 allocations; gobble's own benchmark gives 1.55 µs and
+     8 at `6c5eb02` on this host. This record uses gobble's benchmark.
+3. **Where the time goes,** from CPU and memory profiles of the issue's
+   benchmark:
+   * **The garbage collector,** about half the wall time, for the
+     10 KB each key allocates.
+   * **The layout, 92% of the bytes.** Every key lays the whole text out
+     again (`Composer.draw` → `View` → `layout`, `lineedit/layout.go:37-99`).
+     It grows `places` one cluster at a time. It builds each row by
+     concatenation over a builder, and joins each row's lead and first
+     cluster only to measure them. It measures every cluster with
+     `ansi.Method.StringWidth` on every layout. `up` and `down` lay the
+     text out, and the draw after them lays it out again
+     (`composer.go:261-301`).
+   * **The text, at every key.** `Line.Insert` joins the whole text on
+     each side of the cursor to check the bound, 4,096 runes by default,
+     then rebuilds the text and cuts all of it into clusters again
+     (`internal/lineinput/lineinput.go:103-135`). `cut`, for backspace,
+     does the same with `strings.Join` (`:262-269`). The bound's check
+     also re-counts the inserted text from its start for each cluster
+     (`l.size(s[:cut+len(c)])`), so a paste costs time quadratic in its
+     length.
+   * **The region.** `Draw` clones the rows, and `window` makes another
+     slice and gives every row to `sanitize.Truncate`, which measures it
+     whole (`inline/region.go:87-92`, `:332-347`). A changed row is
+     decoded sequence by sequence against the old one and measured three
+     times (`:360-395`). `wrap` copies the whole drawing once more into a
+     concatenation (`:422-427`).
+   * **The keys.** `Keymap.decide` calls `Stroke.Matches` on each of the
+     Composer scope's 35 bindings for every key, and each call makes a
+     map lookup and a `unicode.IsPrint` before the cheap comparisons
+     (`keymap/matcher.go:211-232`, `keymap/notation.go:404-425`). The
+     Composer passes a new `when.Map{}` at each key (`composer.go:184`).
+     `NextEvent` reslices its queue (`:393-400`), so the next key's first
+     event allocates a new one.
+4. **Decided: nine changes, each exactly what it replaces.**
+   No exported name is added, removed or changed, and no output byte
+   changes.
+   1. **`internal/sanitize.StringWidth(m, s)`:** a string of printable
+      ASCII alone (0x20 to 0x7e) is as wide as it is long under every
+      method, as A9 item 4 takes a word; any other byte gives the string
+      to `m.StringWidth`. `Truncate` checks its fit with it, and every
+      measure below goes through it.
+   2. **The `Line` splices, and keeps what it knows.**
+      * An edit replaces its clusters with `slices.Replace`. It cuts into
+        clusters only the edit, with the cluster before it and as many
+        after it as it takes for the last cluster cut to stay apart from
+        the next one. One after is not always enough: deleting a line
+        break before a cluster that is only a ZWJ joins that cluster to
+        what follows it.
+      * The text's size, in the bound's units, is kept as it changes, and
+        the bound's count of an insert runs once over it.
+      * Each cluster's width under the method is measured once, as it
+        enters, and kept beside it (`Widths`).
+      * `Edited()` gives the first cluster changed since the last call,
+        and how many clusters at the end no edit has touched, and starts
+        both counts again.
+   3. **The Composer keeps its layout, and lays out again only the rows
+      an edit can change.**
+      * Each row records its first cluster, its line's first cluster, and
+        its *reach*: the last cluster its break read. A row's break reads
+        from its first cluster to the first that does not fit, and its
+        places depend also on whether the line ends where the next row
+        starts. So its reach is the larger of that cluster and the next
+        row's start, and a line's last row reaches the line's end.
+      * After an edit, the layout keeps every row whose reach is before
+        the first cluster changed, and lays out again from the first that
+        reaches it. A kept row read only clusters that did not change, so
+        it, its string and its places are what a full layout would make.
+      * A change of width lays out everything. `up`, `down` and the draw
+        share one layout.
+   4. **Resync.** While it lays out again, once a row would start inside
+      the unchanged tail, past its first cluster, at an old row's start
+      moved by the change in length, and its line has the same lead, the
+      old rows from there are kept. Their strings are kept, and their
+      places move by the change in rows. A row depends only on its own
+      clusters, its line's lead and its line's end, which are all in the
+      tail. The rows of that row's own line keep the line start as laid
+      now, since that line may start before the change; a later line's
+      start moves by the change in length.
+   5. **A row costs one allocation:** its string is built once, with its
+      size known first. A row's lead and first cluster are measured
+      together only when the cluster starts with a byte that is not
+      printable ASCII. A cluster that starts with printable ASCII joins
+      nothing before it: no such character is Extend, ZWJ, SpacingMark or
+      Prepend in UAX #29 (GB9, GB9a, GB9b). The indents under the prompt
+      and the continuation are made once.
+   6. **The Composer's buffers are reused.**
+      * `draw` hands the region a rows slice it reuses. `View` still
+        returns a new slice, so a caller's never changes under it.
+      * `NextEvent` keeps its queue's array once it is drained.
+      * One empty `when.Map` serves every key.
+   7. **The region does each thing once.**
+      * `Draw` keeps the caller's rows in a slice it reuses, and two row
+        slices take turns as the drawn rows and the next.
+      * `window` cuts to the width only the rows its height shows.
+      * `shared` compares printable ASCII byte by byte, then backs off one
+        byte when the byte after it, in either row, is not printable
+        ASCII and could join it into one cluster. It then decodes from
+        there as before.
+      * Widths go through item 1.
+      * The synchronized update is written in the drawing's own builder,
+        a CSI's number with `strconv.Itoa` and no concatenation, line
+        feeds without `strings.Repeat`.
+   8. **`safetext.Clean` returns printable ASCII as it is,** before its
+      parser: no rule removes, replaces or rewrites a printable ASCII
+      character. It already returned such text unchanged and allocated
+      nothing; it now also does not parse it.
+   9. **The dispatcher skips a binding its key cannot match.** Each
+      binding keeps its first stroke's key name and its rune as text,
+      made when the keymap is built; each key, its name once, as
+      `Stroke.Matches` reads it. `decide` skips a binding whose first
+      stroke matches the key neither by name nor by text, and is not
+      matched by position (a Scan stroke, or the leader), before calling
+      `Matches`. These are the three ways `Matches` can match, so it is
+      never skipped past a key it would take, and `Matches` stays the
+      rule.
+5. **Determinism, tested.** Each fast path has a fuzz target that holds
+   it to the slow path it replaces:
+   * `FuzzStringWidth`: item 1 against `m.StringWidth`, both methods;
+   * `FuzzSplice`: after any insert or deletion, the clusters kept against
+     the whole text cut again, the size against the text's, each kept
+     width against a fresh measure, and the edit's marks at or before the
+     first and after the last change;
+   * `FuzzRelay`: after any edit, the kept and relaid layout against one
+     made from nothing, row, place, pad, start, reach and line start,
+     under both methods, widths −1 to 38;
+   * `FuzzRegionBytes`: the region against `v2.6.2`'s, kept in a test file,
+     byte for byte, over draws, prints, resizes, reports, timeouts,
+     commits and clears;
+   * `FuzzMay`: item 9's skip never refuses a key `Matches` takes.
+
+   With these, every existing test, golden and fuzz target of `inline`,
+   `lineedit`, `ask`, `pick`, `transcript`, `palette`, `workspace`,
+   `keymap`, `command`, `safetext` and the internal packages passes. The
+   only change to them: `TestLayoutMarks`, an internal test, passes the
+   `Line`'s widths to `layout`. On a scratch copy of the tree, the targets above ran:
+   * `FuzzRelay`, 5 minutes, 10.1 million inputs;
+   * `FuzzComposer`, 2 minutes, 0.8 million;
+   * `FuzzSplice`, 0.34 million; `FuzzMay`, 9.9 million;
+     `FuzzRegionBytes`, 0.14 million;
+   * `FuzzStringWidth`, 30 s, 5.4 million.
+
+   No failure was found by the final runs. On the way they found three
+   faults in the prototype, each fixed before the numbers below, and kept
+   as seeds:
+   * a lone cluster wider than the room, at the end, reached one short;
+   * a row's reach ignored where the next row starts;
+   * resync moved its own line's start.
+6. **The result,** on the same host and day, the prototype on a scratch
+   copy against `d234bfa`, medians of five:
+
+   | Benchmark | Before | After | Faster by |
+   | :--- | :--- | :--- | :--- |
+   | The issue's key | 14.53 µs, 52 allocations, 10,092 B | 1.381 µs, 6, 216 B | 10.5 times |
+   | `View` | 6.57 µs, 42, 9,368 B | 0.339 µs, 1, 48 B | 19.4 times |
+   | `Region.Draw` | 2.02 µs, 5, 168 B | 0.332 µs, 3, 112 B | 6.1 times |
+   | A key at the start of 20 rows | 82.73 µs, 228, 90,964 B | 6.916 µs, 8, 448 B | 12.0 times |
+   | A key at the end of about 4,000 runes | 228.51 µs, 552, 290,198 B | 4.223 µs, 6, 184 B | 54.1 times |
+   | Up and down | 14.91 µs, 91, 19,000 B | 1.208 µs, 4, 120 B | 12.3 times |
+
+   The issue's key is under gobble's own editor's 1.55 µs, 8 allocations
+   and 808 bytes, and under a third of its 4.5 µs budget, on this host.
+   The Linux and Windows hosts are measured in the step.
+7. **Budgets,** as A9 item 5 set them: gobble's numbers, tested on every
+   host.
+   * **Allocations and bytes:** each of the four key benchmarks above at
+     most 8 allocations and 808 bytes a key, gobble's editor's. An
+     allocation count is the same on every run, and `d234bfa`'s code fails
+     each budget.
+   * **Time:** gobble's gate, as its own. A test built with the `perf`
+     tag holds the issue's key within three times gobble's baseline for
+     the host's GOOS, and reports the time and allocations. CI does not
+     run it, since time varies by host and load. The step runs it on
+     macOS, Linux and Windows through a `perf` gate, not run by default,
+     which `tools/verify` lacks. A
+     [0018-MADR-python-verification-tools.md](0018-MADR-python-verification-tools.md)
+     amendment adds that gate, as its own step, before this record's
+     step.
+8. **Considered, and not chosen:**
+   * **The issue's item 2 alone,** a layout kept by the text's version and
+     the width: typing lays out once a key, so it gains nothing there.
+     Item 3 keeps it, for `up` and `down`, as a side effect.
+   * **Laying out again from the changed line only:** the issue's text is
+     one line of three rows, so it gains nothing there.
+   * **The text as one string with clusters as offsets** (the issue's item
+     4 as worded): a row could be a slice of the text, not built. That
+     changes `Line.Clusters` for `ask`, `pick` and `lineedit` alike, for
+     about a tenth of what remains. Item 2's splice reaches the same end
+     with `Clusters` kept.
+   * **An index of bindings by stroke:** `Matches` matches by text, and
+     names the keypad's Enter as enter, so a map from `Stroke` to bindings
+     is not its rule. Item 9's skip keeps `Matches` the rule.
+   * **`unsafe`, `sync.Pool`, a goroutine or a cache keyed by time:** each
+     costs determinism or idiom, and none is needed.
+9. **The release.** Nothing exported changes. `main` already carries 0024's
+   terminal Step 1, which adds exported names (`termcap.WithoutQuery`,
+   `WithoutGatedQueries`, `WithoutQueries`), so the next tag is a minor,
+   `v2.7.0`. 0024's terminal release then becomes the one after it. The
+   owner put this one first ("issue 13 first"); gobble waits on it.
+10. **Issue #13** is told what is found and proposed, with the numbers; it
+    is told again when a tag carries the change.
+
 ## More Information
 
 * Issues of this repository: #7, #8, #9 and #10, each with gobble's

@@ -1,6 +1,6 @@
 ---
 status: in-progress
-date: 2026-10-25
+date: 2026-10-30
 associated-madr: "0018-MADR-python-verification-tools.md"
 ---
 # Implement the Python verification tools
@@ -281,6 +281,29 @@ own commit, before that step's.*
 * **Mutation:** the gate runs `npx --no-install markdownlint-cli2` again.
 * **Acceptance:** the `markdownlint` gate passes through `remote linux`,
   where it failed.
+* **Checks:** `tools-tests`, under Python 3.12 too; `scan`.
+
+### Step 10 (A5): a `perf` gate, run only by name
+
+*Added 2026-10-30, for MADR amendment A5, which
+[0023-MADR-line-mode-components.md](0023-MADR-line-mode-components.md)
+A12 item 7 needs; approved with it. Its own commit, before
+[0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
+Step 7c's.*
+
+* **`gates.py`:** `Gate("perf", ("go", "test", "-tags", "perf", "-run",
+  "^TestPerf", "-count=1", "-v", "./..."), OFF, quote=(r"per op",),
+  default=False)`.
+* **Tests** (`tools/verify/tests/test_gates.py`):
+  * `test_perf_runs_the_tagged_tests`: the gate's arguments are those, with
+    `GOWORK=off`, and it quotes "per op";
+  * `REPEATS`, the gates outside the default list, gains `perf`, so
+    `test_the_default_list` holds it out of the default run and in
+    `--only`'s.
+* **Mutations:** the gate in the default list; the `perf` tag dropped.
+* **Acceptance:** `gates --only perf` exits 0 on this tree, which has no
+  `perf` test yet; 0023-PLAN Step 7c's first `perf` run, on three hosts,
+  is the gate's use.
 * **Checks:** `tools-tests`, under Python 3.12 too; `scan`.
 
 ## Verification
@@ -730,4 +753,36 @@ Step 1's Linux gates failed `markdownlint` ("Pin the gate via make
   * `python3 -m unittest discover -s tools -t .`: "Ran 68 tests", OK,
     under Python 3.14 and 3.12;
   * `tools.verify scan`: clean.
+* **Close-out:** as Step 8's, once CI is green on the pushed tree.
+
+Step 9 was committed by the owner with 0024's terminal Step 1, as `d234bfa`.
+
+### Step 10 (A5): a `perf` gate, run only by name
+
+*2026-10-30.* The owner approved 0023-MADR A12 and its Step 7c: "approve
+A12 and 7c, issue 13 first, proceed". A12 item 7 names this gate, so A5 is
+`accepted` with it.
+
+* **`gates.py`:** the `perf` gate, `go test -tags perf -run ^TestPerf
+  -count=1 -v ./...` with `GOWORK=off`, quoting "per op", not in the
+  default list, with a comment naming A5.
+* **Tests:**
+  * `test_perf_runs_the_tagged_tests`: the gate's arguments, environment,
+    default and quote.
+  * `REPEATS` gains `perf`, so `test_the_default_list` holds it out of the
+    default run and in `--only`'s.
+  * Run before the gate existed: "FAILED (failures=1, errors=2)", "'perf'
+    not found".
+* **Mutations,** through `tools.verify mutate`, 2 killed of 2:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | 10.1 the gate in the default list | `test_the_default_list`: "Items in the first set but not the second" |
+  | 10.2 the `perf` tag dropped | `test_perf_runs_the_tagged_tests`: "Tuples differ: ('go', 'test', '-run', …" |
+
+* **Acceptance:** `gates --only perf` on this tree: "perf: exit=0 (11s)",
+  "1 passed, 0 failed, 0 skipped". No `perf` test exists yet;
+  0023-PLAN Step 7c's runs on the three hosts are the gate's first use.
+* **Checks:** `python3 -m unittest discover -s tools -t .`: "Ran 69
+  tests", OK, under Python 3.14 and 3.12; `tools.verify scan`: clean.
 * **Close-out:** as Step 8's, once CI is green on the pushed tree.

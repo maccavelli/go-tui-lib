@@ -132,6 +132,10 @@ def default_gates(repo: Path, python: str = sys.executable) -> list[Gate]:
         Gate("modules", (python, "scripts/go-modules.py", "--check"), default=False),
         Gate("apicheck", ("make", "apicheck"), needs_history=True, quote=(r"^apicheck:",), default=False),
         Gate("examples", ("make", "examples"), quote=(r"^examples:",), default=False),
+        # The timed tests, built with the perf tag, which CI does not run
+        # (MADR A5): by name alone, here and through remote.
+        Gate("perf", ("go", "test", "-tags", "perf", "-run", "^TestPerf", "-count=1", "-v", "./..."), OFF,
+             quote=(r"per op",), default=False),
         Gate("shellcheck", ("shellcheck", *sorted(str(p.relative_to(repo)) for p in (repo / "scripts").glob("*.sh")))),
         # The Makefile's pin, not the newest release npx would choose (MADR A4).
         Gate("markdownlint", ("make", "markdownlint"), quote=(r"^Summary:",)),
