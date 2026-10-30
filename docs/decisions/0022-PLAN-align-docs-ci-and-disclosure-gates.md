@@ -391,3 +391,81 @@ applied to the real workflows, and the contract check alone was run.
 
 Not checked locally: how GitHub routes a push. Phase 3, step 3 observes
 it after an authorized push.
+
+Phase 2 was committed by the owner as `4ff2e22`.
+
+### Phase 3, steps 1 and 2: documentation and the final checks, 2026-10-30
+
+What changed:
+
+* **`AGENTS.md`:**
+  * "Records": `scripts/check_records.py --next` prints the next number,
+    and `make check-records`, with what it fails on;
+  * "Pre-add checks": before staging a document, the documents' line,
+    `make markdownlint check-records docs-check disclosure-check`. Before
+    staging a workflow or a script, also `scripts/check_ci_filters.py` and
+    the tests of each script changed;
+  * a new section, "CI routing":
+    * the docs-safe paths, and that any other file, a mix or a `v*` tag
+      runs CI;
+    * why Markdown that code reads is not docs-safe unless its reader runs
+      in Docs: `command/testdata/**/*.md` stays in CI, and
+      `TestDefaultsInventory` and the excerpt check run in Docs;
+    * the one line both workflows run;
+    * what `scripts/check_ci_filters.py` fails on, and that a new reader
+      joins `READERS` in its own change;
+  * "Identifiers": `make disclosure-check` is the portable half and does
+    not replace the pre-push guard. It is placed after "Never bypass it
+    with `--no-verify`", so that line's "it" still means the guard, the
+    fault acp-go-sdk2's
+    `0037-PLAN-align-docs-ci-and-disclosure-gates.md` recorded.
+* **`docs/architecture.md`:**
+  * the tree names the three scripts and their tests;
+  * "Tooling":
+    * the four make targets, and what each runs;
+    * `scripts/check_ci_filters.py` and its YAML reader;
+    * the `gates` job's `documents` step and the CI-filters check;
+    * Docs' Go setup and shared line;
+    * the local pre-push guard, which no workflow has.
+* **The records index:** the pair's rows name both files exactly, with
+  `accepted` and `in-progress`, matching each file's front matter. The
+  index is written by hand; `scripts/check_records.py` checks its rows
+  and generates none.
+
+Both files were read in full after the edit. No fault was found.
+
+**Checks,** each exit 0, with the status taken before any output was
+read:
+
+* `make check-records markdownlint docs-check disclosure-check`:
+  * "check-records: 55 record(s), 72 Markdown file(s), 0 error(s)";
+  * "Summary: 0 issues in 0 files";
+  * "examples: 15 excerpt(s) checked", "examples: clean";
+  * `TestDefaultsInventory` "ok";
+  * "check-disclosure: 1051 tracked file(s), 0 finding(s)";
+* `python3 scripts/go-examples.py --check-guide`: "15 excerpt(s) checked",
+  "clean";
+* `actionlint@v1.7.12`; `python3 scripts/check_ci_filters.py`: "0
+  problem(s)";
+* `python3 -m tools.verify scan --base HEAD`, over this phase's change,
+  this pair included: "scan: clean (5 pattern(s))", the identifier
+  patterns of the local, uncommitted config.
+
+**Planted breaks,** the six step 2 names. Each was applied to the tree as
+it now stands, in its own scratch copy made a git repository, by
+`python3 -m tools.verify mutate --keep`. The target was then run in each
+copy, its status taken before its output was read. Six of six failed as
+required:
+
+| Break | Target | What failed |
+| :--- | :--- | :--- |
+| the 0024 terminal PLAN's index row removed | `make check-records`, exit 2 | "docs/README.md: no row for docs/decisions/0024-PLAN-terminal-text-and-convention-opt-outs.md" |
+| a link to `guides/gone.md#nowhere` in `docs/architecture.md` | `make check-records`, exit 2 | "docs/architecture.md:540: broken link: guides/gone.md#nowhere" |
+| `#CI routing` above the new section in `AGENTS.md` | `make markdownlint`, exit 2 | "AGENTS.md:465:1 error MD018/no-missing-space-atx" |
+| a Windows home path with a made-up account in `docs/architecture.md` | `make disclosure-check`, exit 2 | "docs/architecture.md:540: windows-home", without the account |
+| Docs' `pull_request` paths lose `*.md` | `scripts/check_ci_filters.py`, exit 1 | "docs: Docs' push and pull_request paths differ" |
+| `command/**/*.md` added to CI's lists and Docs' | `scripts/check_ci_filters.py`, exit 1 | "readers: CI ignores command/testdata/commands/notes.md, under a testdata directory go test reads", one line for each of the 5 fixtures |
+
+Step 3 is not done. It observes GitHub's routing after a push, which needs
+the owner's authorization in that turn. Until it is recorded, this PLAN
+stays `in-progress`.

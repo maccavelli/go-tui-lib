@@ -240,6 +240,12 @@ scripts/
   go-examples_test.py       its offline test
   go-precheck_test.py       the pre-add check's gofmt step and its files,
                             and the shim, on throwaway repositories
+  check_records.py          the records' names, pairs and index, and every
+                            relative link; --next prints the next number
+  check_disclosure.py       real home paths in the tracked text
+  check_ci_filters.py       ci.yml's filters against docs.yml, the readers
+                            of the documents, and the shared checks
+  check_*_test.py           their offline tests
 tools/verify/               python3 -m tools.verify: a step's gates, its
                             mutation proofs, the gates on another host, the
                             identifier scan, planned type names; run by a
@@ -349,7 +355,26 @@ docs/
 
 - **`make` targets:** `test`, `test-sum`, `fmt`, `vet`, `lint`,
   `modernize`, `tidy`, `tidy-check`, `vuln`, `fuzz`, `apicheck`,
-  `examples`, `pre-add-check`, `release-check`, `help`.
+  `examples`, `markdownlint`, `check-records`, `docs-check`,
+  `disclosure-check`, `pre-add-check`, `release-check`, `help`.
+- **The documents' checks**
+  ([0022-MADR](decisions/0022-MADR-align-docs-ci-and-disclosure-gates.md)),
+  which `ci.yml` and `docs.yml` run as one line:
+  - `make markdownlint` runs `markdownlint-cli2` at the `Makefile`'s
+    `MARKDOWNLINT` pin, 0.23.2;
+  - `make check-records` runs `scripts/check_records.py`: the records'
+    names, placement and pairs, one index row per record, and every
+    relative link and anchor in the tracked Markdown outside `testdata`;
+  - `make docs-check` runs the checks that read the documents:
+    `scripts/go-examples.py --check-guide`, and `TestDefaultsInventory`
+    alone, with `GOWORK=off`;
+  - `make disclosure-check` runs `scripts/check_disclosure.py`: a macOS,
+    Linux or Windows home path in a tracked file, unless its account is a
+    placeholder, printed by file, line and kind only.
+- **`scripts/check_ci_filters.py`** reads both workflows with a reader for
+  the YAML subset they use, which refuses anything outside it. It fails
+  when the filters, the triggers, the readers of the documents, or the
+  shared checks and their pins drift apart (AGENTS.md, "CI routing").
 - **Per module.** `test`, `vet`, `lint`, `modernize`, `tidy-check` and
   `vuln` run once in each module's directory with `GOWORK=off`, taking the
   list from `scripts/go-modules.py`; a failure to list the modules fails
@@ -480,8 +505,12 @@ docs/
       job's checkout fetches the whole history and its tags;
     - `examples`: the examples gate's test, then `make examples`;
     - `precheck test`: the pre-add check's own test;
+    - `documents`: the tests of `check_records.py` and
+      `check_disclosure.py`, then
+      `make markdownlint check-records docs-check disclosure-check`;
     - `shellcheck` v0.11.0 (pinned by SHA-256 and first on `PATH`),
-      `markdownlint-cli2` 0.23.2 and `actionlint` v1.7.12;
+      `actionlint` v1.7.12, and `scripts/check_ci_filters.py` after its
+      test;
     - `verification tools`: `tools/` compiles, and its unittest suite
       passes, on the runner's `python3` 3.12.
   - One run per ref (`concurrency`, cancel in progress). Actions are pinned
@@ -491,14 +520,20 @@ docs/
     `.opencode/` skips `ci.yml` (`paths-ignore`) and runs `docs.yml`
     instead. Markdown under `command/testdata/`, which the tests read, is
     never skipped, and a tag push is never path-filtered
-    ([0019-MADR-skip-full-ci-for-docs-only-pushes.md](decisions/0019-MADR-skip-full-ci-for-docs-only-pushes.md)).
+    ([0019-MADR-skip-full-ci-for-docs-only-pushes.md](decisions/0019-MADR-skip-full-ci-for-docs-only-pushes.md);
+    [0022-MADR-align-docs-ci-and-disclosure-gates.md](decisions/0022-MADR-align-docs-ci-and-disclosure-gates.md)).
 - **Docs** (`.github/workflows/docs.yml`) runs on a push to `main` or a
   pull request that changes those documents, `.markdownlint-cli2.jsonc`
-  or the workflow itself. One `ubuntu-24.04` job runs `markdownlint-cli2`
-  0.23.2, with `ci.yml`'s command, and
-  `scripts/go-examples.py --check-guide`, the guides' excerpt check. Its
-  `paths` list `ci.yml`'s five `paths-ignore` patterns, and the two lists
-  must agree. A change to code and documents runs both workflows.
+  or the workflow itself. One `ubuntu-24.04` job sets up Go from
+  `go.work`, at `ci.yml`'s pins, and runs
+  `make markdownlint check-records docs-check disclosure-check`, the
+  line `ci.yml`'s `documents` step runs, so the documents' readers run on
+  a docs-only change too. Its `paths` are `ci.yml`'s five `paths-ignore`
+  patterns plus its two own, and `scripts/check_ci_filters.py` fails when
+  they are not. A change to code and documents runs both workflows.
+- **The pre-push disclosure guard** stays local: it runs the owner's
+  private patterns before every push (AGENTS.md, "Identifiers"), and no
+  workflow has them. CI's disclosure check is the portable half.
 
 ## What is not here
 

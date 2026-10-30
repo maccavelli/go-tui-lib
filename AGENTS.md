@@ -307,12 +307,19 @@ docs/reports/NNNN-GATES-short-slug.md
   (`docs/reports/0010-REPORT-nested-modules-and-adapter-sources.md`); a
   REPORT about nothing earlier takes the next.
 - **Next number** is the highest `NNNN` among all four kinds anywhere under
-  `docs/`, plus one. Never give a new decision a number already used,
-  never renumber an existing record, never leave a gap deliberately.
+  `docs/`, plus one: `python3 scripts/check_records.py --next` prints it.
+  Never give a new decision a number already used, never renumber an
+  existing record, never leave a gap deliberately.
 - Cite records by full filename, never by number alone. Cite another
   repository's record by repository and filename; a relative link cannot reach
   it.
 - `docs/README.md` indexes every record. Update it in the same change.
+- `make check-records` runs `scripts/check_records.py`. It fails on a
+  misnamed or misplaced record, a second MADR of a number, a PLAN with no
+  MADR, a GATES with no PLAN, a record with no row in the index's
+  "Records" table or a row that names another, and a broken relative link
+  or anchor in any tracked Markdown file outside `testdata`
+  (`docs/decisions/0022-MADR-align-docs-ci-and-disclosure-gates.md`).
 
 ## Pre-add checks
 
@@ -390,6 +397,16 @@ It also fails when:
 `make apicheck` and `make examples` run the API diff gate and the examples
 gate alone.
 
+Before staging a document, run the documents' checks, the line both
+workflows run ("CI routing"):
+
+```bash
+make markdownlint check-records docs-check disclosure-check
+```
+
+Before staging a workflow or a file under `scripts/`, also run
+`python3 scripts/check_ci_filters.py` and the tests of each script changed.
+
 Golden files are rewritten with `go test ./<pkg>/ -tuitest.update`, or
 across packages with `TUITEST_UPDATE=1 go test ./...`, and read before they
 are committed. A test binary that defines its own boolean `-update` flag
@@ -445,6 +462,42 @@ Nothing in `make`, CI or the commit gate runs it; CI only tests it.
   path; `tools/verify/verify.example.json` shows the shape with
   placeholders.
 
+## CI routing
+
+`.github/workflows/ci.yml` is the full CI. `.github/workflows/docs.yml`
+runs the documents' checks alone, for a push to `main` or a pull request
+that changes only documents
+(`docs/decisions/0019-MADR-skip-full-ci-for-docs-only-pushes.md`;
+`docs/decisions/0022-MADR-align-docs-ci-and-disclosure-gates.md`).
+
+- **The docs-safe paths** are `*.md` at the root, `docs/**/*.md`,
+  `.claude/**/*.md`, `.grok/**/*.md` and `.opencode/**/*.md`. CI's `push`
+  and `pull_request` ignore exactly these; Docs runs on them, on
+  `.markdownlint-cli2.jsonc` and on itself. A change to any other file, or
+  a mix, runs CI. A `v*` tag always runs CI: GitHub evaluates no path
+  filter for a tag push.
+- **Markdown that code reads is not docs-safe** unless its reader runs in
+  Docs. `command/testdata/**/*.md`, which `go test` reads, stays in CI.
+  `TestDefaultsInventory`, which reads `docs/guides/defaults.md` and the
+  records it cites, and the guides' excerpt check run in Docs through
+  `make docs-check`.
+- **Both workflows run one line,**
+  `make markdownlint check-records docs-check disclosure-check`. The
+  `Makefile` pins `markdownlint-cli2`; no workflow names it.
+- **`scripts/check_ci_filters.py`**, in CI's `gates` job, fails when:
+  - CI's two ignore lists differ, or CI gains a `paths` filter;
+  - CI loses its `push` to `main`, its `v*` tags or `pull_request`;
+  - Docs' paths are not CI's ignored paths plus its own two;
+  - an ignored pattern matches no tracked file;
+  - CI ignores a file under `testdata`, or a file a reader in `READERS`
+    reads while Docs does not run that reader;
+  - a Go literal names an ignored document that is neither a reader's
+    input nor listed in `NOT_READS`;
+  - the shared line or its pins drift between the workflows.
+
+  A new reader of a document is added to `READERS`, with its make target,
+  in the change that adds it.
+
 ## Identifiers
 
 Nothing committed carries a hostname, account name, org-internal path, or a
@@ -462,6 +515,11 @@ real-machine absolute path. Use placeholders (`<user>`, `/home/<user>/...`).
   ```
 
 - Never bypass it with `--no-verify`.
+- `make disclosure-check` (`scripts/check_disclosure.py`) is the portable
+  half, which both workflows run: it fails on a macOS, Linux or Windows
+  home path in any tracked file whose account is not a placeholder, and
+  prints only the file, line and kind. It holds no private pattern, and
+  does not replace the pre-push guard.
 
 ## Commits
 
