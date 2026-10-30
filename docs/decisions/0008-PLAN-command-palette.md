@@ -1545,9 +1545,15 @@ Step 8's `d0815db`. One deviation, D1, below.
   > * An overlay's pane is sent `workspace.OverlayClosedMsg` whenever the
   >   workspace closes it.
   >
-  > [The command palette guide](docs/guides/command-palette.md) and
-  > [the migration guide](docs/guides/migrating.md#migrating-to-v210).
+  > [The command palette guide](../guides/command-palette.md) and
+  > [the migration guide](../guides/migrating.md#migrating-to-v210).
   > Records: `0008-MADR-command-palette.md` (§1 to §8, A1 to A6).
+
+  *Corrected 2026-10-30 by
+  [0022-PLAN-align-docs-ci-and-disclosure-gates.md](0022-PLAN-align-docs-ci-and-disclosure-gates.md)
+  deviation D1: the quote's links are made relative to this record, as
+  the records check requires. The published release body is
+  unchanged.*
 * **The disclosure guard** over the 11 commits ahead of `origin/main`
   (`02a7879` to `d0815db`, against `2ecc8bb`) passed, exit 0, with no
   finding, and `main` is not behind `origin/main`. It runs again over this

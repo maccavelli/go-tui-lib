@@ -1886,10 +1886,18 @@ loop test); `command/registry.go` imports Bubble Tea
   > *Charm-free cores:* `fuzzy`, `glyph`, `layout`, `safetext` and `when`
   > link no Charm module but `x/ansi`, and a test holds them to it.
   >
-  > [The migration guide](docs/guides/migrating.md#migrating-to-v0130)
+  > [The migration guide](../guides/migrating.md#migrating-to-v1130)
   > has the details. Records:
   > `0020-MADR-charm-free-cores-glyphs-and-safetext.md` (D8, D9, D11,
   > A3), and `0008-PLAN-command-palette.md` Steps 2 to 4.
+
+  *Corrected 2026-10-30 by
+  [0022-PLAN-align-docs-ci-and-disclosure-gates.md](0022-PLAN-align-docs-ci-and-disclosure-gates.md)
+  deviation D1: the quote's links are made relative to this record, as
+  the records check requires,
+  and the guide's `v0.13.0` section, which 0020-MADR A4 renamed
+  `v1.13.0`, is linked by its present anchor. The published release body is
+  unchanged.*
 
 * **Issue comments,** drafted for the owner, to post once `v0.13.0` is
   tagged and the consumer smoke test passes:
@@ -3011,10 +3019,16 @@ loop test); `command/registry.go` imports Bubble Tea
   > * `termcap.Report`'s JSON is `schema_version` 2, and writes the colour
   >   profile by its token (`truecolor`).
   >
-  > [The migration guide](docs/guides/migrating.md#migrating-to-v200) has
+  > [The migration guide](../guides/migrating.md#migrating-to-v200) has
   > the table of every moved and retyped name. Records:
   > `0020-MADR-charm-free-cores-glyphs-and-safetext.md` (D2 to D7, D10,
   > A1.2, A2, A4.1, A4.2).
+
+  *Corrected 2026-10-30 by
+  [0022-PLAN-align-docs-ci-and-disclosure-gates.md](0022-PLAN-align-docs-ci-and-disclosure-gates.md)
+  deviation D1: the quote's links are made relative to this record, as
+  the records check requires. The published release body is
+  unchanged.*
 * **Issue comments,** drafted for the owner, to post once `v2.0.0` is
   tagged and the consumer smoke test passes:
   * **#2:** "`termcap` in `v2.0.0` links no Charm module but `x/ansi`. Its

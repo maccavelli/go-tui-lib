@@ -811,10 +811,16 @@ deviation.
   >   provider that already has a method `Opened(when.Context)` is now
   >   called when the picker opens.
   >
-  > [The defaults guide](docs/guides/defaults.md) and
-  > [the migration guide](docs/guides/migrating.md#migrating-to-v220).
+  > [The defaults guide](../guides/defaults.md) and
+  > [the migration guide](../guides/migrating.md#migrating-to-v220).
   > Records: `0024-MADR-opt-in-and-opt-out-coverage.md` (D1 to D4, D9,
   > A1).
+
+  *Corrected 2026-10-30 by
+  [0022-PLAN-align-docs-ci-and-disclosure-gates.md](0022-PLAN-align-docs-ci-and-disclosure-gates.md)
+  deviation D1: the quote's links are made relative to this record, as
+  the records check requires. The published release body is
+  unchanged.*
 * **The disclosure guard** over the 9 commits ahead of `origin/main`
   (`08129ea` to `ae2d222`, against `65d437b`) passed, exit 0, with no
   finding, and `main` is not behind `origin/main`. It runs again over this

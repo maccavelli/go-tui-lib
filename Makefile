@@ -18,8 +18,11 @@ APIDIFF_VERSION ?= v0.0.0-20261007180756-3d68b386da03
 # The scripts under scripts/ are Python, the standard library only
 # (docs/decisions/0017-MADR-python-repository-scripts.md).
 PYTHON ?= python3
+# markdownlint-cli2 at the one version both workflows use
+# (docs/decisions/0022-PLAN-align-docs-ci-and-disclosure-gates.md Phase 1).
+MARKDOWNLINT ?= npx --yes markdownlint-cli2@0.23.2
 
-.PHONY: all help test test-sum fmt vet lint modernize tidy tidy-check vuln fuzz apicheck examples pre-add-check release-check
+.PHONY: all help test test-sum fmt vet lint modernize tidy tidy-check vuln fuzz apicheck examples markdownlint check-records docs-check disclosure-check pre-add-check release-check
 
 all: help
 
@@ -113,6 +116,24 @@ apicheck: ## Fails on an incompatible API change since the previous tag, per mod
 # excerpts (docs/decisions/0014-PLAN-api-policy-gates.md Step 5).
 examples: ## Builds and runs the framework examples in a temporary module
 	@$(PYTHON) ./scripts/go-examples.py
+
+# The documents' checks: ci.yml's gates job and docs.yml run the same four
+# targets (docs/decisions/0022-PLAN-align-docs-ci-and-disclosure-gates.md
+# Phase 1).
+markdownlint: ## Lints the Markdown with the pinned markdownlint-cli2
+	$(MARKDOWNLINT)
+
+check-records: ## Checks the records' names, pairs and index, and every relative link in the Markdown
+	@$(PYTHON) ./scripts/check_records.py
+
+# The checks that read the documents: the guides' excerpts, against the
+# regions they name, and the defaults guide, against the API.
+docs-check: ## Runs the checks that read the documents: the guides' excerpts and the defaults inventory
+	@$(PYTHON) ./scripts/go-examples.py --check-guide
+	GOWORK=off go test -count=1 -run '^TestDefaultsInventory$$' ./internal/conformance/
+
+disclosure-check: ## Fails on a real user-home path in the tracked text
+	@$(PYTHON) ./scripts/check_disclosure.py
 
 # The pre-add rule (AGENTS.md). scripts/go-precheck.py is the one
 # implementation; the agent gate at `git commit` runs it through

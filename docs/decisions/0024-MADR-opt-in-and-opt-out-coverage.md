@@ -569,4 +569,4 @@ Step 3 wrote the inventory; its deviation D1 has the evidence.
   in `v2.2.0` (tag at `6084bb3`). D5 to D7, A1's three gaps, and the
   catalogue's adoption are
   [0024-PLAN-terminal-text-and-convention-opt-outs.md](0024-PLAN-terminal-text-and-convention-opt-outs.md),
-  proposed.
+  approved 2026-10-30.

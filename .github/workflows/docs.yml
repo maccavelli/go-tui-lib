@@ -1,7 +1,10 @@
-# The checks ci.yml runs on the documents, for a push or pull request
-# that changes only them: markdownlint, with ci.yml's command, and the
-# guides' excerpt check, the Markdown half of `make examples`. The five
-# document patterns below must match ci.yml's paths-ignore, so that a
+# The documents' checks, for a push or pull request that changes only the
+# documents: the same make line as ci.yml's documents step, so both run
+# markdownlint at its pin, the records and links check, the checks that
+# read the documents (the guides' excerpts and the defaults inventory) and
+# the portable disclosure check
+# (docs/decisions/0022-MADR-align-docs-ci-and-disclosure-gates.md). The
+# five document patterns below must match ci.yml's paths-ignore, so that a
 # change to those files alone runs this workflow instead of the full CI
 # (docs/decisions/0019-MADR-skip-full-ci-for-docs-only-pushes.md).
 name: Docs
@@ -21,7 +24,8 @@ concurrency:
 
 jobs:
   # The runner image's Node and Python, with no setup action, as in
-  # ci.yml; the guide check needs Python 3.12, the runner's.
+  # ci.yml; the scripts need Python 3.12, the runner's. Go, for the
+  # defaults inventory's test, comes from go.work, as in ci.yml.
   docs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -29,10 +33,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: markdownlint
-        run: npx --yes markdownlint-cli2@0.23.2
-      - name: guide excerpts
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: '**/go.sum'
+      - name: documents
         shell: bash
         run: |
           python3 --version
-          python3 scripts/go-examples.py --check-guide
+          make markdownlint check-records docs-check disclosure-check

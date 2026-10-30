@@ -178,14 +178,26 @@ jobs:
       - name: precheck test
         shell: bash
         run: python3 scripts/go-precheck_test.py
-      # Scripts, Markdown and workflows are checked as the pre-add gate and
-      # the records require (go-selfupdate-lib docs/decisions/0003-MADR-remediate-debugging-pass-findings.md D9).
+      # The documents' checks, the same make line as docs.yml's, after the
+      # tests of the two scripts it adds: markdownlint at its pin, the
+      # records and links, the checks that read the documents, and the
+      # portable disclosure check
+      # (docs/decisions/0022-PLAN-align-docs-ci-and-disclosure-gates.md Phase 1).
+      - name: documents
+        shell: bash
+        run: |
+          python3 scripts/check_records_test.py
+          python3 scripts/check_disclosure_test.py
+          make markdownlint check-records docs-check disclosure-check
+      # Scripts and workflows are checked as the pre-add gate and the
+      # records require (go-selfupdate-lib docs/decisions/0003-MADR-remediate-debugging-pass-findings.md D9);
+      # markdownlint moved to the documents step (0022-PLAN Phase 1).
       # shellcheck is pinned to the release the pre-add hosts use (the
       # latest), checksum-verified, and first on PATH so actionlint's
       # embedded checks use it too. The runner's distribution copy is older
       # and reports differently (go-selfupdate-lib docs/decisions/0003-PLAN-remediate-debugging-pass-findings.md
       # deviation D5).
-      - name: shellcheck, markdownlint, actionlint
+      - name: shellcheck, actionlint
         shell: bash
         env:
           SHELLCHECK_VERSION: v0.11.0
@@ -202,7 +214,6 @@ jobs:
           # The Python scripts compile (docs/decisions/0017-MADR-python-repository-scripts.md).
           python3 --version
           python3 -m py_compile scripts/*.py
-          npx --yes markdownlint-cli2@0.23.2
           go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
       # The verification tools compile and pass their tests on the runner's
       # python3, the 3.12 floor; nothing here runs them on the repository

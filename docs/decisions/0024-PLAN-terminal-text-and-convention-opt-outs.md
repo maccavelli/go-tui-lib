@@ -1,6 +1,6 @@
 ---
-status: proposed
-date: 2026-10-25
+status: in-progress
+date: 2026-10-30
 associated-madr: "0024-MADR-opt-in-and-opt-out-coverage.md"
 ---
 # Close the terminal, text and convention gaps, and adopt the message catalogue
@@ -168,3 +168,12 @@ step.
   set to another system.
 
 ## Execution Record
+
+### Approval, 2026-10-30
+
+The owner: "approve 0022 and 0024, then proceed". Both prerequisites hold:
+[0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md) is
+`complete` (`a088933`), and the owner has approved this PLAN, which is now
+`in-progress`. It runs after
+[0022-PLAN-align-docs-ci-and-disclosure-gates.md](0022-PLAN-align-docs-ci-and-disclosure-gates.md),
+approved in the same message.

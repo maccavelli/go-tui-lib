@@ -1,6 +1,7 @@
 ---
-status: proposed
-date: 2026-10-25
+status: accepted
+date: 2026-10-30
+decision-makers: the repository owner
 ---
 # Align docs-only CI and disclosure gates
 
@@ -27,6 +28,8 @@ Across the repositories, the common documentation contract is pinned Markdownlin
 * Detect changed paths inside one full workflow and conditionally skip expensive jobs.
 
 ## Decision Outcome
+
+*Accepted 2026-10-30 by the owner: "approve 0022 and 0024, then proceed".*
 
 Chosen option: "Align the documentation gates and add a portable disclosure check, with a path and gate parity test", because it gives both workflows the same common documentation checks, covers local Markdown readers, and makes filter drift observable. This is proposed for the owner; it does not approve CI implementation.
 
