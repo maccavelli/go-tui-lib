@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-10-30
 associated-madr: "0023-MADR-line-mode-components.md"
 ---
@@ -2645,5 +2645,13 @@ this step were written first, in the same change.
 * **Not done:** no release, as A11 item 7 says. `linemode`'s raw-mode path
   runs only on a terminal, so the gate builds and vets it and runs its
   refusal; the loop it calls is `ExampleComposer`'s, run on a screen.
-* **Step 7b's CI** waits for the owner's commit and push. This PLAN
-  becomes `complete` again once it passes.
+* **CI.** The owner committed the step (`a65d724`); the disclosure
+  guard, run over `2ead35c..a65d724` before the push, exited 0 with
+  nothing to report; the owner pushed `main`. CI run 41064893045 passed:
+  `modules`, `gates`, its `examples` step among them, and `test` on macOS
+  15, Ubuntu 24.04 and Windows 2025; Docs run 41064893037 passed.
+* **Step 7b complete, 2026-10-30.**
+* **This PLAN is complete, 2026-10-30.** Step 7's Verification holds with
+  Steps 7a and 7b: 7b's 10 mutations killed, its gates on macOS, Linux and
+  Windows, and CI passed on `main` at `a65d724`. Left as the PLAN left it:
+  what D10 leaves out, and `stream/glamourmd`, which 0009's PLAN builds.
