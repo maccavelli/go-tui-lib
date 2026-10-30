@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-10-30
 associated-madr: "0022-MADR-align-docs-ci-and-disclosure-gates.md"
 ---
@@ -480,7 +480,7 @@ that commit, the agent had run it over `a088933..4ff2e22`, also exit 0.
 | Push | Changes | Workflows started | Runs and conclusions |
 | :--- | :--- | :--- | :--- |
 | `a088933..eb862cf` | mixed: the workflows, `Makefile`, `scripts/`, `AGENTS.md`, records and docs | CI and Docs | CI 41103202698, "completed success", jobs `modules`, `gates` and `test` on Windows 2025, Ubuntu 24.04 and macOS 15; Docs 41103202654, "completed success", job `docs` |
-| this record alone | docs-only: this PLAN | to be observed | |
+| `eb862cf..49a672c`, this record alone | docs-only: this PLAN | Docs alone | Docs 41109199104, "completed success", job `docs`; no CI run, by `gh run list --commit` after the run completed |
 
 In the mixed push's logs (`gh run view --log`):
 
@@ -498,3 +498,32 @@ In the mixed push's logs (`gh run view --log`):
 
 So both workflows run the documents' checks on GitHub, and Docs' Go setup
 and `Makefile` work on its runner.
+
+The owner committed the record above as `49a672c` and pushed it. The
+guard, run over `eb862cf..49a672c` after the push, exited 0 with nothing to
+report. Only Docs started, so a docs-only push routes as intended.
+
+Tags, schedules and dispatch are not waited for, as step 3 says:
+
+* the filters are `paths-ignore` under `on.push` and `on.pull_request`
+  alone;
+* GitHub evaluates no path filter for a tag push, so `push.tags: ['v*']`
+  runs CI whatever a tag's commit changes;
+* CI has no `schedule` and no `workflow_dispatch`;
+* `scripts/check_ci_filters.py`'s `filters` part fails when CI loses a
+  trigger in `CI_TRIGGERS` or gains a `paths` filter. It printed
+  "check-ci-filters: 0 problem(s)" in CI run 41103202698.
+
+**Every criterion under Verification holds:**
+
+* both workflows run pinned markdownlint, the records and link check, and
+  the disclosure check, on GitHub;
+* each Markdown reader runs on changes to its input: the command fixtures
+  in CI, and the inventory and the excerpt check in Docs;
+* a docs-only push started Docs alone, and a mixed push started both;
+* the scratch plants failed their gates, and drift fails the contract
+  check;
+* the guard checked every outgoing commit, and its private list is in no
+  workflow.
+
+**This PLAN is complete, 2026-10-30.**

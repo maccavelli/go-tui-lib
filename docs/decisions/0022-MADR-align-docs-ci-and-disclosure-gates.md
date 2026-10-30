@@ -68,3 +68,8 @@ Keep the narrow ignore list and guide excerpt check. Add a record naming/pair/in
 
 This fleet alignment decision cites 0019-MADR-skip-full-ci-for-docs-only-pushes.md without rewriting its history. The implementation is [0022-PLAN-align-docs-ci-and-disclosure-gates.md](0022-PLAN-align-docs-ci-and-disclosure-gates.md).
 
+*Built 2026-10-30* by that PLAN, now `complete`. Its Confirmation holds: each
+new gate was seen failing on planted input, the workflows pass actionlint and
+the contract check, and a docs-only push (Docs 41109199104) and a mixed push
+(CI 41103202698, Docs 41103202654) routed as decided.
+
