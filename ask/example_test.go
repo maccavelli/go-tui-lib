@@ -18,6 +18,7 @@ import (
 // is answered. Here the user rejects, and types why; the question and the
 // answer, in words, stay in the scrollback.
 func ExampleAsker() {
+	// guide:question
 	q := ask.Question{
 		Title: "Run go test ./... in the repository?",
 		Rows: []ask.Row{
@@ -31,6 +32,7 @@ func ExampleAsker() {
 		},
 		Cancel: ask.Answer{ID: "cancel", Key: "c", Label: "cancel"},
 	}
+	// guide:end
 	scr := inlinetest.NewScreen(60, 10, ansi.WcWidth)
 	a := ask.NewAsker(q, ask.WithGlyphs(glyph.ASCII()))
 	now := time.Unix(0, 0)

@@ -17,6 +17,7 @@ import (
 	"github.com/maccavelli/go-tui-lib/v2/termkey"
 )
 
+// guide:run
 // widthPoll is how often the loop looks at the terminal's width when
 // nothing else wakes it: a host may watch SIGWINCH instead, where there is
 // one.
@@ -90,6 +91,8 @@ func run(in *inline.Reader, out io.Writer, width func() int, c *lineedit.Compose
 		}
 	}
 }
+
+// guide:end
 
 // A line-mode host's loop around a Composer, on a test screen in place of
 // the terminal: two lines typed, each submitted with enter and left in the

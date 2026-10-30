@@ -211,6 +211,79 @@ def case9(work):
     check("the skip switch passes", 0, run(os.path.join(work, "g"), env={"GO_PRECHECK_SKIP_EXAMPLES": "1"}))
 
 
+PKG = """package p
+
+// guide:loop
+// loop counts to n.
+func loop(n int) int {
+	i := 0
+	for i < n {
+		i++
+	}
+	return i
+}
+
+// guide:end
+"""
+
+LOOP = """```go
+// loop counts to n.
+func loop(n int) int {
+    i := 0
+    for i < n {
+        i++
+    }
+    return i
+}
+```
+"""
+
+
+def case10(work):
+    # 10. A source in a package's file, outside testdata/frameworks, is
+    #     checked (docs/decisions/0023-MADR-line-mode-components.md A11
+    #     item 2).
+    j = tree(os.path.join(work, "j"))
+    write(os.path.join(j, "p", "example_test.go"), PKG)
+    g = os.path.join(j, "docs", "guides", "g.md")
+    write(g, read(g) + "\n<!-- from: p/example_test.go#loop -->\n\n" + LOOP)
+    check("a source in a package file passes", 0, run(j, "--check-guide"))
+    has("both excerpts were checked", "2 excerpt(s) checked")
+    write(g, read(g).replace("i++", "i += 1"))
+    check("a package file's excerpt one change away fails", 1, run(j, "--check-guide"))
+    has("its difference is shown", "+        i += 1")
+
+
+def case11(work):
+    # 11. A source that leaves the repository, or is not a Go file, fails.
+    k = tree(os.path.join(work, "k"))
+    write(os.path.join(work, "outside.go"), PKG)
+    g = os.path.join(k, "docs", "guides", "g.md")
+    base = read(g)
+    write(g, base + "\n<!-- from: ../outside.go#loop -->\n\n" + LOOP)
+    check("a source outside the repository fails", 1, run(k, "--check-guide"))
+    has("it is named", "../outside.go#loop is not a Go file in the repository")
+    write(os.path.join(k, "p", "notes.txt"), PKG)
+    write(g, base + "\n<!-- from: p/notes.txt#loop -->\n\n" + LOOP)
+    check("a source that is not a Go file fails", 1, run(k, "--check-guide"))
+    has("it is named too", "p/notes.txt#loop is not a Go file in the repository")
+
+
+def case12(work):
+    # 12. Every from line above a block names a region it must equal
+    #     (A11 item 3).
+    m = tree(os.path.join(work, "m"))
+    write(os.path.join(m, "p", "example_test.go"), PKG)
+    write(os.path.join(m, "q", "copy.go"), PKG.replace("package p", "package q"))
+    g = os.path.join(m, "docs", "guides", "g.md")
+    write(g, read(g) + "\n<!-- from: p/example_test.go#loop -->\n<!-- from: q/copy.go#loop -->\n\n" + LOOP)
+    check("two from lines over one block pass", 0, run(m, "--check-guide"))
+    has("all three excerpts were checked", "3 excerpt(s) checked")
+    write(os.path.join(m, "q", "copy.go"), PKG.replace("package p", "package q").replace("i++", "i += 1"))
+    check("a second source that differs fails", 1, run(m, "--check-guide"))
+    has("the second source is named", "the excerpt differs from q/copy.go#loop")
+
+
 def main():
     work = tempfile.mkdtemp()
     for name in ("GOWORK", "GO_PRECHECK_SKIP_EXAMPLES"):
@@ -225,6 +298,9 @@ def main():
         case("7. --check-guide and a broken build", case7, work)
         case("8. --update", case8, work)
         case("9. the skip switch", case9, work)
+        case("10. a source in a package file", case10, work)
+        case("11. a source outside the repository", case11, work)
+        case("12. two from lines over one block", case12, work)
     finally:
         shutil.rmtree(work, ignore_errors=True)
     print(f"go-examples_test: {passed} passed, {failed} failed")

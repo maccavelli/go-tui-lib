@@ -235,7 +235,8 @@ scripts/
   go-apicheck_test.py       its test, on throwaway repositories
   apicheck.allow            the incompatible changes a PLAN allows
   go-examples.py            builds and runs the framework examples, and
-                            checks the guides' excerpts of them
+                            checks the guides' excerpts of them and of
+                            the packages' examples
   go-examples_test.py       its offline test
   go-precheck_test.py       the pre-add check's gofmt step and its files,
                             and the shim, on throwaway repositories
@@ -281,8 +282,9 @@ internal/conformance/       the conformance scan: terminal ownership,
                             the Charm-free cores' closure (tests only)
 tuitest/internal/clash/     proves tuitest's -update flag does not clash (tests only)
 testdata/frameworks/        the framework examples: programs on flag, Cobra,
-                            Kong and urfave/cli, built in a module of their
-                            own (go.mod.tmpl), and their cases
+                            Kong and urfave/cli, and the line-mode host,
+                            built in a module of their own (go.mod.tmpl),
+                            and their cases
 .claude/ .grok/ .opencode/  per-agent pointers to AGENTS.md
 opencode.json
 docs/
@@ -415,8 +417,8 @@ docs/
   ([0015-MADR](decisions/0015-MADR-precheck-gofmt-errors.md)). It ends
   with `scripts/go-modules.py --check`, then:
   - with no file list, the API diff gate;
-  - with no file list, or one naming a file under `testdata/frameworks`,
-    the examples gate.
+  - with no file list, or one naming a file under `testdata/frameworks`
+    or a Go file that starts a `// guide:` region, the examples gate.
 
   `make pre-add-check` runs it, and so does the machine-wide agent gate
   before an agent `git commit` that stages Go files.
@@ -438,7 +440,10 @@ docs/
     `go.mod` comes from `go.mod.tmpl` with a `replace` of the root;
   - it builds and vets the programs, and runs `cases.txt`;
   - it compares each guide block marked `<!-- from: … -->` with the
-    program region it names;
+    region it names, in a Go file inside the repository: a program here,
+    or a package's example
+    ([0023-MADR](decisions/0023-MADR-line-mode-components.md) A11). Every
+    from line over a block names a region the block must equal;
   - `--check-guide` does only the comparison, and `--update` rewrites
     `go.mod.tmpl` and `go.sum` from `go mod tidy`.
 - **`.golangci.yml`:**

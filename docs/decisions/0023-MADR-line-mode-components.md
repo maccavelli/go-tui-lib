@@ -748,6 +748,8 @@ func (t *Transcript) HandleTimeout(now time.Time, idle bool) string // the repri
   most and never calls `Close`, as gobble's `TestNoCloseOnStdin` does.
 * **The gate:** each new core joins `TestCoresAreCharmFree` in the commit
   that builds it; the `<pkg>tea` packages are not cores.
+* *Added 2026-10-30 by A11:* the line-mode guide's Go blocks are held to
+  the examples they come from, by `scripts/go-examples.py`'s guide check.
 
 ### D12. Order and releases
 
@@ -1618,6 +1620,58 @@ when CI ran on Step 7's push:
 4. **A patch release, `v2.6.2`:** nothing exported changes.
 5. **x/ansi's parser** panicking past its buffer is upstream's to fix;
    telling charmbracelet/x is the owner's call, and this record does not.
+   *Withdrawn 2026-10-30 by A11 item 8.*
+
+### A11 (2026-10-30): the line-mode guide's excerpts checked, and the upstream report out of scope
+
+*Status: accepted (2026-10-30),* the owner's ask after
+[0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
+was complete, "do item 2, write the amendment and proceed": no gate held
+the line-mode guide's Go blocks to code that compiles and runs.
+
+1. **The fact.** `docs/guides/line-mode.md` has four Go blocks: the host
+   loop `run` with `widthPoll`, the raw-mode `session`, the `Question` and
+   the host's `host`. Step 7 copied them from `ExampleComposer`'s file, a
+   scratch program and `ExampleAsker`. `scripts/go-examples.py`'s guide
+   check compares a block only when a `<!-- from: -->` line names its
+   source, and only a source under `testdata/frameworks`. The guide has no
+   such line, so its blocks can drift from the code with every gate
+   green, and `session` and `host` are in no committed file.
+2. **A source may be any Go file in the repository.** The guide check
+   takes a `from:` path that is relative, stays inside the repository and
+   names a `.go` file, not only one under `testdata/frameworks`. A
+   package's example file compiles and runs under `go test`, its output
+   checked. A path that leaves the repository is refused.
+3. **Every from line above a block names a region the block must equal,**
+   so two from lines over one block hold two copies of the code to it,
+   and to each other. A from line followed by anything but another from
+   line or a Go block still fails.
+4. **Where each block lives:**
+   * `run` and `widthPoll`: `lineedit/example_test.go`, region `run`,
+     which `ExampleComposer` runs;
+   * the `Question`: `ask/example_test.go`, region `question`, which
+     `ExampleAsker` asks;
+   * `host`: a new `transcript/example_test.go`, region `host`, which
+     `ExampleTranscript` drives on a test screen through a streamed reply,
+     a resize and the reprint;
+   * `session`: a new program, `testdata/frameworks/linemode`, region
+     `session`. It holds a copy of `run`, so that it builds, and that copy
+     is the guide's second from line over `run`. Its case runs it with no
+     terminal, and wants exit 1 and "not a terminal".
+5. **The examples module requires `golang.org/x/term` v0.47.0,** for
+   `session`'s raw mode: the version A5 item 1's parity generator runs.
+   Only the examples' temporary module requires it, as only the
+   generator's module file does under A5. The library's modules still
+   require no `golang.org/x/term`. AGENTS.md's "Dependencies" names it
+   beside the tier-1 frameworks.
+6. **The pre-add check runs the examples gate** also when a file it is
+   given starts a `// guide:` region, since a region now lives in a
+   package's files as well as under `testdata/frameworks`.
+7. **No release.** Nothing a consumer builds changes: tests, a script,
+   the examples and documents.
+8. **Out of scope: reporting x/ansi's parser to charmbracelet/x.** A10
+   item 5's "the owner's call" is withdrawn. Neither this record nor its
+   PLAN carries it as a step or an open item.
 
 ## More Information
 

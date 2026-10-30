@@ -262,6 +262,19 @@ def case8(work):
     hasnt("the warning is not taken for a replace directive", "a replace directive")
 
 
+def case9(work):
+    # 9. A Go file given that starts a guide region runs the examples gate,
+    #    here skipped by its switch; one that does not, does not
+    #    (docs/decisions/0023-MADR-line-mode-components.md A11 item 6).
+    i = repo(os.path.join(work, "i"))
+    write(os.path.join(i, "p", "example_test.go"),
+          "package p\n\n// guide:f\nfunc g() int { return F() }\n\n// guide:end\n")
+    check("a file with a region passes", 0, run(i, "p/example_test.go"))
+    has("it runs the examples gate", "examples: skipped")
+    check("a file with no region passes", 0, run(i, "p/p.go"))
+    hasnt("it does not run the examples gate", "examples: skipped")
+
+
 def main():
     work = tempfile.mkdtemp()
     os.environ.pop("GOWORK", None)
@@ -277,6 +290,7 @@ def main():
         if PRECHECK.endswith(".py"):
             case("7. the shim", case7, work)
         case("8. a warning from go", case8, work)
+        case("9. a guide region", case9, work)
     finally:
         shutil.rmtree(work, ignore_errors=True)
     print(f"go-precheck_test: {passed} passed, {failed} failed")

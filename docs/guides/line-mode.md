@@ -25,9 +25,13 @@ the work:
 of these packages links no Charm module but `x/ansi`; the `…tea` packages
 are the Bubble Tea forms. Why they are built this way is in
 [0023-MADR](../decisions/0023-MADR-line-mode-components.md), with its
-amendments A1 to A9. The examples `ExampleAsker`, `ExampleChooser`,
-`ExampleComposer` and `ExamplePrinter` compile and run with each package's
-tests (`go doc -all github.com/maccavelli/go-tui-lib/v2/lineedit`).
+amendments A1 to A11. The examples `ExampleAsker`, `ExampleChooser`,
+`ExampleComposer`, `ExamplePrinter` and `ExampleTranscript` compile and
+run with each package's tests
+(`go doc -all github.com/maccavelli/go-tui-lib/v2/lineedit`). Each Go
+block below is cut from one of them, or from the program
+`testdata/frameworks/linemode`, and `make examples` fails when the two
+differ.
 
 ## What is yours
 
@@ -58,6 +62,9 @@ goroutine (0023-MADR D2). The host:
 
 This is the loop around a `Composer`, as `ExampleComposer` runs it on a
 test screen:
+
+<!-- from: lineedit/example_test.go#run -->
+<!-- from: testdata/frameworks/linemode/main.go#run -->
 
 ```go
 // widthPoll is how often the loop looks at the terminal's width when
@@ -157,6 +164,8 @@ library does not require. The region's `Restore` gives the bytes that
 undo what an interrupted drawing could leave set, the cursor hidden and
 mode 2026 on: `launch.Restorer`'s shape.
 
+<!-- from: testdata/frameworks/linemode/main.go#session -->
+
 ```go
 func session() ([]string, error) {
     in, out := int(os.Stdin.Fd()), int(os.Stdout.Fd())
@@ -225,6 +234,8 @@ A `Question` is rows of answers, each chosen by one key. The answer with
 `Reason` reads a line after its key, up to enter. The `Cancel` answer's
 key, ctrl+c, and the host's `Cancel()` cancel. The question and the answer,
 in words, stay in the scrollback.
+
+<!-- from: ask/example_test.go#question -->
 
 ```go
 q := ask.Question{
@@ -391,7 +402,10 @@ new width:
   and the host says its output is idle, at a line's start with nothing
   held; until then it gives "". Call it at each idle point.
 
-This is the host's side of it, on the loop's goroutine:
+This is the host's side of it, on the loop's goroutine, as
+`ExampleTranscript` runs it on a test screen:
+
+<!-- from: transcript/example_test.go#host -->
 
 ```go
 // host is a conversation's state, on the loop's goroutine: the region the

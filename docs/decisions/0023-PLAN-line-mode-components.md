@@ -1,6 +1,6 @@
 ---
-status: complete
-date: 2026-10-29
+status: in-progress
+date: 2026-10-30
 associated-madr: "0023-MADR-line-mode-components.md"
 ---
 # Implement the line-mode question, picker, composer and transcript
@@ -45,6 +45,7 @@ code's at `5fb6928`; a step that relies on one cites it.
 | 6a | `stream/`, `transcript/` | the reprint's and the printer's speed, and their budgets (D27, 0023-MADR A9) | a patch, `v2.6.1` |
 | 7 | `docs/`, `README.md`; *annotated 2026-10-29:* the four examples' `example_test.go` in `ask/`, `pick/`, `lineedit/` and `stream/`, which the step names | the guide, the close-out | |
 | 7a | `internal/sanitize/`, `termcap/reply.go`, `inline/inlinetest/`, `docs/`, `README.md` | a reply's parameters counted on every path to them (D28, 0023-MADR A10) | a patch, `v2.6.2` |
+| 7b | `scripts/go-examples.py`, `scripts/go-precheck.py` and their tests, `testdata/frameworks/`, the examples of `ask/`, `lineedit/` and `transcript/`, `docs/`, `AGENTS.md` | the line-mode guide's excerpts held to the examples (0023-MADR A11) | none |
 
 Each step's package joins `cores` and the `charmfree` files in the commit
 that builds it; the `<pkg>tea` packages are not cores. Each step adds its
@@ -57,6 +58,8 @@ English defaults, through `msgcat`.
   the line mode, win32-input-mode, undo and a kill ring, a `picktea`.
 * `stream/glamourmd`, 0009's glamour adapter, which 0009's own PLAN builds.
 * `git push` and tags, which are the owner's.
+* *Added 2026-10-30 by 0023-MADR A11 item 8:* reporting x/ansi's parser
+  to charmbracelet/x.
 
 ## Prerequisites
 
@@ -473,6 +476,53 @@ changes.
   `v2.6.2`, with `ParseReply` given CI's input, its negative control the
   same program against `v2.6.1`, which panics.
 
+### Step 7b: the line-mode guide's excerpts, checked
+
+*Added 2026-10-30 by 0023-MADR A11,* at the owner's ask. Nothing
+exported changes, and nothing is released.
+
+* **The gate,** `scripts/go-examples.py`'s guide check:
+  * a `from:` source is a `.go` file at a relative path inside the
+    repository, not only under `testdata/frameworks`; one that leaves it
+    is refused;
+  * every from line above a block, blank lines between, names a region
+    the block must equal.
+* **The pre-add check,** `scripts/go-precheck.py`, runs the examples gate
+  also when a file given starts a `// guide:` region.
+* **The sources,** each with its region:
+  * `lineedit/example_test.go`, `run`: `widthPoll` and `run`;
+  * `ask/example_test.go`, `question`: the `Question`;
+  * `transcript/example_test.go`, new, `host`: the `host` type, which
+    `ExampleTranscript` drives on a test screen through a submitted line,
+    a streamed reply, a resize and the reprint, its output checked;
+  * `testdata/frameworks/linemode/main.go`, new, `session` and a copy of
+    `run`; `cases.txt` runs it with no terminal, exit 1 and "not a
+    terminal"; `go.mod.tmpl` and `go.sum` require `golang.org/x/term`
+    v0.47.0, by `scripts/go-examples.py --update`, the diff read.
+* **The guide:** a from line over each of its four Go blocks, two over
+  `run`; `ExampleTranscript` named beside the other examples; its
+  amendments A1 to A11.
+* **Docs:** AGENTS.md's "Dependencies" (the examples module's
+  `golang.org/x/term`) and "Pre-add checks" (the new trigger);
+  `docs/architecture.md`'s examples gate and `testdata/frameworks` rows;
+  `docs/README.md`'s examples row and this PLAN's row.
+* **Tests,** each seen failing:
+  * `scripts/go-examples_test.py`: a source in a package's file passes;
+    one outside the repository fails; two from lines over one block pass
+    when both regions equal it, and fail when the second differs;
+  * `scripts/go-precheck_test.py`: a Go file given that starts a region
+    runs the examples gate, and one that does not, does not;
+  * `ExampleTranscript`'s output.
+* **Mutations:** the source restricted to `testdata/frameworks` again;
+  only the first from line over a block checked; a path with `..`
+  accepted; the pre-add trigger without the region test; the host's
+  reprint without the region's `Clear`. On a scratch copy of the tree: a
+  one-byte change to each of the guide's four blocks fails
+  `--check-guide`.
+* **Gates:** `python3 -m tools.verify gates` on macOS, Linux and Windows;
+  `go-examples_test.py` and `go-precheck_test.py`; markdownlint; the
+  identifier scan.
+
 ## Verification
 
 * Every step's mutations are killed, each failure quoted in the record.
@@ -494,7 +544,8 @@ changes.
 * **Rollout.** Four releases, after Steps 2, 3, 4 and 6, in gobble's
   order; gobble takes each as it lands. *Added 2026-10-29 (D27):* and a
   patch, `v2.6.1`, after Step 6a. *Added 2026-10-29 (D28):* and a patch,
-  `v2.6.2`, after Step 7a.
+  `v2.6.2`, after Step 7a. *Added 2026-10-30 (A11):* Step 7b releases
+  nothing.
 * **Rollback.** Before a push, each step is one local commit. After it, a
   patch release fixes forward. Every change is an addition.
 
@@ -2499,7 +2550,8 @@ drafted, and were closed on 2026-10-27, 2026-10-28 and 2026-10-28
     exited 1, `panic: runtime error: index out of range [33] with length
     33`.
 * **Step 7a complete, 2026-10-29.**
-* **This PLAN is complete, 2026-10-29.** Step 7's Verification, above,
+* ~~**This PLAN is complete, 2026-10-29.**~~ *Reopened 2026-10-30 by
+  Step 7b, 0023-MADR A11.* Step 7's Verification, above,
   holds with Step 7a: its 4 mutations killed, its gates on macOS, Linux
   and Windows, `apicheck` 0 incompatible changes, the smoke test from the
   proxy; CI passed on `main` at `696f4af` and on every release tag; and the
@@ -2507,3 +2559,91 @@ drafted, and were closed on 2026-10-27, 2026-10-28 and 2026-10-28
   Left as the PLAN left it: what D10 leaves out, `stream/glamourmd`, which
   0009's PLAN builds, and x/ansi's parser, upstream's (0023-MADR A10 item
   5).
+
+### Step 7b: the line-mode guide's excerpts, checked
+
+*2026-10-30.* The owner committed the close-out (`2ead35c`) and asked: "pull
+1 out of scope and stop repeating it as an action item. do item 2, write
+the amendment and proceed". Item 1 was the upstream report, now 0023-MADR
+A11 item 8 and "Out of scope"; item 2 was this step. 0023-MADR A11 and
+this step were written first, in the same change.
+
+* **Tests first,** each run on the scripts as they were:
+  * `scripts/go-examples_test.py`, cases 10 to 12: 23 passed, 8 failed.
+    A source in a package's file failed, `p/example_test.go#loop is not
+    under testdata/frameworks.`; a path out of the repository and a
+    `.txt` file were refused, but with that message, not "is not a Go
+    file in the repository"; two from lines over one block failed,
+    `<!-- from: p/example_test.go#loop --> is not followed by a Go
+    block.`
+  * `scripts/go-precheck_test.py`, case 9: 20 passed, 1 failed, `FAIL it
+    runs the examples gate: no line holds examples: skipped`. A Go file
+    starting a region did not run the gate.
+  * `ExampleTranscript` passed on its first run, against code that
+    already existed; mutation 7b.5 below is its failure.
+* **Code:**
+  * `scripts/go-examples.py`: `blocks` keeps every from line over a block,
+    with blank lines between them; `in_repo` takes a `.go` file at a
+    relative path that stays inside the repository, in place of the
+    `testdata/frameworks/` prefix, and the refusal reads "is not a Go file
+    in the repository".
+  * `scripts/go-precheck.py`: `starts_region` and `GUIDE_START`, a line
+    `// guide:<name>` other than `end`, with CR LF allowed; the examples
+    gate runs when a Go file given holds one.
+  * The regions: `// guide:run` over `widthPoll` and `run` in
+    `lineedit/example_test.go`; `// guide:question` over the `Question` in
+    `ExampleAsker`; `transcript/example_test.go`, new, with `host`, its
+    region, and `ExampleTranscript`, which writes the shell's line,
+    submits a line, streams four chunks at 60 columns, narrows the screen
+    to 40 with `ReflowDown`, ends the reply and calls `idle` at the
+    settle's deadline. Its output is the conversation at 40 columns, the
+    empty prompt, and "0 rows of scrollback".
+  * `testdata/frameworks/linemode/main.go`, new: `main`, `session` in its
+    region, and `run` copied by a script from `lineedit`'s region, so the
+    two started equal. `cases.txt` gains `linemode => 1 stderr not a
+    terminal`.
+  * The examples module, by `scripts/go-examples.py --update` after
+    `golang.org/x/term v0.47.0` was added to `go.mod.tmpl`, the diff read:
+    `golang.org/x/term` v0.47.0 required; `x/ansi` v0.11.8 moved from
+    indirect to direct, since `linemode` imports it; and `golang.org/x/sys`
+    from v0.47.0 to v0.49.0, x/term v0.47.0's requirement. `go.sum` gains
+    the two modules' four lines and drops x/sys v0.47.0's two. Nothing
+    changes in the library's `go.mod`.
+* **Docs:** the guide's five from lines, two over `run`, and its intro;
+  AGENTS.md's "Dependencies" and "Pre-add checks"; `docs/architecture.md`'s
+  `go-examples.py` and `testdata/frameworks` rows and its pre-add and
+  `make examples` items; `docs/README.md`'s examples row and the two 0023
+  rows. Every guide block already equalled its source: the first full run
+  of `scripts/go-examples.py` read "47 case(s) run", "15 excerpt(s)
+  checked", "clean". Before this step, 46 cases ran and 10 excerpts were
+  checked.
+* **Seen failing,** through `python3 -m tools.verify mutate` on scratch
+  copies, 10 killed of 10:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | 7b.1 the source restricted to `testdata/frameworks` again | `FAIL a source in a package file passes: want 0, got 1`, and five more of cases 10 and 12 |
+  | 7b.2 only the first from line over a block checked | `FAIL a second source that differs fails: want 1, got 0`; `no line holds 3 excerpt(s) checked` |
+  | 7b.3 a path with `..` accepted | `FAIL a source outside the repository fails: want 1, got 0` |
+  | 7b.4 the pre-add trigger without the region test | `FAIL it runs the examples gate: no line holds examples: skipped` |
+  | 7b.5 the host's reprint without the region's `Clear` | `--- FAIL: ExampleTranscript`: the got output has no `>` prompt row before "0 rows of scrollback" |
+  | 7b.6 the guide's `run`, `4096` to `4095` | `line-mode.md:66: the excerpt differs from lineedit/example_test.go#run` |
+  | 7b.7 the guide's `session`, `return 80` to `return 81` | `line-mode.md:167: the excerpt differs from testdata/frameworks/linemode/main.go#session` |
+  | 7b.8 the guide's `Question`, `"once"` to `"one"` | `line-mode.md:238: the excerpt differs from ask/example_test.go#question` |
+  | 7b.9 the guide's `host`, a full stop added to a comment | `line-mode.md:408: the excerpt differs from transcript/example_test.go#host` |
+  | 7b.10 `linemode`'s copy of `run`, `4096` to `4095` | `line-mode.md:67: the excerpt differs from testdata/frameworks/linemode/main.go#run` |
+
+* **Gates:** `python3 -m tools.verify gates` over the step's seventeen
+  files. macOS: 19 passed, 0 failed, in 664 s; `release-check` read "416
+  file(s) clean in 1 module(s)", with `apicheck` and the examples gate;
+  `go-examples_test` 31 passed and `go-precheck_test` 21 passed.
+  `remote linux`: 18 passed, 0 failed, 1 skipped (`gofmt`, which is given
+  no files there), in 1401 s, "418 file(s) clean". `remote windows`: 18
+  passed, 0 failed, 1 skipped, in 2514 s, "418 file(s) clean".
+  markdownlint over the six documents: 0 issues. The identifier scan of
+  the change, untracked files included, is clean.
+* **Not done:** no release, as A11 item 7 says. `linemode`'s raw-mode path
+  runs only on a terminal, so the gate builds and vets it and runs its
+  refusal; the loop it calls is `ExampleComposer`'s, run on a screen.
+* **Step 7b's CI** waits for the owner's commit and push. This PLAN
+  becomes `complete` again once it passes.

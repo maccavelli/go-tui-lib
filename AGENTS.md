@@ -63,7 +63,9 @@ The framework examples under `testdata/frameworks` build in a temporary
 module outside the repository's modules (`make examples`). That module may
 require the tier-1 frameworks
 `docs/decisions/0014-MADR-native-integration-api.md` names (Cobra, Kong and
-urfave/cli); the library's modules never do.
+urfave/cli), and `golang.org/x/term` for the line-mode example's raw mode
+(`docs/decisions/0023-MADR-line-mode-components.md` A11); the library's
+modules never do.
 
 `go.mod` and `go.sum` change with the code that needs them: a requirement is
 added in the commit that adds its first import, and removed in the commit that
@@ -349,10 +351,12 @@ It ends with `scripts/go-modules.py --check`. Then:
   without `FILES`), it runs the API diff gate, `scripts/go-apicheck.py`.
   `GO_PRECHECK_SKIP_APICHECK=1` skips it offline.
 - **With no file list, or one that names a file under
-  `testdata/frameworks`,** it runs the examples gate,
-  `scripts/go-examples.py`. That gate builds the framework examples in a
-  temporary module, runs their cases, and compares the commands guide's
-  excerpts with them. `GO_PRECHECK_SKIP_EXAMPLES=1` skips it offline.
+  `testdata/frameworks` or a Go file that starts a `// guide:` region,**
+  it runs the examples gate, `scripts/go-examples.py`. That gate builds
+  the framework examples in a temporary module, runs their cases, and
+  compares each guide's excerpts with the regions they name, in those
+  programs or in a package's examples. `GO_PRECHECK_SKIP_EXAMPLES=1`
+  skips it offline.
 
 `make release-check` runs it over every module and file, before a tag.
 `golint` is not used: its checks are `revive`'s `exported`,

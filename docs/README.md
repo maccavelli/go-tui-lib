@@ -59,8 +59,8 @@ it was when they were written
 | 0021 | PLAN | [Implement: hold `termkey` to the standard library and `internal/enum`](decisions/0021-PLAN-termkey-closure-gate.md) | complete |
 | 0022 | MADR | [Align docs-only CI and disclosure gates](decisions/0022-MADR-align-docs-ci-and-disclosure-gates.md) | proposed |
 | 0022 | PLAN | [Implement aligned docs-only CI and disclosure gates](decisions/0022-PLAN-align-docs-ci-and-disclosure-gates.md) | proposed |
-| 0023 | MADR | [Give a line-mode CLI an inline question, a picker, a composer and a streamed transcript, as I/O-free Charm-free cores on one live region](decisions/0023-MADR-line-mode-components.md) | accepted; A1 to A10 accepted |
-| 0023 | PLAN | [Implement the line-mode question, picker, composer and transcript](decisions/0023-PLAN-line-mode-components.md) | complete (`v2.6.2`) |
+| 0023 | MADR | [Give a line-mode CLI an inline question, a picker, a composer and a streamed transcript, as I/O-free Charm-free cores on one live region](decisions/0023-MADR-line-mode-components.md) | accepted; A1 to A11 accepted |
+| 0023 | PLAN | [Implement the line-mode question, picker, composer and transcript](decisions/0023-PLAN-line-mode-components.md) | in-progress (Step 7b; `v2.6.2` released) |
 | 0024 | MADR | [Let a program with its own CLI refuse, replace or opt into every behaviour the library imposes, with the floors stated and an inventory the tests hold](decisions/0024-MADR-opt-in-and-opt-out-coverage.md) | accepted; A1 accepted |
 | 0024 | PLAN | [Implement API rule 12, its floors, the message catalogue and the defaults inventory, and close the command-and-control gaps](decisions/0024-PLAN-command-and-control-opt-outs.md) | complete (`v2.2.0`) |
 | 0024 | PLAN | [Close the terminal, text and convention gaps, and adopt the message catalogue](decisions/0024-PLAN-terminal-text-and-convention-opt-outs.md) | proposed |
@@ -108,7 +108,7 @@ it was when they were written
 | let an agent drive the TUI over MCP, safely | [guides/commands.md](guides/commands.md#let-an-agent-drive-the-program) |
 | load the user's and the project's command files, or an agent's commands | [guides/commands.md](guides/commands.md#command-files) |
 | run the same commands from my own CLI (`flag`, Cobra, Kong) | [guides/commands.md](guides/commands.md#run-commands-from-your-own-cli) |
-| see complete, tested programs on `flag`, Cobra, Kong and urfave/cli | `testdata/frameworks/`, built and run by `make examples` ([architecture.md, Tooling](architecture.md#tooling)) |
+| see complete, tested programs on `flag`, Cobra, Kong and urfave/cli, and a line-mode host | `testdata/frameworks/`, built and run by `make examples` ([architecture.md, Tooling](architecture.md#tooling)) |
 | know why go-tui-lib ships no CLI front end | [0012-MADR](decisions/0012-MADR-bring-your-own-cli.md) |
 | start the TUI from my CLI with `--tui`, in `flag`, Cobra, Kong or urfave/cli, and fall back to the CLI when it cannot run | [guides/commands.md](guides/commands.md#start-the-tui-from-your-cli) |
 | test my CLI's `--tui` path with fake terminals | `launch/launchtest`, and `ExampleTerminal` in `launch/launchtest/example_test.go` |

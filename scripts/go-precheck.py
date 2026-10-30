@@ -45,7 +45,8 @@ the API belongs to the whole module, not to the files. And
 scripts/go-examples.py, which builds and runs the framework examples under
 testdata/frameworks and checks the guides' excerpts of them, on the
 release-check path and whenever a file list names a file under
-testdata/frameworks (Step 5, deviation D5).
+testdata/frameworks (Step 5, deviation D5), or a Go file that starts a guide
+region (docs/decisions/0023-MADR-line-mode-components.md A11 item 6).
 
 A Go file under a testdata directory is gofmt'd, but its directory is not
 given to go vet or go test: the go command ignores testdata, and the
@@ -83,6 +84,8 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 NETWORK = re.compile(r"no such host|connection refused|timeout|dial tcp|proxy", re.IGNORECASE)
 RELEASE = re.compile(r"^v[0-9]+\.[0-9]+\.[0-9]+$")
+# A line that starts a guide region (scripts/go-examples.py, step 4).
+GUIDE_START = re.compile(r"^[ \t]*// guide:(?!end[\r\n]*$)[^ \t\r\n]+[\r\n]*$")
 
 
 def err(line):
@@ -285,6 +288,15 @@ def check_module(c, m, mfiles, pkgs, golangci, have_vuln):
             c.fail(1)
 
 
+def starts_region(path):
+    """Whether a Go file holds a line that starts a guide region, which a
+    guide's <!-- from: --> line can name."""
+    if not path.endswith(".go") or not os.path.isfile(path):
+        return False
+    with open(path, encoding="utf-8", errors="replace") as f:
+        return any(GUIDE_START.match(line) for line in f)
+
+
 def main(argv):
     for stream in (sys.stdout, sys.stderr):
         stream.reconfigure(newline="\n")
@@ -295,9 +307,11 @@ def main(argv):
     os.chdir(root)
     c = Check(root)
 
-    # Whether the framework examples run: on a whole-tree run, or when a
-    # file under testdata/frameworks is given.
-    examples_run = not argv or any(f.removeprefix("./").startswith("testdata/frameworks/") for f in argv)
+    # Whether the framework examples run: on a whole-tree run, when a file
+    # under testdata/frameworks is given, or a Go file that starts a guide
+    # region (docs/decisions/0023-MADR-line-mode-components.md A11 item 6).
+    examples_run = not argv or any(f.removeprefix("./").startswith("testdata/frameworks/") or starts_region(f)
+                                   for f in argv)
 
     # Collect the Go files to check.
     if argv:

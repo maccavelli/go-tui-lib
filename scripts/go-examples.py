@@ -17,15 +17,21 @@ temporary module outside the repository's modules:
        <framework> <args...> => <exit> stdout|stderr <substring>
      and fails unless the exit status matches and the stream named holds
      the substring.
-  4. The guide check: every fenced Go block in docs/guides/*.md whose
-     nearest non-blank line above is
-       <!-- from: testdata/frameworks/<file>#<name> -->
-     must equal the lines between "// guide:<name>" and "// guide:end" in
-     that file. The region's blank lines at either end are dropped (gofmt
-     puts one before a top-level marker), its common leading tabs are
-     removed, and each remaining leading tab is written as four spaces,
-     since the guides indent with spaces (deviation D4); then the two are
-     compared line for line.
+  4. The guide check: every fenced Go block in docs/guides/*.md under one
+     or more lines
+       <!-- from: <file>#<name> -->
+     with only blank lines between them and the block, must equal the
+     lines between "// guide:<name>" and "// guide:end" in each file
+     named. The file is a Go file at a path relative to the repository's
+     root, inside it: a program under testdata/frameworks, or a package's
+     own file, such as an example its tests run
+     (docs/decisions/0023-MADR-line-mode-components.md A11). Two from
+     lines over one block hold two copies of the code to it. The region's
+     blank lines at either end are dropped (gofmt puts one before a
+     top-level marker), its common leading tabs are removed, and each
+     remaining leading tab is written as four spaces, since the guides
+     indent with spaces (deviation D4); then the two are compared line for
+     line.
 
 Usage:
   scripts/go-examples.py                 steps 1 to 4
@@ -212,10 +218,11 @@ def cases(go, root, src, work):
 
 def blocks(guides):
     """Each <!-- from: --> line of the guides, in order: (guide, line, ref,
-    block), the block None for a from line no Go block follows."""
+    block), the block None for a from line no Go block follows. The from
+    lines over one block, blank lines between, each get that block."""
     found = []
     for guide in guides:
-        pending = None
+        pending = []
         inblock = False
         body = None
         for i, line in enumerate(lines_of(guide), start=1):
@@ -227,24 +234,29 @@ def blocks(guides):
                 continue
             m = FROM_LINE.match(line)
             if m:
-                if pending:
-                    found.append((pending[0], pending[1], pending[2], None))
-                pending = (guide, i, m.group(1))
+                pending.append((guide, i, m.group(1)))
                 continue
             if pending and BLANK.match(line):
                 continue
             if pending and GO_FENCE.match(line):
                 body = []
-                found.append((pending[0], pending[1], pending[2], body))
-                pending = None
+                found.extend((g, n, ref, body) for g, n, ref in pending)
+                pending = []
                 inblock = True
                 continue
-            if pending:
-                found.append((pending[0], pending[1], pending[2], None))
-                pending = None
-        if pending:
-            found.append((pending[0], pending[1], pending[2], None))
+            found.extend((g, n, ref, None) for g, n, ref in pending)
+            pending = []
+        found.extend((g, n, ref, None) for g, n, ref in pending)
     return found
+
+
+def in_repo(file):
+    """Whether a from line's file is a Go file at a relative path that
+    stays inside the repository."""
+    if not file.endswith(".go") or os.path.isabs(file) or file.startswith(("/", "\\")):
+        return False
+    path = os.path.normpath(file)
+    return path != ".." and not path.startswith(".." + os.sep)
 
 
 def region(path, name):
@@ -300,8 +312,8 @@ def guide_check(root):
             err(f"examples: {where}: {ref} names no region (<file>#<name>).")
             status = 1
             continue
-        if not file.startswith("testdata/frameworks/"):
-            err(f"examples: {where}: {ref} is not under testdata/frameworks.")
+        if not in_repo(file):
+            err(f"examples: {where}: {ref} is not a Go file in the repository.")
             status = 1
             continue
         if not os.path.isfile(os.path.join(root, file)):
