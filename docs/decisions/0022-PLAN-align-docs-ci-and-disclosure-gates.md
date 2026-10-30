@@ -466,6 +466,35 @@ required:
 | Docs' `pull_request` paths lose `*.md` | `scripts/check_ci_filters.py`, exit 1 | "docs: Docs' push and pull_request paths differ" |
 | `command/**/*.md` added to CI's lists and Docs' | `scripts/check_ci_filters.py`, exit 1 | "readers: CI ignores command/testdata/commands/notes.md, under a testdata directory go test reads", one line for each of the 5 fixtures |
 
-Step 3 is not done. It observes GitHub's routing after a push, which needs
+~~Step 3 is not done. It observes GitHub's routing after a push, which needs
 the owner's authorization in that turn. Until it is recorded, this PLAN
-stays `in-progress`.
+stays `in-progress`.~~ Step 3 follows.
+
+### Phase 3, step 3: the observed rollout, 2026-10-30
+
+The owner committed steps 1 and 2 as `eb862cf` and pushed `main`. The push
+was made before the agent ran the disclosure guard over it. Run afterwards,
+over `a088933..eb862cf`, the guard exited 0 with nothing to report. Before
+that commit, the agent had run it over `a088933..4ff2e22`, also exit 0.
+
+| Push | Changes | Workflows started | Runs and conclusions |
+| :--- | :--- | :--- | :--- |
+| `a088933..eb862cf` | mixed: the workflows, `Makefile`, `scripts/`, `AGENTS.md`, records and docs | CI and Docs | CI 41103202698, "completed success", jobs `modules`, `gates` and `test` on Windows 2025, Ubuntu 24.04 and macOS 15; Docs 41103202654, "completed success", job `docs` |
+| this record alone | docs-only: this PLAN | to be observed | |
+
+In the mixed push's logs (`gh run view --log`):
+
+* CI's `gates` job printed:
+  * "check_records_test: 33 passed, 0 failed" and
+    "check_disclosure_test: 10 passed, 0 failed";
+  * from the shared line: "Summary: 0 issues in 0 files",
+    "check-records: 55 record(s), 72 Markdown file(s), 0 error(s)",
+    "examples: 15 excerpt(s) checked", `TestDefaultsInventory` "ok", and
+    "check-disclosure: 1051 tracked file(s), 0 finding(s)";
+  * "check_ci_filters_test: 42 passed, 0 failed" and "check-ci-filters: 0
+    problem(s)".
+* Docs printed the same five lines from the shared line, the
+  inventory's `go test` among them.
+
+So both workflows run the documents' checks on GitHub, and Docs' Go setup
+and `Makefile` work on its runner.
