@@ -1,5 +1,5 @@
 ---
-status: complete
+status: in-progress
 date: 2026-10-29
 associated-madr: "0023-MADR-line-mode-components.md"
 ---
@@ -44,6 +44,7 @@ code's at `5fb6928`; a step that relies on one cites it.
 | 6 | `transcript/` | the bounded, reprintable conversation | the next minor |
 | 6a | `stream/`, `transcript/` | the reprint's and the printer's speed, and their budgets (D27, 0023-MADR A9) | a patch, `v2.6.1` |
 | 7 | `docs/`, `README.md`; *annotated 2026-10-29:* the four examples' `example_test.go` in `ask/`, `pick/`, `lineedit/` and `stream/`, which the step names | the guide, the close-out | |
+| 7a | `internal/sanitize/`, `termcap/reply.go`, `inline/inlinetest/`, `docs/`, `README.md` | a reply's parameters counted on every path to them (D28, 0023-MADR A10) | a patch, `v2.6.2` |
 
 Each step's package joins `cores` and the `charmfree` files in the commit
 that builds it; the `<pkg>tea` packages are not cores. Each step adds its
@@ -439,6 +440,39 @@ changes.
   Status; issues #7 to #10 told, for the owner to close.
 * This PLAN becomes `complete`, and its row says so.
 
+### Step 7a: a reply's parameters, and a patch release
+
+*Added 2026-10-29 by deviation D28, 0023-MADR A10.* Nothing exported
+changes.
+
+* **Code:**
+  * `internal/sanitize`: the parameter count of the sequence at a
+    string's start, on each path to x/ansi's parameter state (ESC, any
+    intermediates, then `[` or `P`; 0x9B; 0x90), and the bound, 32.
+  * `termcap/reply.go`: `ParseReply` takes the count from there in place
+    of its own `params`; its bound is the same.
+  * `inline/inlinetest/screen.go`: a sequence at or over the bound is
+    decoded with no parser and shows nothing; the parser is sized one
+    over the bound, as `ParseReply`'s.
+  * `docs/architecture.md`: the `internal/sanitize` row names the count.
+* **Tests:**
+  * `internal/sanitize`: the count on each path, and none for a sequence
+    of no parameters.
+  * `termcap`: every path with 32, 33 and 40 separators and a digit is
+    `ReplyUnknown` with no panic; a DA1 reply of 31 separators is still
+    read; CI's input joins `replySeeds`.
+  * `inline/inlinetest`: every path with 40 separators and a digit, between
+    two letters, leaves the two letters drawn and no panic; a cursor move
+    with 31 separators still moves.
+  * `FuzzParseReply` 10 minutes.
+* **Mutations:** the count without the intermediates' skip; without
+  0x90; off by one at the bound; `Screen` with its guard removed.
+* **The release,** `v2.6.2`, under rule 4: notes in
+  `docs/guides/migrating.md` ("Migrating to `v2.6.2`": nothing to change);
+  `README.md`'s current release; the smoke test of Step 6, against
+  `v2.6.2`, with `ParseReply` given CI's input, its negative control the
+  same program against `v2.6.1`, which panics.
+
 ## Verification
 
 * Every step's mutations are killed, each failure quoted in the record.
@@ -459,7 +493,8 @@ changes.
 
 * **Rollout.** Four releases, after Steps 2, 3, 4 and 6, in gobble's
   order; gobble takes each as it lands. *Added 2026-10-29 (D27):* and a
-  patch, `v2.6.1`, after Step 6a.
+  patch, `v2.6.1`, after Step 6a. *Added 2026-10-29 (D28):* and a patch,
+  `v2.6.2`, after Step 7a.
 * **Rollback.** Before a push, each step is one local commit. After it, a
   patch release fixes forward. Every change is an addition.
 
@@ -2339,9 +2374,26 @@ drafted, and were closed on 2026-10-27, 2026-10-28 and 2026-10-28
     edits and streams: the releases' tests did each in turn, its own
     component, and no one program did all four;
   * the identifier scan found nothing, at every step.
-* **This PLAN is complete, 2026-10-29,** once CI passes on this step's
-  push, which the handoff reports. Done as its Goal says: every
-  Verification item holds, CI passed on each pushed tree, the owner
+* ~~**This PLAN is complete, 2026-10-29,** once CI passes on this step's
+  push, which the handoff reports.~~ *Struck 2026-10-29 by D28, below.*
+  Done as its Goal says: every Verification item holds, CI passed on each pushed tree, the owner
   tagged each release, `v2.3.0` to `v2.6.0` and the patch `v2.6.1`, and
   each release's smoke test passed. Left as the PLAN left it: what D10
   leaves out, and `stream/glamourmd`, which 0009's PLAN builds.
+* **Deviation D28, 2026-10-29: a reply's parameters.**
+  * **Found** by CI on this step's push, run 40969366150, whose `gates`
+    job failed in `fuzz`: `FuzzParseReply` panicked in x/ansi's parser on
+    `"\x1b [;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;0"`, the input its
+    `fuzz-corpus` artifact kept; `modules` and the three `test` jobs
+    passed, and Docs run 40969366185 passed. Reproduced in a scratch
+    module at `5dd7285` and at `v2.2.0`, and with x/ansi v0.11.9; the same
+    panic in `inlinetest.Screen`. Not this step's code: the facts are
+    0023-MADR A10 item 1.
+  * **Resolutions offered:** amend this record with a Step 7a and a patch
+    release, `v2.6.2` (recommended); the same fix under a new pair for
+    `termcap`'s parser; or a later record, `main`'s CI failing until then.
+  * **Chosen by the owner,** 2026-10-29: "Amend 0023, patch v2.6.2
+    (Recommended)". 0023-MADR A10. Added to the PLAN: Step 7a, its row in
+    "In scope", and its patch in "Rollout". The PLAN is `in-progress`
+    again: CI did not pass on this step's push, so the line above does not
+    hold.

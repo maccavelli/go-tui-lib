@@ -354,7 +354,7 @@ The decision has thirteen parts, D1 to D13.
 | Package | Holds | Imports | Issue |
 | :--- | :--- | :--- | :--- |
 | `inline` | `Region`, the live rows below the scrollback; `Reflow`; `Reader`, the read-when-asked edge | `termkey`, `termcap`, `glyph`, `internal/enum`, `internal/sanitize`; `x/ansi` | all |
-| `inline/inlinetest` | `Screen`, a terminal grid for tests, with the three re-wrap kinds | `x/ansi` | all |
+| `inline/inlinetest` | `Screen`, a terminal grid for tests, with the three re-wrap kinds | `x/ansi`; *amended:* `inline` (A1), `internal/sanitize` (A10) | all |
 | `ask` | `Question`, `Row`, `Answer`, `Layout`, `Asker`, `Response` | `inline`, `lineedit`, `glyph`, `internal/sanitize`; `x/ansi` | #7 |
 | `ask/asktea` | the question as a workspace overlay pane | `ask`, `workspace`; Bubble Tea | #7 |
 | `pick` | `Entry`, `Chooser` | `inline`, `lineedit`, `fuzzy`, `internal/sanitize`; `x/ansi` | #8 |
@@ -1573,6 +1573,51 @@ numbers to come down:
    gate allows for with a slack of three times its baseline (its
    `perf_test.go`), and `v2.6.0`'s 12.3 ms passed that.
 6. **A patch release, `v2.6.1`:** nothing exported changes.
+
+### A10 (2026-10-29): a reply's parameters, counted on every path to them
+
+*Status: accepted (2026-10-29),* the owner's answer to
+[0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
+Step 7's deviation D28, "Amend 0023, patch v2.6.2 (Recommended)", found
+when CI ran on Step 7's push:
+
+1. **The fact.** CI run 40969366150, on `5dd7285`, fuzzed
+   `FuzzParseReply` for its 20 s and found a panic in x/ansi v0.11.8's
+   parser (`parser_decode.go:200`, `index out of range [33] with length
+   33`), reached through `termcap.ParseReply` (`reply.go:147`), on 37
+   bytes: ESC, a space, `[`, 33 semicolons and `0`. The parser stores a
+   digit at `params[paramsLen]` with no bound, once the separators have
+   taken `paramsLen` to the buffer's end; v0.11.9 does the same. It reaches
+   that state from ESC, any intermediate bytes 0x20 to 0x2f, then `[` or
+   `P`, and from 0x9B or 0x90 as the first byte. `ParseReply`'s guard
+   counts the separators only after `ESC [`, `ESC P`, 0x9B or 0x90, so an
+   intermediate between ESC and `[` passes it. It panics so at `v2.2.0`,
+   before this record's first step. `inline/inlinetest`'s `Screen`, built
+   in Step 1, decodes what it is written with a parser of 32 parameters
+   and has no guard: `ESC [`, `ESC SP [`, `ESC SP ! " [`, 0x9B, `ESC P` and
+   `ESC SP P` with 40 separators and a digit each panic it, and
+   `ParseReply` on the three with an intermediate. termkey decodes the CI
+   input as keys, alt+space and then `[` and the semicolons, so
+   `inline.Region`, which gives `ParseReply` an unknown sequence's bytes,
+   was not shown to reach it; `ParseReply` is exported and takes any
+   string, and `termcap/termcaptea` gives it Bubble Tea's unknown
+   sequences.
+2. **One count, on every path.** `internal/sanitize` counts the
+   parameters x/ansi's parser would read for the sequence at a string's
+   start, on each path item 1 names, and gives the bound, 32. `ParseReply`
+   reads a reply with as many or more as `ReplyUnknown`, as it did for
+   `ESC [`, with its parser one larger, as before; `Screen` decodes such a
+   sequence with no parser and shows nothing for it, as for any sequence
+   it does not draw, and the text after it is drawn. `inline/inlinetest`
+   imports `internal/sanitize`, already in its closure through `inline`;
+   D1's table gains it.
+3. **Tests,** each seen failing on the code as it is: every path with
+   the bound's separators and a digit, through `ParseReply` and through
+   `Screen`, does not panic, and a reply one under the bound is still
+   read; CI's input joins `FuzzParseReply`'s seeds.
+4. **A patch release, `v2.6.2`:** nothing exported changes.
+5. **x/ansi's parser** panicking past its buffer is upstream's to fix;
+   telling charmbracelet/x is the owner's call, and this record does not.
 
 ## More Information
 
