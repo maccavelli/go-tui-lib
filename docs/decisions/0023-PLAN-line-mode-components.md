@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-10-29
 associated-madr: "0023-MADR-line-mode-components.md"
 ---
@@ -2474,5 +2474,36 @@ drafted, and were closed on 2026-10-27, 2026-10-28 and 2026-10-28
   more Charm modules; and `./reply` in a module requiring `v2.6.1` from
   the proxy exited 1, `panic: runtime error: index out of range [33] with
   length 33`.
-* **The release,** `v2.6.2`, waits for the owner's commit, push and tag
-  under rule 4.
+* **The release, `v2.6.2`,** under rule 4:
+  * The owner committed the step (`696f4af`) and pushed `main`, with the
+    amendment (`dc7c912`), before the disclosure guard was run by hand;
+    the owner's own pre-push hook runs the same guard on every push, and
+    run by hand afterwards over `dc7c912..696f4af` it exited 0 with
+    nothing to report. CI run 40987107952 passed: `modules`, `gates`, its
+    fuzz among them, and `test` on macOS 15, Ubuntu 24.04 and Windows
+    2025; Docs run 40987107937 passed. `main`'s CI, red at `5dd7285`
+    (D28), is green again at `696f4af`.
+  * The owner tagged `696f4af` `v2.6.2`, annotated, and pushed the tag;
+    its CI run, 40990715478, passed the same five jobs.
+  * The proxy serves `v2.6.2` at `696f4af`. The consumer smoke test, the
+    rehearsal's program in a scratch module outside the repository with
+    `GOWORK` empty, required it by `go get`, then ran `go mod tidy`,
+    `go vet` and `go build`, and the program: the reprint, 7 rows at 40
+    columns, the scrollback cleared; and `./reply`, "ParseReply:
+    unknown". Its closure, listed for Linux, macOS and Windows, is seven
+    modules, and `x/ansi` alone of Charm.
+  * Its three controls failed as they must: `-control` exited 1; the
+    closure check over `lineedit/lineedittea` found
+    `charm.land/bubbletea/v2` and seven more Charm modules on Linux and
+    macOS, six on Windows; and `./reply` requiring `v2.6.1` from the proxy
+    exited 1, `panic: runtime error: index out of range [33] with length
+    33`.
+* **Step 7a complete, 2026-10-29.**
+* **This PLAN is complete, 2026-10-29.** Step 7's Verification, above,
+  holds with Step 7a: its 4 mutations killed, its gates on macOS, Linux
+  and Windows, `apicheck` 0 incompatible changes, the smoke test from the
+  proxy; CI passed on `main` at `696f4af` and on every release tag; and the
+  owner tagged `v2.3.0` to `v2.6.0` and the patches `v2.6.1` and `v2.6.2`.
+  Left as the PLAN left it: what D10 leaves out, `stream/glamourmd`, which
+  0009's PLAN builds, and x/ansi's parser, upstream's (0023-MADR A10 item
+  5).
