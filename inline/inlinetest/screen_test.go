@@ -2,6 +2,7 @@ package inlinetest
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/charmbracelet/x/ansi"
@@ -107,6 +108,37 @@ func TestSplitWrite(t *testing.T) {
 	write(s, "2Dx")
 	if got := s.Lines()[0]; got != "axc" {
 		t.Errorf("CSI 2 D across two writes: %q", got)
+	}
+}
+
+// TestManyParams: a sequence with more parameters than the screen reads,
+// a digit after the last, on every path to x/ansi's parameter state,
+// shows nothing and does not panic the parser, which stores that digit
+// past its buffer; the text around it is drawn. One under the bound is
+// still read (docs/decisions/0023-MADR-line-mode-components.md A10).
+func TestManyParams(t *testing.T) {
+	for _, p := range []struct{ intro, final string }{
+		{"\x1b[", "C"}, {"\x1b [", "C"}, {"\x1b !\"[", "C"}, {"\x9b", "C"},
+		{"\x1bP", "q\x1b\\"}, {"\x1b P", "q\x1b\\"}, {"\x90", "q\x9c"},
+	} {
+		in := "a" + p.intro + strings.Repeat(";", 40) + "0" + p.final + "b"
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Errorf("Write(%q) panicked: %v", in, r)
+				}
+			}()
+			s := NewScreen(60, 2, ansi.WcWidth)
+			write(s, in)
+			if got := s.Lines()[0]; got != "ab" {
+				t.Errorf("Write(%q): %q; want \"ab\"", in, got)
+			}
+		}()
+	}
+	s := NewScreen(60, 2, ansi.WcWidth)
+	write(s, "\x1b[3"+strings.Repeat(";", 31)+"Cx")
+	if got := s.Lines()[0]; got != "   x" {
+		t.Errorf("CSI 3 C with 32 parameters: %q; want \"   x\"", got)
 	}
 }
 

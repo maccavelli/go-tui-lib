@@ -7,6 +7,30 @@ needs a major version, at a new module path
 ([AGENTS.md, API conventions](../../AGENTS.md#api-conventions), rule 1).
 Up to `v0.12.0`, a deprecated name was removed in the next minor release.
 
+## Migrating to `v2.6.2`
+
+`v2.6.2` is a patch: nothing exported changes, no default changes, and
+every reply and drawing that did not panic is read and drawn as before:
+`make apicheck` against `v2.6.1` reports 0 incompatible changes
+([0023-PLAN-line-mode-components](../decisions/0023-PLAN-line-mode-components.md)
+Step 7a). A program on `v2.6.1` needs no change:
+
+```bash
+go get github.com/maccavelli/go-tui-lib/v2@v2.6.2
+```
+
+### Fixed
+
+- **`termcap.ParseReply` no longer panics on a sequence with more than 32
+  parameters.** x/ansi's parser stores a digit past its parameter buffer,
+  and `ParseReply`'s bound missed an ESC followed by intermediate bytes
+  before `[` or `P`, such as `ESC SP [`; it panicked so since `v2.0.0`.
+  Every path to the parameters is now counted, and such a reply is
+  `ReplyUnknown`
+  ([0023-MADR](../decisions/0023-MADR-line-mode-components.md) A10).
+- **`inlinetest.Screen` no longer panics** on such a sequence written to
+  it: it shows nothing for it, and draws the text around it.
+
 ## Migrating to `v2.6.1`
 
 `v2.6.1` is a patch: nothing exported changes, no default changes, and

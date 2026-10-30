@@ -2397,3 +2397,82 @@ drafted, and were closed on 2026-10-27, 2026-10-28 and 2026-10-28
     "In scope", and its patch in "Rollout". The PLAN is `in-progress`
     again: CI did not pass on this step's push, so the line above does not
     hold.
+
+### Step 7a: a reply's parameters, and a patch release
+
+*2026-10-29.* The owner committed the amendment (`dc7c912`) and said
+"committed, proceed".
+
+* **Tests first,** each run on the code as it was:
+  * `termcap`'s `TestParseReplyParamBound`: CI's input, and each of seven
+    paths, `ESC [`, `ESC SP [`, `ESC SP ! " [`, 0x9B, `ESC P`, `ESC SP P`
+    and 0x90, with 32, 33 and 40 separators, a digit and a final byte,
+    each `ReplyUnknown` with no panic. Before the fix it failed seven
+    times, each `ESC SP` form with 33 or 40 separators and CI's input,
+    `ParseReply("\x1b [;;;…;0") panicked: runtime error: index out of
+    range [33] with length 33`; 32 separators fit the parser's 33.
+  * `inline/inlinetest`'s `TestManyParams`: each of the seven paths with
+    40 separators and a digit between `a` and `b` draws `ab`, and `CSI 3
+    C` with 31 separators still moves three cells. Before the fix it
+    failed on all seven, `Write("a\x1b[;;…;0Cb") panicked: runtime error:
+    index out of range [40] with length 32`.
+  * `internal/sanitize`'s `TestSeparators`: the count on each path, with
+    `:` as a separator, and none for `ESC [ m`, a bare `ESC [`, an OSC, a
+    charset designation, `ESC ESC [`, text and "". It could not compile
+    before `Separators` existed; mutations 7a.1 and 7a.2 below are its
+    failures.
+  * CI's input joins `replySeeds`.
+* **Code:**
+  * `internal/sanitize/separators.go`: `Separators`, the separators x/ansi's
+    parser reads for the sequence at a string's start, on each path, and
+    `MaxSeparators`, 32, the bound, with why a parser is one larger.
+  * `termcap/reply.go`: `ParseReply` takes both from there; its `params`
+    and `maxParams` are gone, and its documentation says a reply over the
+    bound is `ReplyUnknown`.
+  * `inline/inlinetest/screen.go`: the parser is sized
+    `MaxSeparators + 1`; a sequence at or over the bound is decoded with
+    no parser and not applied, so it shows nothing and the text after it
+    is drawn.
+* **Docs:** "Migrating to `v2.6.2`" in `docs/guides/migrating.md`, nothing
+  to change and the two fixes, `ParseReply`'s panic dated to `v2.0.0`: a
+  scratch module requiring `v2.0.0` from the proxy panics on CI's input,
+  `index out of range [33] with length 33`; `README.md`'s current release
+  `v2.6.2`; `docs/architecture.md`'s `internal/sanitize` row names
+  `Separators` and `MaxSeparators`.
+* **Seen failing,** through `python3 -m tools.verify mutate` on scratch
+  copies, 4 killed of 4:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | 7a.1 the count without the intermediates' skip | `separators_test.go:34: Separators("\x1b [1;2m") = 0; want 1`, and `TestParseReplyParamBound` and `TestManyParams` |
+  | 7a.2 the count without 0x90 | `separators_test.go:34: Separators("\x90>;\|v\x9c") = 0; want 1`; `reply_test.go:137: ParseReply("\x90;;…;0q\x9c") panicked` |
+  | 7a.3 `ParseReply`'s bound off by one, `>` for `>=` | `reply_test.go:108: 33 parameters: ParseReply("\x1b[?1;1;…;1c") = {Kind:primary-attributes …}`, the existing case: 32 separators fit the parser and do not panic, and the bound keeps them unknown |
+  | 7a.4 `Screen` with its guard removed | `screen_test.go:128: Write("a\x1b[;;…;0Cb") panicked: runtime error: index out of range [40] with length 33`, on all seven paths |
+
+* **Fuzz:** `FuzzParseReply` for 600 s, on a scratch copy of the tree,
+  33.3 million inputs, clean, no failing input written.
+* **The API:** `make apicheck`, "against v2.6.1, 0 incompatible
+  change(s)".
+* **Pre-add:** `make pre-add-check` over the seven Go files, "7 file(s)
+  clean in 1 module(s)".
+* **Gates:** `python3 -m tools.verify gates` over the step's ten files:
+  macOS 19 passed, 0 failed, in 760 s, `release-check` "414 file(s) clean
+  in 1 module(s)", with `apicheck` and the examples gate; `remote linux`
+  18 passed, 0 failed, 1 skipped (`gofmt`, which is given no files
+  there), in 1185 s, "416 file(s) clean", this step's two new files
+  among them; `remote windows` 18 passed, 0 failed, 1 skipped, in
+  2451 s, "416 file(s) clean". markdownlint over the three documents: 0
+  issues. The identifier scan of the change, untracked files included,
+  is clean.
+* **The smoke test, rehearsed** against the tree by a `replace`: Step 6's
+  program as it is, required as `v2.6.2`, the reprint 7 rows at 40
+  columns, the scrollback cleared; `./reply`, `termcap.ParseReply` on
+  CI's input, "ParseReply: unknown"; the closure, listed for Linux, macOS
+  and Windows, seven modules, and `x/ansi` alone of Charm. Its three
+  controls failed as they must: `-control` exited 1; the closure check
+  over `lineedit/lineedittea` found `charm.land/bubbletea/v2` and seven
+  more Charm modules; and `./reply` in a module requiring `v2.6.1` from
+  the proxy exited 1, `panic: runtime error: index out of range [33] with
+  length 33`.
+* **The release,** `v2.6.2`, waits for the owner's commit, push and tag
+  under rule 4.

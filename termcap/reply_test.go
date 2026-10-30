@@ -110,6 +110,40 @@ func TestParseReply(t *testing.T) {
 	}
 }
 
+// paramPaths are the ways into x/ansi's parameter state, with a final
+// byte for each: ESC, any intermediates, then [ or P; 0x9B; 0x90
+// (docs/decisions/0023-MADR-line-mode-components.md A10).
+var paramPaths = []struct{ intro, final string }{
+	{"\x1b[", "c"}, {"\x1b [", "c"}, {"\x1b !\"[", "c"}, {"\x9b", "c"},
+	{"\x1bP", "q\x1b\\"}, {"\x1b P", "q\x1b\\"}, {"\x90", "q\x9c"},
+}
+
+// TestParseReplyParamBound: on every path to the parameters, a reply
+// with the bound's separators or more, and a digit after the last, is
+// ReplyUnknown and does not panic x/ansi's parser, which stores that digit
+// past its buffer (A10 item 1). CI's input, from run 40969366150, among
+// them.
+func TestParseReplyParamBound(t *testing.T) {
+	raws := []string{"\x1b [;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;0"}
+	for _, p := range paramPaths {
+		for _, n := range []int{32, 33, 40} {
+			raws = append(raws, p.intro+strings.Repeat(";", n)+"0"+p.final)
+		}
+	}
+	for _, raw := range raws {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Errorf("ParseReply(%q) panicked: %v", raw, r)
+				}
+			}()
+			if got := ParseReply(raw); got.Kind != ReplyUnknown {
+				t.Errorf("ParseReply(%q).Kind = %v; want unknown", raw, got.Kind)
+			}
+		}()
+	}
+}
+
 func TestReplyKindsAndSettings(t *testing.T) {
 	if s := strings.Join([]string{ReplyUnknown.String(), ReplyNotify.String(), ModeNotRecognized.String(), ModePermanentlyReset.String()}, ","); s != "unknown,notify,not-recognized,permanently-reset" {
 		t.Errorf("names %s", s)

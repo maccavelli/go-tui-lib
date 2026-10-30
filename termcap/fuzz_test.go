@@ -26,6 +26,7 @@ var replySeeds = []string{
 	"\x1b[?997;1n", "\x1b_Gi=31;OK\x1b\\", "\x9fGi=31;EINVAL\x9c", "\x90>|v\x9c",
 	"\x1b]99;i=termcap:p=?;a=focus\x1b\\", "\x1b]11;?\a", "\x1b[" + strings.Repeat("1;", 40) + "c",
 	"\x1b]4;1;" + strings.Repeat("f", 1100) + "\a", "", "x", "\x1b", "\x1b]11;rgb:0/0/0\x18",
+	"\x1b [" + strings.Repeat(";", 33) + "0", // CI run 40969366150's (0023-MADR A10)
 }
 
 // FuzzParseReply: ParseReply never panics; Raw is always the input; a

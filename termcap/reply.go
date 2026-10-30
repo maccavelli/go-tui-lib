@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/maccavelli/go-tui-lib/v2/internal/enum"
+	"github.com/maccavelli/go-tui-lib/v2/internal/sanitize"
 )
 
 // Reply is one terminal reply. ParseReply always sets Raw; a host that has
@@ -122,12 +123,6 @@ func (s ModeSetting) supported() bool { return s != ModeNotRecognized && s != Mo
 // maxReply is the longest reply the probe parses.
 const maxReply = 1024
 
-// maxParams is the most parameters ParseReply reads. x/ansi v0.11.8's
-// parser panics past its parameter buffer, so a reply with more is
-// ReplyUnknown; and it drops the last parameter when the buffer is exactly
-// full, so the buffer has one more.
-const maxParams = 32
-
 // ParseReply reads one complete reply, as a decoder such as termkey's
 // returns it. It never fails: a sequence it does not know, or one over
 // 1 KiB, is ReplyUnknown. A string holding more than one sequence is read
@@ -135,14 +130,17 @@ const maxParams = 32
 //
 // It reads the 7-bit introducers and the 8-bit ones, 0x9B CSI, 0x9D OSC,
 // 0x90 DCS and 0x9F APC, and ends a string at BEL, ESC \, 0x9C, or a bare
-// ESC at the end, as old urxvt sends.
+// ESC at the end, as old urxvt sends. A reply with sanitize.MaxSeparators
+// parameter separators or more, on any path to them, is ReplyUnknown:
+// x/ansi's parser panics past its parameter buffer
+// (docs/decisions/0023-MADR-line-mode-components.md A10).
 func ParseReply(raw string) Reply {
 	r := Reply{Raw: raw}
-	if len(raw) > maxReply || params(raw) >= maxParams {
+	if len(raw) > maxReply || sanitize.Separators(raw) >= sanitize.MaxSeparators {
 		return r
 	}
 	p := ansi.NewParser()
-	p.SetParamsSize(maxParams + 1)
+	p.SetParamsSize(sanitize.MaxSeparators + 1)
 	p.SetDataSize(maxReply)
 	seq, _, _, state := ansi.DecodeSequence(raw, 0, p)
 	data := string(p.Data())
@@ -190,27 +188,6 @@ func stringSeq(seq string) bool {
 // terminated reports whether the string seq ends with BEL, 0x9C or ESC \.
 func terminated(seq string) bool {
 	return strings.HasSuffix(seq, "\a") || strings.HasSuffix(seq, "\x9c") || strings.HasSuffix(seq, "\x1b\\")
-}
-
-// params counts the separators in a CSI's or DCS's parameters: the
-// parameters are one more.
-func params(raw string) int {
-	i := 0
-	switch {
-	case strings.HasPrefix(raw, "\x1b[") || strings.HasPrefix(raw, "\x1bP"):
-		i = 2
-	case strings.HasPrefix(raw, "\x9b") || strings.HasPrefix(raw, "\x90"):
-		i = 1
-	default:
-		return 0
-	}
-	n := 0
-	for ; i < len(raw) && raw[i] >= 0x30 && raw[i] <= 0x3f; i++ {
-		if raw[i] == ';' || raw[i] == ':' {
-			n++
-		}
-	}
-	return n
 }
 
 // csiReply reads the CSI replies: DA1, DA2, DECRPM, the Kitty keyboard

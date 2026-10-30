@@ -15,6 +15,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/maccavelli/go-tui-lib/v2/inline"
+	"github.com/maccavelli/go-tui-lib/v2/internal/sanitize"
 )
 
 // Screen is a terminal's screen, enough of one to check what a component
@@ -60,6 +61,7 @@ type Screen struct {
 // m, the cursor at the top left.
 func NewScreen(columns, rows int, m ansi.Method) *Screen {
 	s := &Screen{method: m, width: max(columns, 1), height: max(rows, 1), parser: ansi.NewParser()}
+	s.parser.SetParamsSize(sanitize.MaxSeparators + 1)
 	for range s.height {
 		s.cells = append(s.cells, s.blank())
 	}
@@ -83,7 +85,15 @@ func (s *Screen) Write(p []byte) (int, error) {
 	s.rest = ""
 	var state byte
 	for data != "" {
-		seq, w, n, next := s.method.DecodeSequenceInString(data, state, s.parser)
+		// x/ansi's parser panics past its parameter buffer: a sequence
+		// with more parameters than the screen reads is decoded without it,
+		// and shows nothing (docs/decisions/0023-MADR-line-mode-components.md
+		// A10).
+		parser := s.parser
+		if sanitize.Separators(data) >= sanitize.MaxSeparators {
+			parser = nil
+		}
+		seq, w, n, next := s.method.DecodeSequenceInString(data, state, parser)
 		if n == 0 {
 			break
 		}
@@ -93,7 +103,9 @@ func (s *Screen) Write(p []byte) (int, error) {
 		}
 		state = next
 		data = data[n:]
-		s.apply(seq, w)
+		if parser != nil {
+			s.apply(seq, w)
+		}
 	}
 	return len(p), nil
 }
