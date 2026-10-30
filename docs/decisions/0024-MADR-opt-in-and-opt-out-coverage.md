@@ -536,6 +536,28 @@ Step 3 wrote the inventory; its deviation D1 has the evidence.
 
    Each name passed `python3 -m tools.verify names`.
 
+### A2 (2026-10-30): the probe's reads fold by its GOOS, not `LookupEnv`
+
+*Status: accepted (2026-10-30),* the owner's choice "The probe's own reads
+(Recommended)", found while
+[0024-PLAN-terminal-text-and-convention-opt-outs.md](0024-PLAN-terminal-text-and-convention-opt-outs.md)
+Step 1 began; its deviation D2 has the evidence.
+
+D5's gap 11 said `Env.LookupEnv` folds by the probe's GOOS. An `Env` is a
+`[]string` with no probe, so the method cannot know that GOOS. What changes
+instead:
+
+* every read the probe makes of the `Env` its host gives folds case by the
+  probe's GOOS, `WithGOOS`'s when set: the terminal's identity, the gated
+  queries' heuristic, and Bubble Tea's rule for modes 2026 and 2027;
+* `Env.LookupEnv` and `Getenv`, called on their own, keep `runtime.GOOS`,
+  and say so;
+* a program's own `WithQuery` reads the `Env` its `Seq` is given, as
+  today.
+
+The server probing for a Windows client, the gap's case, reads the client's
+variables by the client's rule.
+
 ## More Information
 
 * The audit, at `65d437b`, by package group, read 2026-10-25. Its three

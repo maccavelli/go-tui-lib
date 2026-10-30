@@ -49,8 +49,8 @@ it was when they were written
 | 0016 | PLAN | [Implement: the toolchain floor moves to Go 1.27.2](decisions/0016-PLAN-go-1-27-2-for-go-2026-6604.md) | complete |
 | 0017 | MADR | [Write the repository's scripts in Python, standard library only, and port the ten shell scripts](decisions/0017-MADR-python-repository-scripts.md) | accepted; built |
 | 0017 | PLAN | [Implement Python repository scripts: port the ten shell scripts, `go-fuzz` first with the case-6 fix](decisions/0017-PLAN-python-repository-scripts.md) | complete |
-| 0018 | MADR | [Keep the agent's verification tooling in the repository, as one modular Python package under `tools/`](decisions/0018-MADR-python-verification-tools.md) | accepted; A1, A2 accepted; A1 built; A3 accepted |
-| 0018 | PLAN | [Implement the Python verification tools](decisions/0018-PLAN-python-verification-tools.md) | in-progress (Step 8, A3) |
+| 0018 | MADR | [Keep the agent's verification tooling in the repository, as one modular Python package under `tools/`](decisions/0018-MADR-python-verification-tools.md) | accepted; A1, A2 accepted; A1 built; A3, A4 accepted |
+| 0018 | PLAN | [Implement the Python verification tools](decisions/0018-PLAN-python-verification-tools.md) | in-progress (Steps 8 and 9, A3 and A4) |
 | 0019 | MADR | [Skip the full CI for a push or pull request that changes only the documents, and check them with a one-job docs workflow instead](decisions/0019-MADR-skip-full-ci-for-docs-only-pushes.md) | accepted |
 | 0019 | PLAN | [Implement: a docs-only push or pull request runs a docs job instead of the full CI](decisions/0019-PLAN-skip-full-ci-for-docs-only-pushes.md) | complete |
 | 0020 | MADR | [Give a line-mode CLI Charm-free cores of `termcap`, `termsvc`, `command` and `keymap`, with their Bubble Tea forms in sub-packages, status and meter glyphs in `glyph`, and `safetext` as the one sanitizer](decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md) | accepted; Q1–Q8 answered; A1.1 answered (c); A1.2–A1.3 recorded; A2 accepted; A3 accepted; A4 accepted; A4.1 answered (`v2.0.0` at `/v2`); A4.2 accepted |
@@ -61,7 +61,7 @@ it was when they were written
 | 0022 | PLAN | [Implement aligned docs-only CI and disclosure gates](decisions/0022-PLAN-align-docs-ci-and-disclosure-gates.md) | complete |
 | 0023 | MADR | [Give a line-mode CLI an inline question, a picker, a composer and a streamed transcript, as I/O-free Charm-free cores on one live region](decisions/0023-MADR-line-mode-components.md) | accepted; A1 to A11 accepted |
 | 0023 | PLAN | [Implement the line-mode question, picker, composer and transcript](decisions/0023-PLAN-line-mode-components.md) | complete (`v2.6.2`) |
-| 0024 | MADR | [Let a program with its own CLI refuse, replace or opt into every behaviour the library imposes, with the floors stated and an inventory the tests hold](decisions/0024-MADR-opt-in-and-opt-out-coverage.md) | accepted; A1 accepted |
+| 0024 | MADR | [Let a program with its own CLI refuse, replace or opt into every behaviour the library imposes, with the floors stated and an inventory the tests hold](decisions/0024-MADR-opt-in-and-opt-out-coverage.md) | accepted; A1, A2 accepted |
 | 0024 | PLAN | [Implement API rule 12, its floors, the message catalogue and the defaults inventory, and close the command-and-control gaps](decisions/0024-PLAN-command-and-control-opt-outs.md) | complete (`v2.2.0`) |
 | 0024 | PLAN | [Close the terminal, text and convention gaps, and adopt the message catalogue](decisions/0024-PLAN-terminal-text-and-convention-opt-outs.md) | in-progress |
 

@@ -17,8 +17,16 @@ type Env []string
 // LookupEnv is the value of key, and whether it is set. When key appears
 // more than once, the last wins, as in tea's own environment. On Windows,
 // where the environment's names ignore case, key matches a name in any
-// case.
+// case. LookupEnv follows runtime.GOOS; a Probe, and FromEnv, read their
+// Env by the system they are given, WithGOOS's or goos
+// (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md A2).
 func (e Env) LookupEnv(key string) (string, bool) { return e.lookup(key, runtime.GOOS) }
+
+// getenvFor is Getenv for a program running on goos.
+func (e Env) getenvFor(key, goos string) string {
+	v, _ := e.lookup(key, goos)
+	return v
+}
 
 // lookup is LookupEnv for a program running on goos.
 func (e Env) lookup(key, goos string) (string, bool) {
@@ -47,9 +55,9 @@ func (e Env) Getenv(key string) string {
 // COLORFGBG and from the variable appearanceEnv names. A stronger fact
 // already held stands.
 func (c *Caps) setEnv(e Env, goos, appearanceEnv string) {
-	if v := sanitize.Line(e.Getenv("TERM_PROGRAM")); v != "" {
+	if v := sanitize.Line(e.getenvFor("TERM_PROGRAM", goos)); v != "" {
 		c.Terminal.Set(v, Environment)
-	} else if v := sanitize.Line(e.Getenv("TERM")); v != "" {
+	} else if v := sanitize.Line(e.getenvFor("TERM", goos)); v != "" {
 		c.Terminal.Set(v, Environment)
 	}
 
@@ -83,12 +91,12 @@ func (c *Caps) setEnv(e Env, goos, appearanceEnv string) {
 	// The appearance chain's environment links, weakest first: COLORFGBG,
 	// then the program's own variable, also read with an LC_ prefix,
 	// because a default sshd forwards LC_*.
-	if dark, ok := colorFGBG(e.Getenv("COLORFGBG")); ok {
+	if dark, ok := colorFGBG(e.getenvFor("COLORFGBG", goos)); ok {
 		c.Dark.SetReason(dark, Heuristic, ReasonColorFGBGGuess)
 	}
 	if appearanceEnv != "" {
 		for _, k := range []string{"LC_" + appearanceEnv, appearanceEnv} {
-			switch strings.ToLower(e.Getenv(k)) {
+			switch strings.ToLower(e.getenvFor(k, goos)) {
 			case "dark":
 				c.Dark.Set(true, Environment)
 			case "light":

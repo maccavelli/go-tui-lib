@@ -70,6 +70,9 @@ const (
 	ReasonEditorTerminal = "editor.terminal-gated"
 	// ReasonReplyTooLong: a reply longer than 1 KiB was not parsed.
 	ReasonReplyTooLong = "probe.reply-too-long"
+	// ReasonUnknownQuery: WithoutQuery named a query the probe does not
+	// have, so it sent nothing.
+	ReasonUnknownQuery = "probe.unknown-query"
 )
 
 // reasons is every token, for the tests that keep them unique and the
@@ -80,5 +83,5 @@ var reasons = []string{
 	ReasonAppleNoOSC8, ReasonWarpNoOSC8, ReasonTmuxLinks, ReasonMuxNoLinks, ReasonUnknownTerminal, ReasonZellijNoForwarding,
 	ReasonColorFGBGGuess, ReasonDesktopAppearance,
 	ReasonLegacyConsoleGuess, ReasonConPTYAnswers, ReasonWindowsTerminalGuess,
-	ReasonJetBrainsPaints, ReasonEditorTerminal, ReasonReplyTooLong,
+	ReasonJetBrainsPaints, ReasonEditorTerminal, ReasonReplyTooLong, ReasonUnknownQuery,
 }

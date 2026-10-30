@@ -135,7 +135,7 @@ func TestProbeReadsHostModes(t *testing.T) {
 	if c.SyncOutput != yes || c.GraphemeWidth != no || c.ColorSchemeReports != yes {
 		t.Errorf("SyncOutput %+v, GraphemeWidth %+v, ColorSchemeReports %+v", c.SyncOutput, c.GraphemeWidth, c.ColorSchemeReports)
 	}
-	q, _ := started(local, WithDisabled())
+	q, _ := started(local, WithoutQueries())
 	reply(q, "\x1b[?2031;1$y")
 	if c := q.Caps(); c.ColorSchemeReports != (Fact[Support]{}) {
 		t.Errorf("a report nobody asked for set ColorSchemeReports %+v", c.ColorSchemeReports)
@@ -171,7 +171,7 @@ func TestProbeTimeout(t *testing.T) {
 	if es := events(p); len(es) != 0 {
 		t.Errorf("after the end: %+v", es)
 	}
-	if _, ok := NewProbe(WithDisabled()).Timeout(); ok {
+	if _, ok := NewProbe(WithoutQueries()).Timeout(); ok {
 		t.Error("a disabled probe has a deadline")
 	}
 }
@@ -255,7 +255,7 @@ func TestProbeHooks(t *testing.T) {
 		t.Errorf("a hook that cannot tell changed Dark: %+v", got)
 	}
 	// A disabled probe hands its hooks over too, and ends.
-	_, es = started(local, WithDisabled(), WithAppearanceHook(hook(true)))
+	_, es = started(local, WithoutQueries(), WithAppearanceHook(hook(true)))
 	if kinds(es, ProbeRunHook) != 1 || kinds(es, ProbeDone) != 1 || written(es) != "" {
 		t.Errorf("disabled: %+v", es)
 	}
@@ -394,7 +394,7 @@ func TestGatedAllowed(t *testing.T) {
 		{Env{"TERM=tmux-256color", "TMUX=x", "SSH_TTY=/dev/pts/0"}, false},
 	}
 	for _, c := range cases {
-		if got := gatedAllowed(c.env); got != c.want {
+		if got := gatedAllowed(c.env, "linux"); got != c.want {
 			t.Errorf("gatedAllowed(%v) = %v, want %v", c.env, got, c.want)
 		}
 	}
@@ -414,7 +414,7 @@ func TestQuerySynchronizedOutput(t *testing.T) {
 		{Env{"TERM=xterm-256color", "TERM_PROGRAM=WezTerm"}, true},
 		{Env{"TERM=xterm-256color", "TERM_PROGRAM=WezTerm", "SSH_TTY=x"}, false},
 	} {
-		if got := querySynchronizedOutput(c.env); got != c.want {
+		if got := querySynchronizedOutput(c.env, "linux"); got != c.want {
 			t.Errorf("%v: %v, want %v", c.env, got, c.want)
 		}
 	}

@@ -62,7 +62,9 @@ type Probe struct {
 	noScheme     bool
 	noBackground bool
 	disabled     bool
-	hostModes    []int // WithoutModeQuery
+	noGated      bool     // WithoutGatedQueries
+	dropped      []string // WithoutQuery
+	hostModes    []int    // WithoutModeQuery
 
 	goos           string // runtime.GOOS, or WithGOOS
 	appearanceEnv  string
@@ -165,15 +167,25 @@ func NewProbe(o ...Option) *Probe {
 
 // Start reads the environment's facts and queues the batch, once: one
 // ProbeWrite of every query and DA1, then a ProbeRunHook for each hook an
-// option set. The deadline runs from now. A disabled probe, or one in a
-// JetBrains terminal, which paints a query as text, writes nothing and
-// ends at once.
+// option set. The deadline runs from now. A probe WithoutQuery gave a
+// name no query has, a disabled probe, and one in a JetBrains terminal,
+// which paints a query as text, write nothing and end at once.
 func (p *Probe) Start(env Env, now time.Time) {
 	if p.started {
 		return
 	}
 	p.started = true
 	p.caps.setEnv(env, p.goos, p.appearanceEnv)
+	// A name no query has is the program's mistake: send nothing rather
+	// than a batch it did not mean, and say why on each query fact.
+	if p.unknownQuery() {
+		for _, f := range queryFacts(&p.caps) {
+			f.SetReason(Unknown, NotQueried, ReasonUnknownQuery)
+		}
+		p.queueHooks()
+		p.finish()
+		return
+	}
 	// JetBrains paints a query as text: send nothing, and say why each
 	// fact a query would have set is unknown (MADR A1, Q7), whether or not
 	// the probe is disabled (docs/decisions/0014-PLAN-component-native-forms.md
@@ -194,11 +206,12 @@ func (p *Probe) Start(env Env, now time.Time) {
 	// An editor's terminal answers for the editor, so the gated queries,
 	// which would describe the user's terminal, are skipped there.
 	inEditor := p.caps.Editor.Value != EditorNone
-	gated := p.ungated || gatedAllowed(env) && !inEditor
-	if inEditor && !gated {
+	heuristic := p.ungated || gatedAllowed(env, p.goos) && !inEditor
+	if inEditor && !heuristic && !p.noGated {
 		p.caps.DesktopNotify.SetReason(Unknown, NotQueried, ReasonEditorTerminal)
 		p.caps.KittyGraphics.SetReason(Unknown, NotQueried, ReasonEditorTerminal)
 	}
+	gated := heuristic && !p.noGated
 	var b strings.Builder
 	for _, q := range p.batch(env) {
 		if q.Gated && !gated {
@@ -277,7 +290,7 @@ func (p *Probe) HandleReply(r Reply, _ time.Time) {
 			p.queue(ProbeEvent{Kind: ProbeColorScheme, Dark: r.Dark})
 			// The exact background, so a theme that follows the scheme
 			// gets the colour.
-			if !p.noBackground {
+			if !p.noBackground && !p.drops("background") {
 				p.queue(ProbeEvent{Kind: ProbeWrite, Data: ansi.RequestBackgroundColor})
 			}
 		}

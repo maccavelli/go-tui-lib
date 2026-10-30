@@ -35,6 +35,10 @@ const (
 	tokenUnknown     = "unknown"
 	tokenNone        = "none"
 	tokenColorScheme = "color-scheme"
+	// tokenKittyKeyboard and tokenKittyGraphics name both a reply kind and
+	// the query it answers.
+	tokenKittyKeyboard = "kitty-keyboard"
+	tokenKittyGraphics = "kitty-graphics"
 )
 
 // ErrUnknownName is wrapped by the error for a name termcap does not know:

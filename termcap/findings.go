@@ -117,6 +117,9 @@ var findingText = map[string]finding{
 	ReasonReplyTooLong: {Issue,
 		"A reply longer than 1 KiB was ignored.",
 		"Report the terminal and its version."},
+	ReasonUnknownQuery: {Issue,
+		"The program left out a query the probe does not have, so no query was sent.",
+		"Name only the probe's queries in WithoutQuery; its documentation lists them."},
 }
 
 // Findings is a finding for each reason token in c, its facts and its

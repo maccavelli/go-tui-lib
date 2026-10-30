@@ -436,7 +436,7 @@ func TestQuitRestoresFirst(t *testing.T) {
 }
 
 func TestDisabledSendsNothing(t *testing.T) {
-	p := NewProber(termcap.WithDisabled())
+	p := NewProber(termcap.WithoutQueries())
 	if p.Init() != nil {
 		t.Fatal("Init returned a command")
 	}

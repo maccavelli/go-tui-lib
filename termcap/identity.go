@@ -131,19 +131,20 @@ type Identity struct {
 // UUID.
 var itermSession = regexp.MustCompile(`^w\d+t\d+p\d+:`)
 
-// FromEnv is the identity env gives on goos, the caller's runtime.GOOS. It
-// is a pure function, so a test can fake tmux, SSH or Windows.
+// FromEnv is the identity env gives on goos, the caller's runtime.GOOS,
+// with names matched as goos matches them: in any case on Windows. It is a
+// pure function, so a test can fake tmux, SSH or Windows.
 //
 // The order encodes known traps: an editor fork's markers survive SSH and
 // tmux, so they come first; JetBrains sets TERM_SESSION_ID and would read
 // as Apple Terminal, so TERMINAL_EMULATOR comes before it; LC_TERMINAL
 // crosses SSH; Terminator sets VTE_VERSION too; and WT_SESSION is last.
 func FromEnv(env Env, goos string) Identity {
-	id := Identity{Term: sanitize.Line(env.Getenv("TERM")), TermFeatures: sanitize.Line(env.Getenv("TERM_FEATURES"))}
-	_, tty := env.LookupEnv("SSH_TTY")
-	_, conn := env.LookupEnv("SSH_CONNECTION")
+	id := Identity{Term: sanitize.Line(env.getenvFor("TERM", goos)), TermFeatures: sanitize.Line(env.getenvFor("TERM_FEATURES", goos))}
+	_, tty := env.lookup("SSH_TTY", goos)
+	_, conn := env.lookup("SSH_CONNECTION", goos)
 	id.Remote = tty || conn
-	id.EnvBrand, id.Version = envBrand(env)
+	id.EnvBrand, id.Version = envBrand(env, goos)
 	id.Version = sanitize.Line(id.Version)
 	id.Brand = id.EnvBrand
 	// Over SSH the terminal is the client's, which the host's environment
@@ -153,27 +154,27 @@ func FromEnv(env Env, goos string) Identity {
 	}
 
 	switch {
-	case env.Getenv("TMUX") != "":
+	case env.getenvFor("TMUX", goos) != "":
 		id.Mux = Tmux
-	case env.Getenv("STY") != "":
+	case env.getenvFor("STY", goos) != "":
 		id.Mux = Screen
-	case env.Getenv("ZELLIJ") != "":
+	case env.getenvFor("ZELLIJ", goos) != "":
 		id.Mux = Zellij
 	}
 
 	switch {
-	case env.Getenv("NVIM") != "":
+	case env.getenvFor("NVIM", goos) != "":
 		id.Editor = EditorNeovim
-	case env.Getenv("VIM_TERMINAL") != "":
+	case env.getenvFor("VIM_TERMINAL", goos) != "":
 		id.Editor = EditorVim
-	case env.Getenv("INSIDE_EMACS") != "":
+	case env.getenvFor("INSIDE_EMACS", goos) != "":
 		id.Editor = EditorEmacs
 	}
 
 	switch {
-	case env.Getenv("MSYSTEM") != "":
+	case env.getenvFor("MSYSTEM", goos) != "":
 		id.Platform = PlatformMSYS
-	case env.Getenv("WSL_DISTRO_NAME") != "" || env.Getenv("WSL_INTEROP") != "":
+	case env.getenvFor("WSL_DISTRO_NAME", goos) != "" || env.getenvFor("WSL_INTEROP", goos) != "":
 		id.Platform = PlatformWSL
 	}
 	return id
@@ -181,12 +182,12 @@ func FromEnv(env Env, goos string) Identity {
 
 // envBrand is the brand the environment names, in FromEnv's order, and the
 // version when the same variable's sibling gives one.
-func envBrand(env Env) (Brand, string) {
+func envBrand(env Env, goos string) (Brand, string) {
 	// 1. Editor forks, whose markers survive SSH and tmux.
-	if env.Getenv("CURSOR_TRACE_ID") != "" {
+	if env.getenvFor("CURSOR_TRACE_ID", goos) != "" {
 		return BrandCursor, ""
 	}
-	if askpass := strings.ToLower(env.Getenv("VSCODE_GIT_ASKPASS_MAIN")); askpass != "" {
+	if askpass := strings.ToLower(env.getenvFor("VSCODE_GIT_ASKPASS_MAIN", goos)); askpass != "" {
 		switch {
 		case strings.Contains(askpass, "windsurf"):
 			return BrandWindsurf, ""
@@ -198,8 +199,8 @@ func envBrand(env Env) (Brand, string) {
 
 	// 2. TERM_PROGRAM, whose version is TERM_PROGRAM_VERSION. A
 	// multiplexer sets it to its own name, which names no terminal.
-	version := env.Getenv("TERM_PROGRAM_VERSION")
-	switch env.Getenv("TERM_PROGRAM") {
+	version := env.getenvFor("TERM_PROGRAM_VERSION", goos)
+	switch env.getenvFor("TERM_PROGRAM", goos) {
 	case "Apple_Terminal":
 		return BrandAppleTerminal, version
 	case "iTerm.app":
@@ -221,10 +222,10 @@ func envBrand(env Env) (Brand, string) {
 	}
 
 	// 3. JetBrains, before TERM_SESSION_ID.
-	if env.Getenv("TERMINAL_EMULATOR") == "JetBrains-JediTerm" {
+	if env.getenvFor("TERMINAL_EMULATOR", goos) == "JetBrains-JediTerm" {
 		return BrandJetBrains, ""
 	}
-	if sid := env.Getenv("TERM_SESSION_ID"); sid != "" {
+	if sid := env.getenvFor("TERM_SESSION_ID", goos); sid != "" {
 		if itermSession.MatchString(sid) {
 			return BrandITerm2, ""
 		}
@@ -232,12 +233,12 @@ func envBrand(env Env) (Brand, string) {
 	}
 
 	// 4. LC_TERMINAL, which a default sshd forwards.
-	if env.Getenv("LC_TERMINAL") == "iTerm2" {
-		return BrandITerm2, env.Getenv("LC_TERMINAL_VERSION")
+	if env.getenvFor("LC_TERMINAL", goos) == "iTerm2" {
+		return BrandITerm2, env.getenvFor("LC_TERMINAL_VERSION", goos)
 	}
 
 	// 5. TERM, and the variables its terminals set beside it.
-	term := env.Getenv("TERM")
+	term := env.getenvFor("TERM", goos)
 	for _, t := range []struct {
 		brand    Brand
 		variable string
@@ -250,24 +251,24 @@ func envBrand(env Env) (Brand, string) {
 		{BrandRio, ""},
 		{BrandContour, ""},
 	} {
-		if strings.Contains(term, t.brand.String()) || t.variable != "" && env.Getenv(t.variable) != "" {
+		if strings.Contains(term, t.brand.String()) || t.variable != "" && env.getenvFor(t.variable, goos) != "" {
 			return t.brand, ""
 		}
 	}
 
 	// 6. Terminator before VTE, which it is built on; then Konsole.
-	if env.Getenv("TERMINATOR_UUID") != "" {
+	if env.getenvFor("TERMINATOR_UUID", goos) != "" {
 		return BrandTerminator, ""
 	}
-	if v := env.Getenv("VTE_VERSION"); v != "" {
+	if v := env.getenvFor("VTE_VERSION", goos); v != "" {
 		return BrandVTE, v
 	}
-	if v := env.Getenv("KONSOLE_VERSION"); v != "" {
+	if v := env.getenvFor("KONSOLE_VERSION", goos); v != "" {
 		return BrandKonsole, v
 	}
 
 	// 7. WT_SESSION last.
-	if env.Getenv("WT_SESSION") != "" {
+	if env.getenvFor("WT_SESSION", goos) != "" {
 		return BrandWindowsTerminal, ""
 	}
 	return BrandUnknown, ""

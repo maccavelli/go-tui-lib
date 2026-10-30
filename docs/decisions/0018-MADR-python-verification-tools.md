@@ -332,6 +332,40 @@ host.
 4. **What is not changed:** the bootstrap still removes every output,
    and nothing new reaches a host.
 
+### A4 (2026-10-30): the markdownlint gate runs the Makefile's pin
+
+*Status: accepted (2026-10-30),* the owner's choice "Pin the gate via make (Recommended)", found while
+[0024-PLAN-terminal-text-and-convention-opt-outs.md](0024-PLAN-terminal-text-and-convention-opt-outs.md)
+Step 1 ran its gates (deviation D3). Implemented by
+[0018-PLAN-python-verification-tools.md](0018-PLAN-python-verification-tools.md)
+Step 9.
+
+**Found.** The `markdownlint` gate ran `npx --no-install markdownlint-cli2`,
+with no version. On 2026-10-30 the Linux host failed it: "npx canceled due
+to missing packages and no YES option: ["markdownlint-cli2@0.24.0"]". With
+no version, npx picks the newest release, which that host does not have.
+It had passed there on 2026-10-30's earlier run of
+0023-PLAN Step 7b, with the same code. CI and the `Makefile` lint at
+0.23.2
+([0022-MADR-align-docs-ci-and-disclosure-gates.md](0022-MADR-align-docs-ci-and-disclosure-gates.md)),
+so the gate could also lint at a version CI does not use.
+
+**Considered.**
+
+* **A. Run `make markdownlint`,** the `Makefile`'s pinned
+  `npx --yes markdownlint-cli2@<version>`, so the gate, CI and Docs lint
+  at one version, which npx fetches where it is missing.
+* **B. Pin the version in the gate,** still with `--no-install`. Every
+  host must already hold that version, and the pin is kept in two places.
+
+**Decided:** "A".
+
+1. The gate's command is `make markdownlint`, and it quotes `Summary:` as
+   before.
+2. A test holds it to that, and the `Makefile` to one pinned
+   `markdownlint-cli2`.
+3. What is not changed: the other gates, and what the gate checks.
+
 ## More Information
 
 * The scratch tools named above are the ones

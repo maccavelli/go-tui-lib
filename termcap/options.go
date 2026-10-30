@@ -27,6 +27,26 @@ func WithQuery(q Query) Option { return optionFunc(func(p *Probe) { p.added = ap
 // does not name.
 func WithoutHeuristic() Option { return optionFunc(func(p *Probe) { p.ungated = true }) }
 
+// WithoutGatedQueries never sends the gated queries (xtversion,
+// notify-query, kitty-graphics, foreground and palette), even where the
+// heuristic would. It wins over WithoutHeuristic.
+func WithoutGatedQueries() Option { return optionFunc(func(p *Probe) { p.noGated = true }) }
+
+// WithoutQuery leaves the named queries out of the batch, and sends the
+// rest. The built-in queries' names are kitty-keyboard, mode-2031,
+// mode-2048, mode-1004, dsr-996, background, da2, xtversion,
+// notify-query, kitty-graphics, foreground, palette, mode-2026 and
+// mode-2027; a WithQuery's Name names it too. DA1, the sentinel, has no
+// name and is always sent. Leaving out background also leaves out the
+// background query each DSR 997 report is followed by.
+//
+// A name no query has is a mistake the probe does not guess at: Start
+// sends nothing and ends the probe at once, each query fact unknown with
+// ReasonUnknownQuery.
+func WithoutQuery(names ...string) Option {
+	return optionFunc(func(p *Probe) { p.dropped = append(p.dropped, names...) })
+}
+
 // WithOverride sets facts the program knows better, from a flag or a file.
 // f runs on the facts the probe starts from, and again on every Caps it
 // hands out. f should set each fact with origin Override, so that no reply
@@ -43,12 +63,18 @@ func WithoutColorSchemeUpdates() Option { return optionFunc(func(p *Probe) { p.n
 // batch, and out of the follow-up to each DSR 997 report.
 func WithoutBackgroundRequest() Option { return optionFunc(func(p *Probe) { p.noBackground = true }) }
 
-// WithDisabled sends nothing: Start writes no query and ends the probe at
-// once, with only the environment's facts, and the JetBrains reasons when
-// the environment names a JetBrains terminal. EnvCaps gives the same facts
-// without a host. A program run without input must not probe: the
+// WithoutQueries sends nothing: Start writes no query and ends the probe
+// at once, with only the environment's facts, and the JetBrains reasons
+// when the environment names a JetBrains terminal. EnvCaps gives the same
+// facts without a host. A program run without input must not probe: the
 // replies would reach the shell.
-func WithDisabled() Option { return optionFunc(func(p *Probe) { p.disabled = true }) }
+func WithoutQueries() Option { return optionFunc(func(p *Probe) { p.disabled = true }) }
+
+// WithDisabled sends nothing, as WithoutQueries does.
+//
+// Deprecated: use WithoutQueries, the name API convention 4 gives an
+// option that turns a default off.
+func WithDisabled() Option { return WithoutQueries() }
 
 // WithGOOS reads the terminal's identity for goos instead of
 // runtime.GOOS: for a test, or for a wish server, whose own operating

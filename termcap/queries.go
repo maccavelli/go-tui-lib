@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/x/ansi"
@@ -36,11 +37,21 @@ type probe struct {
 	fact   func(*Caps) *Fact[Support]
 }
 
+// queryNames is every built-in query's name, in the batch's order: the
+// tokens WithoutQuery takes. They are API: a name is added, never renamed
+// (docs/decisions/0024-PLAN-terminal-text-and-convention-opt-outs.md Step 1,
+// deviation D1). DA1, the sentinel, has none.
+var queryNames = []string{
+	tokenKittyKeyboard, "mode-2031", "mode-2048", "mode-1004", "dsr-996", "background", "da2",
+	"xtversion", "notify-query", tokenKittyGraphics, "foreground", "palette", "mode-2026", "mode-2027",
+}
+
 // batch is every query in the batch's order, before the sentinel: the
 // Kitty keyboard request, the DECRQM set and DSR 996, the OSC 11 background
 // query unless declined, DA2, the gated queries, each added query, then
 // DECRQM 2026 and 2027 where Bubble Tea's own rule would send them. A mode
-// WithoutModeQuery names is left out. The background query is written here
+// WithoutModeQuery names, and a query WithoutQuery names, is left out. The
+// background query is written here
 // rather than sent on its own, which a host could write after the sentinel
 // (docs/decisions/0005-MADR-terminal-capabilities-and-services.md A3).
 func (p *Probe) batch(env Env) []*probe {
@@ -48,19 +59,19 @@ func (p *Probe) batch(env Env) []*probe {
 		return func(c *Caps) { f(c).Set(Unsupported, Queried) }
 	}
 	qs := []*probe{
-		{Name: "kitty-keyboard", Seq: fixed(ansi.RequestKittyKeyboard), Parse: parseKittyKeyboard,
+		{Name: tokenKittyKeyboard, Seq: fixed(ansi.RequestKittyKeyboard), Parse: parseKittyKeyboard,
 			silent: unsupported(func(c *Caps) *Fact[Support] { return &c.KittyKeyboard })},
-		modeProbe("color-scheme-reports", ansi.ModeLightDark, ansi.RequestModeLightDark, true),
-		modeProbe("in-band-resize", ansi.ModeInBandResize, ansi.RequestModeInBandResize, true),
-		modeProbe("focus-events", ansi.ModeFocusEvent, ansi.RequestModeFocusEvent, true),
-		{Name: tokenColorScheme, Seq: fixed(ansi.RequestLightDarkReport), Parse: parseColorScheme},
+		modeProbe(ansi.ModeLightDark, ansi.RequestModeLightDark, true),
+		modeProbe(ansi.ModeInBandResize, ansi.RequestModeInBandResize, true),
+		modeProbe(ansi.ModeFocusEvent, ansi.RequestModeFocusEvent, true),
+		{Name: "dsr-996", Seq: fixed(ansi.RequestLightDarkReport), Parse: parseColorScheme},
 		{Name: "background", Seq: p.background, Parse: parseBackground},
-		{Name: "secondary-attributes", Seq: fixed(ansi.RequestSecondaryDeviceAttributes), Parse: parseDA2},
-		{Name: "terminal-version", Seq: fixed(ansi.RequestNameVersion), Gated: true, Parse: parseVersion},
-		{Name: "desktop-notify", Seq: wrapped(osc99Query), Gated: true, Parse: parseOSC99,
+		{Name: "da2", Seq: fixed(ansi.RequestSecondaryDeviceAttributes), Parse: parseDA2},
+		{Name: "xtversion", Seq: fixed(ansi.RequestNameVersion), Gated: true, Parse: parseVersion},
+		{Name: "notify-query", Seq: wrapped(osc99Query), Gated: true, Parse: parseOSC99,
 			silent: unsupported(func(c *Caps) *Fact[Support] { return &c.DesktopNotify }),
 			prefix: "\x1b]99;", fact: func(c *Caps) *Fact[Support] { return &c.DesktopNotify }},
-		{Name: "kitty-graphics", Seq: wrapped(kittyGraphicsQuery), Gated: true, Parse: parseKittyGraphics,
+		{Name: tokenKittyGraphics, Seq: wrapped(kittyGraphicsQuery), Gated: true, Parse: parseKittyGraphics,
 			silent: unsupported(func(c *Caps) *Fact[Support] { return &c.KittyGraphics })},
 		{Name: "foreground", Seq: fixed(ansi.RequestForegroundColor), Gated: true, Parse: parseForeground},
 		{Name: "palette", Seq: fixed(paletteQuery), Gated: true, Parse: parsePalette, prefix: "\x1b]4;"},
@@ -72,24 +83,37 @@ func (p *Probe) batch(env Env) []*probe {
 	// and termcaptea leaves them out; a host that is not Bubble Tea gets them
 	// from the probe, under the same rule. Tea reads no silence into them,
 	// and neither does the probe.
-	if querySynchronizedOutput(env) {
+	if querySynchronizedOutput(env, p.goos) {
 		qs = append(qs,
-			modeProbe("sync-output", ansi.ModeSynchronizedOutput, ansi.RequestModeSynchronizedOutput, false),
-			modeProbe("grapheme-width", ansi.ModeUnicodeCore, ansi.RequestModeUnicodeCore, false))
+			modeProbe(ansi.ModeSynchronizedOutput, ansi.RequestModeSynchronizedOutput, false),
+			modeProbe(ansi.ModeUnicodeCore, ansi.RequestModeUnicodeCore, false))
 	}
-	return slices.DeleteFunc(qs, func(q *probe) bool { return q.mode != 0 && slices.Contains(p.hostModes, q.mode) })
+	return slices.DeleteFunc(qs, func(q *probe) bool {
+		return q.mode != 0 && slices.Contains(p.hostModes, q.mode) || p.drops(q.Name)
+	})
+}
+
+// drops reports whether WithoutQuery named name.
+func (p *Probe) drops(name string) bool { return slices.Contains(p.dropped, name) }
+
+// unknownQuery reports whether WithoutQuery gave a name that is neither a
+// built-in query's nor a WithQuery's; "" names none.
+func (p *Probe) unknownQuery() bool {
+	return slices.ContainsFunc(p.dropped, func(n string) bool {
+		return n == "" || !slices.Contains(queryNames, n) && !slices.ContainsFunc(p.added, func(q Query) bool { return q.Name == n })
+	})
 }
 
 // querySynchronizedOutput is Bubble Tea v2.0.10's
 // shouldQuerySynchronizedOutput (tea.go:980-994), copied so that a host
 // that is not Bubble Tea asks for modes 2026 and 2027 where tea would: not
 // over SSH unless the terminal is known to answer, and not in Apple
-// Terminal.
-func querySynchronizedOutput(env Env) bool {
-	termType := env.Getenv("TERM")
-	termProg, okTermProg := env.LookupEnv("TERM_PROGRAM")
-	_, okSSHTTY := env.LookupEnv("SSH_TTY")
-	_, okWTSession := env.LookupEnv("WT_SESSION")
+// Terminal. env is read as goos reads it.
+func querySynchronizedOutput(env Env, goos string) bool {
+	termType := env.getenvFor("TERM", goos)
+	termProg, okTermProg := env.lookup("TERM_PROGRAM", goos)
+	_, okSSHTTY := env.lookup("SSH_TTY", goos)
+	_, okWTSession := env.lookup("WT_SESSION", goos)
 
 	return (!okTermProg && !okSSHTTY) ||
 		okWTSession ||
@@ -143,11 +167,11 @@ func modeFact(c *Caps, mode int) *Fact[Support] {
 	return nil
 }
 
-// modeProbe asks with DECRQM whether the terminal knows a mode. When silent,
-// no reply before the sentinel means it does not.
-func modeProbe(name string, mode ansi.DECMode, seq string, silent bool) *probe {
+// modeProbe asks with DECRQM whether the terminal knows a mode; its name
+// is mode-<n>. When silent, no reply before the sentinel means it does not.
+func modeProbe(mode ansi.DECMode, seq string, silent bool) *probe {
 	q := &probe{
-		Name: name, Seq: fixed(seq), Parse: func(r Reply, c *Caps) bool {
+		Name: "mode-" + strconv.Itoa(int(mode)), Seq: fixed(seq), Parse: func(r Reply, c *Caps) bool {
 			if r.Kind != ReplyMode || r.Mode != int(mode) {
 				return false
 			}
@@ -302,20 +326,21 @@ func isDark(c color.Color) bool {
 // gatedAllowed reports whether the gated queries may go out. Some terminals
 // print a query they do not understand, so they go only where the
 // environment gives reason to expect an answer: not to Apple Terminal, and
-// over SSH only to a terminal the environment names.
-func gatedAllowed(env Env) bool {
-	if env.Getenv("TERM_PROGRAM") == "Apple_Terminal" {
+// over SSH only to a terminal the environment names. env is read as goos
+// reads it.
+func gatedAllowed(env Env, goos string) bool {
+	if env.getenvFor("TERM_PROGRAM", goos) == "Apple_Terminal" {
 		return false
 	}
-	_, tty := env.LookupEnv("SSH_TTY")
-	_, conn := env.LookupEnv("SSH_CONNECTION")
+	_, tty := env.lookup("SSH_TTY", goos)
+	_, conn := env.lookup("SSH_CONNECTION", goos)
 	if !tty && !conn {
 		return true
 	}
-	if env.Getenv("LC_TERMINAL") == "iTerm2" {
+	if env.getenvFor("LC_TERMINAL", goos) == "iTerm2" {
 		return true
 	}
-	term := env.Getenv("TERM")
+	term := env.getenvFor("TERM", goos)
 	for _, b := range []Brand{BrandKitty, BrandGhostty, BrandWezTerm, BrandAlacritty, BrandFoot, BrandRio, BrandContour} {
 		if strings.Contains(term, b.String()) {
 			return true

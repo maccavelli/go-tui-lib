@@ -72,7 +72,7 @@ var replyKindNames = enum.Names[ReplyKind]{
 	Pkg: pkgName, Type: "ReplyKind", Unknown: ErrUnknownName,
 	Tokens: []string{
 		tokenUnknown, "primary-attributes", "secondary-attributes", "version", "mode", "color",
-		"kitty-keyboard", tokenColorScheme, "kitty-graphics", "notify", "cursor-position",
+		tokenKittyKeyboard, tokenColorScheme, tokenKittyGraphics, "notify", "cursor-position",
 	},
 }
 

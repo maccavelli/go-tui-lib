@@ -176,12 +176,12 @@ record that is not there.
 | Behaviour | Default | Control | Status |
 | :--- | :--- | :--- | :--- |
 | The probe | sends its batch | `termcap.WithDisabled` | built |
-| The probe, by the rule's name | sends its batch | `termcap.WithoutQueries` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
+| The probe, by the rule's name | sends its batch | `termcap.WithoutQueries` | built |
 | The background query, and the DECRQMs | sent | `termcap.WithoutBackgroundRequest`, `termcap.WithoutModeQuery` | built |
-| One query of the batch | sent | `termcap.WithoutQuery` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
+| One query of the batch | sent | `termcap.WithoutQuery` | built |
 | A query of the program's own | none | `termcap.WithQuery` | built |
 | The gated queries | sent where the heuristic allows | `termcap.WithoutHeuristic` | built |
-| The gated queries, off | sent where the heuristic allows | `termcap.WithoutGatedQueries` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
+| The gated queries, off | sent where the heuristic allows | `termcap.WithoutGatedQueries` | built |
 | Mode 2031 | set when supported | `termcap.WithoutColorSchemeUpdates` | built |
 | The probe's timeout | 2 s | `termcap.WithTimeout` | built |
 | What the environment says | read from the `Env` given | `termcap.WithOverride`, `termcap.WithAppearanceEnv`, `termcap.WithAppearanceHook`, `termcap.WithConsoleHost` | built |

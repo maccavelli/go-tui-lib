@@ -214,6 +214,13 @@ class TestDefaultGates(unittest.TestCase):
         for g in self.gates.values():
             self.assertNotIn(os.path.basename(g.args[0]), {"sh", "bash", "zsh", "cmd", "powershell"}, g.name)
 
+    def test_markdownlint_runs_the_makefiles_pin(self) -> None:
+        # The gate runs make's pinned markdownlint-cli2, never the newest
+        # release npx would choose (docs/decisions/0018-MADR-python-verification-tools.md A4).
+        self.assertEqual(self.gates["markdownlint"].args, ("make", "markdownlint"))
+        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+        self.assertRegex(makefile, r"(?m)^MARKDOWNLINT \?= npx --yes markdownlint-cli2@\d+\.\d+\.\d+$")
+
 
 class TestCommand(RepoCase):
     def command(self, gate_list: list[gates.Gate], *argv: str) -> tuple[int, str, str]:

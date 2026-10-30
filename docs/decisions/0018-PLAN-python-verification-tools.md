@@ -266,6 +266,23 @@ PLAN is `in-progress` until Step 8 is done.*
 * **Checks:** `tools-tests`, under Python 3.12 too; `markdownlint`;
   `scan`.
 
+### Step 9 (A4): the markdownlint gate runs the Makefile's pin
+
+*Added 2026-10-30, for MADR amendment A4, from
+[0024-PLAN-terminal-text-and-convention-opt-outs.md](0024-PLAN-terminal-text-and-convention-opt-outs.md)
+Step 1's deviation D3, which the owner decided the same day. It is its
+own commit, before that step's.*
+
+* **`gates.py`:** the `markdownlint` gate runs `("make", "markdownlint")`.
+* **Test** (`tools/verify/tests/test_gates.py`,
+  `test_markdownlint_runs_the_makefiles_pin`): the gate's arguments are
+  those, and the `Makefile` sets `MARKDOWNLINT` to one pinned
+  `markdownlint-cli2`. It is seen failing on the gate as it was.
+* **Mutation:** the gate runs `npx --no-install markdownlint-cli2` again.
+* **Acceptance:** the `markdownlint` gate passes through `remote linux`,
+  where it failed.
+* **Checks:** `tools-tests`, under Python 3.12 too; `scan`.
+
 ## Verification
 
 * `python3 -m unittest discover -s tools -t .` passes on macOS, the Linux
@@ -687,3 +704,30 @@ the step is pushed and CI is green.
   clean.
 * **Close-out:** this PLAN becomes `complete` again once CI is green on
   the pushed tree, which is the owner's to push.
+
+### Step 9 (A4): the markdownlint gate runs the Makefile's pin
+
+*2026-10-30.* The owner chose A4 when 0024-PLAN-terminal-text-and-convention-opt-outs.md
+Step 1's Linux gates failed `markdownlint` ("Pin the gate via make
+(Recommended)"). A4 is `accepted`.
+* **`gates.py`:** the `markdownlint` gate runs `("make", "markdownlint")`,
+  with a comment naming A4.
+* **Test:** `test_markdownlint_runs_the_makefiles_pin`, in
+  `TestDefaultGates`. Run on the gate as it was, it failed:
+  `('npx', '--no-install', 'markdownlint-cli2')` against
+  `('make', 'markdownlint')`, "FAILED (failures=1)".
+* **Mutation,** through `tools.verify mutate`, 1 killed of 1:
+
+  | Mutation | Killed by |
+  | :--- | :--- |
+  | 9.1 the gate runs `npx --no-install markdownlint-cli2` again | `test_markdownlint_runs_the_makefiles_pin`: "Tuples differ: ('npx', '--no-install', 'markdownlint-cli2') != ('make', 'markdownlint')" |
+
+* **Acceptance:** `remote linux`, for 0024's Step 1, ran the gates with
+  this change. `markdownlint: exit=0 (4s)`, "Summary: 0 issues in 0
+  files", where the run before it had failed; "gates: 21 passed, 0 failed,
+  1 skipped in 1128s".
+* **Checks:**
+  * `python3 -m unittest discover -s tools -t .`: "Ran 68 tests", OK,
+    under Python 3.14 and 3.12;
+  * `tools.verify scan`: clean.
+* **Close-out:** as Step 8's, once CI is green on the pushed tree.

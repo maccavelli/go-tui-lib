@@ -133,7 +133,8 @@ def default_gates(repo: Path, python: str = sys.executable) -> list[Gate]:
         Gate("apicheck", ("make", "apicheck"), needs_history=True, quote=(r"^apicheck:",), default=False),
         Gate("examples", ("make", "examples"), quote=(r"^examples:",), default=False),
         Gate("shellcheck", ("shellcheck", *sorted(str(p.relative_to(repo)) for p in (repo / "scripts").glob("*.sh")))),
-        Gate("markdownlint", ("npx", "--no-install", "markdownlint-cli2"), quote=(r"^Summary:",)),
+        # The Makefile's pin, not the newest release npx would choose (MADR A4).
+        Gate("markdownlint", ("make", "markdownlint"), quote=(r"^Summary:",)),
         Gate("actionlint", ("actionlint",)),
     ]
     for t in sorted((repo / "scripts").glob("*_test.py")):

@@ -63,9 +63,12 @@ step.
 ### Step 1: the probe's queries
 
 * Every built-in query's `Name` is a stable token, checked or set here (`kitty-keyboard`,
-  `color-scheme-mode`, `dsr-996`, `background`, `da2`, `xtversion`,
+  ~~`color-scheme-mode`,~~ `dsr-996`, `background`, `da2`, `xtversion`,
   `notify-query`, `kitty-graphics`, `foreground`, `palette`, and the
   DECRQM modes as `mode-<n>`); a test holds the names to a table.
+  *Amended 2026-10-30, deviation D1:* `color-scheme-mode` was a slip. The
+  five DECRQMs are `mode-2031`, `mode-2048`, `mode-1004`, `mode-2026` and
+  `mode-2027`, so the list names each of the 14 built-ins once.
 * `WithoutQuery(names ...string)` drops the named queries; an unknown name
   is an error from the first `Start`, through a `ProbeDone` reason,
   `ReasonUnknownQuery`. DA1 has no name and cannot be dropped.
@@ -74,6 +77,10 @@ step.
 * `WithoutQueries()` is today's `WithDisabled`; `WithDisabled` is marked
   `// Deprecated: use WithoutQueries`.
 * `Env.LookupEnv` folds case by the probe's GOOS: `WithGOOS`'s when set.
+  *Amended 2026-10-30, deviation D2:* every read the probe makes of its
+  `Env` (the identity, the gating heuristic, Bubble Tea's mode rule)
+  folds by the probe's GOOS. `Env.LookupEnv`, which has no probe, keeps
+  `runtime.GOOS`, and its comment says so.
 * **Tests:** the batch unchanged without the options, byte for byte; each
   name drops its query alone; gated queries off under
   `WithoutGatedQueries` with an SSH environment that would send them;
@@ -177,3 +184,160 @@ The owner: "approve 0022 and 0024, then proceed". Both prerequisites hold:
 `in-progress`. It runs after
 [0022-PLAN-align-docs-ci-and-disclosure-gates.md](0022-PLAN-align-docs-ci-and-disclosure-gates.md),
 approved in the same message.
+
+### Step 1: the probe's queries
+
+**Deviations,** each stopped before any code, the owner's choice dated:
+
+* **D1, 2026-10-30: the query names.**
+  * *Found:* the built-in queries carry names nobody can see, such as
+    `color-scheme-reports`, `secondary-attributes` and `sync-output`; no
+    test, golden or guide names one.
+  * The Step's list names 10 tokens and "the DECRQM modes as `mode-<n>`".
+    The batch has 9 queries that are not modes and 5 DECRQMs (2031, 2048,
+    1004, 2026, 2027). So `color-scheme-mode` was either a slip or a
+    second name for DECRQM 2031 that breaks `mode-<n>`.
+  * Once `WithoutQuery` takes them, the names are API and never renamed.
+  * *Decision:* "PLAN's, all modes mode-<n>", over the list taken
+    literally and over the code's names. The Step is annotated above.
+  * *MADR:* unchanged; D5 names no tokens.
+* **D2, 2026-10-30: `LookupEnv`'s fold.**
+  * *Found:* the Step and MADR D5 gap 11 say `Env.LookupEnv` folds case by
+    the probe's GOOS, but an `Env` is a `[]string` and has no probe.
+  * *Decision:* "The probe's own reads", over also exporting a lookup that
+    takes a GOOS:
+    * every read the probe makes of its `Env` folds by its GOOS;
+    * `Env.LookupEnv` keeps `runtime.GOOS`;
+    * a `WithQuery`'s `Seq` still reads the `Env` it is given.
+  * The Step is annotated above.
+  * *MADR:* amended, A2, since D5 asserted the method changes.
+* **D3, 2026-10-30: the markdownlint gate on the Linux host.**
+  * *Found:* `remote linux` failed one gate of 21, `markdownlint`: "npx
+    canceled due to missing packages and no YES option:
+    ["markdownlint-cli2@0.24.0"]". The gate ran
+    `npx --no-install markdownlint-cli2` with no version
+    (`tools/verify/gates.py:136`), so npx picked the newest release, which
+    that host lacks. It is not this step's fault; the same gate passed
+    there for 0023-PLAN Step 7b.
+  * *Decision:* "Pin the gate via make (Recommended)", over pinning the version in the gate itself.
+    [0018-MADR-python-verification-tools.md](0018-MADR-python-verification-tools.md)
+    A4 and
+    [0018-PLAN-python-verification-tools.md](0018-PLAN-python-verification-tools.md)
+    Step 9 make the gate run `make markdownlint`, as its own commit ahead
+    of this step's. Linux's gates are then run again.
+  * *MADR:* this record's is unchanged; 0018's has A4.
+
+**What changed** (`termcap`):
+
+* **The names.** The 14 built-in queries carry the tokens of D1, in the
+  batch's order, and `queryNames` lists them:
+  * `kitty-keyboard`, `mode-2031`, `mode-2048`, `mode-1004`, `dsr-996`,
+    `background`, `da2`;
+  * `xtversion`, `notify-query`, `kitty-graphics`, `foreground`,
+    `palette`, `mode-2026`, `mode-2027`.
+
+  `modeProbe` names each DECRQM `mode-<n>` from its number.
+  `kitty-keyboard` and `kitty-graphics` are also `ReplyKind` tokens, so
+  both are package constants, `tokenKittyKeyboard` and
+  `tokenKittyGraphics`, as `tokenColorScheme` was; goconst asked for it.
+* **`WithoutQuery(names ...string)`:**
+  * `batch` leaves out each query named, a `WithQuery`'s by its `Name`
+    too;
+  * leaving out `background` also leaves out the OSC 11 that follows a
+    DSR 997 report;
+  * a name that is neither a built-in's nor a `WithQuery`'s, or `""`,
+    makes `Start` send nothing and end at once. Each query fact is
+    unknown, `NotQueried`, `ReasonUnknownQuery` (`probe.unknown-query`),
+    as JetBrains' are, and the hooks still run;
+  * DA1 has no name and is always sent.
+* **`WithoutGatedQueries()`:** the gated queries are never sent, and it
+  wins over `WithoutHeuristic`. An editor's terminal gets no
+  `ReasonEditorTerminal` under it, since the option is the reason.
+* **`WithoutQueries()`:** `WithDisabled`'s doc and behaviour.
+  `WithDisabled` calls it, marked `// Deprecated: use WithoutQueries`.
+  `EnvCaps` and every test outside the package moved to the new name, so
+  staticcheck reports no SA1019.
+* **The GOOS fold, D2:** `Env` gains `getenvFor(key, goos)`. `setEnv`,
+  `FromEnv`, `envBrand`, `gatedAllowed` and `querySynchronizedOutput` read
+  through it and `lookup(key, goos)`, the probe's GOOS. `LookupEnv`'s doc
+  says it keeps `runtime.GOOS`. revive's confusing-naming rule refused
+  the first name, `getenv`.
+* **`ReasonUnknownQuery`'s finding:** an `Issue`, "The program left out a
+  query the probe does not have, so no query was sent."
+* **`docs/guides/defaults.md`:** the rows of `WithoutQueries`,
+  `WithoutQuery` and `WithoutGatedQueries` are `built`.
+
+**Tests** (`termcap/queryopts_test.go`, new):
+
+* `TestQueryNames`: the batch's names and `queryNames` against the table.
+* `TestWithoutQuery`: each of the 14 names leaves out its own query, and
+  the rest is the batch byte for byte, DA1 last.
+* `TestWithoutQueryReplies`: a query left out is not offered its reply, and
+  is not unsupported at the sentinel; the DSR 997 follow-up goes with
+  `background`.
+* `TestWithoutQueryAdded`: a `WithQuery` is left out by its name.
+* `TestWithoutQueryUnknownName`: `da1`, `nope`, `""` and `Kitty-Keyboard`
+  each send nothing, with the reason; `""` beside an unnamed `WithQuery`
+  too.
+* `TestWithoutGatedQueries`: local, an SSH peer the heuristic names, and
+  under `WithoutHeuristic`; no editor's reason.
+* `TestWithoutQueriesIsWithDisabled`: the same events and `Caps`, locally
+  and under JetBrains.
+* `TestProbeReadsEnvForItsGOOS`: lowercase names, read by a Windows and a
+  Linux probe on this host, and by `gatedAllowed`,
+  `querySynchronizedOutput` and `FromEnv`.
+
+Without the new options every existing test, `TestProbeBatch`'s bytes
+among them, passed unchanged. The new tests passed on their first run,
+since the code came first; the mutations below are their failures.
+
+**Seen failing,** through `tools.verify mutate`, 14 killed of 14. Mutation
+1.2's anchor was refreshed after the constants and run again alone:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| 1.1 `WithoutQuery` drops nothing | `TestWithoutQuery`: "without kitty-keyboard: wrote …" for each name |
+| 1.2 `WithoutQuery` drops DA1 (`da1` a name) | `TestQueryNames`; `TestWithoutQueryUnknownName`: `"da1"` wrote the batch |
+| 1.3 `WithoutGatedQueries` ignored | `TestWithoutGatedQueries`: "local: wrote …", and its other two cases |
+| 1.4 the probe's `getenvFor` folds by `runtime.GOOS` | `TestProbeReadsEnvForItsGOOS`: "windows: … EnvBrand {Value:unknown …}; want remote, WezTerm" |
+| 1.5 `FromEnv`'s `SSH_TTY` folds by `runtime.GOOS` | `TestProbeReadsEnvForItsGOOS`: "windows: Remote {Value:false …}" |
+| 1.6 the DSR 997 follow-up sent with `background` dropped | `TestWithoutQueryReplies`: "after DSR 997, wrote \"\\x1b]11;?\\a\"" |
+| 1.7 an unknown name accepted | `TestWithoutQueryUnknownName`: each of the four names wrote the batch |
+| 1.8 `""` names an unnamed `WithQuery` | `TestWithoutQueryUnknownName`: "WithoutQuery(\"\") beside an unnamed query wrote …" |
+| 1.9 the editor's reason under `WithoutGatedQueries` | `TestWithoutGatedQueries`: "an editor's reason under WithoutGatedQueries: {… Reason:editor.terminal-gated}" |
+| 1.10 a `WithQuery`'s name not known | `TestWithoutQueryAdded`: "without the added query: \"\"" |
+| 1.11 `WithDisabled` no longer `WithoutQueries` | `TestWithoutQueriesIsWithDisabled` |
+| 1.12 two names swapped in `queryNames` | `TestQueryNames`: "queryNames … want …" |
+| 1.13 a mode named `decrqm-<n>` | `TestQueryNames`; `TestWithoutQuery`: "without mode-2031" |
+| 1.14 `ReasonUnknownQuery` without a finding | `TestEveryReasonHasAFinding`: "token \"probe.unknown-query\" has no finding" |
+
+**Gates,** `python3 -m tools.verify gates --label p24ts1` over the step's
+files:
+
+* **macOS:** the first run failed `release-check` on its lint: goconst
+  over `kitty-keyboard` and `kitty-graphics`, and revive's confusing-naming
+  over `getenv`. After the fixes above, "22 passed, 0 failed, 0 skipped in
+  724s"; `release-check`, "419 file(s) clean", with `apicheck` and the
+  examples gate.
+* **`remote linux`:**
+  * the first run: "20 passed, 1 failed, 1 skipped", the failure
+    `markdownlint`, deviation D3;
+  * after 0018-PLAN Step 9: "21 passed, 0 failed, 1 skipped in 1128s",
+    "419 file(s) clean", `markdownlint` "Summary: 0 issues in 0 files".
+* **`remote windows`:** "21 passed, 0 failed, 1 skipped in 2555s", "419
+  file(s) clean". It ran before 0018-PLAN Step 9, with the old
+  `markdownlint` command, which that host could still run ("Summary: 0
+  issues in 0 files"). That change touches no gate but `markdownlint`, so
+  the run stands.
+* The skip on each remote host is `gofmt`, which is given no files there.
+* `make apicheck`: "against v2.6.2, 0 incompatible change(s)".
+  `WithDisabled` stays.
+* `tools.verify scan --base HEAD`: "scan: clean (5 pattern(s))";
+  `scripts/check_records.py` and `scripts/check_disclosure.py`: clean.
+
+**Not done here:** the guides' prose (`terminal-capabilities.md`'s option
+table and its advice to pass `WithDisabled`) is Step 6's, as the PLAN
+places it; only the defaults rows move in this step, by the rules.
+
+**Step 1 complete, 2026-10-30,** for the owner's commit, after 0018-PLAN
+Step 9's.

@@ -3,7 +3,7 @@ package termcap
 import "time"
 
 // EnvCaps is the facts the environment gives on goos, without a program or
-// a probe: exactly what a Probe built with WithDisabled holds once
+// a probe: exactly what a Probe built with WithoutQueries holds once
 // started, so a program's own command line can decide from them
 // (docs/decisions/0014-MADR-native-integration-api.md W2).
 //
@@ -17,7 +17,7 @@ import "time"
 // ReasonJetBrainsPaints, as a disabled probe's do.
 func EnvCaps(env Env, goos string, opts ...Option) Caps {
 	o := make([]Option, 0, len(opts)+2)
-	o = append(append(o, opts...), WithDisabled(), WithGOOS(goos))
+	o = append(append(o, opts...), WithoutQueries(), WithGOOS(goos))
 	p := NewProbe(o...)
 	p.Start(env, time.Time{}) // its events, the hooks and ProbeDone, are not taken
 	return p.Caps()
