@@ -278,3 +278,116 @@ a git repository, since the copies have no `.git` and both scripts read
 Plants 1.26 and 1.27 are the readers that Docs now runs.
 
 Not checked locally: what the changed steps do on GitHub, until a push.
+
+Phase 1 was committed by the owner as `dfce61e`.
+
+### Phase 2: workflow routing and parity, 2026-10-30
+
+*Step 1, the routing,* needed no change. CI's `push` and `pull_request`
+already carry the same `paths-ignore`, the docs-safe set of step 1. Docs'
+`paths` are that set, `.markdownlint-cli2.jsonc` and `docs.yml`. Neither
+workflow's triggers, concurrency, permissions or jobs change in this
+phase. CI has no `schedule` and no `workflow_dispatch` to keep.
+
+What changed:
+
+* **`scripts/check_ci_filters.py`, new:** the contract check, ported from
+  acp-go-sdk2's `scripts/check_ci_filters.py`. It reads both workflows as
+  YAML, the `Makefile`'s recipes and the tracked files, and checks five
+  parts:
+  * *`filters`:* CI's two ignore lists are equal and not empty, and CI has
+    no `paths` filter. CI keeps each trigger in `CI_TRIGGERS`: `push` to
+    `main`, `push` to `v*` tags, and `pull_request`.
+  * *`docs`:* Docs' two lists are equal, and are CI's ignored paths plus
+    `DOCS_EXTRA`.
+  * *`tracked`:* each ignored pattern matches a tracked file, and Docs
+    runs on every tracked file CI ignores.
+  * *`readers`:*
+    * no ignored file is under a `testdata` directory, so
+      `command/testdata/**/*.md` stays in full CI;
+    * for each of `READERS` (`TestDefaultsInventory` and the guide
+      check) whose input CI ignores, Docs runs its make target, and the
+      target's recipe runs the reader;
+    * every tracked file a Go file names by a literal path, as a string
+      or as `filepath.Join`'s literal parts, is not ignored, is read by
+      one of `READERS`, or is in `NOT_READS`.
+  * *`gates`* and *`pins`:* both workflows run the four document targets
+    through make, neither names `markdownlint-cli2` itself, and the
+    `Makefile` pins it once. Every action Docs uses, CI uses at the same
+    pin, and Docs has `contents: read`.
+
+  `NOT_READS` lists, each with its reason, the four Go literals that name
+  an ignored document without reading it:
+  * `fuzzy/example_test.go`'s two candidate strings;
+  * a key of `palette/providers_test.go`'s in-memory file system;
+  * the name `TestDefaultsInventory` looks for in a row's status.
+
+  A line there that no longer matches fails as stale. The first run,
+  before `NOT_READS` existed, reported exactly those four.
+* **The YAML reader** is acp-go-sdk2's, for the subset the workflows use.
+  It refuses anchors, aliases, tags, flow mappings, document markers,
+  duplicate keys and tabs in indentation.
+  * PyYAML 6.0.3, which this host has, served once, from the session's
+    scratch directory, as an oracle and not a dependency.
+  * On both workflows, the reader's value equalled `yaml.safe_load`'s,
+    with YAML 1.1's `on: true` key read as `on`, and PyYAML's booleans and
+    integers written as the reader keeps them, as strings.
+* **The globs** follow GitHub's: `**/` also matches no directory, so
+  `.opencode/**/*.md` matches `.opencode/rules.md`.
+* **`scripts/check_ci_filters_test.py`, new:** 12 cases, 42 checks.
+  * It copies the tracked files once into a scratch git repository, and
+    each case copies that and breaks one part.
+  * It also covers the reader, the globs, the refused YAML and this
+    repository itself.
+  * Every check passed on its first run; the mutations below are its
+    failures.
+* **`ci.yml`:** the `gates` step "shellcheck, actionlint, CI filters" runs
+  the test and the check after actionlint. The header comment names the
+  check. **`docs.yml`:** its header comment says that the check holds its
+  paths to CI's.
+
+**Checks,** each exit 0:
+
+* `python3 scripts/check_ci_filters.py`: "check-ci-filters: 0
+  problem(s)";
+* `python3 scripts/check_ci_filters_test.py`: "42 passed, 0 failed";
+* `actionlint@v1.7.12` over both workflows; `py_compile` of the two
+  scripts;
+* `scripts/check_records.py`: 0 errors; `scripts/check_disclosure.py`: 0
+  findings;
+* `python3 -m tools.verify scan --base HEAD`: "scan: clean".
+
+**Seen failing,** through `python3 -m tools.verify mutate` on scratch
+copies, each made a git repository first, as in Phase 1. 22 killed of 22:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| 2.1 the `pull_request` list not compared | `FAIL lists differ: exit 1: want 1, got 0` |
+| 2.2 a `paths` filter accepted | `FAIL a paths filter` |
+| 2.3 the triggers not checked | `FAIL tags lost`, `FAIL the branch lost`, `FAIL pull_request lost` |
+| 2.4 Docs' `push` and `pull_request` not compared | `FAIL Docs' lists differ` |
+| 2.5 Docs' paths not compared with CI's | `FAIL Docs misses an ignored pattern` |
+| 2.6 a pattern with no file accepted | `FAIL a pattern with no file` |
+| 2.7 an ignored file Docs misses accepted | `FAIL and its files` |
+| 2.8 `testdata` may be ignored | `FAIL testdata ignored` |
+| 2.9 a reader's target not looked for in Docs | `FAIL Docs without docs-check` |
+| 2.10 a reader's recipe not read | `FAIL the recipe drops the inventory`, `FAIL the recipe drops the guide check` |
+| 2.11 `filepath.Join`'s parts not read | `FAIL a Join names one` |
+| 2.12 a stale `NOT_READS` line accepted | `FAIL a stale NOT_READS line` |
+| 2.13 `markdownlint-cli2` in a workflow accepted | `FAIL CI runs markdownlint itself` |
+| 2.14 the `Makefile`'s pin not counted | `FAIL the pin twice` |
+| 2.15 Docs' action pins not compared | `FAIL another checkout pin` |
+| 2.16 Docs' permissions not checked | `FAIL Docs may write` |
+| 2.17 a duplicate key accepted | `FAIL a duplicate key is refused: want 2, got 0` |
+| 2.18 `**/` needs a directory | `FAIL the copy is clean`: "tracked: CI ignores '.opencode/**/*.md', which matches no tracked file" |
+| 2.19 plant: CI's `pull_request` list loses `.opencode/**/*.md` | "filters: CI's push and pull_request paths-ignore differ, or are empty" |
+| 2.20 plant: `command/testdata/**/*.md` added to CI's lists and Docs' | "readers: CI ignores command/testdata/commands/notes.md, under a testdata directory go test reads", one line for each of the 5 fixtures |
+| 2.21 plant: Docs drops `disclosure-check` from its make line | "gates: Docs does not run make disclosure-check" |
+| 2.22 plant: Docs sets up Go at another pin | "pins: Docs uses actions/setup-go@0a2b…, and CI ['actions/setup-go@b7ad…']" |
+
+The four plants are the ones step 3 names: a mismatched path, a Markdown
+reader wrongly ignored, a missing Docs gate and a differing pin. Each was
+applied to the real workflows, and the contract check alone was run.
+
+Not checked locally: how GitHub routes a push. Phase 3, step 3 observes
+it after an authorized push.

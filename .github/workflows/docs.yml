@@ -6,7 +6,8 @@
 # (docs/decisions/0022-MADR-align-docs-ci-and-disclosure-gates.md). The
 # five document patterns below must match ci.yml's paths-ignore, so that a
 # change to those files alone runs this workflow instead of the full CI
-# (docs/decisions/0019-MADR-skip-full-ci-for-docs-only-pushes.md).
+# (docs/decisions/0019-MADR-skip-full-ci-for-docs-only-pushes.md);
+# scripts/check_ci_filters.py, which ci.yml runs, fails when they do not.
 name: Docs
 on:
   push:

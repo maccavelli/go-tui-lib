@@ -3,7 +3,11 @@ name: CI
 # .github/workflows/docs.yml instead, whose paths list the same patterns;
 # the two lists must agree. A tag push is never path-filtered. Markdown
 # under command/testdata/ stays out of the list, since tests read it
-# (docs/decisions/0019-MADR-skip-full-ci-for-docs-only-pushes.md).
+# (docs/decisions/0019-MADR-skip-full-ci-for-docs-only-pushes.md). The
+# documents' own readers run in docs.yml too, and
+# scripts/check_ci_filters.py, in the gates job, fails when the lists, the
+# triggers below, the readers or the shared checks drift apart
+# (docs/decisions/0022-MADR-align-docs-ci-and-disclosure-gates.md).
 on:
   push:
     branches: [main]
@@ -197,7 +201,7 @@ jobs:
       # embedded checks use it too. The runner's distribution copy is older
       # and reports differently (go-selfupdate-lib docs/decisions/0003-PLAN-remediate-debugging-pass-findings.md
       # deviation D5).
-      - name: shellcheck, actionlint
+      - name: shellcheck, actionlint, CI filters
         shell: bash
         env:
           SHELLCHECK_VERSION: v0.11.0
@@ -215,6 +219,11 @@ jobs:
           python3 --version
           python3 -m py_compile scripts/*.py
           go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          # This workflow's filters and docs.yml agree, and no ignored file
+          # has a reader that only this workflow runs
+          # (docs/decisions/0022-PLAN-align-docs-ci-and-disclosure-gates.md Phase 2).
+          python3 scripts/check_ci_filters_test.py
+          python3 scripts/check_ci_filters.py
       # The verification tools compile and pass their tests on the runner's
       # python3, the 3.12 floor; nothing here runs them on the repository
       # (docs/decisions/0018-MADR-python-verification-tools.md, item 7).
