@@ -306,6 +306,41 @@ Step 7c's.*
   is the gate's use.
 * **Checks:** `tools-tests`, under Python 3.12 too; `scan`.
 
+### Step 11 (A6): a failing script test names its case
+
+*Added 2026-10-31, for MADR amendment A6, from
+[0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
+Step 7d's deviation D30; proposed.*
+
+* **`gates.py`:** `FAIL_LINES` gains `^\s+FAIL \S` and `^ERROR: \S`,
+  each with a comment naming what prints it; the module's docstring
+  says so.
+* **Tests** (`tools/verify/tests/test_gates.py`):
+  * a failing gate whose output holds a harness's `  FAIL c: want 1, got
+    2` early, then 30 `ok` lines, quotes that line before its tail;
+  * a failing gate whose output holds unittest's `ERROR: test_x (m.T)`
+    early quotes it;
+  * a passing gate whose output holds either line quotes only its
+    `quote` lines;
+  * a line `FAILED (failures=1)`, and a word `FAIL` inside a line, are
+    not failure lines by the new patterns.
+* **Mutations:** each new pattern dropped; `^\s+FAIL \S` as `^\s*FAIL`,
+  which also takes `FAILED`.
+* **Acceptance,** on a scratch clone of the tree, never the tree itself:
+  a case planted to fail early in `scripts/check_records_test.py`, run
+  through `gates --only script-test-check_records` on macOS and through
+  `remote windows` from the clone; each run's output names the case.
+* **The flake** (A6 item 2): `remote windows -- --only
+  script-test-check_ci_filters`, from the tree, until a run fails or ten
+  have passed. The case and its message, or "ten passed", go in this
+  step's record and in a dated note under 0023-PLAN Step 7d's D30. A
+  fix is proposed as an amendment to 0022-MADR, for the owner, and not
+  made here.
+* **Records:** A6 `accepted`; `docs/README.md`'s rows; this PLAN
+  `complete` again once CI is green on the pushed tree.
+* **Checks:** `tools-tests`, under Python 3.12 too; `markdownlint`;
+  `scan`.
+
 ## Verification
 
 * `python3 -m unittest discover -s tools -t .` passes on macOS, the Linux
@@ -786,3 +821,13 @@ A12 and 7c, issue 13 first, proceed". A12 item 7 names this gate, so A5 is
 * **Checks:** `python3 -m unittest discover -s tools -t .`: "Ran 69
   tests", OK, under Python 3.14 and 3.12; `tools.verify scan`: clean.
 * **Close-out:** as Step 8's, once CI is green on the pushed tree.
+
+### Close-out of Steps 8 to 10 (2026-10-31)
+
+* Steps 8, 9 and 10 were each to close once CI was green on the pushed
+  tree. `main` at `b8a2021` carries all three (Step 10 as `ef628ce`), and
+  its CI run, 41157446810, passed `modules`, `gates`, and `test` on macOS
+  15, Ubuntu 24.04 and Windows 2025. The tag `v2.7.0` at the same commit
+  passed run 41159317505.
+* **Steps 8 to 10 complete, 2026-10-31.** The PLAN stays `in-progress`
+  for Step 11, proposed.

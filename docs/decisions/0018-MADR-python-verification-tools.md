@@ -391,6 +391,57 @@ Linux and Windows alike.
    logs its time and allocations a line, as gobble's `perfCheck` does.
 4. What is not changed: the default gates, and CI.
 
+### A6 (2026-10-31): a failing script test names its case
+
+*Status: proposed (2026-10-31),* the owner's choice "Record it, fix
+reporting next (Recommended)" in
+[0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
+Step 7d, deviation D30. To be implemented by
+[0018-PLAN-python-verification-tools.md](0018-PLAN-python-verification-tools.md)
+Step 11.
+
+**Found.**
+
+1. **A failing script test's case is not quoted.** Each
+   `script-test-*` gate runs a harness under `scripts/`, which prints a
+   failing case as `  FAIL <case>: …`, indented, and goes on to the next
+   (AGENTS.md, "Scripts"). A3 item 1's `FAIL_LINES` match `--- FAIL`,
+   `FAIL` at the start of a line, a panic and a Go position, and none of
+   them matches an indented `FAIL`. So a failing harness quotes only its
+   last 15 lines.
+2. **A case was lost to it.** On 2026-10-31 the Windows host's
+   `script-test-check_ci_filters` gate exited 1, "41 passed, 1 failed".
+   Its 15 lines were groups 11 and 12, both passing, and the summary
+   line. The host had removed the outputs, as A3 item 4 keeps it, and
+   four reruns on the same tree passed. The case is not known.
+3. **`tools-tests` has the same gap for an error.** unittest prints a
+   failing test as `FAIL: <test>`, which `^FAIL\b` matches, and a test
+   that raised as `ERROR: <test>`, which nothing matches.
+
+**Considered.**
+
+* **A. Add the two forms to `FAIL_LINES`:** `^\s+FAIL \S`, the
+  harnesses' line, and `^ERROR: \S`, unittest's. A3's quoting then
+  reaches them on every host, with no other change.
+* **B. A harness prints its failures again at its end,** inside the tail:
+  nine harnesses change, and a new harness must remember to.
+* **C. Bring a failing gate's whole output back:** A3's option B, left
+  then for the reasons A3 gives, which still hold.
+
+**Decided:** "A", because it is A3's rule given the repository's own
+failure line, in one place.
+
+1. **`FAIL_LINES` gains `^\s+FAIL \S` and `^ERROR: \S`.** The quoting
+   order, the limit and a passing gate's quoting are A3's.
+2. **The flake is then looked into:** the gate runs again on the Windows
+   host until a run fails or ten have passed, and the case it names is
+   recorded. A fix to `scripts/check_ci_filters_test.py` or the script
+   it tests belongs to
+   [0022-MADR-align-docs-ci-and-disclosure-gates.md](0022-MADR-align-docs-ci-and-disclosure-gates.md),
+   as an amendment of its own, not to this one.
+3. **What is not changed:** the harnesses, the bootstrap, which still
+   removes every output, and the other gates.
+
 ## More Information
 
 * The scratch tools named above are the ones
