@@ -52,7 +52,7 @@ record that is not there.
 | A command's danger | required | `command.WithDanger` | floor |
 | The ID, slash and argument grammars | fixed | `command.ArgsOf`, `command.Request` | floor |
 | Exit statuses of its errors | `ErrUnknown` 2, `ErrUnavailable` 1, `ErrRefused` 3 | `launch.ExitError` | built |
-| The built-in commands' text, and the MCP error text | English | `command.WithCatalog` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
+| The built-in commands' text, and the MCP error text | English | `command.WithCatalog`, `command.Messages` | built |
 
 ## command/commandtea
 
@@ -124,7 +124,7 @@ record that is not there.
 | Focus | the first pane of the ring | `workspace.WithFocus`, `workspace.WithFocusRing`, `workspace.Focusable` | built |
 | Focus when the focused pane hides | the ring's first pane | `workspace.WithFocusFallback`, `workspace.FocusFallback` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
 | A help footer | the workspace's bindings and the focused pane's | `workspace.Workspace.Bindings` | built |
-| Text it shows: results, help | English | `workspace.WithCatalog` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
+| Text it shows: results, reasons, help | English | `workspace.WithCatalog`, `workspace.Messages` | built |
 | A modal overlay takes clicks outside it | always | `workspace.Overlay.Modal` | decided (0002-MADR-multi-pane-workspace-layouts.md) |
 
 ## palette
@@ -147,7 +147,7 @@ record that is not there.
 | A click on a row | accepts it | `palette.WithoutClickAccept` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
 | Accepting a hit | closes the picker | `palette.WithoutCloseOnAccept` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
 | A query of `?` | lists the prefixes | `palette.WithoutPrefixList` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
-| Text it shows | English | `palette.WithCatalog` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
+| Text it shows, a provider's rows too | English | `palette.WithCatalog`, `palette.Messages`, `palette.Search.Catalog` | built |
 | Hit text | cleaned | `safetext.Clean` | floor |
 | The file provider's limits | an index above 5000 paths, a walk of 200 000 | `palette.WithIndexAbove`, `palette.WithMaxFiles` | built |
 | Recents' half-life and size | 7 days, 500 | `palette.WithHalfLife`, `palette.WithMaxEntries` | built |
@@ -190,7 +190,7 @@ record that is not there.
 | A reply's length | 1 KiB | `termcap.ParseReply` | floor |
 | The DA1 sentinel | sent last | `termcap.Probe.Start` | floor |
 | The report | 80 columns, text | `termcap.WithReportWidth`, `termcap.WithReportJSON` | built |
-| The report's findings | English | `termcap.WithReportCatalog` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
+| The report's findings and notes | English | `termcap.WithReportCatalog`, `termcap.Messages` | built |
 | tmux's facts | not asked | `termcap.TmuxQuery`, `termcap.ParseTmux`, `termcap.Probe.SetTmux` | built |
 | Modes 2026 and 2027 in a Bubble Tea program | asked by Bubble Tea, not the prober | `termcaptea.NewProber` | decided (0020-MADR-charm-free-cores-glyphs-and-safetext.md) |
 

@@ -1,7 +1,6 @@
 package palette
 
 import (
-	"fmt"
 	"strings"
 
 	"charm.land/bubbles/v2/textinput"
@@ -88,7 +87,7 @@ func (p *Picker) drawRow(r row, selected bool, width int) string {
 	var badgeStyle lipgloss.Style
 	switch {
 	case r.failed:
-		text = g.Failed + " " + text + " failed"
+		text = g.Failed + " " + say(p.cfg.catalog, MsgFailed, text)
 	case p.listing():
 		hint = r.hit.Group
 	default:
@@ -204,20 +203,19 @@ func cut(s string, a, b int, m ansi.Method) string {
 // was refused, or else the parameter's description, and "argument 1 of 2".
 func (p *Picker) helpLine(rows []row, width int) string {
 	t, m := p.w.Theme(), p.w.WidthMethod()
-	count := "no results"
-	if len(rows) > 0 {
-		count = fmt.Sprintf("%d of %d", p.sel+1, len(rows))
-	}
-	if p.eng.pending > 0 {
-		if len(rows) == 0 {
-			count = "searching" + t.Glyphs.Ellipsis
-		} else {
-			count += ", searching" + t.Glyphs.Ellipsis
-		}
+	cat := p.cfg.catalog
+	count := say(cat, MsgNoResults)
+	switch {
+	case p.eng.pending > 0 && len(rows) == 0:
+		count = say(cat, MsgSearching) + t.Glyphs.Ellipsis
+	case p.eng.pending > 0:
+		count = say(cat, MsgCountSearching, p.sel+1, len(rows)) + t.Glyphs.Ellipsis
+	case len(rows) > 0:
+		count = say(cat, MsgCount, p.sel+1, len(rows))
 	}
 	help, helpStyle := "", t.Styles.Muted
 	if st := p.args; st != nil {
-		count = fmt.Sprintf("argument %d of %d", st.at+1, len(st.params))
+		count = say(cat, MsgArgumentCount, st.at+1, len(st.params))
 		help = sanitize.Line(st.param().Description)
 		if st.reason != "" {
 			help, helpStyle = sanitize.Line(st.reason), t.Styles.Error

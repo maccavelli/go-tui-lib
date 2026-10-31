@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 
 	"github.com/maccavelli/go-tui-lib/v2/internal/sanitize"
+	"github.com/maccavelli/go-tui-lib/v2/msgcat"
 	"github.com/maccavelli/go-tui-lib/v2/when"
 )
 
@@ -58,8 +59,9 @@ type Registry struct {
 	prefixer func(Source) string
 	loop     atomic.Pointer[loopState] // the program's loop, or nil
 	running  running
-	maxArg   int  // the largest request's arguments, and slash or command line, in bytes
-	bare     bool // WithoutBuiltins: NewRegistry adds none of its own commands
+	maxArg   int            // the largest request's arguments, and slash or command line, in bytes
+	bare     bool           // WithoutBuiltins: NewRegistry adds none of its own commands
+	catalog  msgcat.Catalog // WithCatalog
 }
 
 // DefaultMaxArgBytes is the largest request's arguments a registry takes,

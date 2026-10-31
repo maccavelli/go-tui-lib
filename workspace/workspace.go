@@ -38,6 +38,7 @@ import (
 	"github.com/maccavelli/go-tui-lib/v2/internal/limits"
 	"github.com/maccavelli/go-tui-lib/v2/keymap"
 	"github.com/maccavelli/go-tui-lib/v2/layout"
+	"github.com/maccavelli/go-tui-lib/v2/msgcat"
 	"github.com/maccavelli/go-tui-lib/v2/theme"
 )
 
@@ -184,6 +185,7 @@ type Workspace struct {
 	last     string           // the last frame
 	dirty    bool             // something changed since the last frame
 	drag     *drag
+	catalog  msgcat.Catalog // WithCatalog
 }
 
 // viewKind tells a pane's cached view from an overlay's: their IDs are

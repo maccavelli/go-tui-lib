@@ -3,7 +3,6 @@ package palette
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io/fs"
 	"math"
 	"path"
@@ -214,8 +213,8 @@ func (f *files) Search(ctx context.Context, q Search, yield func(Hit) bool) erro
 	if w.stopped {
 		yield(Hit{
 			ID:       "files:limit",
-			Text:     fmt.Sprintf("only the first %d files are searched", f.cfg.maxFiles),
-			Disabled: "the file limit",
+			Text:     say(q.Catalog, MsgFileLimit, f.cfg.maxFiles),
+			Disabled: say(q.Catalog, MsgFileLimitReason),
 			Score:    fuzzy.Score{Grade: fuzzy.Subsequence, Value: math.MinInt},
 		})
 	}

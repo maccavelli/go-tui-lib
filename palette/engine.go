@@ -223,7 +223,7 @@ func (e *engine) query(text string) tea.Cmd {
 	targets := e.targets(&text)
 	e.ctx, e.cancel = context.WithCancel(e.s.ctx)
 	e.ch = make(chan event, maxBatch)
-	e.search = Search{Text: text, WhenContext: e.s.whenC}
+	e.search = Search{Text: text, WhenContext: e.s.whenC, Catalog: e.cfg.catalog}
 	if text != "" {
 		e.search.Matcher = fuzzy.NewMatcher(text)
 	}

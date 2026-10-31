@@ -9,6 +9,7 @@ import (
 
 	"github.com/maccavelli/go-tui-lib/v2/command"
 	"github.com/maccavelli/go-tui-lib/v2/fuzzy"
+	"github.com/maccavelli/go-tui-lib/v2/msgcat"
 	"github.com/maccavelli/go-tui-lib/v2/when"
 )
 
@@ -65,6 +66,9 @@ type Search struct {
 	Text        string
 	Matcher     *fuzzy.Matcher
 	WhenContext when.Context
+	// Catalog is the picker's WithCatalog, or nil: the words a provider
+	// gives its own rows in (0024-MADR A4).
+	Catalog msgcat.Catalog
 }
 
 // Hit is one result. Fields are added, never changed, so build one with a

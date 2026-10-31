@@ -6,6 +6,7 @@ import (
 
 	"github.com/maccavelli/go-tui-lib/v2/internal/enum"
 	"github.com/maccavelli/go-tui-lib/v2/internal/sanitize"
+	"github.com/maccavelli/go-tui-lib/v2/msgcat"
 	"github.com/maccavelli/go-tui-lib/v2/workspace"
 )
 
@@ -59,6 +60,7 @@ type config struct {
 	placeholder string
 	noInput     bool      // a completion pop-up: no input row, non-modal
 	recents     *Frecency // where accepted hits are recorded, or nil
+	catalog     msgcat.Catalog
 }
 
 func newConfig(opts []Option) config {
@@ -68,6 +70,11 @@ func newConfig(opts []Option) config {
 	}
 	return c
 }
+
+// WithCatalog gives the picker's own words in the program's: see
+// Messages. Each provider's Search carries it, so a provider words its own
+// rows too (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md A4).
+func WithCatalog(c msgcat.Catalog) Option { return optionFunc(func(cfg *config) { cfg.catalog = c }) }
 
 // WithLimit keeps the best n hits across providers; below 1 keeps
 // DefaultLimit.

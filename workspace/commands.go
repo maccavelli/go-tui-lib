@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"maps"
 	"slices"
-	"strconv"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -138,7 +137,7 @@ func paneError(reason string) error {
 func (b *builder) focus() command.Command {
 	return newCommand(b, "workspace.focus", "Focus a pane", func(a paneArg) (command.Result, error) {
 		if !b.w.focusable(layout.PaneID(a.Pane)) {
-			return command.Result{}, paneError("is not a pane on screen that takes focus")
+			return command.Result{}, paneError(b.w.say(MsgNotFocusable))
 		}
 		return command.Result{Cmd: commandtea.Effect(b.w.Focus(layout.PaneID(a.Pane)))}, nil
 	}, b.opts("focus", command.UI, "Moves focus to a pane on screen.", command.WithArgHint("pane")))
@@ -158,7 +157,7 @@ func (b *builder) focusIndex() command.Command {
 	return newCommand(b, "workspace.focus.index", "Focus a pane by its place", func(a indexArg) (command.Result, error) {
 		r := b.w.focusRing()
 		if a.Index < 1 || a.Index > len(r) {
-			return command.Result{Text: "No pane " + strconv.Itoa(a.Index) + " in the focus ring."}, nil
+			return command.Result{Text: b.w.say(MsgNoPaneIndex, a.Index)}, nil
 		}
 		return command.Result{Cmd: commandtea.Effect(b.w.Focus(r[a.Index-1]))}, nil
 	}, b.opts("", command.UI, "Moves focus to the n-th pane of the focus ring, as alt+n does.", command.WithArgHint("index")))
@@ -175,7 +174,7 @@ func (b *builder) resizeDirection() command.Command {
 	return newCommand(b, cmdResizeDirection, "Move the nearest split", func(a directionArg) (command.Result, error) {
 		d, ok := directions[a.Direction]
 		if !ok {
-			return command.Result{}, &command.ArgError{Path: "/direction", Reason: "is not left, right, up or down"}
+			return command.Result{}, &command.ArgError{Path: "/direction", Reason: b.w.say(MsgNotADirection)}
 		}
 		return command.Result{Cmd: commandtea.Effect(b.w.resizeFocused(d.axis, d.delta))}, nil
 	}, b.opts("", command.UI, "Moves the separator nearest the focused pane by one cell, as alt+shift and an arrow do.",
@@ -189,7 +188,7 @@ func (b *builder) zoom() command.Command {
 			id = b.w.focus
 		}
 		if !b.w.known(id) {
-			return command.Result{}, paneError("is not a pane of the layout")
+			return command.Result{}, paneError(b.w.say(MsgNotAPane))
 		}
 		return command.Result{Cmd: commandtea.Effect(b.w.Zoom(id))}, nil
 	}, b.opts("zoom", command.UI, "Gives a pane the whole area, or restores the layout when it is zoomed already.",
@@ -199,7 +198,7 @@ func (b *builder) zoom() command.Command {
 func (b *builder) toggle() command.Command {
 	return newCommand(b, "workspace.toggle", "Hide or show a pane", func(a paneArg) (command.Result, error) {
 		if !b.w.known(layout.PaneID(a.Pane)) {
-			return command.Result{}, paneError("is not a pane of the layout")
+			return command.Result{}, paneError(b.w.say(MsgNotAPane))
 		}
 		return command.Result{Cmd: commandtea.Effect(b.w.Toggle(layout.PaneID(a.Pane)))}, nil
 	}, b.opts("toggle", command.UI, "Hides a pane, or shows it when it is hidden.", command.WithArgHint("pane")))
@@ -234,18 +233,18 @@ func (w *Workspace) separator(split string) (string, error) {
 	}
 	switch len(named) {
 	case 0:
-		return "", &command.ArgError{Path: "/split", Reason: "is not a resizable split on screen"}
+		return "", &command.ArgError{Path: "/split", Reason: w.say(MsgNotASplit)}
 	case 1:
 		return named[0], nil
 	}
-	return "", &command.ArgError{Path: "/split", Reason: "has " + strconv.Itoa(len(named)) + " separators on screen; name one of " + strings.Join(named, ", ")}
+	return "", &command.ArgError{Path: "/split", Reason: w.say(MsgManySplits, len(named), strings.Join(named, ", "))}
 }
 
 func (b *builder) layoutUse(layouts map[string]layout.Node) command.Command {
 	c := newCommand(b, "workspace.layout.use", "Use a layout", func(a layoutArg) (command.Result, error) {
 		root, ok := layouts[a.Name]
 		if !ok {
-			return command.Result{}, &command.ArgError{Path: "/name", Reason: "is not a layout's name"}
+			return command.Result{}, &command.ArgError{Path: "/name", Reason: b.w.say(MsgNotALayout)}
 		}
 		return command.Result{Cmd: commandtea.Effect(b.w.SetLayout(root))}, nil
 	}, b.opts("layout", command.UI, "Switches to a named layout.", command.WithArgHint("name")))
@@ -315,10 +314,10 @@ func (b *builder) panes() command.Command {
 		for _, p := range infos {
 			fmt.Fprintf(&text, "%s  %s  %d,%d %dx%d", p.ID, p.Title, p.X, p.Y, p.Width, p.Height)
 			if p.Focused {
-				text.WriteString("  focused")
+				text.WriteString("  " + b.w.say(MsgPaneFocused))
 			}
 			if p.Hidden {
-				text.WriteString("  hidden")
+				text.WriteString("  " + b.w.say(MsgPaneHidden))
 			}
 			text.WriteString("\n")
 		}
@@ -355,7 +354,7 @@ func (w *Workspace) paneInfos() []paneInfo {
 func (b *builder) closeOverlay() command.Command {
 	return newCommand(b, cmdOverlayClose, "Close the overlay", func(command.NoArgs) (command.Result, error) {
 		if len(b.w.overlays) == 0 {
-			return command.Result{Text: "No overlay is open."}, nil
+			return command.Result{Text: b.w.say(MsgNoOverlay)}, nil
 		}
 		return command.Result{Cmd: commandtea.Effect(b.w.Pop())}, nil
 	}, b.opts("close", command.UI, "Closes the top overlay."))

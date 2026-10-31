@@ -585,6 +585,31 @@ changes:
   multiplexer; any other value keeps the default, and `WithClipboard`
   still wins.
 
+### A4 (2026-10-31): what the catalogue covers in the existing packages
+
+*Status: accepted (2026-10-31),* the owner's choices "Run-time text, not
+metadata (Recommended)" and "Search carries the catalogue
+(Recommended)", found while
+[0024-PLAN-terminal-text-and-convention-opt-outs.md](0024-PLAN-terminal-text-and-convention-opt-outs.md)
+Step 3 began; its deviations D8 and D9 have the evidence.
+
+D9 says every string a package shows a user or an agent has an ID. In
+`palette`, `workspace`, `command` and `termcap` that is narrowed to the
+text their code makes at run time:
+
+* **In:** gap 12's list; the argument and pane reasons the workspace's
+  handlers and `command.describe` give; the built-ins' output labels; the
+  report's findings.
+* **Out:** command titles, descriptions and argument help, which are a
+  command's metadata and its schema; enum tokens, such as a command's
+  danger; the report's field labels, which are its JSON names; and Go
+  error values, such as schema-validation reasons, which are errors by
+  Go's convention.
+* **The providers:** `palette.Search` carries the picker's catalogue, so
+  a provider, the files provider or a program's, words its own rows.
+
+A later record may bring the metadata in.
+
 ## More Information
 
 * The audit, at `65d437b`, by package group, read 2026-10-25. Its three

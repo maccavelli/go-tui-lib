@@ -13,6 +13,7 @@ import (
 	"github.com/maccavelli/go-tui-lib/v2/command"
 	"github.com/maccavelli/go-tui-lib/v2/fuzzy"
 	"github.com/maccavelli/go-tui-lib/v2/internal/sanitize"
+	"github.com/maccavelli/go-tui-lib/v2/msgcat"
 )
 
 // stage is the argument stage: a hit whose parameters the picker asks for,
@@ -30,6 +31,7 @@ type stage struct {
 	shown   []row          // the choices the input matches, best first
 	matcher *fuzzy.Matcher // the input's, while it is not empty
 	reason  string         // why the last value was refused, until the input changes
+	cat     msgcat.Catalog // the picker's words
 }
 
 // choice is one value of a list: as it is drawn, and as it is sent.
@@ -130,15 +132,15 @@ func (st *stage) give(typed string, sel int) bool {
 	present := true
 	if st.choices != nil {
 		if sel < 0 || sel >= len(st.shown) {
-			st.reason = p.Name + ": pick one of its values"
+			st.reason = say(st.cat, MsgRefused, p.Name, say(st.cat, MsgPickOne))
 			return false
 		}
 		v = st.choices[st.shown[sel].src].v
 	} else {
 		var why string
-		v, present, why = value(p, typed)
+		v, present, why = value(p, typed, st.cat)
 		if why != "" {
-			st.reason = p.Name + ": " + why
+			st.reason = say(st.cat, MsgRefused, p.Name, why)
 			return false
 		}
 	}
@@ -150,15 +152,15 @@ func (st *stage) give(typed string, sel int) bool {
 }
 
 // value is typed as p's value, whether there is one, and why it is
-// refused: an empty input is p's default, or none when p is not required;
-// a number is parsed and held to p's Min and Max.
-func value(p command.Param, typed string) (any, bool, string) {
+// refused, in c's words: an empty input is p's default, or none when p is
+// not required; a number is parsed and held to p's Min and Max.
+func value(p command.Param, typed string, c msgcat.Catalog) (any, bool, string) {
 	if typed == "" {
 		switch {
 		case p.HasDefault:
 			return p.Default, true, ""
 		case p.Required:
-			return nil, false, "required"
+			return nil, false, say(c, MsgRequired)
 		}
 		return nil, false, ""
 	}
@@ -166,18 +168,18 @@ func value(p command.Param, typed string) (any, bool, string) {
 	case "integer":
 		i, err := strconv.ParseInt(strings.TrimSpace(typed), 10, 64)
 		if err != nil {
-			return nil, false, "not a whole number"
+			return nil, false, say(c, MsgNotWholeNumber)
 		}
-		if why := bounds(p, float64(i)); why != "" {
+		if why := bounds(p, float64(i), c); why != "" {
 			return nil, false, why
 		}
 		return i, true, ""
 	case "number":
 		f, err := strconv.ParseFloat(strings.TrimSpace(typed), 64)
 		if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
-			return nil, false, "not a number"
+			return nil, false, say(c, MsgNotNumber)
 		}
-		if why := bounds(p, f); why != "" {
+		if why := bounds(p, f, c); why != "" {
 			return nil, false, why
 		}
 		return f, true, ""
@@ -185,13 +187,13 @@ func value(p command.Param, typed string) (any, bool, string) {
 	return typed, true, ""
 }
 
-// bounds is why n is outside p's Min and Max, or "".
-func bounds(p command.Param, n float64) string {
+// bounds is why n is outside p's Min and Max, in c's words, or "".
+func bounds(p command.Param, n float64, c msgcat.Catalog) string {
 	switch {
 	case p.Min != nil && n < *p.Min:
-		return "at least " + strconv.FormatFloat(*p.Min, 'g', -1, 64)
+		return say(c, MsgAtLeast, strconv.FormatFloat(*p.Min, 'g', -1, 64))
 	case p.Max != nil && n > *p.Max:
-		return "at most " + strconv.FormatFloat(*p.Max, 'g', -1, 64)
+		return say(c, MsgAtMost, strconv.FormatFloat(*p.Max, 'g', -1, 64))
 	}
 	return ""
 }

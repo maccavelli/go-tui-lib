@@ -93,11 +93,11 @@ func mcpTool(c *Command) MCPTool {
 func (r *Registry) CallMCP(ctx context.Context, name string, arguments []byte, caller string) MCPCallResult {
 	res, err := r.Run(ctx, Request{ID: ID(name), Args: arguments, Origin: OriginAgent, Caller: caller})
 	if err != nil {
-		return mcpError(name, err)
+		return r.mcpError(name, err)
 	}
 	text, err := resultText(res)
 	if err != nil {
-		return mcpError(name, err)
+		return r.mcpError(name, err)
 	}
 	out := MCPCallResult{ResultType: mcpResultComplete, Content: []MCPContent{}, StructuredContent: res.Value}
 	if text != "" {
@@ -106,21 +106,22 @@ func (r *Registry) CallMCP(ctx context.Context, name string, arguments []byte, c
 	return out
 }
 
-// mcpError is err as a result the model can act on.
-func mcpError(name string, err error) MCPCallResult {
+// mcpError is err as a result the model can act on, in the registry's
+// words.
+func (r *Registry) mcpError(name string, err error) MCPCallResult {
 	var msg string
 	ae, isArg := errors.AsType[*ArgError](err)
 	switch {
 	case errors.Is(err, ErrUnknown):
-		msg = "There is no tool named " + name + "; list the tools to see which there are."
+		msg = r.say(MsgMCPUnknown, name)
 	case errors.Is(err, ErrUnavailable):
-		msg = "The tool " + name + " is not available now: " + err.Error()
+		msg = r.say(MsgMCPUnavailable, name, err.Error())
 	case errors.Is(err, ErrRefused):
-		msg = "The call to " + name + " was refused: " + err.Error() + ". Do not retry it unchanged."
+		msg = r.say(MsgMCPRefused, name, err.Error())
 	case isArg:
-		msg = "The arguments do not fit the tool's input schema: " + ae.Error() + ". Fix them and call again."
+		msg = r.say(MsgMCPArgs, ae.Error())
 	default:
-		msg = "The tool " + name + " failed: " + err.Error()
+		msg = r.say(MsgMCPFailed, name, err.Error())
 	}
 	return MCPCallResult{ResultType: mcpResultComplete, Content: []MCPContent{{Type: mcpText, Text: msg}}, IsError: true}
 }

@@ -121,6 +121,11 @@ step.
   MCP error text), and the report (`WithReportCatalog`, beside
   `WithReportWidth`).
 * Each string's call site reads `msgcat.Format(c, id, default, args...)`.
+* *Amended 2026-10-31, deviations D8 and D9:* "every string they show" is
+  the text made at run time, not command metadata, enum tokens or report
+  labels; `palette.Search` carries the picker's catalogue to its
+  providers; `termcap.Findings` stays English, and `WithReportCatalog`
+  words `Report`'s findings, as text and as JSON.
 * **Tests:** without a catalogue, every golden unchanged; a `Table` that
   rewords one message changes that message alone; each package's
   `Messages()` holds every `MessageID` constant it exports, both ways;
@@ -521,3 +526,154 @@ Go files on macOS, and through `remote linux` and `remote windows`:
   clean.
 
 **Step 2 complete, 2026-10-31,** for the owner's commit.
+
+### Step 3: the catalogue in the existing packages
+
+*2026-10-31:* the owner committed Step 2 (`071adc0`) and said "committed
+proceed".
+
+**Deviations,** each stopped before any code, the owner's choice dated:
+
+* **D8, 2026-10-31: which strings the catalogue covers.**
+  * *Found:* the step says "a `MessageID` constant per string they show";
+    MADR D6's gap 12 cites fewer. Beyond gap 12, the four packages show:
+    the 15 workspace commands' and 3 built-ins' titles and descriptions,
+    and their argument help, which becomes the JSON Schema an agent reads
+    (`workspace/commands.go:96-372`, `command/builtin.go`); the argument
+    and pane reasons the workspace's handlers and `command.describe` give
+    (`workspace/commands.go:141-248`, `command/builtin.go:40`); the danger
+    badge, an enum's token (`palette/view.go:96-99`); and the report's
+    labels, its JSON names.
+  * *Decision:* "Run-time text, not metadata (Recommended)", over also
+    command metadata and over gap 12's list alone. In scope: gap 12's
+    list, and the text the four packages' own code makes at run time, the
+    workspace's and `describe`'s argument and pane reasons and the
+    built-ins' output labels among them. Out: command titles,
+    descriptions and argument help; enum tokens such as the danger badge;
+    the report's field labels; and Go error values, such as `command`'s
+    schema-validation reasons and the errors an MCP text quotes, which are
+    errors by Go's convention, made where no catalogue is in reach.
+  * *MADR:* amended, A4, since D9 says every string a package shows has an
+    ID.
+* **D9, 2026-10-31: the file provider's text.**
+  * *Found:* the files provider makes its limit row itself,
+    "only the first %d files are searched" (`palette/files.go:214-220`),
+    and does not know the picker, so a picker's `WithCatalog` cannot reach
+    it.
+  * *Decision:* "Search carries the catalogue (Recommended)", over a
+    files option: `palette.Search` gains `Catalog`, which the picker fills
+    from `WithCatalog`, so the files provider, and a program's own, word
+    their rows in the program's language.
+  * *MADR:* amended, A4, which names the field.
+* **Readings, not questions,** stated at the stop and not objected to:
+  `termcap.Findings` stays English, and `WithReportCatalog` words
+  `Report`'s findings, as text and as JSON; each finding has two IDs,
+  `termcap.<token>` and `termcap.<token>.fix`.
+
+No file is added to the step's scope.
+
+**What changed,** 89 message IDs, each with its English default in its
+package's `Messages()`:
+
+* `palette` (15, `palette/messages.go`): the help line's counts,
+  "searching", "no results" and the argument count; a failed provider's
+  row; the argument stage's reasons, each as "<name>: <reason>"; the files
+  provider's limit row and its reason. `WithCatalog`; `Search.Catalog`,
+  which the engine fills, so the files provider reads it (D9); the stage
+  keeps the catalogue, and `value` and `bounds` take it. Each text is one
+  line, through `sanitize.Line`.
+* `workspace` (16, `workspace/messages.go`): the two results, the six
+  reasons its handlers give, "focused" and "hidden" in `workspace.panes`,
+  and the six help names, which `helpDescs` now keys by ID. `WithCatalog`.
+* `command` (8, `command/catalog.go`): `describe`'s reason and its danger
+  and arguments lines; the five MCP error texts, `mcpError` now a method of
+  the registry. `WithCatalog`, a `RegistryOption`. The texts are data the
+  library does not draw, so they are not cut to one line.
+* `termcap` (50, `termcap/messages.go`, its constants and table generated
+  from `findingText`): each of the 22 findings' message and fix, as
+  `termcap.<token>` and `termcap.<token>.fix`; the two for a token with no
+  finding; and the four notes `Report` writes beside a fact never queried.
+  `findingText` holds IDs; `Findings` is `findingsIn(c, nil)`, in English;
+  `WithReportCatalog` words `Report`'s findings and notes, as text and as
+  JSON. The text report stays ASCII, so each byte outside it prints as
+  `?`, as `printable` always did; `WithReportCatalog`'s doc says so.
+* **A reading of D8, not a question:** the notes beside a fact never
+  queried are text `Report` makes at run time, not labels, so they are in.
+* `docs/guides/defaults.md`: the four packages' rows are `built`, each
+  naming its `Messages`, and `palette`'s `Search.Catalog` too.
+* **A slip, undone:** `command/messages.go` already holds the registry's
+  messages (`ResultMsg` and the rest), and was overwritten by mistake when
+  the catalogue was first written; it was restored from `HEAD` before any
+  test ran, and is unchanged. The catalogue is `command/catalog.go`.
+
+**Tests,** in each package's `messages_test.go` (`command`'s
+`catalog_test.go`):
+
+* `TestMessagesHoldEveryID`: the exported `msgcat.MessageID` constants,
+  read from the package's own files with `go/parser`, against
+  `Messages()`, both ways; `msgcat.Check(Messages(), Messages())`; in
+  `termcap`, each finding's two IDs by its token.
+* One message reworded alone changes that text alone: `palette`'s frames
+  and help lines, compared with the default's with the text replaced by
+  one of the same width; `workspace`'s results and reasons, through the
+  registry, or through the handler where the schema's enum keeps a reason
+  from it (`workspace.resize.direction`, `workspace.layout.use`), its
+  splits' reason, the panes' marks and its help; `command`'s five MCP texts
+  and `describe`'s three; `termcap`'s findings, fixes and notes in the text
+  report, the JSON report keeping the words, and `Findings` English.
+* `TestSearchCarriesTheCatalog`: a provider is asked with the picker's
+  catalogue, and with none without it.
+* Without a catalogue, every existing test and golden passes unchanged,
+  the 16 text-report goldens and `command`'s MCP goldens among them.
+
+**Seen failing,** through `tools.verify mutate` on scratch copies, 21
+killed of 21: of each kind the step names, a call site ignoring the
+catalogue, `Messages()` missing an ID and a default's arguments swapped,
+in each package; the rest so that each new test is seen to fail:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| 3.1 palette: the count ignores the catalogue | `TestCatalogRewordsOneMessage`: "count: …" |
+| 3.2 palette: `Messages` misses an ID | `TestMessagesHoldEveryID`: "Messages has no palette.file-limit-reason" |
+| 3.3 palette: the count's arguments swapped in its default | `TestCatalogRewordsOneMessage`: "count: the default frame holds no "1 of 3"" |
+| 3.4 palette: `Search` carries no catalogue | `TestSearchCarriesTheCatalog`: "with: Search.Catalog <nil>, want map[palette.no-results:aucun]" |
+| 3.5 palette: the argument stage has no catalogue | `TestCatalogArgumentReasons`: "refused: "target: required …", want "target! required …"" |
+| 3.6 palette: the file limit ignores the `Search`'s catalogue | `TestCatalogFilesLimit`: "the catalogue's: {ID:files:limit Text:only the first 1 files are searched …" |
+| 3.7 palette: the failed row ignores the catalogue | `TestCatalogRewordsOneMessage`: "failed: …" |
+| 3.8 palette: a number's reason ignores the catalogue | `TestCatalogValueReasons`: "a number: "not a number"" |
+| 3.9 workspace: `say` ignores the catalogue | `TestCatalogRewordsOneMessage`: "workspace.no-pane-index by workspace.focus.index, reworded: "No pane 9 in the focus ring.", want "Pas de volet 9.""; `TestCatalogPanesMarks`, `TestCatalogManySplits`, `TestCatalogHelp` |
+| 3.10 workspace: `Messages` misses an ID | `TestMessagesHoldEveryID`: "Messages has no workspace.help-close" |
+| 3.11 workspace: the splits' arguments swapped in its default | `TestCatalogManySplits`: "the default: "has row:0, row:1 separators on screen; name one of 2"" |
+| 3.12 workspace: the help ignores the catalogue | `TestCatalogHelp`: "workspace.help-next-pane reworded: ["next pane" …], want ["Xnext pane" …]" |
+| 3.13 workspace: a reason the schema guards ignores the catalogue | `TestCatalogRewordsOneMessage`: "workspace.not-a-direction by workspace.resize.direction, reworded: "is not left, right, up or down"" |
+| 3.14 command: `say` ignores the catalogue | `TestCatalogMCP`: "command.mcp-unknown reworded: "There is no tool named no.such; …", want "Pas d'outil no.such."" |
+| 3.15 command: `Messages` misses an ID | `TestMessagesHoldEveryID`: "Messages has no command.mcp-args" |
+| 3.16 command: the refusal's arguments swapped in its default | `TestCatalogMCP`: "command.mcp-refused: "The call to command: refused: … was refused: session.reset. …"" |
+| 3.17 command: `describe`'s danger line ignores the catalogue | `TestCatalogDescribe`: "the danger line, reworded: …" |
+| 3.18 termcap: `Report`'s findings ignore the catalogue | `TestReportCatalogRewordsOneMessage`: "termcap.terminal.unknown: …"; `TestReportCatalogJSONAndASCII`: "the JSON report: …" |
+| 3.19 termcap: the notes ignore the catalogue | `TestReportCatalogRewordsOneMessage`: "termcap.note-tea-asks: …" |
+| 3.20 termcap: `Messages` misses an ID | `TestMessagesHoldEveryID`: "Messages has no termcap.note-timeout" |
+| 3.21 termcap: a finding's message and fix swapped | `TestMessagesHoldEveryID`: "terminal.unknown: IDs termcap.terminal.unknown.fix and termcap.terminal.unknown" |
+
+**Gates:**
+
+* `make pre-add-check` over the step's 23 Go files, before the gates,
+  first failed on two findings in `termcap`'s new code: goconst over "None
+  needed." three times in `Messages`, so `noFix` is its constant again;
+  and revive's confusing-naming over the unexported `findings` beside
+  `Findings`, now `findingsIn`. Mutation 3.18, re-anchored there, was
+  killed again with the same lines; every other anchor was checked to
+  match once. The check was then clean: "23 file(s) clean".
+
+| Host | `gates` |
+| :--- | :--- |
+| macOS, with the step's Go files | 22 passed, 0 failed, 0 skipped, 771 s; `release-check` "430 file(s) clean", with `apicheck` and the examples gate |
+| `remote linux` | 21 passed, 0 failed, 1 skipped, 1235 s; "438 file(s) clean", the step's 8 new files among them, which a remote run takes untracked |
+| `remote windows` | 21 passed, 0 failed, 1 skipped, 2614 s; "438 file(s) clean" |
+
+* The skip on each remote host is `gofmt`, which is given no files there.
+* `make apicheck`: "against v2.7.1, 0 incompatible change(s)".
+* `TestDefaultsInventory`, the documents' checks and the identifier scan:
+  clean.
+
+**Step 3 complete, 2026-10-31,** for the owner's commit.

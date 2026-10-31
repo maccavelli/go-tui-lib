@@ -37,16 +37,16 @@ func (r *Registry) builtins() []Command {
 	describe := MustNew(BuiltinDescribe, "Describe a command", func(_ context.Context, _ *Invocation, a describeArgs) (Result, error) {
 		c, ok := r.Lookup(ID(a.ID))
 		if !ok {
-			return Result{}, &ArgError{Path: "/id", Reason: "no command has this ID"}
+			return Result{}, &ArgError{Path: "/id", Reason: r.say(MsgNoSuchCommand)}
 		}
 		info := manifestCommandOf(&c)
 		text := string(c.ID) + "\n" + c.Title + "\n"
 		if c.Description != "" {
 			text += c.Description + "\n"
 		}
-		text += "danger: " + info.Danger + "\n"
+		text += r.say(MsgDescribeDanger, info.Danger) + "\n"
 		if len(c.Args) > 0 {
-			text += "arguments: " + string(c.Args) + "\n"
+			text += r.say(MsgDescribeArguments, string(c.Args)) + "\n"
 		}
 		return Result{Value: info, Text: text}, nil
 	},

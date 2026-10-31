@@ -328,7 +328,7 @@ func (p *Picker) accept() tea.Cmd {
 		return p.finish(r.hit, nil, true)
 	}
 	p.eng.reset() // the providers' searches are done with
-	p.args = &stage{hit: r.hit, params: ps}
+	p.args = &stage{hit: r.hit, params: ps, cat: p.cfg.catalog}
 	p.ask()
 	return nil
 }

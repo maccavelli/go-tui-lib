@@ -10,16 +10,18 @@ import (
 	"github.com/maccavelli/go-tui-lib/v2/command"
 	"github.com/maccavelli/go-tui-lib/v2/keymap"
 	"github.com/maccavelli/go-tui-lib/v2/keymap/keymaptea"
+	"github.com/maccavelli/go-tui-lib/v2/msgcat"
 )
 
 // Workspace is a help.KeyMap, so help.Model renders its bindings
 // (docs/decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md §5).
 var _ help.KeyMap = (*Workspace)(nil)
 
-// helpDescs are the workspace's commands' descriptions in its help.
-var helpDescs = map[command.ID]string{
-	"workspace.focus.next": "next pane", "workspace.focus.prev": "previous pane", "workspace.focus.index": "pane",
-	"workspace.zoom": "zoom", cmdResizeDirection: "resize", cmdOverlayClose: "close",
+// helpDescs are the workspace's commands' descriptions in its help, by
+// message ID.
+var helpDescs = map[command.ID]msgcat.MessageID{
+	"workspace.focus.next": MsgHelpNextPane, "workspace.focus.prev": MsgHelpPrevPane, "workspace.focus.index": MsgHelpPane,
+	"workspace.zoom": MsgHelpZoom, cmdResizeDirection: MsgHelpResize, cmdOverlayClose: MsgHelpClose,
 }
 
 // helpBinding is the binding of the workspace's command id as the engine
@@ -33,7 +35,10 @@ func (w *Workspace) helpBinding(id command.ID) key.Binding {
 	}
 	return keymaptea.KeyBinding(w.km, id, p, keymap.DescriberFunc(func(id command.ID) (string, bool) {
 		d, ok := helpDescs[id]
-		return d, ok
+		if !ok {
+			return "", false
+		}
+		return w.say(d), true
 	}))
 }
 

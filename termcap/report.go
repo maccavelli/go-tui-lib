@@ -13,14 +13,17 @@ import (
 	"unicode"
 
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/maccavelli/go-tui-lib/v2/msgcat"
 )
 
 // ReportOption configures Report.
 type ReportOption func(*reportConfig)
 
 type reportConfig struct {
-	width int
-	json  bool
+	width   int
+	json    bool
+	catalog msgcat.Catalog
 }
 
 // DefaultReportWidth is the width, in cells, Report wraps at.
@@ -32,6 +35,13 @@ func WithReportWidth(w int) ReportOption { return func(r *reportConfig) { r.widt
 // WithReportJSON writes the report as JSON instead: the schema version,
 // Caps, and the findings. The width does not apply.
 func WithReportJSON() ReportOption { return func(r *reportConfig) { r.json = true } }
+
+// WithReportCatalog gives the findings and the notes in the program's
+// words: see Messages. The text report stays ASCII, so each byte outside
+// it prints as ?; the JSON report keeps the words as they are.
+func WithReportCatalog(c msgcat.Catalog) ReportOption {
+	return func(r *reportConfig) { r.catalog = c }
+}
 
 // ReportSchemaVersion is the JSON report's schema_version. It changes only
 // when a field is removed or retyped; a field added leaves it. Version 2
@@ -50,12 +60,13 @@ type reportJSON struct {
 // nameWidth is the column the values start in.
 const nameWidth = 22
 
-// notQueried says why a fact no query or variable set may have stayed so.
-var notQueried = map[string]string{
-	"sync_output":    "tea asks only outside SSH and Apple Terminal, and not every terminal answers",
-	"grapheme_width": "tea asks only outside SSH and Apple Terminal, and not every terminal answers",
-	"desktop_notify": "asked only behind the heuristic",
-	"kitty_graphics": "asked only behind the heuristic",
+// notQueried says why a fact no query or variable set may have stayed so,
+// by message ID.
+var notQueried = map[string]msgcat.MessageID{
+	"sync_output":    MsgNoteTeaAsks,
+	"grapheme_width": MsgNoteTeaAsks,
+	"desktop_notify": MsgNoteHeuristic,
+	"kitty_graphics": MsgNoteHeuristic,
 }
 
 // Report writes c to w as one line per fact, in Caps's field order: the
@@ -70,7 +81,7 @@ func Report(w io.Writer, c Caps, o ...ReportOption) error {
 	for _, f := range o {
 		f(&cfg)
 	}
-	findings := Findings(c)
+	findings := findingsIn(c, cfg.catalog)
 	if cfg.json {
 		if findings == nil {
 			findings = []Finding{}
@@ -90,7 +101,7 @@ func Report(w io.Writer, c Caps, o ...ReportOption) error {
 			continue // D7: a view fact is shown once a program sets it
 		}
 		name := fieldName(t.Field(i))
-		b.WriteString(line(name, describe(name, v.Field(i), c.TimedOut), cfg.width))
+		b.WriteString(line(name, describe(name, v.Field(i), c.TimedOut, cfg.catalog), cfg.width))
 	}
 	if len(findings) > 0 {
 		b.WriteString("\nfindings\n")
@@ -121,7 +132,7 @@ func fieldName(f reflect.StructField) string {
 // describe is a field's value, and for a Fact, its origin and its reason:
 // the fact's reason token when it has one, else, for a fact never
 // queried, what may have kept it so.
-func describe(name string, v reflect.Value, timedOut bool) string {
+func describe(name string, v reflect.Value, timedOut bool, cat msgcat.Catalog) string {
 	if v.Kind() != reflect.Struct || v.NumField() != 3 {
 		return value(v)
 	}
@@ -136,15 +147,18 @@ func describe(name string, v reflect.Value, timedOut bool) string {
 	if token := v.Field(2).String(); token != "" {
 		why += ": " + printable(token)
 	} else if origin == NotQueried {
-		reason := notQueried[name]
+		var reason string
+		if id, ok := notQueried[name]; ok {
+			reason = say(cat, id)
+		}
 		switch {
 		case timedOut && reason != "":
-			reason += "; or no reply before the timeout"
+			reason = say(cat, MsgNoteOrTimeout, reason)
 		case timedOut:
-			reason = "no reply before the timeout"
+			reason = say(cat, MsgNoteTimeout)
 		}
 		if reason != "" {
-			why += ": " + reason
+			why += ": " + printable(reason)
 		}
 	}
 	return val + " (" + why + ")"
