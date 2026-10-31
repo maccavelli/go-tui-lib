@@ -12,6 +12,13 @@ type Restorer interface {
 	Restore() string
 }
 
+// RestorerFunc is a function used as a Restorer
+// (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md D7).
+type RestorerFunc func() string
+
+// Restore calls f.
+func (f RestorerFunc) Restore() string { return f() }
+
 // save is the saved-state seam: it saves v's terminal state, and returns
 // what puts it back. Tests replace it.
 var save = saveState

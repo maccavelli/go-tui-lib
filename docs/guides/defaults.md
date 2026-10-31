@@ -94,7 +94,7 @@ record that is not there.
 | A hook when the program starts | none | `launch.OnStart` | built |
 | The flags' names | `--mode` and `--tui` | `launch.Choice` | built |
 | Exit statuses | Bubble Tea's ends as the shell expects | `launch.ExitError` | built |
-| An adapter for a restorer | none | `launch.RestorerFunc` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
+| An adapter for a restorer | none | `launch.RestorerFunc` | built |
 
 ## when
 
@@ -102,7 +102,7 @@ record that is not there.
 | :--- | :--- | :--- | :--- |
 | The grammar, and its 4096 bytes and depth 64 | VS Code's when clauses | `when.Parse` | floor |
 | Where the values come from | a map or layers | `when.Map`, `when.Layered` | built |
-| An adapter for a context | none | `when.ContextFunc` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
+| An adapter for a context | none | `when.ContextFunc` | built |
 
 ## workspace
 

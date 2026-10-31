@@ -108,6 +108,13 @@ type Context interface {
 	Value(key string) (Value, bool)
 }
 
+// ContextFunc is a function used as a Context
+// (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md D7).
+type ContextFunc func(key string) (Value, bool)
+
+// Value calls f.
+func (f ContextFunc) Value(key string) (Value, bool) { return f(key) }
+
 // Map is a simple Context.
 type Map map[string]Value
 

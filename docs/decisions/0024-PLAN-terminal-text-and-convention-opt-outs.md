@@ -775,3 +775,49 @@ assertion is seen to fail:
   clean.
 
 **Step 4 complete, 2026-10-31,** for the owner's commit.
+
+### Step 5: the adapters
+
+*2026-10-31:* the owner committed Step 4 (`c098544`) and said "committed,
+proceed". No deviation. `RestorerFunc` and `ContextFunc` passed
+`tools.verify names`: "names: 2 planned name(s), clean".
+
+**What changed:**
+
+* `launch/restore.go`: `RestorerFunc func() string`, whose `Restore`
+  calls it.
+* `when/value.go`: `ContextFunc func(key string) (Value, bool)`, whose
+  `Value` calls it.
+* `docs/guides/defaults.md`: the two rows are `built`. No row this PLAN
+  planned is left `planned`.
+
+**Tests:** `launch/adapter_test.go`'s `TestRestorerFunc`, the function
+called by `Restore` and its bytes written last by `Run`, through a program
+that fails before `Init`, as `TestRunNotStarted` runs one;
+`when/adapter_test.go`'s `TestContextFunc`, the function asked by
+`Value`, by an expression's `Eval` and through `Layered`.
+
+**Seen failing,** through `tools.verify mutate` on scratch copies, 2
+killed of 2:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| 5.1 `RestorerFunc` ignores its function | `TestRestorerFunc`: "Restore = "" after 0 calls; want <FUNC> after 1" |
+| 5.2 `ContextFunc` ignores its function | `TestContextFunc`: "Value(mode) = , false; want insert, true", and its three other checks |
+
+**Gates:**
+
+* `make pre-add-check` over the step's 4 Go files: "4 file(s) clean".
+
+| Host | `gates` |
+| :--- | :--- |
+| macOS, with the step's Go files | 22 passed, 0 failed, 0 skipped, 863 s; `release-check` "440 file(s) clean", with `apicheck` and the examples gate |
+| `remote linux` | 21 passed, 0 failed, 1 skipped, 1258 s; "442 file(s) clean", the step's two new test files among them, untracked |
+| `remote windows` | 21 passed, 0 failed, 1 skipped, 2664 s; "442 file(s) clean" |
+
+* The skip on each remote host is `gofmt`, which is given no files there.
+* `make apicheck`: "against v2.7.1, 0 incompatible change(s)".
+* `TestDefaultsInventory`, the documents' checks and the identifier scan:
+  clean.
+
+**Step 5 complete, 2026-10-31,** for the owner's commit.
