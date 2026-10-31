@@ -3113,6 +3113,12 @@ failed.
     [0018-MADR-python-verification-tools.md](0018-MADR-python-verification-tools.md)
     is written after this step's commit, as its own. No file is added to
     this step's scope.
+  * *Note, 2026-10-31:* 0018-MADR A6 is accepted, and
+    [0018-PLAN-python-verification-tools.md](0018-PLAN-python-verification-tools.md)
+    Step 11 makes a failing gate quote a harness's `  FAIL` line. Its ten
+    Windows runs of the gate: ten passed, each "check_ci_filters_test: 42
+    passed, 0 failed", in 104 to 137 s. The case of D30's one failure stays
+    unknown; a later failure now names its case in the summary.
 
 **Not done here, and the release:** the owner's commit, push and tag
 `v2.7.1`; CI on both; the smoke test of Step 6 against the tag. This step

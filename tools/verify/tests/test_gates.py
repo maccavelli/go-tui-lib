@@ -124,6 +124,24 @@ class TestFailureLines(RepoCase):
         outcomes = gates.run([gates.Gate("t", g, quote=(r"^Ran \d+",))], repo=self.repo, files=[], out_dir=self.tmp / "out", emit=lambda _: None)
         self.assertEqual(list(outcomes[0].lines), ["Ran 3 tests"])
 
+    def test_a_harness_failure_is_named(self) -> None:
+        # MADR A6: a script harness prints a failing case indented.
+        lines = self.quoted(go_test(["  FAIL c: want 1, got 2"], 30))
+        self.assertEqual(lines, ["  FAIL c: want 1, got 2", *self.tail(30)])
+
+    def test_a_unittest_error_is_named(self) -> None:
+        lines = self.quoted(go_test(["ERROR: test_x (m.T)"], 30))
+        self.assertEqual(lines, ["ERROR: test_x (m.T)", *self.tail(30)])
+
+    def test_a_passing_gate_does_not_quote_a_harness_failure(self) -> None:
+        g = go_test(["  FAIL c: want 1, got 2", "ERROR: test_x (m.T)", "Ran 3 tests"], 30, status=0)
+        outcomes = gates.run([gates.Gate("t", g, quote=(r"^Ran \d+",))], repo=self.repo, files=[], out_dir=self.tmp / "out", emit=lambda _: None)
+        self.assertEqual(list(outcomes[0].lines), ["Ran 3 tests"])
+
+    def test_failed_and_a_word_fail_are_not_failure_lines(self) -> None:
+        lines = self.quoted(go_test(["FAILED (failures=1)", "  FAILED (failures=1)", "  the FAIL c line", "x FAIL c"], 30))
+        self.assertEqual(lines, self.tail(30))
+
 
 #: A child that runs a quick gate, then one that sleeps, and prints as the
 #: runner does by default.

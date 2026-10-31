@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-12
+date: 2026-10-31
 decision-makers: the repository owner
 consulted: the agent that executes the PLANs
 informed: contributors, through AGENTS.md
@@ -393,7 +393,8 @@ Linux and Windows alike.
 
 ### A6 (2026-10-31): a failing script test names its case
 
-*Status: proposed (2026-10-31),* the owner's choice "Record it, fix
+*Status: accepted (2026-10-31),* the owner's "committed, approved to
+proceed"; proposed the same day, from the owner's choice "Record it, fix
 reporting next (Recommended)" in
 [0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
 Step 7d, deviation D30. To be implemented by

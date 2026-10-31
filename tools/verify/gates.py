@@ -5,9 +5,10 @@ and the lines of its output worth quoting. The runner writes each gate's
 whole output to a file, prints one line per gate as it ends,
 ``name: exit=N (Ns)``, with its quoted lines, goes on after a failure, and
 fails if any gate failed. A failing gate quotes the lines that name its
-failure, then its last lines
-(docs/decisions/0018-MADR-python-verification-tools.md, item 2, A2 and
-A3).
+failure, a script harness's failing case and a unittest error among them,
+then its last lines
+(docs/decisions/0018-MADR-python-verification-tools.md, item 2, A2, A3
+and A6).
 """
 
 from __future__ import annotations
@@ -39,6 +40,11 @@ FAIL_LINES = (
     r"^panic:",
     r"^\s+\S+_test\.go:\d+:",
     r"^\s*\S+\.go:\d+:\d+:",
+    # A script harness's failing case, "  FAIL <case>: …" (AGENTS.md,
+    # "Scripts"; MADR A6).
+    r"^\s+FAIL \S",
+    # A unittest test that raised, "ERROR: <test>" (MADR A6).
+    r"^ERROR: \S",
 )
 #: The most failure lines quoted ahead of the tail.
 FAIL_QUOTE = 40

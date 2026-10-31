@@ -1,6 +1,6 @@
 ---
 status: in-progress
-date: 2026-10-30
+date: 2026-10-31
 associated-madr: "0018-MADR-python-verification-tools.md"
 ---
 # Implement the Python verification tools
@@ -831,3 +831,59 @@ A12 and 7c, issue 13 first, proceed". A12 item 7 names this gate, so A5 is
   passed run 41159317505.
 * **Steps 8 to 10 complete, 2026-10-31.** The PLAN stays `in-progress`
   for Step 11, proposed.
+
+### Step 11: a failing script test names its case (2026-10-31)
+
+*Approved 2026-10-31:* the owner said "committed, approved to proceed"
+after A6 and this step were committed (`3039804`).
+
+**What changed:**
+
+* `tools/verify/gates.py`: `FAIL_LINES` gains `^\s+FAIL \S`, a script
+  harness's failing case, and `^ERROR: \S`, a unittest test that raised,
+  each with a comment naming what prints it; the module's docstring says
+  a failing gate quotes them.
+* `tools/verify/tests/test_gates.py`, in `TestFailureLines`:
+  `test_a_harness_failure_is_named`, `test_a_unittest_error_is_named`,
+  `test_a_passing_gate_does_not_quote_a_harness_failure` and
+  `test_failed_and_a_word_fail_are_not_failure_lines`.
+
+**Seen failing,** through `tools.verify mutate` on scratch copies, 4
+killed of 4:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| 11.1 `^\s+FAIL \S` dropped | `test_a_harness_failure_is_named`: "Lists differ: ['ok  \tpkg/p16\t0.1s', … != ['  FAIL c: want 1, got 2', …" |
+| 11.2 `^ERROR: \S` dropped | `test_a_unittest_error_is_named`: "Lists differ: ['ok  \tpkg/p16\t0.1s', … != ['ERROR: test_x (m.T)', …" |
+| 11.3 `^\s+FAIL \S` as `^\s*FAIL` | `test_failed_and_a_word_fail_are_not_failure_lines`: "Lists differ: ['FAILED (failures=1)', '  FAILED (failures[…" |
+| 11.4 a passing gate quotes the two new patterns too | `test_a_passing_gate_does_not_quote_a_harness_failure`: "Lists differ: ['  FAIL c: want 1, got 2', 'ERROR: test_x (m.T)', 'Ran 3 tests'] != ['Ran 3 tests']" |
+
+11.4 is added to the step's three: no mutation of the three makes the
+passing-gate test fail, and a test is unused until it has been seen to.
+It changes no file of the step's scope.
+
+**Acceptance,** on a scratch clone of `b25090c` with the step's two
+files, and `check("planted A6 case", 1, 2)` put ahead of
+`scripts/check_records_test.py`'s cases, about 40 lines before its end:
+
+* `gates --only script-test-check_records` on macOS: exit 1, its first
+  quoted line "  FAIL planted A6 case: want 1, got 2", then the 15 lines
+  of the tail, ending "check_records_test: 33 passed, 1 failed".
+* `remote windows -- --only script-test-check_records`, from the clone:
+  the same lines, exit 1.
+* The control, the clone's `gates.py` put back to `HEAD`'s, on macOS: the
+  quoted lines begin at "  ok   a missing anchor", and the planted case
+  is not among them.
+
+**The flake** (A6 item 2):
+`remote windows -- --only script-test-check_ci_filters`, from the tree:
+ten passed, each "check_ci_filters_test: 42 passed, 0 failed", in 104 to
+137 s. The case of D30's one failure stays unknown; a later failure now
+names its case in the summary.
+
+**Checks:** `tools-tests`: "Ran 73 tests", OK, through the gate (Python
+3.14) and under Python 3.12.15. The documents' checks and the identifier
+scan: clean.
+
+**Not done here:** the owner's commit and push, and CI on the pushed
+tree, after which this step is complete and this PLAN `complete`.
