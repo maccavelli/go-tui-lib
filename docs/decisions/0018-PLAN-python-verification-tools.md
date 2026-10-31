@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-10-31
 associated-madr: "0018-MADR-python-verification-tools.md"
 ---
@@ -887,3 +887,11 @@ scan: clean.
 
 **Not done here:** the owner's commit and push, and CI on the pushed
 tree, after which this step is complete and this PLAN `complete`.
+
+**CI.** The owner committed the step as `d1a32f4`. The owner pushed `main` at `d1a32f4`, after the disclosure guard, run
+over `6d4eac7`, `b25090c` and `d1a32f4`, exited 0. CI run 41218781073 passed:
+`modules`, `gates`, and `test` on macOS 15, Ubuntu 24.04 and Windows
+2025. Docs run 41218781118 passed.
+
+* **Step 11 complete, 2026-10-31.**
+* **This PLAN is complete, 2026-10-31.**

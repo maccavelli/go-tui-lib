@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-10-31
 associated-madr: "0020-MADR-charm-free-cores-glyphs-and-safetext.md"
 ---
@@ -3321,3 +3321,12 @@ tests alone: `TestOSC8Bound`, `TestDepartures`, `TestKeepSGR` and
 **Not done here:** the owner's commit and push, and CI on the pushed
 tree, after which this step is complete and this PLAN `complete` again.
 No release (A5 item 5).
+
+**CI.** The owner committed the step as `b25090c`. The owner pushed `main` at `d1a32f4`, after the disclosure guard, run
+over `6d4eac7`, `b25090c` and `d1a32f4`, exited 0. CI run 41218781073 passed:
+`modules`, `gates`, and `test` on macOS 15, Ubuntu 24.04 and Windows
+2025. Docs run 41218781118 passed.
+
+* **Step 14 complete, 2026-10-31.**
+* **This PLAN is complete again, 2026-10-31.** No release; A5's change
+  is in the next one.
