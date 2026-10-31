@@ -95,9 +95,11 @@ func TestStyled(t *testing.T) {
 // TestDepartures pins one input for each class where Line and Styled
 // differ from v0.12.0's, the oracle, beyond U+FFFD
 // (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md
-// A3.1): what each gives now, and what v0.12.0 gave, so that a row that
+// A3.1 and A5): what each gives now, and what v0.12.0 gave, so that a row that
 // stops departing fails too.
 func TestDepartures(t *testing.T) {
+	// A link whose OSC 8 body is 2,049 bytes, one over safetext's bound.
+	long := "\x1b]8;;https://x/" + strings.Repeat("c", 2049-len("8;;https://x/")) + "\x1b\\"
 	for _, c := range []struct {
 		class, in                string
 		line, styled             string
@@ -109,6 +111,7 @@ func TestDepartures(t *testing.T) {
 		{"4, the 0x9C byte of U+00DC does not end an OSC", "a\x1b]0;\u00dc b", "a", "a", "a b", "a b"},
 		{"5, a private marker after a parameter", "a\x1b[0?mb", "ab", "ab", "ab", "a?mb"},
 		{"6, an SGR U+009B introduces is not kept (A3.3)", "a\u009b1mb", "ab", "ab", "a1mb", "a1mb"},
+		{"7, an OSC 8 over 2,048 bytes is removed (A5)", "a" + long + "b", "ab", "ab", "ab", "a" + long + "b"},
 	} {
 		if got := Line(c.in); got != c.line {
 			t.Errorf("class %s: Line(%q) = %q, want %q", c.class, c.in, got, c.line)

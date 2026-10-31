@@ -3,6 +3,7 @@ package safetext_test
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -223,6 +224,38 @@ func TestKeepSGR(t *testing.T) {
 	} {
 		if got := clean(t, c.in, c.rules); got != c.want {
 			t.Errorf("%s: Clean(%q) = %q, want %q", c.name, c.in, got, c.want)
+		}
+	}
+}
+
+// TestOSC8Bound: under KeepSGR an OSC 8 whose body, the bytes between
+// ESC ] and its terminator, is 2,048 bytes is kept, and one of 2,049 is
+// removed, by Clean, by the Sanitizer at every split, and by the Sanitizer
+// written a byte at a time
+// (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md A5).
+func TestOSC8Bound(t *testing.T) {
+	keep := safetext.Rules{KeepSGR: true}
+	const head = "8;;https://e.org/"
+	for _, n := range []int{2048, 2049} {
+		for _, term := range []string{"\a", "\x1b\\"} {
+			in := "x\x1b]" + head + strings.Repeat("a", n-len(head)) + term + "y"
+			want := in
+			if n > 2048 {
+				want = "xy"
+			}
+			name := fmt.Sprintf("a body of %d bytes ended by %q", n, term)
+			if got := clean(t, in, keep); got != want {
+				t.Errorf("%s: Clean gives %d bytes, want %d", name, len(got), len(want))
+			}
+			var b bytes.Buffer
+			s := safetext.NewSanitizer(&b, keep)
+			for i := range len(in) {
+				_, _ = s.Write([]byte{in[i]})
+			}
+			_ = s.Close()
+			if b.String() != want {
+				t.Errorf("%s: the Sanitizer a byte at a time gives %d bytes, want %d", name, b.Len(), len(want))
+			}
 		}
 	}
 }

@@ -167,6 +167,34 @@ func plainest(s string) bool {
 	return true
 }
 
+// linkMax is safetext's bound on a kept OSC 8, written out: the most
+// bytes between ESC ] and the terminator.
+const linkMax = 2048
+
+// longOSC reports, in a plainest s, an OSC whose body is over linkMax
+// bytes. Styled removes such an OSC 8, and v0.12.0 kept it: class 7
+// (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md A5).
+func longOSC(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] != 0x1b {
+			continue
+		}
+		n := plainLen(s[i:])
+		if s[i+1] == ']' {
+			// ESC ], the body, then BEL, or ESC \ when it ends in "\".
+			body := n - 3
+			if s[i+n-1] == '\\' {
+				body--
+			}
+			if body > linkMax {
+				return true
+			}
+		}
+		i += n - 1
+	}
+	return false
+}
+
 // plainLen is the length of the plainest-form sequence s begins with, or 0.
 func plainLen(s string) int {
 	if len(s) < 2 {
@@ -209,8 +237,8 @@ func plainLen(s string) int {
 // FuzzAgainstV0120 holds Line, Styled and HasControl to v0.12.0's, the
 // oracle, by four exact properties. For every input x: HasControl equals
 // the oracle's; Line of Styled is Line; and, outside the classes of
-// 0020-MADR A3.1, where the grammar differs on purpose, Line and Styled
-// equal the oracle's on subparts(x), so that for invalid UTF-8 they differ
+// 0020-MADR A3.1 and A5, where the grammar differs on purpose, Line and
+// Styled equal the oracle's on subparts(x), so that for invalid UTF-8 they differ
 // by D9 S2 alone. TestDepartures pins each class
 // (docs/decisions/0020-PLAN-charm-free-cores-glyphs-and-safetext.md Step 5).
 func FuzzAgainstV0120(f *testing.F) {
@@ -228,6 +256,8 @@ func FuzzAgainstV0120(f *testing.F) {
 		"a\u0090q\u009cb", "a\x1bXs\x07b", "a\x1b_\u00e9\x1b\\b", "a\x1b]0;\u00dc b", "a\x1b[0?mb", "a\u009b1mb",
 		// Found by the fuzzer: class 4 behind ESC RS ], and U+05DC is d7 9c.
 		"0\x1b\x1e]\u05dc0",
+		// Found by CI's fuzzer on v2.7.1, run 41207098226: class 7.
+		"\x1b]8;id=1;https://x\x1b\\l\x1b]8;" + strings.Repeat("c", 3753) + ";\x1b\\",
 	} {
 		f.Add(s)
 	}
@@ -247,7 +277,7 @@ func FuzzAgainstV0120(f *testing.F) {
 		if got, want := Line(s), oracleLine(x); got != want {
 			t.Errorf("Line(%q) = %q; v0.12.0 gives %q", s, got, want)
 		}
-		if !plainest(s) {
+		if !plainest(s) || longOSC(s) {
 			return
 		}
 		if got, want := Styled(s), oracleStyled(x); got != want {

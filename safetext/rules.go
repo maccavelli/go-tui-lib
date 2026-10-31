@@ -42,7 +42,8 @@ type Rules struct {
 	// and so is one introduced or ended by a C1 code point (U+009B,
 	// U+009D, U+009C): what KeepSGR keeps is the input's own bytes
 	// (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md
-	// A3.3).
+	// A3.3). An OSC 8 whose body, the bytes between ESC ] and its
+	// terminator, is over 2,048 bytes is removed too (A5).
 	KeepSGR bool
 	// LinkSchemes, with KeepSGR, keeps an OSC 8 link only when its target's
 	// scheme, compared without case, is one of these, and the target has a

@@ -223,6 +223,7 @@ record that is not there.
 | :--- | :--- | :--- | :--- |
 | What survives | by the `Rules` given | `safetext.Rules` | built |
 | Invisible and bidirectional controls, invalid UTF-8 | removed, or U+FFFD | `safetext.Rules` | floor |
+| A kept OSC 8's length | at most 2,048 bytes; a longer one is removed | `safetext.Rules` | floor |
 
 ## fuzzy
 

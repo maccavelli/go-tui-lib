@@ -177,8 +177,10 @@ const sgrMax = 128
 // Step 9, D9).
 const maxSGRParams = 32
 
-// oscMax is the longest OSC 8 a machine keeps, in bytes: a link's target
-// longer than this is removed with its sequence.
+// oscMax is the longest OSC 8 a machine keeps, in bytes, counting its
+// body between ESC ] and the terminator: "8;", the parameters, ";" and
+// the target. A longer one is removed with its sequence
+// (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md A5).
 const oscMax = 2048
 
 // machine is the parser and the rules it cleans by. Its zero value is not

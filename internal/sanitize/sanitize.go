@@ -32,14 +32,17 @@ import (
 func Line(s string) string { return safetext.Clean(s, safetext.Line()) }
 
 // styled is Styled's rules: Line's, with each SGR of at most 32 parameters
-// and each OSC 8 hyperlink whose target is printable ASCII kept as it is.
+// and each OSC 8 hyperlink of printable ASCII and at most 2,048 bytes
+// kept as it is.
 var styled = safetext.Rules{Flatten: true, KeepSGR: true}
 
 // Styled is Line for text that carries its own styles and links: each SGR
 // and OSC 8 hyperlink is kept as it is, and the text between them is
 // filtered as Line filters it. Every other sequence, a stray ESC and a
 // sequence cut short are dropped
-// (docs/decisions/0014-PLAN-hardening.md Step 9, D9).
+// (docs/decisions/0014-PLAN-hardening.md Step 9, D9), and so is an OSC 8
+// over 2,048 bytes
+// (docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md A5).
 func Styled(s string) string { return safetext.Clean(s, styled) }
 
 // Truncate cuts s to at most cells cells measured with m, and when it cuts

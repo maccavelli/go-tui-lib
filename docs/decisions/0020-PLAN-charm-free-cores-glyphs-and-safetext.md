@@ -1,6 +1,6 @@
 ---
-status: complete
-date: 2026-10-24
+status: in-progress
+date: 2026-10-31
 associated-madr: "0020-MADR-charm-free-cores-glyphs-and-safetext.md"
 ---
 # Implement Charm-free cores of `termcap`, `termsvc`, `command` and `keymap`, the `termkey` decoder, the status and meter glyphs, and `safetext`
@@ -1336,8 +1336,9 @@ Step 7d's deviation D31; proposed.*
     `FuzzAgainstV0120`, as CI's run did;
   * `oscMax` 4,096: `TestOSC8Bound` and `TestDepartures`;
   * `len(body) <= oscMax` as `<`: `TestOSC8Bound`, through `Clean`;
-  * `m.oscN+n > len(m.osc)` as `>=`: `TestOSC8Bound`, through the
-    `Sanitizer`.
+  * ~~`m.oscN+n > len(m.osc)` as `>=`: `TestOSC8Bound`, through the
+    `Sanitizer`.~~ *Replaced 2026-10-31 (Step 14, deviation 1): the
+    machine's bulk bound, `m.oscN+n <= len(m.osc)`, as `<`.*
 * **Fuzzing:** `FuzzAgainstV0120` for 5 minutes on a scratch copy, and
   `make fuzz`; neither fails.
 * **Gates:** `python3 -m tools.verify gates` on macOS, and through
@@ -3238,3 +3239,85 @@ Step 7d's deviation D31; proposed.*
 * **Identifiers:** `python3 -m tools.verify scan`: `scan: clean (5 pattern(s))`.
 * **Not done:** the issue comments are the owner's to post. The close-out
   is to be committed by the owner; nothing more is tagged.
+
+### Step 14: class 7, an OSC 8 over 2,048 bytes (2026-10-31)
+
+*Approved 2026-10-31:* the owner committed A5 and this step (`6d4eac7`)
+and said "committed, approved to proceed". This PLAN is `in-progress`
+again.
+
+**What changed:**
+
+* `safetext/rules.go`: `KeepSGR`'s comment says that an OSC 8 whose body
+  is over 2,048 bytes is removed, citing A5.
+* `safetext/clean.go`: `oscMax`'s comment says the body is counted, "8;",
+  the parameters, ";" and the target. The code is unchanged.
+* `safetext/safetext_test.go`: `TestOSC8Bound`, bodies of 2,048 and 2,049
+  bytes, each ended by BEL and by `ESC \`, through `clean` (which runs
+  `Clean`, `IsClean` and the `Sanitizer` split at every byte) and through
+  a `Sanitizer` written a byte at a time.
+* `internal/sanitize/sanitize.go`: the comments of `styled` and `Styled`
+  name the bound.
+* `internal/sanitize/sanitize_test.go`: `TestDepartures` gains "7, an OSC
+  8 over 2,048 bytes is removed (A5)", a link whose body is 2,049 bytes;
+  `Line`, `Styled` and `v0.12.0`'s `Line` give "ab", and `v0.12.0`'s
+  `Styled` keeps it.
+* `internal/sanitize/fuzz_test.go`: `longOSC`, with its own `linkMax`,
+  2,048, leaves an input holding an OSC whose body is longer out of the
+  comparison of `Styled`; CI's input is a seed, built with
+  `strings.Repeat`; the target's comment cites A5.
+* `docs/guides/defaults.md`: the `safetext` table's row "A kept OSC 8's
+  length", a floor.
+
+**First, against today's code,** on a scratch copy of `6d4eac7` with the
+tests alone: `TestOSC8Bound`, `TestDepartures`, `TestKeepSGR` and
+`FuzzAgainstV0120`'s seeds passed, since they pin what the code does.
+
+**Seen failing,** through `tools.verify mutate` on scratch copies:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| 14.1 the fuzz test's class 7 clause removed | `FuzzAgainstV0120/seed#33`: `fuzz_test.go:284: Styled("\x1b]8;id=1;https://x\x1b\\l\x1b]8;ccc…` |
+| 14.2 `oscMax` 4,096 | `TestOSC8Bound`: "a body of 2049 bytes ended by "\a": Clean gives 2054 bytes, want 2", and the same for the `Sanitizer` a byte at a time; `TestDepartures`: "class 7, an OSC 8 over 2,048 bytes is removed (A5): Styled(…), want "ab"" |
+| 14.3 `len(body) <= oscMax` as `<` | `TestOSC8Bound`: "a body of 2048 bytes ended by "\a": Clean gives 2 bytes, want 2053" |
+| 14.4 `m.oscN+n > len(m.osc)` as `>=` | survived; deviation 1 |
+| 14.4b `m.oscN+n <= len(m.osc)` as `<`, the bulk path | `TestOSC8Bound`: "a body of 2048 bytes ended by "\a": the Sanitizer a byte at a time gives 2 bytes, want 2053" |
+
+* **Deviation 1, 2026-10-31: mutation 14.4 cannot change behaviour.**
+  * **Found:** with `content()`'s `m.oscN+n > len(m.osc)` as `>=`, every
+    test passed. Each caller of `content()` that can still be keeping an
+    OSC 8 passes a byte that is not ASCII (DEL) or more than one byte (a
+    character), and either already stops the keeping, so the term only
+    guards the index of `m.osc[m.oscN] = c`. Printable bytes, written one
+    at a time or not, take the bulk path, whose bound is
+    `m.oscN+n <= len(m.osc)`.
+  * **Resolutions offered:** aim 14.4 at the bulk path's bound, recorded
+    here (recommended); or remove the term from `content()`, which is
+    outside the step's paths and removes a guard on an index.
+  * **Chosen by the owner,** 2026-10-31: "Retarget 14.4 at :418
+    (Recommended)". 14.4b replaces it, killed as above; the spec's bullet
+    is annotated. No file is added to the step's scope.
+
+**Fuzzing,** on macOS, on scratch copies of the tree:
+
+* `FuzzAgainstV0120` for 5 minutes: 9,359,199 inputs, no failure.
+* `make fuzz`: "21 packages ran clean". A first try, on a copy without
+  `.git`, stopped at "fatal: not a git repository", since `go-fuzz.py`
+  lists the tracked files; it was run again on a copy with it.
+
+**Gates:**
+
+| Host | `gates` | `release-check` |
+| :--- | :--- | :--- |
+| macOS, with the step's six Go files | 22 passed, 0 failed, 0 skipped, 952 s | 428 file(s) clean, with `apicheck` and the examples gate |
+| `remote linux` | 21 passed, 0 failed, 1 skipped, 1129 s | 428 file(s) clean |
+| `remote windows` | 21 passed, 0 failed, 1 skipped, 2560 s | 428 file(s) clean |
+
+* The skip on each remote host is `gofmt`, which is given no files there.
+* `make apicheck`: "against v2.7.1, 0 incompatible change(s)".
+* The documents' checks, `TestDefaultsInventory` among them, and the
+  identifier scan: clean.
+
+**Not done here:** the owner's commit and push, and CI on the pushed
+tree, after which this step is complete and this PLAN `complete` again.
+No release (A5 item 5).

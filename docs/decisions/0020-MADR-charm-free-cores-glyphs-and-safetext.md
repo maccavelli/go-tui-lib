@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-24
+date: 2026-10-31
 decision-makers: the repository owner
 consulted: "issues #2, #3, #4, #5, #11 and #12 of this repository's tracker, filed by gobble-cli on 2026-10-23, with their comments; gobble-cli docs/decisions/0032-MADR-go-tui-lib-integration-boundary.md and its amendment A1, read at gobble-cli 09673ba; this repository at 63c68d6; the module sources of charm.land/bubbletea/v2 v2.0.10, github.com/charmbracelet/colorprofile v0.4.3, github.com/charmbracelet/ultraviolet v0.0.0-20260811164956-006e29f97886 and github.com/charmbracelet/x/ansi v0.11.8; the external sources listed under More Information"
 informed: gobble-cli, pi-go
@@ -1611,8 +1611,9 @@ major version.**
 
 ### A5 (2026-10-31): class 7, an OSC 8 over 2,048 bytes (adds to A3.1)
 
-*Status: proposed (2026-10-31),* the owner's choice "Record, amend 0020
-(Recommended)" in
+*Status: accepted (2026-10-31),* the owner's "committed, approved to
+proceed"; proposed the same day, from the owner's choice "Record, amend
+0020 (Recommended)" in
 [0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
 Step 7d, deviation D31. To be implemented by
 [0020-PLAN-charm-free-cores-glyphs-and-safetext.md](0020-PLAN-charm-free-cores-glyphs-and-safetext.md)
