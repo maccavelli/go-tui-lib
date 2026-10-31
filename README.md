@@ -18,7 +18,7 @@ pattern, used by every program that needs it.
 
 ## Status
 
-- **The current release is `v2.7.1`,** at the module path
+- **The current release is `v2.8.0`,** at the module path
   `github.com/maccavelli/go-tui-lib/v2`
   ([0020-MADR](docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
   A4.1). `v2.0.0` follows `v1.13.0`, which a `v1` user keeps; `v1.13.0` follows
@@ -114,8 +114,15 @@ pattern, used by every program that needs it.
   workspace's own commands through its registry, makes `launch`'s decision
   with its helpers, puts the epilogue where it wants it, and binds the
   palette's commands under its own keys. `msgcat` is the message catalogue
-  the packages' text will come from
+  the packages' text comes from
   ([0024-MADR](docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md)).
+  Since `v2.8.0` the terminal, the text and the mouse follow too: a
+  program overrides one capability view without changing the terminal's
+  brand, sets `termsvc`'s limits and copy route, keeps `Auto` from the
+  bell, words the palette's, the workspace's, the registry's and the
+  report's text through its catalogue, keeps the click's focus while
+  dropping the drag, opens a bare overlay, and keeps the palette open
+  after an accept.
 - **A line-mode question, since `v2.3.0`.** `ask` asks a question inline,
   below a CLI's scrollback: rows of answers, each chosen by one key, a
   reason read after one, and the answer left in the scrollback in words.

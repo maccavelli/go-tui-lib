@@ -7,6 +7,64 @@ needs a major version, at a new module path
 ([AGENTS.md, API conventions](../../AGENTS.md#api-conventions), rule 1).
 Up to `v0.12.0`, a deprecated name was removed in the next minor release.
 
+## Migrating to `v2.8.0`
+
+`v2.8.0` is a minor release. It adds options, a type and fields across
+`termcap`, `termsvc`, `palette`, `workspace`, `command`, `launch` and
+`when`. Nothing is removed or retyped, and without the new options every
+drawing and report is byte for byte what it was, but for the one change
+below: `make apicheck` against `v2.7.1` reports 0 incompatible changes
+([0024-PLAN-terminal-text-and-convention-opt-outs](../decisions/0024-PLAN-terminal-text-and-convention-opt-outs.md)
+Steps 2 to 5). A program on `v2.7.1` needs no change:
+
+```bash
+go get github.com/maccavelli/go-tui-lib/v2@v2.8.0
+```
+
+### Added
+
+- **One capability view, apart from the brand.** `termcap.Caps` gains
+  `LinksSupport`, `NotifyOSC9Support`, `NotifyOSC777Support`,
+  `KeyboardRequest`, `PointerSupport` and `ProgressSupport`: set one
+  through `WithOverride`, with origin `Override`, and its view, `Links`,
+  `Notifications`, `Keyboard`, `termsvc.Pointer` or
+  `termsvc.ProgressSupported`, reads it first. `termcap.Report` writes one
+  only once it is set
+  ([0024-MADR](../decisions/0024-MADR-opt-in-and-opt-out-coverage.md) D5,
+  A3).
+- **`termsvc`'s limits and routes:** `WithTitleCells(n)` and
+  `WithBodyCells(n)`; `WithoutBell()`, so `Auto` sends nothing where it
+  would ring the bell; `WithCopyRoute(RouteOSC52)` or
+  `WithCopyRoute(RouteOSC52Tmux)`; and `Linker{Schemes: …}`, whose `Link`
+  accepts the schemes you name. `termsvc.Link` is `Linker{}.Link`.
+- **The message catalogue in four packages** (A4): `palette.WithCatalog`,
+  `workspace.WithCatalog`, `command.WithCatalog` and
+  `termcap.WithReportCatalog`, each with its `Messages()` and its
+  `Msg…` IDs; `palette.Search.Catalog` gives a provider the picker's.
+  `termcap.Findings` stays English.
+- **The mouse and the overlay:** `workspace.WithoutMouseFocus()` and
+  `WithoutMouseResize()`; `workspace.Overlay.Bare`;
+  `workspace.WithFocusFallback`, with `FocusFallback` and
+  `FocusFallbackFunc`; `palette.WithoutClickAccept()`,
+  `WithoutCloseOnAccept()` and `WithoutPrefixList()` (D6, A1).
+- **Adapters:** `launch.RestorerFunc` and `when.ContextFunc` (D7).
+
+### Changed
+
+- **`termsvc.MaxCopyBytes` bounds OSC 52 alone.** A copy through a
+  program's own clipboard, `WithClipboard`, takes any length; before, one
+  over 100,000 bytes failed before the clipboard was called. A copy through
+  OSC 52 still fails over it (D5).
+
+### Documented
+
+- **`safetext`'s bound on a kept OSC 8 link:** under `KeepSGR`, an OSC 8
+  whose body is over 2,048 bytes is removed, as it always was; `KeepSGR`'s
+  and `internal/sanitize`'s `Styled`'s documentation now say so, and a test
+  holds it
+  ([0020-MADR](../decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
+  A5).
+
 ## Migrating to `v2.7.1`
 
 `v2.7.1` is a patch: nothing exported changes, no default changes, and

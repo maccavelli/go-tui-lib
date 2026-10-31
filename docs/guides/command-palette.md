@@ -59,6 +59,19 @@ being reopened. Its options: `WithLimit` (200 hits by default),
 providers' errors, `WithGOOS` for key hints, `WithRecents` and
 `WithoutInput`. `Open` takes `WithID`, `WithAnchor` and `WithSize`.
 
+Three options turn one behaviour off each:
+
+- **`WithoutClickAccept()`:** a click selects its row, as the arrows do,
+  and `enter` accepts it.
+- **`WithoutCloseOnAccept()`:** accepting sends `SelectedMsg` and runs the
+  hit, and the picker stays open for the next; after the argument stage it
+  is back at the query the hit came from.
+- **`WithoutPrefixList()`:** a query of `?` is searched like any other.
+
+`WithCatalog(c)` gives the picker's own words, its counts, "searching",
+the argument stage's reasons and a failed provider's row, in your
+`msgcat.Catalog`, by the IDs `palette.Messages()` lists.
+
 `ExamplePicker` in `palette/example_test.go` runs this end to end: it
 opens a picker over three themes, types a query, moves the selection and
 accepts it.
@@ -89,7 +102,8 @@ again.
 A query that starts with a provider's prefix searches that provider
 alone, with the prefix taken off: `>open` searches the commands for
 "open", and `@main` the files. A query of `?` lists the prefixes, and
-accepting one types it. `tab` completes the selected hit's text under the
+accepting one types it, unless the picker has `WithoutPrefixList()`.
+`tab` completes the selected hit's text under the
 query's prefix.
 
 ## Write a provider
@@ -123,7 +137,10 @@ func (b bookmarks) Search(ctx context.Context, s palette.Search, yield func(pale
   handler, never the screen.
 - **`s.Matcher` is compiled once per keystroke** and shared by every
   provider; score with it so that hits from different providers rank
-  together. `s.WhenContext` is the when values where the picker opened.
+  together. `s.WhenContext` is the when values where the picker opened,
+  and `s.Catalog` the picker's `WithCatalog`, or nil, for the words of
+  rows your provider makes itself, as the files provider's limit row
+  does.
 - **A hit's `ID`** de-duplicates hits across providers, keeping the best
   score, and keys the recents. Its text fields are made one line of
   display text before they are drawn, so a title with an escape sequence

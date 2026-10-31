@@ -821,3 +821,70 @@ killed of 2:
   clean.
 
 **Step 5 complete, 2026-10-31,** for the owner's commit.
+
+### Step 6: documentation, the release, and the close-out
+
+*2026-10-31:* the owner committed Step 5 (`ca5fd68`) and said "committed,
+proceed".
+
+**A reading, not a question:** Step 1's additions were released in
+`v2.7.0`, with 0023-PLAN Step 7c, and "Migrating to `v2.7.0`" already
+names `WithDisabled`'s deprecation and the `LookupEnv` correction. So
+"Migrating to `v2.8.0`" names Steps 2 to 5, and 0020-MADR A5's bound,
+documented in `b25090c`.
+
+**What changed:**
+
+* `docs/guides/terminal-capabilities.md`: the option table names
+  `WithoutQueries`, `WithoutQuery` and `WithoutGatedQueries`, with
+  `WithDisabled` as its deprecated name, and the query names; "Do not
+  probe without input" says `WithoutQueries`; a new "Override one view";
+  `WithoutBell`, the cells, the copy's bound and route, `Linker`, the
+  pointer's and progress's facts, and `WithReportCatalog`. Step 1 left
+  this prose to this step.
+* `docs/guides/command-palette.md`: the three `Without…` options,
+  `WithCatalog`, `?` under `WithoutPrefixList`, and `Search.Catalog`.
+* `docs/guides/building-workspaces.md`: the focus fallback, the two mouse
+  options, `Overlay.Bare`, and `WithCatalog`.
+* `docs/guides/commands.md`: `when.ContextFunc`, `command.WithCatalog`
+  and `launch.RestorerFunc`.
+* `docs/guides/migrating.md`: "Migrating to `v2.8.0`": Added, Changed
+  (`MaxCopyBytes` bounds OSC 52 alone), Documented (0020-MADR A5).
+* `README.md`: the current release `v2.8.0`, and the defaults bullet says
+  what `v2.8.0` adds.
+* `docs/guides/defaults.md`: no row is `planned`; every row is `built`,
+  `floor` or `decided`.
+
+**The API,** apidiff at the `Makefile`'s pin against `v2.7.1`, compatible
+changes included: 120 additions and nothing else, by package `command` 10,
+`launch` 1, `palette` 21, `termcap` 58, `termsvc` 5, `when` 1 and
+`workspace` 24; `make apicheck`: "against v2.7.1, 0 incompatible
+change(s)".
+
+**The smoke test, rehearsed** against the tree by a `replace`, in a scratch
+module outside the repository with `GOWORK` empty (`smoke28.py local`): a
+probe `WithoutQuery("da2")` writes a batch with no DA2, ending with DA1; a
+picker `WithCatalog` shows "nothing here" for no results; a bare overlay of
+10 by 1 is told 10 by 1 and draws its text. The control, `-control`,
+expecting `v2.7.1`'s behaviour, exited 1: "the batch holds DA2: false,
+want true".
+
+**Gates,** over the tree as this step leaves it, which changes Markdown
+alone:
+
+| Host | `gates` |
+| :--- | :--- |
+| macOS | 21 passed, 0 failed, 1 skipped, 760 s; `release-check` "442 file(s) clean", with `apicheck` and the examples gate |
+| `remote linux` | 21 passed, 0 failed, 1 skipped, 939 s; "442 file(s) clean" |
+| `remote windows` | 21 passed, 0 failed, 1 skipped, 2605 s; "442 file(s) clean" |
+
+* The skip on each host is `gofmt`, which is given no Go files.
+* The documents' checks, `TestDefaultsInventory` and the examples' excerpt
+  check among them, and the identifier scan: clean.
+
+**Not done here, and the release:** the owner's commit; the disclosure
+guard; the owner's push and CI; the owner's annotated tag `v2.8.0` and CI
+on it; the smoke test from the proxy; and the close-out: this PLAN
+`complete`, the MADR's More Information recording every part built, and
+the index rows. This step stays open for them, and the PLAN
+`in-progress`.

@@ -216,6 +216,9 @@ mode =~ /^insert/i
 - **`Available(context, surface)`** lists the commands a palette, a slash
   popup or help shows: not hidden, offered on that surface, with `When`
   true.
+- **A context of your own** is a `when.Context`: `when.Map` holds values,
+  `when.Layered` asks several in turn, and `when.ContextFunc` makes one of
+  a function, such as one that reads your program's state as it is.
 
 ## Slash commands
 
@@ -308,6 +311,9 @@ res := r.CallMCP(ctx, call.Name, call.Arguments, client.Name) // a tools/call re
   apply, and returns a `CallToolResult` with `resultType: "complete"`. An
   unknown tool, bad arguments, a refusal or a failure is `isError: true`
   with a sentence the model can act on, never a protocol error.
+  `command.WithCatalog(c)` gives those sentences, and the built-in
+  `command.describe`'s words, in your `msgcat.Catalog`, by the IDs
+  `command.Messages()` lists.
 - **What your MCP server still owns** under 2026-07-28:
   - the `tools/list` envelope: `tools`, `resultType: "complete"`, and the
     required `ttlMs` and `cacheScope` (`"private"` suits a program's own
@@ -817,6 +823,8 @@ fits `FromSource`.
 - **`launch.WithRestorer(p)`** with your `*termcaptea.Prober` writes its
   resets, such as mode 2031's, to the TUI's stream on every outcome, a
   crash included, so the CLI mode's input gets no colour-scheme reports.
+  `launch.RestorerFunc` makes a `Restorer` of a function, for a mode your
+  program set itself.
 - **`launch.OnStart(f)`** calls `f` with the `*tea.Program` before it
   runs, so a goroutine of yours can `Send` to it.
 - **`launch.WithFilter`** is `tea.WithFilter`, given your own model;

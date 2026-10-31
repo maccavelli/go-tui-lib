@@ -212,7 +212,10 @@ func (l list) View(width, height int) string { return strings.Join(l.items, "\n"
 
 The first pane is told in `ws.Init()`. Focus moves on the focus keys, a
 click, `ws.Focus(id)`, hiding the focused pane, and opening or closing a
-modal overlay. `ws.Focus(id)` while a modal overlay is open changes the
+modal overlay. When the focused pane is hidden, focus goes to the focus
+ring's first pane; `workspace.WithFocusFallback(f)` chooses instead, given
+the pane that lost it and the ring, and `workspace.FocusFallbackFunc` makes
+one of a function. A pane it names outside the ring is ignored. `ws.Focus(id)` while a modal overlay is open changes the
 focused pane, which is told when the overlay closes.
 
 A pointer pane may implement `Focuser` instead; its `Focus` and `Blur` are
@@ -301,6 +304,8 @@ in `v0.11.0`, is gone in `v0.12.0`: see
 The same actions are also commands, `workspace.Commands(ws)`, for a
 palette, slash lines and agents: see
 [the workspace's commands](commands.md#the-workspaces-commands).
+`workspace.WithCatalog(c)` gives their results and reasons, and the help's
+names, in your `msgcat.Catalog`, by the IDs `workspace.Messages()` lists.
 
 The workspace is a `help.KeyMap`, and `ws.Help()` is a bubbles help model
 drawn with the workspace's glyphs and styles, so a help footer is one call:
@@ -325,6 +330,10 @@ With a mouse mode set:
 - the wheel scrolls the pane under the pointer, focused or not;
 - dragging a separator resizes;
 - panes receive their mouse events in their own cells.
+
+`WithoutMouse()` turns all of it off. `WithoutMouseFocus()` keeps a click
+from focusing, and `WithoutMouseResize()` a drag from resizing; each
+leaves the rest, and the panes still get their events.
 
 A resize, by key, by drag or by `ws.Resize(sep, delta)`, moves the
 separator from where it is drawn, as far as the panes' bounds allow. The
@@ -351,6 +360,9 @@ focus, so `Update` returns it rather than dropping it.
   cursor, and `Anchor{Kind: workspace.OnPane, Pane: id}` relative to a pane.
 - **Size.** An overlay's pane gets `SizeMsg` with its content size when it
   opens, and again whenever a resize changes it.
+- **Bare.** `Overlay{…, Bare: true}` draws the pane alone at the overlay's
+  size, with no border and no title, so the pane draws its own chrome; it
+  may be as small as 1 by 1.
 - **Focus.** A modal overlay takes the keyboard: the focused pane gets
   `PaneBlurMsg`, and the overlay's pane `PaneFocusMsg`; closing it gives
   the keyboard back. A non-modal overlay changes no focus.

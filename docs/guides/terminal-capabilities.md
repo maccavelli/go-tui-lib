@@ -133,16 +133,41 @@ features; turning the protocol off belongs to a later record (MADR A4).
 | `WithOverride(f)` | sets facts you know better; set them with origin `Override` |
 | `WithoutColorSchemeUpdates()` | never subscribes to mode 2031 |
 | `WithoutBackgroundRequest()` | never asks for the background |
-| `WithDisabled()` | sends nothing; the probe ends at once with the environment's facts, which a `Prober` delivers on the first `tea.EnvMsg` |
+| `WithoutQueries()` | sends nothing; the probe ends at once with the environment's facts, which a `Prober` delivers on the first `tea.EnvMsg`. `WithDisabled()` is its deprecated name |
+| `WithoutQuery(names...)` | leaves the named queries out of the batch and sends the rest; a name no query has sends nothing, and each fact says `probe.unknown-query` |
+| `WithoutGatedQueries()` | never sends the gated queries, even where the heuristic would; it wins over `WithoutHeuristic()` |
 | `WithAppearanceEnv(name)` | reads light or dark from `LC_` + `name`, which a default sshd forwards, and from `name`, which wins when both are set |
 | `WithAppearanceHook(f)` | asks the desktop, through your function |
 | `WithConsoleHost(f)` | asks Windows whether this is the classic console |
 | `WithGOOS(goos)` | reads the identity for another OS: a test, or a wish server |
 | `WithoutModeQuery(modes...)` | leaves those DECRQM queries out of the batch: the host asks for them, and passes their reports in |
 
+The built-in queries' names, in the batch's order, are `kitty-keyboard`,
+`mode-2031`, `mode-2048`, `mode-1004`, `dsr-996`, `background`, `da2`,
+`xtversion`, `notify-query`, `kitty-graphics`, `foreground`, `palette`,
+`mode-2026` and `mode-2027`; a `WithQuery`'s `Name` names it too. DA1, the
+sentinel, has none and is always sent.
+
 Under JetBrains the prober sends nothing at all, and inside Neovim's, Vim's
 or Emacs's terminal it skips the gated queries; each fact says why. A
 disabled prober says why under JetBrains too.
+
+### Override one view
+
+The views, `Links`, `Notifications` and `Keyboard`, and `termsvc`'s
+`Pointer` and `ProgressSupported`, come from the brand's tables. To change
+one without changing the brand, set its fact through `WithOverride`, with
+origin `Override`: `LinksSupport`, `NotifyOSC9Support`,
+`NotifyOSC777Support`, `KeyboardRequest` (the flags to ask for),
+`PointerSupport` or `ProgressSupport`. A view reads its fact once the
+fact's origin is not `NotQueried`, and is as before otherwise; the report
+shows a view fact only once it is set.
+
+```go
+p := termcaptea.NewProber(termcap.WithOverride(func(c *termcap.Caps) {
+    c.LinksSupport.Set(termcap.Supported, termcap.Override) // our users' terminal shows OSC 8
+}))
+```
 
 On Windows, `termcap.Env`'s lookups ignore the case of a name, as
 Windows's environment does: `Path` and `PATH` are one variable. Elsewhere
@@ -152,7 +177,7 @@ they match exactly.
 
 A program run with `tea.WithInput(nil)` must not probe: tea skips its own
 queries then, but the replies to the prober's would leak into the shell.
-Pass `termcap.WithDisabled()`, or do not embed a prober at all.
+Pass `termcap.WithoutQueries()`, or do not embed a prober at all.
 
 With no program at all, such as in your own command line,
 `termcap.EnvCaps(env, goos, opts...)` gives the same facts a disabled
@@ -276,7 +301,8 @@ return m, termsvctea.Notify(n, termsvc.Notification{Title: "Done", Body: "3 file
 
 - **`Auto`** picks OSC 99 when the terminal answered its query, then OSC 9
   or OSC 777 by brand, then the bell; inside tmux or screen the sequence is
-  wrapped for passthrough.
+  wrapped for passthrough. `WithoutBell()` keeps `Auto` from ringing it:
+  where no protocol works, nothing is sent, and the result is `disabled`.
 - **Focus comes from `tea.FocusMsg` and `tea.BlurMsg`,** which need
   `View.ReportFocus`, through `termsvctea.Observe`, which calls
   `n.SetFocus`; `termcap.CapsMsg` reaches `n.SetCaps` the same way. `WhenUnfocused` sends only after a blur;
@@ -286,7 +312,8 @@ return m, termsvctea.Notify(n, termsvc.Notification{Title: "Done", Body: "3 file
   reason (`disabled`, `empty`, `focused`, `focus-unknown`, `gated`,
   `failed`), and a backend's `Err`.
 - **Text is cleaned:** escape sequences and controls removed, line breaks
-  collapsed, cut to 80 cells for the title and 240 for the body.
+  collapsed, cut to 80 cells for the title and 240 for the body, or
+  `WithTitleCells(n)` and `WithBodyCells(n)`.
   `WithNotifyFilter(f)` lets you decide last, such as for completed turns
   only; `WithBackend(b)` sends through a desktop API you supply, and
   `termsvc.BackendFunc` makes one of a function.
@@ -311,7 +338,11 @@ return m, termsvctea.Notify(n, termsvc.Notification{Title: "Done", Body: "3 file
   tmux also wraps it for passthrough. It delivers `CopiedMsg`:
   `Unconfirmed`, because OSC 52 never replies. With `WithClipboard(b)` your
   clipboard confirms or fails; `termsvc.ClipboardFunc` makes one of a
-  function. Over 100,000 bytes it fails and sends nothing.
+  function, and takes any length. Through OSC 52, a text over
+  `MaxCopyBytes`, 100,000 bytes, fails and sends nothing.
+  `WithCopyRoute(termsvc.RouteOSC52Tmux)` wraps the copy for tmux even
+  where the environment does not show tmux, and `RouteOSC52` sends it
+  plain inside tmux.
   `termsvctea.CopyContext` and `WithCopyTimeout` bound your clipboard as
   `NotifyContext` and `WithBackendTimeout` bound a backend.
 - **`termsvc.CopySequence(caps, text)`** returns the bytes a copy writes,
@@ -326,7 +357,8 @@ return m, termsvctea.Notify(n, termsvc.Notification{Title: "Done", Body: "3 file
 - **`LinkDisplay(caps)`** says whether to show a label alone, as an OSC 8
   link, or the label with its URL, where links do not work.
   **`termsvc.Link(url, text)`** builds a link, refusing schemes other than
-  http, https, file and mailto. **`LinkPolicy.Openable(url)`** decides
+  http, https, file and mailto; **`termsvc.Linker{Schemes: …}.Link`**
+  accepts the schemes you name instead. **`LinkPolicy.Openable(url)`** decides
   whether a click may open it (http and https by default);
   `termsvctea.Open(policy, url)` delivers `OpenURLMsg`, and your program
   opens it.
@@ -338,8 +370,8 @@ return m, termsvctea.Notify(n, termsvc.Notification{Title: "Done", Body: "3 file
 | `SanitizeTitle(s)` | `View.WindowTitle`: no controls or bidirectional marks, at most 240 characters |
 | `PromptStart`, `CommandStart`, `CommandExecuted`, `CommandFinished(exit)` | OSC 133 marks in inline output; on the alternate screen they mean nothing |
 | `Activity(vendor, state, t)`, `ParseActivity`, `termsvctea.ActivityBeacon` | an opt-in beacon for an editor that embeds the terminal, every 5 s |
-| `Pointer(caps, shape)` | the mouse pointer's shape, on Ghostty and kitty outside a multiplexer |
-| `ProgressSupported(caps)` | whether `View.ProgressBar` shows as a bar |
+| `Pointer(caps, shape)` | the mouse pointer's shape, on Ghostty and kitty outside a multiplexer, or where `caps.PointerSupport` says |
+| `ProgressSupported(caps)` | whether `View.ProgressBar` shows as a bar, or what `caps.ProgressSupport` says |
 
 ## A doctor command
 
@@ -354,7 +386,11 @@ func doctor(w io.Writer, caps termcap.Caps) error {
 }
 ```
 
-`termcap.Findings(caps)` returns the findings alone.
+`termcap.Findings(caps)` returns the findings alone, in English.
+`WithReportCatalog(c)` words the report's findings and notes in your
+`msgcat.Catalog`, by the IDs `termcap.Messages()` lists; the text report
+stays ASCII, so each byte outside it prints as `?`, and the JSON report
+keeps your words.
 
 ## Test with fake terminals
 
