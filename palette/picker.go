@@ -328,7 +328,7 @@ func (p *Picker) accept() tea.Cmd {
 		return p.finish(r.hit, nil, true)
 	}
 	p.eng.reset() // the providers' searches are done with
-	p.args = &stage{hit: r.hit, params: ps, cat: p.cfg.catalog}
+	p.args = &stage{hit: r.hit, params: ps, cat: p.cfg.catalog, query: p.input.Value()}
 	p.ask()
 	return nil
 }
@@ -382,9 +382,10 @@ func (p *Picker) give() tea.Cmd {
 // finish ends the picker with h: it records h's ID in the recents, sends
 // SelectedMsg, runs h's Run with args on the event loop when run is true
 // and the picker is not a completion pop-up, and returns a command that
-// closes the picker, which takes no more input until it is closed.
+// closes the picker, which takes no more input until it is closed. Under
+// WithoutCloseOnAccept it stays open, back at the query h was accepted
+// from when an argument stage asked for h's values.
 func (p *Picker) finish(h Hit, args jsontext.Value, run bool) tea.Cmd {
-	p.done = true
 	if p.cfg.recents != nil {
 		p.cfg.recents.Record(h.ID)
 	}
@@ -393,11 +394,17 @@ func (p *Picker) finish(h Hit, args jsontext.Value, run bool) tea.Cmd {
 		c = h.Run(args)
 	}
 	id := p.id
-	return tea.Batch(
-		func() tea.Msg { return SelectedMsg{ID: id, Hit: h} },
-		c,
-		func() tea.Msg { return workspace.Close(id) },
-	)
+	selected := func() tea.Msg { return SelectedMsg{ID: id, Hit: h} }
+	if p.cfg.keepOpen {
+		var back tea.Cmd
+		if st := p.args; st != nil {
+			p.query()
+			back = p.set(st.query)
+		}
+		return tea.Batch(selected, c, back)
+	}
+	p.done = true
+	return tea.Batch(selected, c, func() tea.Msg { return workspace.Close(id) })
 }
 
 // complete makes the query the selected hit's text, under the prefix the
@@ -488,8 +495,8 @@ func (p *Picker) wheel(m tea.MouseWheelMsg) {
 	}
 }
 
-// click runs the row under a left click; the input row and the help line
-// do nothing.
+// click runs the row under a left click, or selects it under
+// WithoutClickAccept; the input row and the help line do nothing.
 func (p *Picker) click(m tea.MouseClickMsg) tea.Cmd {
 	first := p.inputRows()
 	if m.Button != tea.MouseLeft || m.Y < first || m.Y >= first+p.visible() {
@@ -501,6 +508,9 @@ func (p *Picker) click(m tea.MouseClickMsg) tea.Cmd {
 		return nil
 	}
 	p.sel = ls[at].row
+	if p.cfg.noClickAccept {
+		return nil
+	}
 	return p.accept()
 }
 

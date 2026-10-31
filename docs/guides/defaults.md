@@ -117,12 +117,12 @@ record that is not there.
 | The width method | WcWidth until mode 2027 | `workspace.WithWidthMethod` | built |
 | The window clamp | `MaxSide` and `MaxCells` | `workspace.WithSize` | floor |
 | Chrome | rounded borders | `workspace.WithChrome`, `workspace.WithPaneChrome`, `workspace.WithBorder` | built |
-| An overlay's chrome | a bordered box with a title | `workspace.Overlay.Bare` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
+| An overlay's chrome | a bordered box with a title | `workspace.Overlay.Bare` | built |
 | Pane titles, badges and views | cleaned | `safetext.Clean` | floor |
 | The mouse | on | `workspace.WithoutMouse` | built |
-| Click to focus, drag to resize, one at a time | on with the mouse | `workspace.WithoutMouseFocus`, `workspace.WithoutMouseResize` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
+| Click to focus, drag to resize, one at a time | on with the mouse | `workspace.WithoutMouseFocus`, `workspace.WithoutMouseResize` | built |
 | Focus | the first pane of the ring | `workspace.WithFocus`, `workspace.WithFocusRing`, `workspace.Focusable` | built |
-| Focus when the focused pane hides | the ring's first pane | `workspace.WithFocusFallback`, `workspace.FocusFallback` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
+| Focus when the focused pane hides | the ring's first pane | `workspace.WithFocusFallback`, `workspace.FocusFallback`, `workspace.FocusFallbackFunc` | built |
 | A help footer | the workspace's bindings and the focused pane's | `workspace.Workspace.Bindings` | built |
 | Text it shows: results, reasons, help | English | `workspace.WithCatalog`, `workspace.Messages` | built |
 | A modal overlay takes clicks outside it | always | `workspace.Overlay.Modal` | decided (0002-MADR-multi-pane-workspace-layouts.md) |
@@ -144,9 +144,9 @@ record that is not there.
 | A completion pop-up | not | `palette.WithoutInput` | built |
 | The argument stage | for a hit with parameters | `palette.Hit.Params` | built |
 | A line-mode picker's entries | a provider of them, its hits with no `Run` | `palette.FromEntries` | built |
-| A click on a row | accepts it | `palette.WithoutClickAccept` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
-| Accepting a hit | closes the picker | `palette.WithoutCloseOnAccept` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
-| A query of `?` | lists the prefixes | `palette.WithoutPrefixList` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
+| A click on a row | accepts it | `palette.WithoutClickAccept` | built |
+| Accepting a hit | closes the picker | `palette.WithoutCloseOnAccept` | built |
+| A query of `?` | lists the prefixes | `palette.WithoutPrefixList` | built |
 | Text it shows, a provider's rows too | English | `palette.WithCatalog`, `palette.Messages`, `palette.Search.Catalog` | built |
 | Hit text | cleaned | `safetext.Clean` | floor |
 | The file provider's limits | an index above 5000 paths, a walk of 200 000 | `palette.WithIndexAbove`, `palette.WithMaxFiles` | built |

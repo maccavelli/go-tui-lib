@@ -216,7 +216,7 @@ func (e *engine) query(text string) tea.Cmd {
 	if e.s == nil {
 		return nil
 	}
-	if text == listPrefixes {
+	if text == listPrefixes && !e.cfg.noPrefixList {
 		e.prefix = true
 		return nil
 	}

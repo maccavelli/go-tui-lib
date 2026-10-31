@@ -32,6 +32,7 @@ type stage struct {
 	matcher *fuzzy.Matcher // the input's, while it is not empty
 	reason  string         // why the last value was refused, until the input changes
 	cat     msgcat.Catalog // the picker's words
+	query   string         // the query the hit was accepted from
 }
 
 // choice is one value of a list: as it is drawn, and as it is sent.

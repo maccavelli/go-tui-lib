@@ -186,6 +186,9 @@ type Workspace struct {
 	dirty    bool             // something changed since the last frame
 	drag     *drag
 	catalog  msgcat.Catalog // WithCatalog
+
+	noMouseFocus, noMouseResize bool          // WithoutMouseFocus, WithoutMouseResize
+	fallback                    FocusFallback // WithFocusFallback, or nil
 }
 
 // viewKind tells a pane's cached view from an overlay's: their IDs are
@@ -356,6 +359,39 @@ func WithState(s layout.State) Option { return optionFunc(func(w *Workspace) { w
 // WithoutMouse turns mouse handling off. It is on by default, and does
 // nothing until the program sets a mouse mode.
 func WithoutMouse() Option { return optionFunc(func(w *Workspace) { w.mouse = false }) }
+
+// WithoutMouseFocus keeps a click on a pane from focusing it. The click
+// still reaches the pane, and dragging a separator still resizes
+// (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md D6).
+func WithoutMouseFocus() Option { return optionFunc(func(w *Workspace) { w.noMouseFocus = true }) }
+
+// WithoutMouseResize keeps a drag on a separator from resizing. A click on
+// a pane still focuses it, and the panes still get their mouse events
+// (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md D6).
+func WithoutMouseResize() Option { return optionFunc(func(w *Workspace) { w.noMouseResize = true }) }
+
+// FocusFallback chooses where focus goes when the focused pane can take it
+// no longer, such as when it is hidden: lost is that pane, and ring the
+// focus ring as it is now, never empty. A pane outside ring is ignored,
+// and focus goes to ring's first, as it does without a FocusFallback
+// (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md A1).
+type FocusFallback interface {
+	Fallback(lost layout.PaneID, ring []layout.PaneID) layout.PaneID
+}
+
+// FocusFallbackFunc is a function used as a FocusFallback.
+type FocusFallbackFunc func(lost layout.PaneID, ring []layout.PaneID) layout.PaneID
+
+// Fallback calls f.
+func (f FocusFallbackFunc) Fallback(lost layout.PaneID, ring []layout.PaneID) layout.PaneID {
+	return f(lost, ring)
+}
+
+// WithFocusFallback chooses where focus goes when the focused pane can take
+// it no longer. The default is the focus ring's first pane.
+func WithFocusFallback(f FocusFallback) Option {
+	return optionFunc(func(w *Workspace) { w.fallback = f })
+}
 
 // WithWidthMethod fixes how the workspace measures text, and stops it
 // following the terminal's mode 2027 report. By default it measures with
@@ -849,11 +885,22 @@ func (w *Workspace) resolve() tea.Cmd {
 	if !w.focusable(w.focus) {
 		if r := w.focusRing(); len(r) > 0 {
 			was := w.focusTarget()
-			w.focus = r[0]
+			w.focus = w.fallbackFrom(w.focus, r)
 			cmds = append(cmds, w.moveFocus(was))
 		}
 	}
 	return tea.Batch(cmds...)
+}
+
+// fallbackFrom is where focus goes from lost, which can take it no longer:
+// WithFocusFallback's choice when it is in ring, else ring's first.
+func (w *Workspace) fallbackFrom(lost layout.PaneID, ring []layout.PaneID) layout.PaneID {
+	if w.fallback != nil {
+		if id := w.fallback.Fallback(lost, slices.Clone(ring)); slices.Contains(ring, id) {
+			return id
+		}
+	}
+	return ring[0]
 }
 
 // chromeOf is pane id's chrome: its override, or the workspace's.

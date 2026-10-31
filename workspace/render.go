@@ -68,8 +68,12 @@ func (w *Workspace) Render() string {
 	}
 	for _, o := range w.overlays {
 		r := w.overlayRect(o)
-		w.frame.Draw(w.renderBox(r, o.Pane, overlayView, o.ID, true), r)
-		w.regions = append(w.regions, region{kind: overlayRegion, id: o.ID, rect: r, inner: insetBorder(r)})
+		if o.Bare {
+			w.frame.Draw(w.viewOf(overlayView, o.ID, o.Pane, r.W, r.H, true), r)
+		} else {
+			w.frame.Draw(w.renderBox(r, o.Pane, overlayView, o.ID, true), r)
+		}
+		w.regions = append(w.regions, region{kind: overlayRegion, id: o.ID, rect: r, inner: overlayInner(o, r)})
 	}
 	slices.Reverse(w.regions) // top first: the last overlay, then separators, then panes
 	w.last = w.frame.Render()
@@ -108,7 +112,7 @@ func (w *Workspace) hit(x, y int) (region, bool) {
 // outside the pane.
 func (w *Workspace) Cursor() *tea.Cursor {
 	if o := w.modal(); o != nil {
-		return placeCursor(o.Pane, insetBorder(w.overlayRect(*o)))
+		return placeCursor(o.Pane, overlayInner(*o, w.overlayRect(*o)))
 	}
 	return w.paneCursor()
 }
@@ -494,7 +498,7 @@ func (w *Workspace) mouseEvent(msg tea.MouseMsg) tea.Cmd {
 	id := reg.id
 	switch reg.kind {
 	case sepRegion:
-		if _, ok := msg.(tea.MouseClickMsg); ok {
+		if _, ok := msg.(tea.MouseClickMsg); ok && !w.noMouseResize {
 			for _, s := range w.plan.Separators {
 				if s.ID == id {
 					pos := m.X
@@ -518,7 +522,7 @@ func (w *Workspace) mouseEvent(msg tea.MouseMsg) tea.Cmd {
 	case paneRegion:
 		pid := layout.PaneID(id)
 		var cmds []tea.Cmd
-		if _, ok := msg.(tea.MouseClickMsg); ok {
+		if _, ok := msg.(tea.MouseClickMsg); ok && !w.noMouseFocus {
 			cmds = append(cmds, w.Focus(pid))
 		}
 		if lm, ok := local(msg, reg.inner); ok {

@@ -677,3 +677,101 @@ in each package; the rest so that each new test is seen to fail:
   clean.
 
 **Step 3 complete, 2026-10-31,** for the owner's commit.
+
+### Step 4: the mouse and the overlay
+
+*2026-10-31:* the owner committed Step 3 (`c10b392`) and said "committed,
+proceed". No deviation: the code took the step as written.
+`FocusFallback` and `FocusFallbackFunc` passed `tools.verify names` again:
+"names: 2 planned name(s), clean".
+
+**Readings, not questions,** where the step is silent:
+
+* a `FocusFallback` that names a pane outside the focus ring is ignored,
+  and focus goes to the ring's first, as without one; it is given a copy
+  of the ring;
+* a bare overlay is at least 1 by 1, where the framed one is 3 by 3 for its
+  border;
+* under `WithoutCloseOnAccept`, a hit accepted through the argument stage
+  leaves the picker at the query it was accepted from, which the stage now
+  keeps.
+
+**What changed:**
+
+* `workspace`:
+  * `WithoutMouseFocus()` and `WithoutMouseResize()`: `mouseEvent` skips
+    the click's focus, or the separator's drag, alone; the pane still gets
+    its click and the wheel.
+  * `FocusFallback`, `FocusFallbackFunc` and `WithFocusFallback`, as MADR
+    A1 gives them: `fallbackFrom` chooses where focus goes when the
+    focused pane can take it no longer.
+  * `Overlay.Bare`: `overlayInner` is the whole rectangle for a bare
+    overlay and the bordered inside for any other, and its content size,
+    its click region and its cursor read it; `Render` draws a bare
+    overlay's view with `viewOf`, at its size, without `renderBox`.
+* `palette`:
+  * `WithoutClickAccept()`: a click selects its row and returns.
+  * `WithoutCloseOnAccept()`: `finish` sends `SelectedMsg` and runs the
+    hit, and does not close or mark the picker done; after an argument
+    stage it sets the stage's `query` again.
+  * `WithoutPrefixList()`: the engine lists the prefixes for "?" only
+    without it.
+* `docs/guides/defaults.md`: the six rows are `built`, the fallback's
+  naming `FocusFallbackFunc` too.
+
+**Tests,** `workspace/optouts_test.go` and `palette/optouts_test.go`:
+
+* `TestMouseOptionsEachDropOneBehaviour`: a drag of 5 cells and a click on
+  a pane, by default, under each option and under both; the pane gets its
+  click and the wheel each time.
+* `TestFocusFallback`: by default; to `logs`, given `side` and the ring
+  `[main logs]`; and to the footer, outside the ring, ignored.
+* `TestBareOverlay`: a 10 by 3 bare overlay is told 10 by 3, a framed one 8
+  by 1; it draws otherwise; its cursor and a click on its corner are at
+  (0,0) of its pane; a 1 by 1 bare overlay is 1 by 1.
+  `TestBareOverlayGolden`: `overlay-bare` across the matrix at 40 and 60
+  columns, eight new goldens, read: the pane's text at the overlay's
+  place, no border.
+* `TestWithoutClickAccept`, `TestWithoutCloseOnAccept` (two accepts, and
+  an argument stage), `TestWithoutPrefixList` (default and with).
+* Without the options every existing test and golden passes unchanged.
+
+**Seen failing,** through `tools.verify mutate` on scratch copies, 15
+killed of 15. 4.1 to 4.6 are the step's; the rest so that each new
+assertion is seen to fail:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| 4.1 `WithoutMouseFocus` also drops the drag | `TestMouseOptionsEachDropOneBehaviour`: "WithoutMouseFocus: resize 0, focused false, side's clicks 1; want 5, false, 1" |
+| 4.2 `Bare` ignored when drawing | `TestBareOverlay`: "the bare overlay drew as the framed one"; `TestBareOverlayGolden` |
+| 4.3 a click still accepts | `TestWithoutClickAccept`: "a click: ran ["c1"], selection 2, overlays []; want nothing run, 2, the picker open" |
+| 4.4 the fallback ignored | `TestFocusFallback`: "to logs: focus main after side hid, want logs" |
+| 4.5 the picker closes under `WithoutCloseOnAccept` | `TestWithoutCloseOnAccept`: "two accepts ran ["a1"]; want a1 and b1" |
+| 4.6 "?" still lists the prefixes under `WithoutPrefixList` | `TestWithoutPrefixList`: "WithoutPrefixList: the prefix list true, plain searched []; want the list false" |
+| 4.7 `WithoutMouseResize` also drops the focus | `TestMouseOptionsEachDropOneBehaviour`: "WithoutMouseResize: resize 0, focused false, …; want 0, true, 1" |
+| 4.8 `WithoutMouseResize` ignored | `TestMouseOptionsEachDropOneBehaviour`: "WithoutMouseResize: resize 5, focused true, …; want 0, true, 1" |
+| 4.9 `WithoutMouseFocus` ignored | `TestMouseOptionsEachDropOneBehaviour`: "WithoutMouseFocus: resize 5, focused true, …; want 5, false, 1" |
+| 4.10 a fallback outside the ring is taken | `TestFocusFallback`: "outside the ring: focus footer after side hid, want main" |
+| 4.11 a bare overlay's content keeps a border | `TestBareOverlay`: "a bare overlay's sizes [{8 1}]; want the last 10x3" |
+| 4.12 a bare overlay is at least 3 by 3 | `TestBareOverlay`: "a 1x1 bare overlay's sizes [{3 3}]" |
+| 4.13 a bare overlay's cursor inside a border | `TestBareOverlay`: "the cursor &{Position:{X:16 Y:5} …}; want the overlay's corner (15,4)" |
+| 4.14 a bare overlay's clicks inside a border | `TestBareOverlay`: "a click on the corner reached the overlay as []; want one at (0,0)" |
+| 4.15 staying open, the query is not given back | `TestWithoutCloseOnAccept`: "after the stage: args <nil>, query "", overlays [palette], rows []; want the query set again, the picker open" |
+
+**Gates:**
+
+* `make pre-add-check` over the step's 9 Go files: "9 file(s) clean";
+  `make modernize`: clean.
+
+| Host | `gates` |
+| :--- | :--- |
+| macOS, with the step's Go files | 22 passed, 0 failed, 0 skipped, 844 s; `release-check` "438 file(s) clean", with `apicheck` and the examples gate |
+| `remote linux` | 21 passed, 0 failed, 1 skipped, 1423 s; "440 file(s) clean", the step's two new test files among them, untracked |
+| `remote windows` | 21 passed, 0 failed, 1 skipped, 2613 s; "440 file(s) clean" |
+
+* The skip on each remote host is `gofmt`, which is given no files there.
+* `make apicheck`: "against v2.7.1, 0 incompatible change(s)".
+* `TestDefaultsInventory`, the documents' checks and the identifier scan:
+  clean.
+
+**Step 4 complete, 2026-10-31,** for the owner's commit.

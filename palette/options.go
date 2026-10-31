@@ -61,6 +61,10 @@ type config struct {
 	noInput     bool      // a completion pop-up: no input row, non-modal
 	recents     *Frecency // where accepted hits are recorded, or nil
 	catalog     msgcat.Catalog
+
+	noClickAccept bool // WithoutClickAccept: a click selects
+	keepOpen      bool // WithoutCloseOnAccept: accepting leaves the picker open
+	noPrefixList  bool // WithoutPrefixList: "?" is an ordinary query
 }
 
 func newConfig(opts []Option) config {
@@ -75,6 +79,22 @@ func newConfig(opts []Option) config {
 // Messages. Each provider's Search carries it, so a provider words its own
 // rows too (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md A4).
 func WithCatalog(c msgcat.Catalog) Option { return optionFunc(func(cfg *config) { cfg.catalog = c }) }
+
+// WithoutClickAccept makes a click on a row select it, as the arrows do,
+// without accepting it; enter accepts
+// (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md D6).
+func WithoutClickAccept() Option { return optionFunc(func(c *config) { c.noClickAccept = true }) }
+
+// WithoutCloseOnAccept keeps the picker open when a hit is accepted: it
+// still sends SelectedMsg and runs the hit, and, after an argument stage,
+// returns to the query that led to it
+// (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md A1).
+func WithoutCloseOnAccept() Option { return optionFunc(func(c *config) { c.keepOpen = true }) }
+
+// WithoutPrefixList makes a query of "?" an ordinary query, searched for
+// like any other, instead of the list of the providers' prefixes
+// (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md A1).
+func WithoutPrefixList() Option { return optionFunc(func(c *config) { c.noPrefixList = true }) }
 
 // WithLimit keeps the best n hits across providers; below 1 keeps
 // DefaultLimit.

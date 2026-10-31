@@ -63,6 +63,11 @@ type Overlay struct {
 	// non-modal overlay takes only esc and the mouse events over it; other
 	// keys still reach the focused pane, which drives it.
 	Modal bool
+	// Bare draws the pane alone, at the overlay's size, with no border and
+	// no title, and at least 1 by 1 instead of 3 by 3. The zero value draws
+	// the chrome (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md
+	// D6).
+	Bare bool
 }
 
 // Push opens an overlay above any already open and tells it its size. A
@@ -185,7 +190,11 @@ func (w *Workspace) updateOverlay(i int, msg tea.Msg) tea.Cmd {
 
 // overlayRect places an overlay in the workspace.
 func (w *Workspace) overlayRect(o Overlay) layout.Rect {
-	ow, oh := min(max(o.Width, 3), w.width), min(max(o.Height, 3), w.height)
+	least := 3 // a border and one cell inside it
+	if o.Bare {
+		least = 1
+	}
+	ow, oh := min(max(o.Width, least), w.width), min(max(o.Height, least), w.height)
 	r := layout.Rect{X: (w.width - ow) / 2, Y: (w.height - oh) / 2, W: ow, H: oh}
 	switch o.Anchor.Kind {
 	case BelowCursor:
@@ -206,8 +215,17 @@ func (w *Workspace) overlayRect(o Overlay) layout.Rect {
 	return r
 }
 
-// overlayContent is an overlay's content size: its rectangle less a border.
+// overlayContent is an overlay's content size: its rectangle less a
+// border, or all of it when it is bare.
 func (w *Workspace) overlayContent(o Overlay) SizeMsg {
-	in := insetBorder(w.overlayRect(o))
+	in := overlayInner(o, w.overlayRect(o))
 	return SizeMsg{Width: in.W, Height: in.H}
+}
+
+// overlayInner is the content area of o placed at r.
+func overlayInner(o Overlay, r layout.Rect) layout.Rect {
+	if o.Bare {
+		return r
+	}
+	return insetBorder(r)
 }
