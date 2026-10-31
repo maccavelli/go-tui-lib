@@ -169,6 +169,12 @@ func full() Caps {
 		Palette:             palette(),
 		PaletteKnown:        true,
 		SecondaryAttributes: []int{1, 95, 0},
+		LinksSupport:        Fact[Support]{Value: Unsupported, Origin: Override},
+		NotifyOSC9Support:   Fact[Support]{Value: Supported, Origin: Override},
+		NotifyOSC777Support: Fact[Support]{Value: Unsupported, Origin: Override},
+		KeyboardRequest:     Fact[int]{Value: 1, Origin: Override},
+		PointerSupport:      Fact[Support]{Value: Supported, Origin: Override},
+		ProgressSupport:     Fact[Support]{Value: Unsupported, Origin: Override},
 	}
 }
 

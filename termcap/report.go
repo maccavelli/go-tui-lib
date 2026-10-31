@@ -7,6 +7,7 @@ import (
 	"image/color"
 	"io"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -59,7 +60,8 @@ var notQueried = map[string]string{
 
 // Report writes c to w as one line per fact, in Caps's field order: the
 // fact's name, as JSON names it; its value; and where it came from, with
-// its reason token, or the reason a fact was not queried. The findings
+// its reason token, or the reason a fact was not queried. A view fact,
+// such as LinksSupport, is written only once a program sets it. The findings
 // follow, one per token. The text is ASCII, with no colour, so it can be
 // pasted into an issue. Lines longer than the width wrap under the value
 // column. WithReportJSON writes the same as JSON.
@@ -84,6 +86,9 @@ func Report(w io.Writer, c Caps, o ...ReportOption) error {
 	v := reflect.ValueOf(c)
 	t := v.Type()
 	for i := range t.NumField() {
+		if slices.Contains(viewFacts, t.Field(i).Name) && v.Field(i).FieldByName("Origin").IsZero() { // NotQueried
+			continue // D7: a view fact is shown once a program sets it
+		}
 		name := fieldName(t.Field(i))
 		b.WriteString(line(name, describe(name, v.Field(i), c.TimedOut), cfg.width))
 	}

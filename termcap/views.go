@@ -22,7 +22,8 @@ type KeyboardCaps struct {
 	Releases bool // ReleasesReported
 }
 
-// Keyboard is the keyboard view of c.
+// Keyboard is the keyboard view of c. A KeyboardRequest that was set is
+// its Request.
 func (c Caps) Keyboard() KeyboardCaps {
 	k := KeyboardCaps{Kitty: c.KittyKeyboard, Accepted: c.KeyboardFlags, Releases: c.ReleasesReported()}
 	reason := keyboardReason(c)
@@ -30,6 +31,9 @@ func (c Caps) Keyboard() KeyboardCaps {
 		k.Request = ansi.KittyReportEventTypes
 	} else if k.Kitty.Reason == "" {
 		k.Kitty.Reason = reason
+	}
+	if c.KeyboardRequest.given() {
+		k.Request = c.KeyboardRequest.Value
 	}
 	return k
 }
@@ -80,8 +84,12 @@ var linkBrands = []Brand{
 	BrandCursor, BrandWindsurf, BrandJetBrains,
 }
 
-// Links is the hyperlink view of c.
+// Links is the hyperlink view of c. A LinksSupport that was set is its
+// OSC8.
 func (c Caps) Links() LinkCaps {
+	if c.LinksSupport.given() {
+		return LinkCaps{OSC8: c.LinksSupport}
+	}
 	var f Fact[Support]
 	brand := c.Brand.Value
 	switch {
@@ -123,7 +131,8 @@ type NotifyCaps struct {
 
 // Notifications is the notification view of c: OSC 9 on iTerm2, WezTerm
 // and Warp, OSC 777 on Ghostty, VTE and foot, neither on others or inside
-// Zellij.
+// Zellij. A NotifyOSC9Support or NotifyOSC777Support that was set is its
+// OSC9 or OSC777.
 func (c Caps) Notifications() NotifyCaps {
 	n := NotifyCaps{OSC99: c.DesktopNotify, Focus: c.FocusEvents}
 	brand := c.Brand.Value
@@ -137,6 +146,12 @@ func (c Caps) Notifications() NotifyCaps {
 	default:
 		n.OSC777.Set(supportIf(slices.Contains([]Brand{BrandGhostty, BrandVTE, BrandFoot, BrandTerminator}, brand)), Heuristic)
 		n.OSC9.Set(supportIf(slices.Contains([]Brand{BrandITerm2, BrandWezTerm, BrandWarp}, brand)), Heuristic)
+	}
+	if c.NotifyOSC9Support.given() {
+		n.OSC9 = c.NotifyOSC9Support
+	}
+	if c.NotifyOSC777Support.given() {
+		n.OSC777 = c.NotifyOSC777Support
 	}
 	return n
 }

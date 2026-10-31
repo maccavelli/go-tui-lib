@@ -61,8 +61,9 @@ func NotifyContext(ctx context.Context, n *termsvc.Notifier, x termsvc.Notificat
 
 // Copy writes text to the clipboard, and delivers termsvc.CopiedMsg. With
 // termsvc.WithClipboard it goes through the program's clipboard; otherwise
-// through OSC 52, and inside tmux also wrapped for passthrough. A payload
-// over termsvc.MaxCopyBytes is not sent, and fails. It is CopyContext under
+// through OSC 52, and inside tmux, or under termsvc.WithCopyRoute's
+// RouteOSC52Tmux, also wrapped for tmux's passthrough. A payload over
+// termsvc.MaxCopyBytes is not sent through OSC 52, and fails. It is CopyContext under
 // context.Background().
 func Copy(c termcap.Caps, text string, o ...termsvc.CopyOption) tea.Cmd {
 	return CopyContext(context.Background(), c, text, o...)
@@ -80,7 +81,7 @@ func CopyContext(ctx context.Context, c termcap.Caps, text string, o ...termsvc.
 		return tea.Sequence(tea.SetClipboard(text), result)
 	case termsvc.RouteOSC52Tmux:
 		return tea.Sequence(
-			tea.Batch(tea.SetClipboard(text), tea.Raw(termsvc.Wrap(c, ansi.SetSystemClipboard(text)))),
+			tea.Batch(tea.SetClipboard(text), tea.Raw(ansi.TmuxPassthrough(ansi.SetSystemClipboard(text)))),
 			result)
 	}
 	return result

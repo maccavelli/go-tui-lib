@@ -213,7 +213,24 @@ func WithBackendTimeout(d time.Duration) NotifyOption {
 	return notifyOptionFunc(func(n *Notifier) { n.timeout = d })
 }
 
-// Text limits, in cells.
+// WithTitleCells cuts a notification's title to n cells. The default is
+// TitleCells; n of 0 or less keeps it.
+func WithTitleCells(n int) NotifyOption {
+	return notifyOptionFunc(func(o *Notifier) { o.titleCells = n })
+}
+
+// WithBodyCells cuts a notification's body to n cells. The default is
+// BodyCells; n of 0 or less keeps it.
+func WithBodyCells(n int) NotifyOption {
+	return notifyOptionFunc(func(o *Notifier) { o.bodyCells = n })
+}
+
+// WithoutBell keeps Auto from ringing the bell where the terminal takes no
+// notification protocol: it sends nothing there, and the notification is
+// SkipDisabled. A Bell set with WithProtocol still rings.
+func WithoutBell() NotifyOption { return notifyOptionFunc(func(n *Notifier) { n.noBell = true }) }
+
+// Text limits, in cells, unless WithTitleCells or WithBodyCells sets them.
 const (
 	TitleCells = 80
 	BodyCells  = 240
@@ -238,6 +255,9 @@ type Notifier struct {
 	backend  Backend
 	gate     func(Notification) bool
 	timeout  time.Duration
+
+	titleCells, bodyCells int  // 0 or less: TitleCells, BodyCells
+	noBell                bool // WithoutBell
 
 	caps       termcap.Caps
 	focused    bool
@@ -266,7 +286,7 @@ func (n *Notifier) SetFocus(focused bool) { n.focused, n.focusKnown = focused, t
 // to write to the terminal, if any, and deliver, which reports the result.
 // The title and body are cleaned first: escape sequences removed, line
 // breaks collapsed to a space, controls removed, and cut to TitleCells and
-// BodyCells cells; the policy, the filter and the numbering of OSC 99
+// BodyCells cells, or WithTitleCells's and WithBodyCells's; the policy, the filter and the numbering of OSC 99
 // notifications are applied here.
 //
 // Skipped, seq is "" and deliver returns the reason. Through the terminal,
@@ -276,7 +296,7 @@ func (n *Notifier) SetFocus(focused bool) { n.focused, n.focusKnown = focused, t
 // must not block, such as a TUI's loop, calls it elsewhere; a backend that
 // fails, its deadline included, gives SkipFailed with its error in Err.
 func (n *Notifier) Prepare(ctx context.Context, x Notification) (seq string, deliver func() NotifyResultMsg) {
-	x.Title, x.Body = clean(x.Title, TitleCells), clean(x.Body, BodyCells)
+	x = n.cleaned(x)
 	if n.backend != nil {
 		if skip := n.skip(x, false); skip != NotSkipped {
 			return "", func() NotifyResultMsg { return NotifyResultMsg{Notification: x, Skipped: skip} }
@@ -304,8 +324,21 @@ func (n *Notifier) Prepare(ctx context.Context, x Notification) (seq string, del
 // itself, such as its own command line. It ignores WithBackend: the bytes
 // are the terminal's.
 func (n *Notifier) Sequence(x Notification) (string, SkipReason) {
-	x.Title, x.Body = clean(x.Title, TitleCells), clean(x.Body, BodyCells)
+	x = n.cleaned(x)
 	return n.bytesFor(x)
+}
+
+// cleaned is x's title and body cleaned, and cut to the notifier's cells.
+func (n *Notifier) cleaned(x Notification) Notification {
+	title, body := TitleCells, BodyCells
+	if n.titleCells > 0 {
+		title = n.titleCells
+	}
+	if n.bodyCells > 0 {
+		body = n.bodyCells
+	}
+	x.Title, x.Body = clean(x.Title, title), clean(x.Body, body)
+	return x
 }
 
 // bytesFor is Sequence for a cleaned x.
@@ -356,6 +389,9 @@ func (n *Notifier) chosen() Protocol {
 		return OSC9
 	case v.OSC777.Value:
 		return OSC777
+	}
+	if n.noBell {
+		return Off
 	}
 	return Bell
 }

@@ -68,8 +68,10 @@ func TestPrepareCopyRoutes(t *testing.T) {
 	}() {
 		t.Error("a clipboard's error was not reported")
 	}
-	if route, deliver := PrepareCopy(ctx, termcap.Caps{}, strings.Repeat("x", MaxCopyBytes+1), WithClipboard(ok)); route != RouteNone || deliver().Status != Failed || len(ok.got) != 1 {
-		t.Errorf("an oversized copy reached the clipboard: route %v, %d calls", route, len(ok.got))
+	// MaxCopyBytes bounds OSC 52 alone: a program's clipboard takes any
+	// length (0024-MADR D5).
+	if route, deliver := PrepareCopy(ctx, termcap.Caps{}, strings.Repeat("x", MaxCopyBytes+1), WithClipboard(ok)); route != RouteBackend || deliver().Status != Confirmed || len(ok.got) != 2 {
+		t.Errorf("an oversized copy did not reach the clipboard: route %v, %d calls", route, len(ok.got))
 	}
 }
 

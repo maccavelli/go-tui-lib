@@ -10,6 +10,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/maccavelli/go-tui-lib/v2/termcap"
 	"github.com/maccavelli/go-tui-lib/v2/termsvc"
@@ -80,8 +81,24 @@ func TestCopyStatus(t *testing.T) {
 	if got, _ := copiedOf(t, Copy(termcap.Caps{}, "x", termsvc.WithClipboard(bad))); got.Status != termsvc.Failed || got.Route != termsvc.RouteBackend || !errors.Is(got.Err, bad.err) {
 		t.Errorf("a clipboard's error: %+v", got)
 	}
-	if got, _ := copiedOf(t, Copy(termcap.Caps{}, strings.Repeat("x", termsvc.MaxCopyBytes+1), termsvc.WithClipboard(ok))); got.Status != termsvc.Failed || len(ok.got) != 1 {
-		t.Errorf("an oversized copy reached the clipboard: %+v, %d calls", got, len(ok.got))
+	// MaxCopyBytes bounds OSC 52 alone: a program's clipboard takes any
+	// length (0024-MADR D5).
+	if got, _ := copiedOf(t, Copy(termcap.Caps{}, strings.Repeat("x", termsvc.MaxCopyBytes+1), termsvc.WithClipboard(ok))); got.Status != termsvc.Confirmed || len(ok.got) != 2 {
+		t.Errorf("an oversized copy did not reach the clipboard: %+v, %d calls", got, len(ok.got))
+	}
+}
+
+// TestCopyRouteForced: under WithCopyRoute's RouteOSC52Tmux, outside the
+// tmux the Caps name, the copy is also written wrapped for tmux.
+func TestCopyRouteForced(t *testing.T) {
+	var raw []any
+	for _, m := range run(Copy(termcap.Caps{}, "x", termsvc.WithCopyRoute(termsvc.RouteOSC52Tmux))) {
+		if r, ok := m.(tea.RawMsg); ok {
+			raw = append(raw, r.Msg)
+		}
+	}
+	if want := ansi.TmuxPassthrough(ansi.SetSystemClipboard("x")); len(raw) != 1 || raw[0] != want {
+		t.Errorf("raw writes %q, want [%q]", raw, want)
 	}
 }
 

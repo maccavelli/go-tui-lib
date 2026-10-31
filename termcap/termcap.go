@@ -122,6 +122,9 @@ type Fact[T any] struct {
 // another Override. A replaced fact has no reason.
 func (f *Fact[T]) Set(v T, o Origin) bool { return f.SetReason(v, o, "") }
 
+// given reports whether f was set at all: its origin is not NotQueried.
+func (f Fact[T]) given() bool { return f.Origin != NotQueried }
+
 // SetReason is Set with a reason token.
 func (f *Fact[T]) SetReason(v T, o Origin, reason string) bool {
 	if o < f.Origin {

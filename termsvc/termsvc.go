@@ -50,21 +50,37 @@ func Wrap(c termcap.Caps, seq string) string {
 // ErrScheme is Link's error for a URL whose scheme it does not link.
 var ErrScheme = errors.New("termsvc: link scheme not allowed")
 
-// linkSchemes are the schemes Link accepts.
+// linkSchemes are the schemes a Linker with no Schemes accepts.
 var linkSchemes = []string{"http", "https", "file", "mailto"}
 
-// Link returns text as an OSC 8 hyperlink to rawURL, with params (such as
-// "id=x") on the opening sequence. It refuses any scheme but http, https,
-// file and mailto, and strips control bytes from the URL, the text and the
-// params. Lip Gloss's Style.Hyperlink is the styling path; Link is the
-// validating one.
+// Linker makes OSC 8 hyperlinks to the schemes it allows
+// (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md A3).
+type Linker struct {
+	// Schemes are the schemes Link accepts, compared without case. Empty
+	// means http, https, file and mailto.
+	Schemes []string
+}
+
+// Link is Linker{}.Link: it accepts http, https, file and mailto.
 func Link(rawURL, text string, params ...string) (string, error) {
+	return Linker{}.Link(rawURL, text, params...)
+}
+
+// Link returns text as an OSC 8 hyperlink to rawURL, with params (such as
+// "id=x") on the opening sequence. It refuses any scheme but l's, and
+// strips control bytes from the URL, the text and the params. Lip Gloss's
+// Style.Hyperlink is the styling path; Link is the validating one.
+func (l Linker) Link(rawURL, text string, params ...string) (string, error) {
 	rawURL = strip(rawURL)
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return "", err
 	}
-	if !slices.Contains(linkSchemes, strings.ToLower(u.Scheme)) {
+	schemes := l.Schemes
+	if len(schemes) == 0 {
+		schemes = linkSchemes
+	}
+	if !slices.ContainsFunc(schemes, func(s string) bool { return strings.EqualFold(s, u.Scheme) }) {
 		return "", ErrScheme
 	}
 	clean := make([]string, len(params))

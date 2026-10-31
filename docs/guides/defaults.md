@@ -186,7 +186,7 @@ record that is not there.
 | The probe's timeout | 2 s | `termcap.WithTimeout` | built |
 | What the environment says | read from the `Env` given | `termcap.WithOverride`, `termcap.WithAppearanceEnv`, `termcap.WithAppearanceHook`, `termcap.WithConsoleHost` | built |
 | The system the identity is read for | the running one | `termcap.WithGOOS` | built |
-| One capability view, apart from the brand | from the brand's table | `termcap.Caps.LinksSupport` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
+| One capability view, apart from the brand | from the brand's table | `termcap.Caps.LinksSupport`, `termcap.Caps.NotifyOSC9Support`, `termcap.Caps.NotifyOSC777Support`, `termcap.Caps.KeyboardRequest`, `termcap.Caps.PointerSupport`, `termcap.Caps.ProgressSupport` | built |
 | A reply's length | 1 KiB | `termcap.ParseReply` | floor |
 | The DA1 sentinel | sent last | `termcap.Probe.Start` | floor |
 | The report | 80 columns, text | `termcap.WithReportWidth`, `termcap.WithReportJSON` | built |
@@ -199,14 +199,15 @@ record that is not there.
 | Behaviour | Default | Control | Status |
 | :--- | :--- | :--- | :--- |
 | A notification's protocol | OSC 99, 9, 777, then the bell | `termsvc.WithProtocol` | built |
-| The bell as the last protocol | under `Auto` | `termsvc.WithoutBell` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
+| The bell as the last protocol | under `Auto` | `termsvc.WithoutBell` | built |
 | When a notification is sent | while unfocused | `termsvc.WithPolicy` | built |
 | A notification backend | none | `termsvc.WithBackend`, `termsvc.BackendFunc`, `termsvc.WithBackendTimeout` | built |
 | A notification filter | none | `termsvc.WithNotifyFilter` | built |
-| A notification's title and body | 80 and 240 cells | `termsvc.WithTitleCells`, `termsvc.WithBodyCells` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
+| A notification's title and body | 80 and 240 cells | `termsvc.WithTitleCells`, `termsvc.WithBodyCells` | built |
 | The clipboard | OSC 52 | `termsvc.WithClipboard`, `termsvc.WithCopyTimeout` | built |
-| The copy's route | by the terminal and the multiplexer | `termsvc.WithCopyRoute` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
-| A link's schemes | http, https, file, mailto | `termsvc.WithLinkSchemes` | planned (0024-PLAN-terminal-text-and-convention-opt-outs.md) |
+| The copy's route | by the terminal and the multiplexer | `termsvc.WithCopyRoute` | built |
+| An OSC 52 copy's length | at most 100,000 bytes; a program's clipboard takes any | `termsvc.MaxCopyBytes` | floor |
+| A link's schemes | http, https, file, mailto | `termsvc.Linker` | built |
 | Text it writes | cleaned | `safetext.Clean` | floor |
 
 ## termkey

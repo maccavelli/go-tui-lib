@@ -3,6 +3,7 @@ package termcap
 import (
 	"errors"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -17,20 +18,33 @@ func reportOf(t *testing.T, c Caps, o ...ReportOption) string {
 }
 
 // TestReportNamesEveryField walks Caps itself, so a field added later is
-// checked without a change here.
+// checked without a change here. The view facts are its one exception:
+// each is written only once set, and full() sets them all
+// (docs/decisions/0024-PLAN-terminal-text-and-convention-opt-outs.md
+// Step 2, D7).
 func TestReportNamesEveryField(t *testing.T) {
-	for _, c := range []Caps{{}, full()} {
-		out := reportOf(t, c, WithReportWidth(0))
+	views := []string{"LinksSupport", "NotifyOSC9Support", "NotifyOSC777Support", "KeyboardRequest", "PointerSupport", "ProgressSupport"}
+	ct := reflect.TypeFor[Caps]()
+	for _, tc := range []struct {
+		name  string
+		c     Caps
+		views bool
+	}{{"zero", Caps{}, false}, {"full", full(), true}} {
+		out := reportOf(t, tc.c, WithReportWidth(0))
 		facts, _, _ := strings.Cut(out, "\n\nfindings\n") // the findings follow the facts
 		lines := strings.Split(strings.TrimSuffix(facts, "\n"), "\n")
-		ct := reflect.TypeFor[Caps]()
-		if len(lines) != ct.NumField() {
-			t.Fatalf("%d lines for %d fields:\n%s", len(lines), ct.NumField(), out)
+		var names []string
+		for f := range ct.Fields() {
+			if tc.views || !slices.Contains(views, f.Name) {
+				names = append(names, fieldName(f))
+			}
 		}
-		for i := range ct.NumField() {
-			name := fieldName(ct.Field(i))
+		if len(lines) != len(names) {
+			t.Fatalf("%s: %d lines for %d fields:\n%s", tc.name, len(lines), len(names), out)
+		}
+		for i, name := range names {
 			if !strings.HasPrefix(lines[i], name+" ") {
-				t.Errorf("line %d is %q, want field %s", i, lines[i], ct.Field(i).Name)
+				t.Errorf("%s: line %d is %q, want field %s", tc.name, i, lines[i], name)
 			}
 		}
 	}

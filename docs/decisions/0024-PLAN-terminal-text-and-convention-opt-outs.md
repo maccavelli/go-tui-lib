@@ -91,12 +91,21 @@ step.
 
 ### Step 2: the views and `termsvc`'s limits
 
-* `Caps` gains `LinksSupport`, `NotifySupport`, `KeyboardRequest`,
+* `Caps` gains `LinksSupport`, ~~`NotifySupport`,~~ `KeyboardRequest`,
   `PointerSupport` and `ProgressSupport`, each a `Fact` its view reads
   first, set through `WithOverride`; unset, each view is today's.
+  *Amended 2026-10-31, deviation D4:* `NotifySupport` is two facts,
+  `NotifyOSC9Support` and `NotifyOSC777Support`. A fact is set when its
+  origin is not `NotQueried`; `KeyboardRequest` is a `Fact[int]`, the
+  flags, and the others are `Fact[Support]`.
 * `termsvc`: `WithTitleCells(n)` and `WithBodyCells(n)`; `MaxCopyBytes`
   applied to the OSC 52 route only; `WithCopyRoute(Route)`;
-  `WithLinkSchemes(schemes ...string)`; `WithoutBell()`.
+  ~~`WithLinkSchemes(schemes ...string)`;~~ `WithoutBell()`.
+  *Amended 2026-10-31, deviations D5 and D6:* the schemes are
+  `Linker{Schemes}`, whose `Link` method `termsvc.Link` calls as
+  `Linker{}.Link`; `WithCopyRoute` takes `RouteOSC52` or `RouteOSC52Tmux`,
+  forcing `PrepareCopy`'s terminal route, any other value keeping the
+  default and `WithClipboard` still winning; `CopySequence` is unchanged.
 * **Tests:** each view unchanged with no fact set, and changed by its fact
   alone; each limit and route default unchanged, and changed by its
   option; a program's clipboard backend copies past `MaxCopyBytes`.
@@ -341,3 +350,174 @@ places it; only the defaults rows move in this step, by the rules.
 
 **Step 1 complete, 2026-10-30,** for the owner's commit, after 0018-PLAN
 Step 9's.
+
+### Step 2: the views and `termsvc`'s limits
+
+*2026-10-31:* the owner said "0024 terminal plan, proceed".
+
+**Deviations,** each stopped before any code, the owner's choice dated:
+
+* **D4, 2026-10-31: one notification fact for two protocols.**
+  * *Found:* `Caps.Notifications()` (`termcap/views.go:126-142`) derives
+    OSC 9 and OSC 777 apart, from the brand, and `Notifier.chosen()`
+    under `Auto` tries OSC 99, then OSC 9, then OSC 777
+    (`termsvc/notify.go:347-361`). One `NotifySupport` fact cannot say
+    which: set to `Supported` on foot, which takes OSC 777 alone, `Auto`
+    would send OSC 9.
+  * *Decision:* "Two facts (Recommended)", over one fact for both:
+    `NotifyOSC9Support` and `NotifyOSC777Support`, each a
+    `Fact[Support]` its field of `Notifications()` reads first; OSC 99
+    keeps its query.
+  * *MADR:* amended, A3, since D5 names `NotifySupport`.
+* **D5, 2026-10-31: `WithLinkSchemes` has no host.**
+  * *Found:* `Link(rawURL, text string, params ...string)`
+    (`termsvc/termsvc.go:62`) takes no options, and its variadic `params`
+    leave no room for any without an incompatible change. `LinkPolicy`
+    (`termsvc/links.go:51`) already holds schemes, for opening, as a
+    field.
+  * *Decision:* "Linker{Schemes} (Recommended)", over a second link
+    function with a `LinkOption` type: `Linker`, whose `Schemes` are the
+    schemes `Link` accepts, http, https, file and mailto when empty, with
+    a `Link` method; `termsvc.Link` is `Linker{}.Link`. `Linker` passed
+    `tools.verify names`: "names: 1 planned name(s), clean".
+  * *MADR:* amended, A3, since D5 names `WithLinkSchemes`.
+* **D6, 2026-10-31: the routes `WithCopyRoute` takes.**
+  * *Found:* `Route` has five values, and `PrepareCopy` chooses between
+    two of them, `RouteOSC52` and `RouteOSC52Tmux`
+    (`termsvc/clipboard.go:144-163`); `CopySequence` takes no options.
+  * *Decision:* "The two OSC 52 routes (Recommended)", over also
+    `RouteTmuxBuffer`: either forces `PrepareCopy`'s terminal route,
+    whatever the multiplexer; any other value keeps the default;
+    `WithClipboard` still wins; `CopySequence` is unchanged.
+  * *MADR:* amended, A3, which says what the option takes.
+* **D7, 2026-10-31: the report and the view facts.**
+  * *Found:* `termcap.Report` writes a line for every `Caps` field, by
+    reflection (`termcap/report.go:84-88`), and
+    `TestReportNamesEveryField` (`report_test.go:21`) holds it to that.
+    The six view facts, unset, would add six "not queried" lines to every
+    text report and change the 16 report goldens under
+    `termcap/termcaptea/testdata/golden/`, against Verification's "every
+    golden and test passes unchanged". The JSON report leaves zero fields
+    out already.
+  * *Decision:* "Print a view fact only when set (Recommended)", over six
+    new lines in every report: `Report` leaves out a view fact whose
+    origin is `NotQueried`, and prints it like any fact when a program
+    sets it; `TestReportNamesEveryField` names the six as its one
+    exception and checks that each appears once set.
+  * *MADR:* unchanged; it says nothing of the report.
+
+No file is added to the step's scope.
+
+**What changed:**
+
+* `termcap`:
+  * `Caps` gains `LinksSupport`, `NotifyOSC9Support`,
+    `NotifyOSC777Support`, `KeyboardRequest` (a `Fact[int]`),
+    `PointerSupport` and `ProgressSupport`, each written to JSON only when
+    set; `viewFacts` names them.
+  * `Fact` gains the unexported `given`: its origin is not `NotQueried`.
+  * `Links`, `Notifications` and `Keyboard` read their facts first, once
+    given; the brand is not touched.
+  * `Report` leaves out a view fact not given (D7), and its doc says so.
+* `termsvc`:
+  * `Pointer` and `ProgressSupported` read `PointerSupport` and
+    `ProgressSupport` first: `Supported` sends or says yes, any other
+    value given does not; Ghostty's empty shape is still "default".
+  * `WithTitleCells`, `WithBodyCells` (0 or less keeps `TitleCells` and
+    `BodyCells`) and `WithoutBell` (`Auto` gives `Off`, so
+    `SkipDisabled`, where it would ring) are `NotifyOption`s; `Prepare`
+    and `Sequence` cut through one `cleaned`.
+  * `MaxCopyBytes` bounds OSC 52 alone: `PrepareCopy` checks it after the
+    clipboard branch, so a program's clipboard takes any length; its doc,
+    `ErrCopyTooLarge`'s and `termsvctea.Copy`'s say so.
+  * `WithCopyRoute(Route)`, a `CopyOption`: `RouteOSC52` or
+    `RouteOSC52Tmux` forces the terminal route (D6).
+  * `termsvctea.CopyContext` writes `RouteOSC52Tmux`'s second copy with
+    `ansi.TmuxPassthrough`, not `termsvc.Wrap(c, …)`, so a forced route
+    is wrapped outside the tmux the Caps name; inside it the bytes are as
+    before.
+  * `Linker{Schemes}` with its `Link` method; `Link` is `Linker{}.Link`.
+    Schemes compare without case, as `LinkPolicy`'s do; the default set's
+    behaviour is unchanged.
+* `docs/guides/defaults.md`: the view facts' row lists the six and is
+  `built`; `WithoutBell`, the cells, `WithCopyRoute` and the schemes,
+  whose control is `termsvc.Linker`, are `built`; a floor row, "An OSC 52
+  copy's length", names `MaxCopyBytes`.
+
+**Tests:**
+
+* New: `termcap/viewfacts_test.go` (`TestViewFactsChangeTheirViewAlone`,
+  over five brands and eight settings; `TestViewFactsNotQueriedChangeNothing`;
+  `TestViewFactsThroughWithOverride`, Apple Terminal by `EnvCaps`);
+  `termsvc/options_test.go` (`TestPointerSupport`, `TestProgressSupport`,
+  `TestLinkDisplayFollowsLinksSupport`, `TestNotifyFactsPickTheProtocol`,
+  `TestNotifierCells`, `TestWithoutBell`, `TestWithCopyRoute`,
+  `TestLinker`); `termsvctea`'s `TestCopyRouteForced`.
+* Changed, each by the step's own rule:
+  * `TestReportNamesEveryField` names the six as its exception (D7): the
+    zero `Caps` reports none, `full()` all;
+  * `full()` sets the six, since `TestFullCapsSetsEveryField` requires
+    every field; `report-json-full.golden`, `full()`'s JSON, gains exactly
+    their six entries, regenerated and read;
+  * `TestPrepareCopyRoutes` and `termsvctea`'s `TestCopyStatus` asserted
+    that an oversized copy never reaches the program's clipboard; the
+    step reverses that rule (D5 gap 10), and they now assert it does,
+    `Confirmed`.
+* Without the new options and facts every other test passes unchanged,
+  the 16 text-report goldens under `termcap/termcaptea/testdata/golden/`
+  among them.
+
+**Seen failing,** through `tools.verify mutate` on scratch copies, 20
+killed of 20. 2.1 to 2.8 are the step's; the rest are added so that each
+new test is seen to fail:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| 2.1 `Links` ignores `LinksSupport` | `TestViewFactsChangeTheirViewAlone`: "kitty, LinksSupport unsupported: …"; `TestViewFactsThroughWithOverride`: "links {Value:unsupported Origin:heuristic Reason:terminal.apple-no-osc8} …; want supported by override" |
+| 2.2 `Notifications` ignores `NotifyOSC9Support` | `TestViewFactsChangeTheirViewAlone`: "kitty, NotifyOSC9Support: …" |
+| 2.3 `Notifications` ignores `NotifyOSC777Support` | `TestViewFactsChangeTheirViewAlone`: "kitty, NotifyOSC777Support: …" |
+| 2.4 `Keyboard` ignores `KeyboardRequest` | `TestViewFactsChangeTheirViewAlone`: "kitty, KeyboardRequest 0: …" |
+| 2.5 `Pointer` ignores `PointerSupport` | `TestPointerSupport`: "WezTerm, supported: "", want "\x1b]22;pointer\a"" |
+| 2.6 `ProgressSupported` ignores `ProgressSupport` | `TestProgressSupport`: "kitty, supported: false, want true" |
+| 2.7 `WithoutBell` ignored | `TestWithoutBell`: "WithoutBell: "\a", {… Sent:true …}; want nothing, SkipDisabled" |
+| 2.8 the copy bound applied to the backend | `TestPrepareCopyRoutes`: "an oversized copy did not reach the clipboard: route none, 1 calls"; `TestCopyStatus`, the same |
+| 2.9 every fact counts as given, whatever its origin | `TestViewFactsNotQueriedChangeNothing`: "kitty: …"; `TestViewFactsThroughWithOverride` |
+| 2.10 the report prints a view fact not given | `TestReportNamesEveryField`: "zero: 35 lines for 29 fields" |
+| 2.11 the report never prints a view fact | `TestReportNamesEveryField`: "full: 29 lines for 35 fields" |
+| 2.12 `WithTitleCells` ignored | `TestNotifierCells`: "title 10: Prepare cut to 80 and 240, want 10 and 240" |
+| 2.13 `WithBodyCells` ignored | `TestNotifierCells`: "body 20: Prepare cut to 80 and 240, want 80 and 20" |
+| 2.14 `WithCopyRoute` ignored | `TestWithCopyRoute`: "wrapped, outside tmux: osc52, …; want osc52-tmux" |
+| 2.15 `WithCopyRoute` takes any route | `TestWithCopyRoute`: "the backend is not forced: backend, …; want osc52-tmux" |
+| 2.16 `termsvctea` wraps by the Caps again | `TestCopyRouteForced`: "raw writes ["\x1b]52;c;eA==\a"], want ["\x1bPtmux;\x1b\x1b]52;c;eA==\a\x1b\\"]" |
+| 2.17 `Linker` ignores its `Schemes` | `TestLinker`: "ssh://host/x refused: termsvc: link scheme not allowed" |
+| 2.18 2.1, through `termsvc` | `TestLinkDisplayFollowsLinksSupport`: "Apple Terminal, supported: label-and-url; kitty, unsupported: label-only" |
+| 2.19 2.2, through `termsvc` | `TestNotifyFactsPickTheProtocol`: "foot with OSC 9: "\x1b]777;notify;Done;b\a", want "\x1b]9;Done: b\a"" |
+| 2.20 2.3, through `termsvc` | `TestNotifyFactsPickTheProtocol`: "kitty with OSC 777: "\a", want "\x1b]777;notify;Done;b\a"" |
+
+**Gates,** `python3 -m tools.verify gates --label p24ts2` over the step's
+Go files on macOS, and through `remote linux` and `remote windows`:
+
+| Host | `gates` |
+| :--- | :--- |
+| macOS | 22 passed, 0 failed, 0 skipped, 808 s; `release-check` "428 file(s) clean", with `apicheck` and the examples gate |
+| `remote linux` | 21 passed, 0 failed, 1 skipped, 1109 s; "430 file(s) clean", the step's two new test files among them, which a remote run takes untracked |
+| `remote windows` | 21 passed, 0 failed, 1 skipped, 2627 s; "430 file(s) clean" |
+
+* The first macOS run failed 2 of 22, both on the step's own tests:
+  `modernize`, which asked `TestReportNamesEveryField` to range over
+  `ct.Fields()`, and `release-check`'s lint, errorlint over `errA !=
+  errB` in `TestLinker`, which `errors.Is` alone now checks. After the
+  fixes, mutations 2.10, 2.11 and 2.17 were run again and killed with the
+  same lines. The remote runs begun beside it were stopped and run again.
+* The second macOS run failed 1 of 22, `release-check`'s lint: gosec
+  G115 over `Origin(….Uint())` in `Report`, a `uint64` to `uint8`
+  conversion. `Report` now asks `reflect.Value.IsZero` of the origin.
+  Mutation 2.11, re-anchored there, and 2.10 were killed again with the
+  same lines; `make pre-add-check` over the step's 15 Go files was clean.
+  The remote runs were stopped and run a third time with the fix.
+* The skip on each remote host is `gofmt`, which is given no files there.
+* `make apicheck`: "against v2.7.1, 0 incompatible change(s)".
+* `TestDefaultsInventory`, the documents' checks and the identifier scan:
+  clean.
+
+**Step 2 complete, 2026-10-31,** for the owner's commit.

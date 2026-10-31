@@ -97,6 +97,30 @@
   9|      95,
   7|      0
   6|    ],
+ 22|    "links_support": {
+ 29|      "value": "unsupported",
+ 26|      "origin": "override"
+  6|    },
+ 28|    "notify_osc9_support": {
+ 27|      "value": "supported",
+ 26|      "origin": "override"
+  6|    },
+ 30|    "notify_osc777_support": {
+ 29|      "value": "unsupported",
+ 26|      "origin": "override"
+  6|    },
+ 25|    "keyboard_request": {
+ 17|      "value": 1,
+ 26|      "origin": "override"
+  6|    },
+ 24|    "pointer_support": {
+ 27|      "value": "supported",
+ 26|      "origin": "override"
+  6|    },
+ 25|    "progress_support": {
+ 29|      "value": "unsupported",
+ 26|      "origin": "override"
+  6|    },
  28|    "background": "#1e1f29",
  25|    "profile": "ansi256",
  28|    "foreground": "#cdd6f4",

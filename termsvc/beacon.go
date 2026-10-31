@@ -130,10 +130,16 @@ type ActivityTickMsg struct{ At time.Time }
 
 // Pointer is the OSC 22 sequence that sets the mouse pointer's shape, such
 // as "pointer" over a link, or "" for the terminal's default. Only Ghostty
-// and kitty outside a multiplexer take it; elsewhere it is "".
+// and kitty outside a multiplexer take it; elsewhere it is "". A
+// PointerSupport that was set decides instead: Supported sends it, any
+// other value does not.
 func Pointer(c termcap.Caps, shape string) string {
 	brand := c.Brand.Value
-	if c.Mux.Value != termcap.NoMux || brand != termcap.BrandGhostty && brand != termcap.BrandKitty {
+	if f := c.PointerSupport; f.Origin != termcap.NotQueried {
+		if f.Value != termcap.Supported {
+			return ""
+		}
+	} else if c.Mux.Value != termcap.NoMux || brand != termcap.BrandGhostty && brand != termcap.BrandKitty {
 		return ""
 	}
 	shape = sanitize.Token(shape, func(r rune) bool { return r >= 'a' && r <= 'z' || r == '-' })
@@ -146,8 +152,11 @@ func Pointer(c termcap.Caps, shape string) string {
 // ProgressSupported reports whether View.ProgressBar (OSC 9;4) shows as a
 // progress bar: on Ghostty, WezTerm, and iTerm2 3.6 or later, whose
 // version comes from its XTVERSION reply. Older iTerm2 shows it as alert
-// text.
+// text. A ProgressSupport that was set decides instead.
 func ProgressSupported(c termcap.Caps) bool {
+	if f := c.ProgressSupport; f.Origin != termcap.NotQueried {
+		return f.Value == termcap.Supported
+	}
 	switch c.Brand.Value {
 	case termcap.BrandGhostty, termcap.BrandWezTerm:
 		return true

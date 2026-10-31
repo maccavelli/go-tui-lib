@@ -11,12 +11,15 @@ import (
 	"github.com/maccavelli/go-tui-lib/v2/termcap"
 )
 
-// MaxCopyBytes is the largest payload a copy sends. A terminal route may
-// truncate or refuse a longer OSC 52 without saying so.
+// MaxCopyBytes is the largest payload a copy sends through OSC 52. A
+// terminal route may truncate or refuse a longer OSC 52 without saying
+// so. A program's own clipboard, through WithClipboard, takes any length
+// (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md D5).
 const MaxCopyBytes = 100_000
 
 // ErrCopyTooLarge is CopySequence's error for a payload over MaxCopyBytes.
-// PrepareCopy reports the same payload as Failed, with no Err.
+// PrepareCopy reports the same payload, on an OSC 52 route, as Failed,
+// with no Err.
 var ErrCopyTooLarge = errors.New("termsvc: copy: the text is over MaxCopyBytes")
 
 // Status is what is known about a copy.
@@ -102,6 +105,7 @@ type CopyOption func(*copyConfig)
 type copyConfig struct {
 	clipboard Clipboard
 	timeout   time.Duration
+	route     Route // WithCopyRoute's, or RouteNone
 }
 
 // WithClipboard copies through b, which confirms or fails, instead of the
@@ -113,22 +117,26 @@ func WithClipboard(b Clipboard) CopyOption { return func(c *copyConfig) { c.clip
 // is 5 s; d of 0 or less leaves only the caller's context.
 func WithCopyTimeout(d time.Duration) CopyOption { return func(c *copyConfig) { c.timeout = d } }
 
+// WithCopyRoute forces the terminal route, RouteOSC52 or RouteOSC52Tmux,
+// whatever multiplexer the Caps name, such as for a tmux the environment
+// does not show. Any other route keeps the default, and WithClipboard
+// still wins.
+func WithCopyRoute(r Route) CopyOption { return func(c *copyConfig) { c.route = r } }
+
 // PrepareCopy decides a copy of text now, on the caller's goroutine: the
-// route it takes, and deliver, which reports it. A payload over
-// MaxCopyBytes is RouteNone, sent nowhere, and fails. With WithClipboard it
-// is RouteBackend, and deliver calls the program's clipboard under ctx,
+// route it takes, and deliver, which reports it. With WithClipboard it is
+// RouteBackend, and deliver calls the program's clipboard under ctx,
 // bounded by WithCopyTimeout, so a caller that must not block calls it
 // elsewhere; a clipboard that fails, its deadline included, gives Failed
-// with its error in Err. Otherwise it is RouteOSC52, or RouteOSC52Tmux
-// inside tmux: the caller writes CopySequence's bytes, or in a Bubble Tea
-// program termsvctea.Copy writes them, and deliver returns Unconfirmed.
+// with its error in Err. Otherwise a payload over MaxCopyBytes is
+// RouteNone, sent nowhere, and fails; any other is RouteOSC52, or
+// RouteOSC52Tmux inside tmux or under WithCopyRoute: the caller writes
+// OSC 52, also wrapped for tmux on RouteOSC52Tmux, or in a Bubble Tea
+// program termsvctea.Copy writes it, and deliver returns Unconfirmed.
 func PrepareCopy(ctx context.Context, c termcap.Caps, text string, o ...CopyOption) (Route, func() CopiedMsg) {
 	cfg := copyConfig{timeout: defaultBackendTimeout}
 	for _, f := range o {
 		f(&cfg)
-	}
-	if len(text) > MaxCopyBytes {
-		return RouteNone, func() CopiedMsg { return CopiedMsg{Status: Failed} }
 	}
 	if b := cfg.clipboard; b != nil {
 		d := cfg.timeout
@@ -141,8 +149,14 @@ func PrepareCopy(ctx context.Context, c termcap.Caps, text string, o ...CopyOpti
 			return CopiedMsg{Status: Confirmed, Route: RouteBackend}
 		}
 	}
+	if len(text) > MaxCopyBytes {
+		return RouteNone, func() CopiedMsg { return CopiedMsg{Status: Failed} }
+	}
 	route := RouteOSC52
-	if c.Mux.Value == termcap.Tmux {
+	switch {
+	case cfg.route == RouteOSC52 || cfg.route == RouteOSC52Tmux:
+		route = cfg.route
+	case c.Mux.Value == termcap.Tmux:
 		route = RouteOSC52Tmux
 	}
 	return route, func() CopiedMsg { return CopiedMsg{Status: Unconfirmed, Route: route} }

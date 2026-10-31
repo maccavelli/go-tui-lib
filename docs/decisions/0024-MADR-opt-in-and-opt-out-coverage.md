@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-26
+date: 2026-10-31
 decision-makers: the repository owner
 consulted: "an audit of every non-test Go file in the public packages at 65d437b, by package group: command, command/commandtea, keymap, keymap/keymaptea, launch, launch/launchtest and when; workspace, palette, theme, glyph, layout and tuitest; termcap, termcap/termcaptea, termcap/termcaptest, termsvc, termsvc/termsvctea, termkey, safetext, fuzzy and internal/sanitize"
 informed: gobble-cli and pi-go, the library's consumers
@@ -557,6 +557,33 @@ instead:
 
 The server probing for a Windows client, the gap's case, reads the client's
 variables by the client's rule.
+
+### A3 (2026-10-31): two notification facts, `Linker`, and the copy routes
+
+*Status: accepted (2026-10-31),* the owner's choices "Two facts
+(Recommended)", "Linker{Schemes} (Recommended)" and "The two OSC 52
+routes (Recommended)", found while
+[0024-PLAN-terminal-text-and-convention-opt-outs.md](0024-PLAN-terminal-text-and-convention-opt-outs.md)
+Step 2 began; its deviations D4 to D6 have the evidence.
+
+D5's gaps 9 and 10 named additions the code cannot take as written. What
+changes:
+
+* **Gap 9:** `NotifySupport` is two facts, `NotifyOSC9Support` and
+  `NotifyOSC777Support`, since the notification view derives OSC 9 and
+  OSC 777 apart and `Auto` chooses between them. `KeyboardRequest` is a
+  `Fact[int]`, the flags the keyboard view asks for; `LinksSupport`,
+  `PointerSupport` and `ProgressSupport` are `Fact[Support]`. A view reads
+  its fact when its origin is not `NotQueried`.
+* **Gap 10, the schemes:** not `WithLinkSchemes`, since `Link`'s variadic
+  parameters leave no room for options, but `Linker{Schemes}`, whose
+  `Link` method accepts those schemes, http, https, file and mailto when
+  empty. `termsvc.Link` is `Linker{}.Link`, as `LinkPolicy{Schemes}`
+  beside it decides what opens.
+* **Gap 10, the route:** `WithCopyRoute` takes `RouteOSC52` or
+  `RouteOSC52Tmux`, forcing `PrepareCopy`'s terminal route whatever the
+  multiplexer; any other value keeps the default, and `WithClipboard`
+  still wins.
 
 ## More Information
 

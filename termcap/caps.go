@@ -57,6 +57,26 @@ type Caps struct {
 	PaletteKnown bool            `json:"palette_known,omitzero"` // all 16 replied
 
 	SecondaryAttributes []int `json:"secondary_attributes,omitzero"` // the DA2 reply
+
+	// Added by 0024-MADR D5 and A3: a program's word on one view, which
+	// that view reads first once its origin is not NotQueried, so the
+	// view changes and the brand does not. A program sets them through
+	// WithOverride, with origin Override.
+
+	LinksSupport        Fact[Support] `json:"links_support,omitzero"`         // Links().OSC8
+	NotifyOSC9Support   Fact[Support] `json:"notify_osc9_support,omitzero"`   // Notifications().OSC9
+	NotifyOSC777Support Fact[Support] `json:"notify_osc777_support,omitzero"` // Notifications().OSC777
+	KeyboardRequest     Fact[int]     `json:"keyboard_request,omitzero"`      // Keyboard().Request, the flags
+	PointerSupport      Fact[Support] `json:"pointer_support,omitzero"`       // termsvc.Pointer
+	ProgressSupport     Fact[Support] `json:"progress_support,omitzero"`      // termsvc.ProgressSupported
+}
+
+// viewFacts are the fields a program sets to override one view. Report
+// leaves each out until it is set, so a report without them is as it was
+// (docs/decisions/0024-PLAN-terminal-text-and-convention-opt-outs.md
+// Step 2, D7).
+var viewFacts = []string{
+	"LinksSupport", "NotifyOSC9Support", "NotifyOSC777Support", "KeyboardRequest", "PointerSupport", "ProgressSupport",
 }
 
 // caps is Caps without its methods, so the JSON methods can embed it.
