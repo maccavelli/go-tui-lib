@@ -606,6 +606,44 @@ Step 10 add first, as their own commit.
   * the smoke test of Step 6, against the tag;
   * issue #13 told, with the three hosts' numbers, for the owner to close.
 
+### Step 7d: the test screen's lines keep a cluster that ends in a space
+
+*Added 2026-10-31, for 0023-MADR A13; proposed.* No exported name is
+added, removed or retyped.
+
+* **Code:** `inline/inlinetest/screen.go`'s `line` drops the row's
+  trailing cells that hold " ", then joins the rest. The comments of
+  `line`, `Lines`, `Scrollback` and `Text` say "trailing blank cells"
+  where they say "trailing spaces".
+* **Tests:**
+  * `inline/inlinetest/screen_test.go`, `TestPrependEndsRow`, under both
+    methods:
+    * "ab" then "\u0600 " at a row's end: `Lines` gives "ab\u0600 ";
+    * that row scrolled off: `Scrollback` gives the same, and `Text` ends
+      with it;
+    * "ab  ": still "ab".
+  * The seed `pick/testdata/fuzz/FuzzChooser/1ccabba223c7e928`, A13 item
+    1's input, which fails before the change.
+  * Every existing test, golden and example passes unchanged.
+  * `FuzzChooser` and `FuzzComposer`, the fuzz targets that read a test
+    screen, run 5 minutes each.
+* **Mutations,** each killing a named test:
+  * `line` trimming bytes again: `TestPrependEndsRow` and the seed;
+  * `line` dropping every trailing cell that ends in a space:
+    `TestPrependEndsRow`;
+  * `line` keeping trailing blank cells: `TestWrites`.
+* **Gates:** `python3 -m tools.verify gates` on macOS, and through
+  `remote linux` and `remote windows`; `make apicheck` 0 incompatible
+  changes; the identifier scan.
+* **Docs:** `docs/architecture.md`'s `inline/inlinetest` row; "Migrating
+  to `v2.7.1`".
+* **The release,** `v2.7.1`, under rule 4, or whichever the owner names
+  (A13 item 6):
+  * notes in `docs/guides/migrating.md`, "Migrating to `v2.7.1`": nothing
+    to change, unless a program's test wanted the cut cluster;
+  * `README.md`'s current release;
+  * the smoke test of Step 6, against the tag.
+
 ## Verification
 
 * Every step's mutations are killed, each failure quoted in the record.
@@ -2883,6 +2921,10 @@ in `FuzzSplice`, `FuzzMay`'s text seed, and `FuzzRegionBytes`'s two seeds.
   fail `pick`'s tests until it is fixed.
 * *Waiting:* for the owner's word, as a fault in `pick`'s drawing of a
   Prepend character, outside A12.
+* *Corrected 2026-10-31 by 0023-MADR A13:* the fault is
+  `inlinetest.Screen`'s, which cut the space out of the cell "\u0600 ",
+  not `pick`'s; `pick` wrote the right bytes. The U+0600 was typed into
+  the query, not into an entry's text. Step 7d fixes it.
 
 **`FuzzSplice` found a real cost** first: about 2,500 flag letters inserted
 one by one took 18 s, since the prototype's splice cut its whole window
@@ -2925,7 +2967,37 @@ same day:
 gobble's editor at `6c5eb02`, on macOS the same day: 1.55 µs, 8
 allocations and 808 B a key.
 
-**Not done here, and the release:** the owner's commit, push and tag; CI
-on both; the smoke test of Step 6 against `v2.7.0`; issue #13 told with
-the three hosts' numbers. This step stays open for them, and the PLAN
-`in-progress`.
+**The release, `v2.7.0`,** under rule 4:
+
+* The owner committed the step (`b8a2021`) and pushed `main` before the
+  disclosure guard was run by hand. The owner's own pre-push hook runs
+  the same guard on every push. Run by hand afterwards over
+  `v2.6.2..b8a2021`, it exited 0 with nothing to report.
+* CI run 41157446810 passed: `modules`, `gates`, and `test` on macOS 15,
+  Ubuntu 24.04 and Windows 2025. Docs run 41157446832 passed.
+* The owner tagged `b8a2021` `v2.7.0`, annotated, and pushed the tag. Its
+  CI run, 41159317505, passed the same five jobs.
+* The proxy serves `v2.7.0` at `b8a2021`. The consumer smoke test,
+  v2.6.2's program unchanged, ran in a scratch module outside the
+  repository with `GOWORK` empty:
+  * it required the tag by `go get`, then ran `go mod tidy`, `go vet` and
+    `go build`;
+  * the program drew the reprint, 7 rows at 40 columns, and cleared the
+    scrollback;
+  * `./reply` printed "ParseReply: unknown";
+  * its closure, listed for Linux, macOS and Windows, is seven modules,
+    and `x/ansi` alone of Charm.
+* Its three controls failed as they must:
+  * `-control` exited 1;
+  * the closure check over `lineedit/lineedittea` found
+    `charm.land/bubbletea/v2` and seven more Charm modules on Linux and
+    macOS, six on Windows;
+  * `./reply` requiring `v2.6.1` from the proxy exited 1, `panic: runtime
+    error: index out of range [33] with length 33`.
+
+* On the owner's word, issue #13 was told, with the three hosts' numbers
+  and the Windows split, for the owner to close (issue comment
+  6539384586).
+* **Step 7c complete, 2026-10-31.** Left open: `FuzzChooser`'s U+0600
+  input, above, which the owner asked to be specified and scoped as its
+  own step: Step 7d, proposed.

@@ -1953,6 +1953,75 @@ which that PLAN's deviation 11 holds until a tag carries the fix.
       letters makes, at most 8,000; cutting the whole window gives
       502,499.
 
+### A13 (2026-10-31): the test screen's lines keep a cluster that ends in a space
+
+*Status: proposed (2026-10-31),* the owner's ask after
+[0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
+Step 7c: "spec and scope the fix for this: the pick bug, where an entry
+starting with U+0600 draws "❯" instead of "❯ \u0600"".
+
+1. **The fault is the test screen's, not `pick`'s,** found on a scratch
+   export of `b8a2021`:
+   * **The input.** `FuzzChooser` typed U+0600, ARABIC NUMBER SIGN, into
+     the query at a width of 50. It then narrowed the screen to 13 and
+     typed two spaces. The character is in the query, not in an entry's
+     text, as Step 7c's record had it.
+   * **The cluster.** U+0600 is Prepend in UAX #29, so it joins the
+     character after it (GB9b): "\u0600 " is one cluster. It measures 1
+     under `ansi.WcWidth` and 0 under `ansi.GraphemeWidth`.
+   * **What `pick` writes is right.** The Chooser's query row is
+     "❯ \u0600  ". The region writes "\x1b[2C\u0600 ", then "\x1b[3C ",
+     and the screen holds the cell "\u0600 " at column 2.
+   * **What the screen gives back is not.** `inlinetest.Screen`'s `line`
+     joins a row's cells and trims trailing spaces byte by byte
+     (`inline/inlinetest/screen.go`, `line`). It cuts the space out of
+     that cell, so `Lines` gives "❯ \u0600", a cluster the screen never
+     held. Alone, U+0600 measures 0, and `FuzzChooser`'s `visible` drops
+     it: "❯".
+   * It fails the same at `ef628ce` and at `b8a2021`. No drawing a
+     release made is wrong.
+2. **The rule: a row's text drops its trailing blank cells, and keeps
+   every other cell whole.** A blank cell holds " ". A cell whose cluster
+   only ends in a space, as a Prepend character joined to one does,
+   stays as written. `Lines`, `Scrollback` and `Text` all read rows
+   through `line`, so the three change together.
+   * The other cells of a wide cluster hold "", which joins to nothing.
+   * The screen blanks any wide cluster it splits (`put`,
+     `blankCluster`), so a trailing "" always follows its own cluster.
+     The rule needs no case for it.
+3. **Who sees the change:** a test that reads an `inlinetest.Screen`
+   where a Prepend character and a space end a row. `Lines` now gives
+   that cell whole. Every other row is byte for byte what it was.
+   * With the change on a scratch copy, every test, golden and example of
+     the module passes unchanged.
+   * `FuzzChooser` ran 2 minutes on it, 386,733 inputs, with no failure.
+4. **The input becomes a seed** of `FuzzChooser`, and `inlinetest`
+   gains a test of the rule.
+5. **Considered and left:**
+   * **`FuzzChooser`'s check changed instead,** to trim before `visible`
+     as the screen does: it would hide the screen's fault from every
+     other test that reads `Lines`.
+   * **`pick` changed, so that a Prepend character never ends a row:**
+     `pick` draws what was typed, and its bytes are right.
+   * **`ask`'s `flow`, which trims a row the same way**
+     (`ask/layout.go`): a row whose last word ends "\u0600 " is drawn
+     without the space. `flow` measures each row after the trim, so its
+     widths match what it draws, and a row ending with no space is its
+     rule. What it drops is a trailing blank, not a screen's cell. Not
+     changed.
+   * **`internal/cells`' `Frame.Render`,** which trims through
+     ultraviolet's `TrimSpace`, also byte by byte: `Frame` is internal,
+     for `workspace`'s goldens of fixed text, and no failure is known.
+     Not changed; a record of its own if one is found.
+   * **The tests that trim rows of fixed text** (`lineedit`'s
+     `trimRows`, and tests in `transcript` and `workspace`): none of
+     their texts holds a Prepend character. Not changed.
+6. **The release.** `inline/inlinetest` is a public package, and this
+   fixes what its `Lines` returns: a patch, `v2.7.1`, or whichever
+   release the owner names. No exported name is added, removed or
+   retyped; `make apicheck` stays at 0 incompatible changes. 0024's
+   terminal release follows it.
+
 ## More Information
 
 * Issues of this repository: #7, #8, #9 and #10, each with gobble's
