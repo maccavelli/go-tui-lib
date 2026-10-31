@@ -1296,6 +1296,58 @@ loop test); `command/registry.go` imports Bubble Tea
   * this PLAN becomes `complete`, and its `docs/README.md` row says so;
   * the issue comments for #2 to #5 drafted in the record for the owner.
 
+### Step 14 (A5): class 7, an OSC 8 over 2,048 bytes
+
+*Added 2026-10-31, for MADR amendment A5, from
+[0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
+Step 7d's deviation D31; proposed.*
+
+* **Paths:** `safetext/rules.go`, `safetext/clean.go` (a comment),
+  `safetext/safetext_test.go`, `internal/sanitize/sanitize.go` (a
+  comment), `internal/sanitize/sanitize_test.go`,
+  `internal/sanitize/fuzz_test.go`, `docs/guides/defaults.md`, the
+  records.
+* **First, before any change,** on a scratch copy: the new tests below
+  are written and run against today's code, and pass, since they pin what
+  the code does; then each is seen to fail by a mutation.
+* **`safetext`:**
+  * `Rules.KeepSGR`'s comment: an OSC 8 whose body, between `ESC ]` and
+    its terminator, is over 2,048 bytes is removed;
+  * `oscMax`'s comment: the body is counted, "8;", parameters, ";" and
+    target;
+  * `TestOSC8Bound` in `safetext_test.go`: under `KeepSGR`, an OSC 8
+    whose body is 2,048 bytes is kept, and one of 2,049 removed, each
+    ended by BEL and by `ESC \`, through `Clean` and through a `Sanitizer`
+    written a byte at a time.
+* **`internal/sanitize`:**
+  * `Styled`'s comment names the bound, citing A5;
+  * `TestDepartures` gains "7, an OSC 8 over 2,048 bytes is removed":
+    `Line` and `Styled` give the text around it, `v0.12.0`'s `Styled`
+    keeps it;
+  * `FuzzAgainstV0120`: `Styled` is not compared with the oracle when the
+    input holds an OSC of the plainest form whose body is over 2,048
+    bytes, the test's own constant, cited to A5; CI's input, built with
+    `strings.Repeat`, is a seed; the clause's comment names class 7.
+* **Docs:** `docs/guides/defaults.md`'s `safetext` table gains "A kept
+  OSC 8's length | at most 2,048 bytes; a longer one is removed |
+  `safetext.Rules` | floor".
+* **Mutations,** through `tools.verify mutate` on scratch copies:
+  * the fuzz test's class 7 clause removed: the seed fails
+    `FuzzAgainstV0120`, as CI's run did;
+  * `oscMax` 4,096: `TestOSC8Bound` and `TestDepartures`;
+  * `len(body) <= oscMax` as `<`: `TestOSC8Bound`, through `Clean`;
+  * `m.oscN+n > len(m.osc)` as `>=`: `TestOSC8Bound`, through the
+    `Sanitizer`.
+* **Fuzzing:** `FuzzAgainstV0120` for 5 minutes on a scratch copy, and
+  `make fuzz`; neither fails.
+* **Gates:** `python3 -m tools.verify gates` on macOS, and through
+  `remote linux` and `remote windows`; `make apicheck`, 0 incompatible
+  changes; the identifier scan; `TestDefaultsInventory`.
+* **Records:** A5 `accepted`; this step's execution record;
+  `docs/README.md`'s rows; this PLAN `complete` again once CI is green on
+  the pushed tree.
+* **The release:** none of its own (A5 item 5).
+
 ## Verification
 
 * `TestCoresAreCharmFree` passes with `cores` holding all twelve packages

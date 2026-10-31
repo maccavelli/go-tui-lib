@@ -1609,6 +1609,74 @@ major version.**
 * **0008-PLAN's release** (Step 9) becomes the next minor version after
   `v2.0.0`.
 
+### A5 (2026-10-31): class 7, an OSC 8 over 2,048 bytes (adds to A3.1)
+
+*Status: proposed (2026-10-31),* the owner's choice "Record, amend 0020
+(Recommended)" in
+[0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
+Step 7d, deviation D31. To be implemented by
+[0020-PLAN-charm-free-cores-glyphs-and-safetext.md](0020-PLAN-charm-free-cores-glyphs-and-safetext.md)
+Step 14.
+
+**Found.**
+
+1. **CI's fuzzer found a seventh class.** On 2026-10-31, CI run
+   41207098226, on the tag `v2.7.1`, failed in `make fuzz`:
+   `FuzzAgainstV0120` found an input on which `Styled` and `v0.12.0`'s
+   differ. The input is an OSC 8 link, the text `l`, and a second OSC 8
+   whose parameter is 3,753 bytes of `c`. `Styled` removes the second
+   sequence whole; `v0.12.0` kept it.
+2. **The bound is `safetext`'s, and is meant.** `safetext/clean.go`'s
+   `oscMax`, 2,048, is the longest OSC 8 body, the bytes between `ESC ]`
+   and its terminator, that `KeepSGR` keeps; a longer one is removed, as
+   any sequence `KeepSGR` does not keep is. The constant is as old as the
+   package (`56fc242`). `v0.12.0` had no such bound.
+3. **Nothing names it.** A3.1's six classes came from 400,000 inputs that
+   never reached 2 KiB, so the bound is not among them, and the
+   differential's domain does not leave it out. `Rules.KeepSGR`'s
+   documentation and `Styled`'s do not state it, and no test holds it: a
+   scratch copy with `oscMax` at 4,096 passes every test of `safetext`
+   and `internal/sanitize`.
+4. **It is older than the releases it showed in.** A probe on scratch
+   copies of `v2.6.0`, `v2.6.2`, `v2.7.0` and `3039804` gives the same
+   result on each: `Styled` agrees with `v0.12.0` up to a body of 2,048
+   bytes, and departs from 2,049. CI's runs on `main` at `b8a2021` and
+   `3039804`, and on the tag `v2.7.0`, passed `make fuzz`: its 20 seconds
+   a target reach that length only by chance.
+
+**Considered.**
+
+* **A. Name it as class 7,** document the bound where `KeepSGR` and
+  `Styled` are documented, hold it with a test, and leave it out of the
+  differential as classes 1 to 5 are.
+* **B. Remove the bound,** so that `safetext` keeps an OSC 8 of any
+  length, as `v0.12.0` did. It is a bound on untrusted input, which
+  `docs/guides/defaults.md` keeps as a floor: never removed.
+* **C. Model the bound in the oracle,** so that `oracleStyled` removes a
+  long OSC 8 too. The oracle would then no longer be `v0.12.0`'s, which
+  is what it is for.
+
+**Decided:** "A", because the bound is a floor and the differential's
+rule (A3.2) is to name each class where the two differ.
+
+1. **Class 7:** under `KeepSGR`, an OSC 8 whose body is over 2,048 bytes
+   is removed whole, where `v0.12.0` kept it. It is in `Styled` only:
+   `Line` removes every OSC. It removes more than `v0.12.0` did, never
+   less.
+2. **The bound is documented:** `Rules.KeepSGR` and `Styled` say that an
+   OSC 8 of more than 2,048 bytes is removed, and `oscMax`'s comment says
+   that the body is counted, not the target alone.
+   `docs/guides/defaults.md`'s `safetext` table lists it, as a floor.
+3. **It is held by tests:** a body of 2,048 bytes is kept and one of
+   2,049 removed, through `Clean` and through a `Sanitizer` written a
+   byte at a time; a `TestDepartures` row for class 7; and the
+   differential leaves class 7 out of the comparison of `Styled`, with
+   CI's input as a seed.
+4. **What is not changed:** the bound, `safetext`'s behaviour, and the
+   oracle.
+5. **The release:** none of its own. The change is a doc comment and
+   tests; it is in the next release.
+
 ## More Information
 
 * The releases: `v1.13.0` (D12's release 1, at `8be11e7`) and `v2.0.0`

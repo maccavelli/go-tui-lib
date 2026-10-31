@@ -1,6 +1,6 @@
 ---
-status: in-progress
-date: 2026-10-30
+status: complete
+date: 2026-10-31
 associated-madr: "0023-MADR-line-mode-components.md"
 ---
 # Implement the line-mode question, picker, composer and transcript
@@ -3117,3 +3117,78 @@ failed.
 **Not done here, and the release:** the owner's commit, push and tag
 `v2.7.1`; CI on both; the smoke test of Step 6 against the tag. This step
 stays open for them, and the PLAN `in-progress`.
+
+**The release, `v2.7.1`,** under rule 4:
+
+* The owner committed the step (`b637294`), then 0018-MADR A6 and its
+  PLAN's Step 11, proposed (`3039804`), and pushed `main`. The disclosure
+  guard, run by hand over `b8a2021..3039804` after the push, exited 0 with
+  nothing to report. CI run 41177274788 passed: `modules`, `gates`, and
+  `test` on macOS 15, Ubuntu 24.04 and Windows 2025. Docs run 41177274777
+  passed.
+* The owner tagged `3039804` `v2.7.1`, annotated, and pushed the tag. The
+  tagged commit is one after the step's: the two differ only in
+  `docs/README.md` and 0018's MADR and PLAN, so the module's code is the
+  step's. The step named no commit for the tag.
+* The tag's CI run, 41207098226, passed `modules` and `test` on the three
+  hosts, and failed `gates` at its `fuzz` step, the job's first; its
+  later steps were skipped. D31 below.
+* The proxy serves `v2.7.1` at `3039804`. The consumer smoke test, Step
+  6's program as `v2.7.0`'s, ran in a scratch module outside the
+  repository with `GOWORK` empty:
+  * it required the tag by `go get`, then ran `go mod tidy`, `go vet` and
+    `go build`;
+  * the program drew the reprint, 7 rows at 40 columns, and cleared the
+    scrollback;
+  * `./reply` printed "ParseReply: unknown";
+  * its closure, listed for Linux, macOS and Windows, is seven modules,
+    and `x/ansi` alone of Charm.
+* Its three controls failed as they must:
+  * `-control` exited 1;
+  * the closure check over `lineedit/lineedittea` found
+    `charm.land/bubbletea/v2` and seven more Charm modules on Linux and
+    macOS, six on Windows;
+  * `./reply` requiring `v2.6.1` from the proxy exited 1, `panic: runtime
+    error: index out of range [33] with length 33`.
+
+* **Deviation D31, 2026-10-31: the tag's CI found a class the
+  differential does not name.**
+  * **Found** in run 41207098226's `make fuzz`: `internal/sanitize`'s
+    `FuzzAgainstV0120`, at `fuzz_test.go:254`, "Styled(…) = …; v0.12.0
+    gives …", on an OSC 8 link, the text `l`, and a second OSC 8 whose
+    parameter is 3,753 bytes of `c`. `Styled` removed the second; v0.12.0
+    kept it.
+  * **The cause** is `safetext`'s `oscMax`, 2,048: under `KeepSGR` an OSC 8
+    whose body is longer is removed. It is as old as `safetext`
+    (`56fc242`). 0020-MADR A3.1's six classes do not name it, so the
+    differential does not leave it out; and no test holds it, since with
+    `oscMax` at 4,096 on a scratch copy every test of `safetext` and
+    `internal/sanitize` passes.
+  * **It is not this step's.** A probe on scratch copies of `v2.6.0`,
+    `v2.6.2`, `v2.7.0` and `3039804` departs from v0.12.0 at the same
+    length on each, a body of 2,049 bytes. This step changed
+    `inline/inlinetest` alone.
+  * **Resolutions offered:** record it here, close this step, and propose
+    the fix as an amendment to
+    [0020-MADR-charm-free-cores-glyphs-and-safetext.md](0020-MADR-charm-free-cores-glyphs-and-safetext.md)
+    with its PLAN's step (recommended); or the same amendment, with this
+    step held open until it lands; or remove the bound, which is a floor
+    on untrusted input, so that the test holds as written.
+  * **Chosen by the owner,** 2026-10-31: "Record, amend 0020
+    (Recommended)", and the tag's failed job rerun, "Yes, rerun failed
+    jobs (Recommended)". 0020-MADR A5 and
+    [0020-PLAN-charm-free-cores-glyphs-and-safetext.md](0020-PLAN-charm-free-cores-glyphs-and-safetext.md)
+    Step 14 are proposed with this record. No file is added to this
+    step's scope.
+  * **The rerun:** run 41207098226, attempt 2, reran `gates` on the tag
+    and passed every step, `fuzz`, the cross `go vet`, lint,
+    `govulncheck`, `apicheck`, the examples, the documents, the CI filters
+    and the verification tools among them. The fuzzer did not reach the
+    length again, so the gap stays until 0020-PLAN Step 14 closes it.
+* **Step 7d complete, 2026-10-31.**
+* **This PLAN is complete, 2026-10-31.** Step 7d's Verification holds but
+  for two findings outside its change, each recorded and followed in its
+  own record: D30's one Windows run of `script-test-check_ci_filters`, in
+  [0018-PLAN-python-verification-tools.md](0018-PLAN-python-verification-tools.md)
+  Step 11, and D31's fuzz finding on the tag, in 0020-PLAN Step 14. Both
+  are proposed.
