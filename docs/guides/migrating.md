@@ -7,6 +7,31 @@ needs a major version, at a new module path
 ([AGENTS.md, API conventions](../../AGENTS.md#api-conventions), rule 1).
 Up to `v0.12.0`, a deprecated name was removed in the next minor release.
 
+## Migrating to `v2.7.1`
+
+`v2.7.1` is a patch: nothing exported changes, no default changes, and
+nothing the library draws changes: `make apicheck` against `v2.7.0`
+reports 0 incompatible changes
+([0023-PLAN-line-mode-components](../decisions/0023-PLAN-line-mode-components.md)
+Step 7d). A program on `v2.7.0` needs no change:
+
+```bash
+go get github.com/maccavelli/go-tui-lib/v2@v2.7.1
+```
+
+### Fixed
+
+- **`inlinetest.Screen`'s `Lines`, `Scrollback` and `Text` keep a cell
+  whose cluster ends in a space.** A Prepend character, such as U+0600,
+  joins the space after it into one cluster. The screen held that cluster
+  in one cell, but each row's trailing spaces were trimmed byte by byte,
+  so the space was cut out of it and the row ended in a cluster the
+  screen never held. Now only trailing blank cells are dropped. This
+  shows only under `ansi.WcWidth`: under `ansi.GraphemeWidth` such a
+  cluster has no width, and the screen keeps no cell for it, as before.
+  A test that wanted the cut row wants the whole cell now
+  ([0023-MADR](../decisions/0023-MADR-line-mode-components.md) A13).
+
 ## Migrating to `v2.7.0`
 
 `v2.7.0` is a minor release. It adds four names to `termcap` and

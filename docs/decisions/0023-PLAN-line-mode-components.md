@@ -47,6 +47,7 @@ code's at `5fb6928`; a step that relies on one cites it.
 | 7a | `internal/sanitize/`, `termcap/reply.go`, `inline/inlinetest/`, `docs/`, `README.md` | a reply's parameters counted on every path to them (D28, 0023-MADR A10) | a patch, `v2.6.2` |
 | 7b | `scripts/go-examples.py`, `scripts/go-precheck.py` and their tests, `testdata/frameworks/`, the examples of `ask/`, `lineedit/` and `transcript/`, `docs/`, `AGENTS.md` | the line-mode guide's excerpts held to the examples (0023-MADR A11) | none |
 | 7c | `internal/sanitize/`, `internal/lineinput/`, `lineedit/`, `inline/`, `safetext/clean.go`, `keymap/`, `docs/`; *approved 2026-10-30* | a key's cost, issue #13 (0023-MADR A12) | the next minor, `v2.7.0` |
+| 7d | `inline/inlinetest/`, `pick/testdata/fuzz/`, `docs/`, `README.md`; *approved 2026-10-31* | the test screen's lines keep a cluster that ends in a space (0023-MADR A13) | a patch, `v2.7.1` |
 
 Each step's package joins `cores` and the `charmfree` files in the commit
 that builds it; the `<pkg>tea` packages are not cores. Each step adds its
@@ -608,8 +609,9 @@ Step 10 add first, as their own commit.
 
 ### Step 7d: the test screen's lines keep a cluster that ends in a space
 
-*Added 2026-10-31, for 0023-MADR A13; proposed.* No exported name is
-added, removed or retyped.
+*Added 2026-10-31, for 0023-MADR A13, and approved the same day:*
+"accept the madr, plan approved to proceed". No exported name is added,
+removed or retyped.
 
 * **Code:** `inline/inlinetest/screen.go`'s `line` drops the row's
   trailing cells that hold " ", then joins the rest. The comments of
@@ -619,6 +621,10 @@ added, removed or retyped.
   * `inline/inlinetest/screen_test.go`, `TestPrependEndsRow`, under both
     methods:
     * "ab" then "\u0600 " at a row's end: `Lines` gives "ab\u0600 ";
+    * *Corrected 2026-10-31 (D29):* under `ansi.GraphemeWidth`, "\u0600 "
+      measures 0 and the screen keeps no cell for it, so the row is "ab",
+      before the change and after it. The test wants each method's row;
+      only `ansi.WcWidth`'s fails before the change.
     * that row scrolled off: `Scrollback` gives the same, and `Text` ends
       with it;
     * "ab  ": still "ab".
@@ -666,7 +672,8 @@ added, removed or retyped.
   order; gobble takes each as it lands. *Added 2026-10-29 (D27):* and a
   patch, `v2.6.1`, after Step 6a. *Added 2026-10-29 (D28):* and a patch,
   `v2.6.2`, after Step 7a. *Added 2026-10-30 (A11):* Step 7b releases
-  nothing.
+  nothing. *Added 2026-10-31 (A12, A13):* a minor, `v2.7.0`, after Step
+  7c, and a patch, `v2.7.1`, after Step 7d.
 * **Rollback.** Before a push, each step is one local commit. After it, a
   patch release fixes forward. Every change is an addition.
 
@@ -3000,4 +3007,113 @@ allocations and 808 B a key.
   6539384586).
 * **Step 7c complete, 2026-10-31.** Left open: `FuzzChooser`'s U+0600
   input, above, which the owner asked to be specified and scoped as its
-  own step: Step 7d, proposed.
+  own step: Step 7d.
+
+### Step 7d: the test screen's lines keep a cluster that ends in a space
+
+*2026-10-31.* The owner committed A13 and this step (`b02a77b`) and said
+"committed. accept the madr, plan approved to proceed".
+
+* **Deviation D29, 2026-10-31: the test's second method.**
+  * **Found** at the first run of `TestPrependEndsRow`, written before the
+    change. Under `ansi.WcWidth` it failed as it must: "the text is
+    "ab\u0600\n"; want "ab\u0600 \n"", and the scrolled row
+    "ab\u0600". Under `ansi.GraphemeWidth` the row was "ab", not
+    "ab\u0600".
+  * **The cause:** the step's text, not the code. "\u0600 " measures 0
+    under `ansi.GraphemeWidth`, as A13 item 1 says. The screen draws only
+    a cluster with a width (`inline/inlinetest/screen.go`, `apply`:
+    `case w > 0: s.put(seq, w)`), a rule older than this step, which
+    `FuzzChooser`'s and `FuzzComposer`'s checks rely on. So that row is
+    "ab" with or without the change, and the step's "under both methods"
+    could not hold.
+  * **Resolutions offered:** the test wants each method's row,
+    "ab\u0600 " under `ansi.WcWidth` and "ab" under `ansi.GraphemeWidth`,
+    with this entry and a correction to A13 (recommended); or the screen
+    keeps a cluster of no width, which reverses its older rule and needs
+    a record of its own.
+  * **Chosen by the owner,** 2026-10-31: "Test each method's truth
+    (Recommended)". 0023-MADR A13 item 7. The step's test bullet is
+    annotated. No file is added to the step's scope.
+
+**What changed:**
+
+* `inline/inlinetest/screen.go`: `line` drops the row's trailing cells
+  that hold " ", then joins the rest. The comments of `line`, `Lines` and
+  `Scrollback` say "trailing blank cells". `Text`'s comment names no
+  trim, so it is unchanged.
+* `inline/inlinetest/screen_test.go`: `TestPrependEndsRow`, as D29 has
+  it.
+* `pick/testdata/fuzz/FuzzChooser/1ccabba223c7e928`: A13 item 1's input,
+  the file the fuzzer wrote at Step 7c.
+* Docs: "Migrating to `v2.7.1`"; `README.md`'s current release;
+  `docs/architecture.md`'s `inline/inlinetest` row. This PLAN's steps
+  table gains 7d's row; "Rollout" gains `v2.7.0` and `v2.7.1`.
+
+**Tests, each seen failing before the change:**
+
+* `TestPrependEndsRow`: under `ansi.WcWidth`, "the text is
+  "ab\u0600\n"; want "ab\u0600 \n"", and the scrolled row "ab\u0600". Under
+  `ansi.GraphemeWidth` it passed before the change and after it, as D29
+  says.
+* The seed: "width 13, row 0: the screen shows "❯"; want "❯ \u0600"".
+* After the change, both pass, and every test, golden and example of the
+  module passes: the `release-check` gate below runs `go test` over it.
+
+**Seen failing,** through `tools.verify mutate` on scratch copies, 3
+killed of 3:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| 7d.1 `line` trims bytes again | `TestPrependEndsRow`: "0: the row is "ab\u0600"; want "ab\u0600 ""; `FuzzChooser/1ccabba223c7e928` |
+| 7d.2 `line` drops every trailing cell that ends in a space | `TestPrependEndsRow`: "0: the row is "ab"; want "ab\u0600 "" |
+| 7d.3 `line` keeps trailing blank cells | `TestWrites`: "after the pending wrap: ["0123456789" "a         "], cursor 1,1" |
+
+**Fuzzing,** on macOS, on a scratch copy of the tree, 5 minutes each:
+`FuzzChooser`, 1,808,503 inputs; `FuzzComposer`, 4,835,682. Neither
+failed.
+
+**Gates:**
+
+| Host | `gates` | `release-check` |
+| :--- | :--- | :--- |
+| macOS | 22 passed, 0 failed, 0 skipped, 763 s | 428 file(s) clean, with `apicheck` and the examples gate |
+| `remote linux` | 21 passed, 0 failed, 1 skipped, 1022 s | 428 file(s) clean |
+| `remote windows` | 20 passed, 1 failed, 1 skipped, 2599 s | 428 file(s) clean |
+
+* The skip on each remote host is `gofmt`, which is given no files there.
+* The failure on Windows is `script-test-check_ci_filters`, D30 below.
+* `make apicheck`: "against v2.7.0, 0 incompatible change(s)".
+* The identifier scan, and the records, docs and disclosure checks:
+  clean.
+
+* **Deviation D30, 2026-10-31: a test of the CI filters failed once on
+  Windows.**
+  * **Found** in the Windows run of every gate:
+    `script-test-check_ci_filters` exited 1, "check_ci_filters_test: 41
+    passed, 1 failed". The summary's last 15 lines show groups 11 and 12
+    passing, so the case is in groups 1 to 10. Those are synthetic cases
+    on copies of the repository's tracked files, which this step's
+    change does not feed.
+  * **Its case is not known.** The Python harness prints "  FAIL" and the
+    case, which `tools/verify/gates.py`'s `FAIL_LINES` do not match, so
+    the summary did not quote it. The host deletes a run's output
+    directory when the run ends, so it could not be fetched.
+  * **It did not recur.** The same gate, alone, on the same tree, through
+    `remote windows`, passed 4 times of 4, in 109 to 133 s:
+    "check_ci_filters_test: 42 passed, 0 failed". It passes on macOS and
+    Linux. Step 7c's two Windows runs passed it, so whether it is older
+    than this step is not known.
+  * **Resolutions offered:** record it so, and propose a 0018 amendment
+    whose step makes the summary quote a script test's failing case, then
+    looks into the failure (recommended); or chase the case on the host
+    now, before this step's commit, with no bound on the time.
+  * **Chosen by the owner,** 2026-10-31: "Record it, fix reporting next
+    (Recommended)". The amendment to
+    [0018-MADR-python-verification-tools.md](0018-MADR-python-verification-tools.md)
+    is written after this step's commit, as its own. No file is added to
+    this step's scope.
+
+**Not done here, and the release:** the owner's commit, push and tag
+`v2.7.1`; CI on both; the smoke test of Step 6 against the tag. This step
+stays open for them, and the PLAN `in-progress`.

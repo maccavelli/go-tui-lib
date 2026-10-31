@@ -352,12 +352,19 @@ func (s *Screen) lay(cs []cluster) []string {
 	return row
 }
 
-// line is a row's text, trailing spaces dropped.
+// line is a row's text, its trailing blank cells dropped. A cell whose
+// cluster only ends in a space, as a Prepend character joined to one
+// does, is kept whole (docs/decisions/0023-MADR-line-mode-components.md
+// A13).
 func (s *Screen) line(row []string) string {
-	return strings.TrimRight(strings.Join(row, ""), " ")
+	end := len(row)
+	for end > 0 && row[end-1] == " " {
+		end--
+	}
+	return strings.Join(row[:end], "")
 }
 
-// Lines are the screen's rows, trailing spaces dropped.
+// Lines are the screen's rows, trailing blank cells dropped.
 func (s *Screen) Lines() []string {
 	out := make([]string, s.height)
 	for i, row := range s.cells {
@@ -367,7 +374,7 @@ func (s *Screen) Lines() []string {
 }
 
 // Scrollback is the rows scrolled off the top, oldest first, trailing
-// spaces dropped, since the last CSI 3 J.
+// blank cells dropped, since the last CSI 3 J.
 func (s *Screen) Scrollback() []string { return append([]string(nil), s.scrolled...) }
 
 // Text is the screen's text form, for a golden file: the scrollback, then

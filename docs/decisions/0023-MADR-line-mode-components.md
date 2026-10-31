@@ -1955,7 +1955,8 @@ which that PLAN's deviation 11 holds until a tag carries the fix.
 
 ### A13 (2026-10-31): the test screen's lines keep a cluster that ends in a space
 
-*Status: proposed (2026-10-31),* the owner's ask after
+*Status: accepted (2026-10-31),* the owner's "accept the madr, plan
+approved to proceed", after the ask after
 [0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
 Step 7c: "spec and scope the fix for this: the pick bug, where an entry
 starting with U+0600 draws "❯" instead of "❯ \u0600"".
@@ -2021,6 +2022,17 @@ starting with U+0600 draws "❯" instead of "❯ \u0600"".
    release the owner names. No exported name is added, removed or
    retyped; `make apicheck` stays at 0 incompatible changes. 0024's
    terminal release follows it.
+7. **Corrected 2026-10-31, by
+   [0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
+   Step 7d (D29),** before its code was committed: only a width method
+   that gives the cluster a width sees the change.
+   * Under `ansi.WcWidth`, "\u0600 " measures 1, holds a cell, and `Lines`
+     now gives it whole.
+   * Under `ansi.GraphemeWidth`, it measures 0. The screen draws only a
+     cluster with a width (`apply`), so it holds no cell, and the row is
+     the same before the change and after it.
+   * Items 2 and 3 hold for the first. `FuzzChooser`, which found the
+     fault, measures with `ansi.WcWidth`.
 
 ## More Information
 

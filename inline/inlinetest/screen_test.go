@@ -46,6 +46,37 @@ func TestWrites(t *testing.T) {
 	}
 }
 
+// TestPrependEndsRow: a row's text drops its trailing blank cells only.
+// U+0600 is Prepend, so it and the space after it are one cluster, which
+// ends in a space. Under WcWidth it is one cell, kept whole; under
+// GraphemeWidth it has no width, so no cell (0023-MADR A13).
+func TestPrependEndsRow(t *testing.T) {
+	const cell = "\u0600 "
+	for _, tc := range []struct {
+		m   ansi.Method
+		row string
+	}{{ansi.WcWidth, "ab" + cell}, {ansi.GraphemeWidth, "ab"}} {
+		m := tc.m
+		s := NewScreen(10, 2, m)
+		write(s, "ab"+cell)
+		if got := s.Lines()[0]; got != tc.row {
+			t.Errorf("%v: the row is %q; want %q", m, got, tc.row)
+		}
+		if got := s.Text(); got != tc.row+"\n" {
+			t.Errorf("%v: the text is %q; want %q", m, got, tc.row+"\n")
+		}
+		write(s, "\r\nx\r\ny")
+		if got := s.Scrollback(); !slices.Equal(got, []string{tc.row}) {
+			t.Errorf("%v: scrolled off, the row is %q; want %q", m, got, tc.row)
+		}
+		s = NewScreen(10, 2, m)
+		write(s, "ab  ")
+		if got := s.Lines()[0]; got != "ab" {
+			t.Errorf("%v: blank cells at the end: %q; want %q", m, got, "ab")
+		}
+	}
+}
+
 // TestLineFeed: raw mode keeps the column; Cooked returns to the start; the
 // bottom row scrolls into the scrollback, which CSI 3 J clears.
 func TestLineFeed(t *testing.T) {
