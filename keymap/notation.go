@@ -389,6 +389,19 @@ func (s Stroke) printable() bool {
 	return !s.Scan && !named && unicode.IsPrint(s.Code)
 }
 
+// foldCode is k's code as Matches compares it: a letter caps lock made
+// upper case is lowered.
+func foldCode(k termkey.KeyEvent) rune {
+	if k.Mod.Contains(termkey.ModCapsLock) && unicode.IsLetter(k.Code) {
+		return unicode.ToLower(k.Code)
+	}
+	return k.Code
+}
+
+// matchName is the name Matches compares for k, for the dispatcher's skip
+// (docs/decisions/0023-MADR-line-mode-components.md A12 item 4.9).
+func matchName(k termkey.KeyEvent) string { return keyName(foldCode(k)) }
+
 // Matches reports whether k is this stroke's key. It ignores the key's
 // lock modifiers, and a letter caps lock made upper case. A stroke matches
 // when:
@@ -406,10 +419,7 @@ func (s Stroke) Matches(k termkey.KeyEvent) bool {
 		return false
 	}
 	mod := k.Mod &^ locks
-	code := k.Code
-	if k.Mod.Contains(termkey.ModCapsLock) && unicode.IsLetter(code) {
-		code = unicode.ToLower(code)
-	}
+	code := foldCode(k)
 	if s.Scan {
 		base := k.BaseCode
 		if base == 0 {
@@ -420,6 +430,6 @@ func (s Stroke) Matches(k termkey.KeyEvent) bool {
 	if mod == s.Mod && keyName(code) == keyName(s.Code) {
 		return true
 	}
-	return s.printable() && !s.Mod.Contains(termkey.ModShift) &&
-		k.Text == string(s.Code) && mod&^termkey.ModShift == s.Mod
+	return mod&^termkey.ModShift == s.Mod && !s.Mod.Contains(termkey.ModShift) &&
+		k.Text == string(s.Code) && s.printable()
 }

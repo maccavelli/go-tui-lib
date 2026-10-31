@@ -188,6 +188,19 @@ type entry struct {
 	hasWhen bool
 	own     Sequence   // a default's own keys, expanded
 	alts    []Sequence // a default's alternatives' keys, expanded
+
+	// first and firstText are the first stroke's key name and its rune as
+	// text, made once, for may; scan says the stroke is matched by position.
+	first, firstText string
+	scan             bool
+}
+
+// may reports whether the entry's first stroke can match ev: by the key's
+// name, by its text, or by position, the three ways Stroke.Matches has. It
+// never refuses a key Matches takes, and refuses most others with one
+// comparison (0023-MADR A12).
+func (e *entry) may(ev keyEvent) bool {
+	return e.scan || ev.name == e.first || ev.key.Text != "" && ev.key.Text == e.firstText
 }
 
 // goos is Settings.GOOS, or runtime.GOOS when it is empty.
@@ -297,6 +310,8 @@ func (k *Keymap) build() error {
 	k.scopes = map[command.Scope][]*entry{}
 	k.index = map[command.Scope]map[Stroke][]*entry{}
 	for _, e := range slices.Backward(k.bound) {
+		s := e.Keys[0]
+		e.first, e.firstText, e.scan = keyName(s.Code), string(s.Code), s.Scan || s.Code == keyLeader
 		k.scopes[e.Scope] = append(k.scopes[e.Scope], e)
 		byStroke := k.index[e.Scope]
 		if byStroke == nil {

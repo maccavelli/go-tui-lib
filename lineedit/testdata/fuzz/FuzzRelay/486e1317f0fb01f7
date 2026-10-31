@@ -1,0 +1,4 @@
+go test fuzz v1
+[]byte("0\n\xe40")
+[]byte("7CC")
+byte('R')

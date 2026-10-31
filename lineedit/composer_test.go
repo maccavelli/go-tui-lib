@@ -274,7 +274,7 @@ func TestLayoutMarks(t *testing.T) {
 			l := lineinput.NewRunes(0, m)
 			l.Insert("\ufe0f0 first\n\u0301second line here")
 			cl := l.Clusters()
-			got := layout(m, width, "> ", "~ ", cl)
+			got := layout(m, width, "> ", "~ ", cl, l.Widths())
 			for _, row := range got.rows {
 				if w := m.StringWidth(row); w > width {
 					t.Errorf("method %d, width %d: %q is %d cells", m, width, row, w)
@@ -512,6 +512,20 @@ func TestRow1Report(t *testing.T) {
 	h.typeIn("\x1b[1;5R")
 	if len(h.submitted()) != 1 {
 		t.Error("ctrl+f3, with no report awaited, did not reach the keymap")
+	}
+}
+
+// TestViewIsACopy: the rows View gives stay as they were after more keys,
+// though the Composer's own drawing reuses a buffer (0023-MADR A12 item
+// 4.6).
+func TestViewIsACopy(t *testing.T) {
+	h := newHost(t, 80)
+	h.typeIn("first words")
+	rows, _, _ := h.c.View(80)
+	kept := slices.Clone(rows)
+	h.typeIn(" and more")
+	if !slices.Equal(rows, kept) {
+		t.Errorf("View's rows changed under the caller: %q, were %q", rows, kept)
 	}
 }
 

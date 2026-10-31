@@ -10,11 +10,24 @@ import (
 // to change, it returns s itself and allocates nothing; otherwise it reads
 // s once and allocates its result once.
 func Clean(s string, r Rules) string {
+	if printableASCII(s) {
+		return s // no rule removes, replaces or rewrites printable ASCII
+	}
 	var m machine
 	m.init(&r, modeClean, s)
 	run(&m, s)
 	m.finish()
 	return m.o.result()
+}
+
+// printableASCII reports whether s is printable ASCII alone.
+func printableASCII(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] < 0x20 || s[i] > 0x7e {
+			return false
+		}
+	}
+	return true
 }
 
 // IsClean reports whether Clean(s, r) would return s: whether s holds

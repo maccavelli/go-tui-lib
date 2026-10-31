@@ -1,7 +1,6 @@
 package inline
 
 import (
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -49,6 +48,7 @@ type Region struct {
 	width int // the terminal's, in cells; 0 until Resize gives it
 
 	drawn []string // the rows on the screen as drawn; nil when none are
+	spare []string // the buffer window builds the next drawn rows in
 	at    int      // the cursor's row among drawn
 	col   int      // the cursor's column, in cells
 	up    int      // for the next first drawing: the rows from the cursor up to the region's first row
@@ -85,11 +85,35 @@ func (r *Region) SetHeight(rows int) { r.height = max(rows, 0) }
 // cursor report it returns nothing, and the report's redraw shows these
 // rows.
 func (r *Region) Draw(rows []string, row, col int) string {
-	r.rows, r.row, r.rcol, r.has = slices.Clone(rows), row, col, true
+	r.rows, r.row, r.rcol, r.has = append(r.rows[:0], rows...), row, col, true
 	if r.awaiting {
 		return ""
 	}
-	return r.wrap(r.paint(""))
+	return r.paintWrapped("")
+}
+
+// paintWrapped returns the moves and text that show the last rows in place
+// of the rows drawn, as one synchronized update with the cursor hidden
+// unless the region draws unsynchronized, or nothing when nothing changes;
+// a first drawing writes prefix, a Print's text, after it erases. The
+// update is written in the same builder as the drawing
+// (docs/decisions/0023-MADR-line-mode-components.md A12 item 4.7).
+func (r *Region) paintWrapped(prefix string) string {
+	rows, at, col := r.window()
+	var b strings.Builder
+	b.Grow(r.size(rows, prefix))
+	if r.sync {
+		b.WriteString(syncOn + cursorHide)
+	}
+	head := b.Len()
+	r.paint(&b, prefix, rows, at, col)
+	if b.Len() == head {
+		return ""
+	}
+	if r.sync {
+		b.WriteString(cursorShow + syncOff)
+	}
+	return b.String()
 }
 
 // Print returns the bytes that write text above the region and draw the
@@ -107,7 +131,7 @@ func (r *Region) Print(text string) string {
 		return r.wrap(t)
 	}
 	r.up, r.drawn = r.at, nil
-	return r.wrap(r.paint(t))
+	return r.paintWrapped(t)
 }
 
 // Commit returns the bytes that leave rows in the scrollback, whole, and
@@ -169,7 +193,7 @@ func (r *Region) flushHeld() string {
 // cursor's row.
 func (r *Region) forget() {
 	r.drawn, r.at, r.col, r.up = nil, 0, 0, 0
-	r.rows, r.row, r.rcol, r.has = nil, 0, 0, false
+	r.rows, r.row, r.rcol, r.has = r.rows[:0], 0, 0, false
 }
 
 // Resize returns the bytes for a terminal now width cells wide: with rows
@@ -254,7 +278,7 @@ func (r *Region) Restore() string {
 // when known.
 func (r *Region) redraw(col int, known bool) string {
 	r.up, r.drawn, r.awaiting = r.liftRows(col, known), nil, false
-	return r.wrap(r.paint(r.flushHeld()))
+	return r.paintWrapped(r.flushHeld())
 }
 
 // liftRows is how many rows above the cursor the region's first row is now
@@ -278,22 +302,34 @@ func (r *Region) liftRows(col int, known bool) int {
 	}
 	up := r.col / w
 	for _, d := range r.drawn[:r.at] {
-		up += max((r.method.StringWidth(d)+w-1)/w, 1)
+		up += max((sanitize.StringWidth(r.method, d)+w-1)/w, 1)
 	}
 	return up
 }
 
-// paint returns the moves and text that show the last rows in place of
-// the rows drawn, unwrapped; a first drawing writes prefix, a Print's
-// text, after it erases.
-func (r *Region) paint(prefix string) string {
-	rows, at, col := r.window()
-	var b strings.Builder
+// size is about what paintWrapped writes for rows, so that its builder
+// grows once: the synchronized update, prefix, and for each row that
+// changes its bytes and room for its moves, a reset and an erase. It is a
+// size to reserve, not a bound: past it, the builder grows again.
+func (r *Region) size(rows []string, prefix string) int {
+	n := len(syncOn+cursorHide+cursorShow+syncOff) + len(prefix) + len(rows) + 32
+	for i, row := range rows {
+		if r.drawn == nil || i >= len(r.drawn) || r.drawn[i] != row {
+			n += len(row) + 24
+		}
+	}
+	return n
+}
+
+// paint writes to b the moves and text that show rows, the window, in place
+// of the rows drawn, unwrapped; what b held before is not its.
+func (r *Region) paint(b *strings.Builder, prefix string, rows []string, at, col int) {
+	mark := b.Len()
 	first := r.drawn == nil
 	cur := r.at
 	if first {
 		if r.up > 0 {
-			b.WriteString("\x1b[" + strconv.Itoa(r.up) + "A")
+			csi(b, r.up, 'A')
 		}
 		b.WriteString("\r" + eraseBelow + prefix)
 		cur = 0
@@ -306,42 +342,51 @@ func (r *Region) paint(prefix string) string {
 				continue
 			}
 		}
-		cur = moveTo(&b, cur, i)
-		r.writeRow(&b, was, row)
+		cur = moveTo(b, cur, i)
+		r.writeRow(b, was, row)
 	}
 	if !first && len(r.drawn) > len(rows) {
-		cur = moveTo(&b, cur, len(rows))
+		cur = moveTo(b, cur, len(rows))
 		b.WriteString("\r" + eraseBelow)
 	}
-	if b.Len() > 0 || cur != at || r.col != col {
-		moveTo(&b, cur, at)
+	if b.Len() > mark || cur != at || r.col != col {
+		moveTo(b, cur, at)
 		b.WriteByte('\r')
 		if col > 0 {
-			b.WriteString("\x1b[" + strconv.Itoa(col) + "C")
+			csi(b, col, 'C')
 		}
 	}
 	if rows == nil {
 		rows = []string{}
 	}
+	r.spare = r.drawn[:0]
 	r.drawn, r.at, r.col = rows, at, col
-	return b.String()
+}
+
+// csi writes CSI n final.
+func csi(b *strings.Builder, n int, final byte) {
+	b.WriteString("\x1b[")
+	b.WriteString(strconv.Itoa(n))
+	b.WriteByte(final)
 }
 
 // window is the last rows cut to the width, and the cursor among them:
 // with a height, the rows around the cursor's.
 func (r *Region) window() (rows []string, at, col int) {
-	rows = make([]string, len(r.rows))
-	for i, row := range r.rows {
-		rows[i] = r.fit(row)
-	}
-	at = min(max(r.row, 0), max(len(rows)-1, 0))
+	all := r.rows
+	at = min(max(r.row, 0), max(len(all)-1, 0))
 	col = max(r.rcol, 0)
 	if r.width > 0 {
 		col = min(col, r.width-1)
 	}
-	if h := r.height; h > 0 && len(rows) > h {
-		from := min(max(at-h+1, 0), len(rows)-h)
-		rows, at = rows[from:from+h], at-from
+	if h := r.height; h > 0 && len(all) > h {
+		from := min(max(at-h+1, 0), len(all)-h)
+		all, at = all[from:from+h], at-from
+	}
+	rows = r.spare[:0]
+	r.spare = nil
+	for _, row := range all {
+		rows = append(rows, r.fit(row))
 	}
 	return rows, at, col
 }
@@ -360,15 +405,15 @@ func (r *Region) fit(row string) string {
 func (r *Region) writeRow(b *strings.Builder, was, row string) {
 	n, escapes := r.shared(was, row)
 	b.WriteByte('\r')
-	if cells := r.method.StringWidth(row[:n]); cells > 0 {
-		b.WriteString("\x1b[" + strconv.Itoa(cells) + "C")
+	if cells := sanitize.StringWidth(r.method, row[:n]); cells > 0 {
+		csi(b, cells, 'C')
 	}
 	b.WriteString(escapes)
 	b.WriteString(row[n:])
 	if styled(row) {
 		b.WriteString(resetStyle)
 	}
-	if r.method.StringWidth(row) < r.method.StringWidth(was) {
+	if sanitize.StringWidth(r.method, row) < sanitize.StringWidth(r.method, was) {
 		b.WriteString(eraseRight)
 	}
 }
@@ -377,6 +422,13 @@ func (r *Region) writeRow(b *strings.Builder, was, row string) {
 // escape sequences and grapheme clusters, and the escape sequences among
 // them, which set the styles in force where it ends.
 func (r *Region) shared(a, b string) (n int, escapes string) {
+	// Printable ASCII alike in both is shared byte by byte: x/ansi decodes
+	// such a byte in the normal state as a sequence of its own, whatever
+	// follows it (parser_decode.go, decodeSequence), so the loop below
+	// would step over it alike (0023-MADR A12 item 4.7, as corrected).
+	for n < len(a) && n < len(b) && a[n] == b[n] && a[n] >= 0x20 && a[n] <= 0x7e {
+		n++
+	}
 	var sa, sb byte
 	var esc strings.Builder
 	for n < len(a) && n < len(b) {
@@ -410,9 +462,11 @@ func styled(row string) bool { return strings.IndexByte(row, ansi.ESC) >= 0 }
 func moveTo(b *strings.Builder, from, to int) int {
 	switch {
 	case to < from:
-		b.WriteString("\x1b[" + strconv.Itoa(from-to) + "A")
+		csi(b, from-to, 'A')
 	case to > from:
-		b.WriteString(strings.Repeat("\n", to-from))
+		for range to - from {
+			b.WriteByte('\n')
+		}
 	}
 	return to
 }

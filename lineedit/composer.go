@@ -26,6 +26,9 @@ const typing = termkey.ModShift | termkey.ModCapsLock | termkey.ModNumLock | ter
 // path is where the Composer's keys are resolved: its scope alone.
 var path = keymap.Path{ComposerScope}
 
+// noValues is the when values the Composer's keys are resolved with: none.
+var noValues = when.Map{}
+
 // pasteFloor is what a paste keeps at the least: printable text, line
 // breaks and tabs (0023-MADR A3 item 11).
 var pasteFloor = safetext.Rules{Newlines: true, Tabs: true}
@@ -70,6 +73,14 @@ type Composer struct {
 
 	done   bool
 	events []ComposerEvent
+	next   int // the first event NextEvent has not given
+
+	// lay is the text laid out at layW cells, from the Line's edit mark;
+	// view is the rows draw hands the region, reused.
+	lay   laid
+	layW  int
+	layOK bool
+	view  []string
 }
 
 // NewComposer is a Composer with an empty line.
@@ -181,7 +192,7 @@ func (c *Composer) key(k termkey.KeyEvent, now time.Time) {
 		return
 	}
 	c.enter = false
-	o := c.disp.Key(k, path, when.Map{})
+	o := c.disp.Key(k, path, noValues)
 	c.outcome(o, now)
 	if o.Command == SubmitID && stroke == "enter" {
 		c.enter = true
@@ -257,9 +268,17 @@ func (c *Composer) command(id command.ID) {
 	}
 }
 
-// laid is the text laid out at the Composer's width.
-func (c *Composer) laid() laid {
-	return layout(c.method, c.width, c.prompt, c.cont, c.line.Clusters())
+// laid is the text laid out at the Composer's width, kept between calls: it
+// is laid out again only from the first row whose break read a cluster
+// changed since the last call, or all of it after a change of width
+// (docs/decisions/0023-MADR-line-mode-components.md A12 item 4.3).
+func (c *Composer) laid() *laid {
+	from, tail := c.line.Edited()
+	if !c.layOK || c.layW != c.width {
+		from, tail, c.layW, c.layOK = 0, 0, c.width, true
+	}
+	c.lay.relay(c.method, c.width, c.prompt, c.cont, c.line.Clusters(), c.line.Widths(), from, tail)
+	return &c.lay
 }
 
 // up moves to the row above, the column nearest the cursor's without
@@ -391,11 +410,13 @@ func (c *Composer) Cancel() {
 
 // NextEvent is the next thing the Composer asks of its host, or EditNone.
 func (c *Composer) NextEvent() ComposerEvent {
-	if len(c.events) == 0 {
+	if c.next == len(c.events) {
+		c.events, c.next = c.events[:0], 0 // drained: the array is reused
 		return ComposerEvent{}
 	}
-	e := c.events[0]
-	c.events = c.events[1:]
+	e := c.events[c.next]
+	c.events[c.next] = ComposerEvent{}
+	c.next++
 	return e
 }
 
@@ -404,26 +425,39 @@ func (c *Composer) NextEvent() ComposerEvent {
 // It changes nothing, so a pane draws through it, as ask's Asker.View
 // (docs/decisions/0023-MADR-line-mode-components.md A2 item 4).
 func (c *Composer) View(width int) (rows []string, row, col int) {
-	l := layout(c.method, width, c.prompt, c.cont, c.line.Clusters())
-	rows, pl := l.rows, l.places[c.line.Pos()]
-	if pl.row == len(rows) {
-		rows = append(rows, l.pad)
+	if width == c.width {
+		return c.viewInto(nil, c.laid(), width)
 	}
+	l := layout(c.method, width, c.prompt, c.cont, c.line.Clusters(), c.line.Widths())
+	return c.viewInto(nil, &l, width)
+}
+
+// viewInto appends to rows the header, cut to width, and the laid rows, the
+// pad row when the cursor is below the last, and gives the cursor's row and
+// column.
+func (c *Composer) viewInto(rows []string, l *laid, width int) ([]string, int, int) {
+	pl := l.places[c.line.Pos()]
 	if c.head != "" {
 		head := c.head
 		if width > 0 {
 			head = sanitize.Truncate(head, width, c.method, c.glyphs.Ellipsis)
 		}
-		rows = append([]string{head}, rows...)
+		rows = append(rows, head)
 		pl.row++
+	}
+	rows = append(rows, l.rows...)
+	if len(rows) == pl.row {
+		rows = append(rows, l.pad)
 	}
 	return rows, pl.row, pl.col
 }
 
-// draw writes the bytes that show the Composer now.
+// draw writes the bytes that show the Composer now, through a rows buffer
+// it reuses: the region copies what it keeps.
 func (c *Composer) draw() {
-	rows, row, col := c.View(c.width)
-	c.write(c.region.Draw(rows, row, col))
+	var row, col int
+	c.view, row, col = c.viewInto(c.view[:0], c.laid(), c.width)
+	c.write(c.region.Draw(c.view, row, col))
 }
 
 func (c *Composer) write(s string) {

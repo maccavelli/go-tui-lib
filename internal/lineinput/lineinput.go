@@ -10,6 +10,7 @@
 package lineinput
 
 import (
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -17,6 +18,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/maccavelli/go-tui-lib/v2/command"
+	"github.com/maccavelli/go-tui-lib/v2/internal/sanitize"
 )
 
 // The commands a Line runs, by lineedit's IDs: lineedit exports each, and
@@ -49,13 +51,21 @@ func Commands() []command.ID {
 	}
 }
 
+// firstCluster cuts the first grapheme cluster from a string: x/ansi's,
+// held in a variable so that a test counts the cuts an edit makes.
+var firstCluster = ansi.FirstGraphemeCluster[string]
+
 // Line is the text and its cursor. Build one with New or NewRunes.
 type Line struct {
 	method   ansi.Method
 	limit    int
 	runes    bool // the limit counts runes, not bytes
 	clusters []string
-	pos      int // the cursor, in clusters from the start
+	widths   []int // each cluster's width under method, measured as it entered
+	pos      int   // the cursor, in clusters from the start
+	used     int   // the text's size, as the bound counts it
+	edit     int   // the first cluster changed since Edited, or len(clusters)
+	tail     int   // the clusters at the end no edit has touched since Edited
 }
 
 // New is an empty Line of at most limit bytes, measured with m. A limit
@@ -75,6 +85,10 @@ func (l *Line) Text() string { return strings.Join(l.clusters, "") }
 // does not change them.
 func (l *Line) Clusters() []string { return l.clusters }
 
+// Widths is each cluster's width in cells under the Line's method, as the
+// cluster entered the line; the caller does not change them.
+func (l *Line) Widths() []int { return l.widths }
+
 // Pos is the cursor, in clusters from the start.
 func (l *Line) Pos() int { return l.pos }
 
@@ -84,8 +98,17 @@ func (l *Line) SetPos(p int) { l.pos = min(max(p, 0), len(l.clusters)) }
 // SetText makes s the line's text, cut to the bound by whole clusters, and
 // puts the cursor at its end.
 func (l *Line) SetText(s string) {
-	l.clusters, l.pos = l.clusters[:0], 0
+	l.clusters, l.widths, l.pos, l.used, l.edit, l.tail = l.clusters[:0], l.widths[:0], 0, 0, 0, 0
 	l.Insert(s)
+}
+
+// Edited is the first cluster changed since the last call, or the text's
+// end when none was, and how many clusters at the end no edit has touched
+// since; it starts both counts again.
+func (l *Line) Edited() (from, tail int) {
+	from, tail = min(l.edit, len(l.clusters)), min(l.tail, len(l.clusters))
+	l.edit, l.tail = len(l.clusters), len(l.clusters)
+	return from, tail
 }
 
 // size is s's length as the bound counts it.
@@ -101,13 +124,12 @@ func (l *Line) size(s string) int {
 // display text the caller has cleaned: a line break in it is a cluster of
 // its own.
 func (l *Line) Insert(s string) {
-	before, after := strings.Join(l.clusters[:l.pos], ""), strings.Join(l.clusters[l.pos:], "")
 	if l.limit > 0 {
-		room := l.limit - l.size(before) - l.size(after)
-		cut := 0
+		room := l.limit - l.used
+		cut, n := 0, 0
 		for rest := s; rest != ""; {
-			c, _ := ansi.FirstGraphemeCluster(rest, l.method)
-			if l.size(s[:cut+len(c)]) > room {
+			c, _ := firstCluster(rest, l.method)
+			if n += l.size(c); n > room {
 				break
 			}
 			cut += len(c)
@@ -115,20 +137,89 @@ func (l *Line) Insert(s string) {
 		}
 		s = s[:cut]
 	}
-	l.set(before+s+after, len(before)+len(s))
+	l.splice(l.pos, l.pos, s)
+}
+
+// splice replaces the clusters from i to j with text, and leaves the cursor
+// after it. Only the edit is cut into clusters again: with the cluster
+// before it, which an insert may join, and as many after it as it takes for
+// the last cluster cut to stay apart from the next, since deleting a line
+// break before a lone ZWJ joins that ZWJ to what follows it, and an insert
+// into a run of flags pairs every flag after it anew. Text added after a
+// boundary already found does not move it, so each cluster taken in is cut
+// again with the last cluster alone, and a run costs time in its length.
+// The size, the widths and the edit marks follow
+// (docs/decisions/0023-MADR-line-mode-components.md A12 item 4.2).
+func (l *Line) splice(i, j int, text string) {
+	a, b := i, j
+	if a > 0 {
+		a-- // an insert may join the cluster before it
+	}
+	for _, c := range l.clusters[i:j] {
+		l.used -= l.size(c)
+	}
+	l.used += l.size(text)
+	var w strings.Builder
+	for _, c := range l.clusters[a:i] {
+		w.WriteString(c)
+	}
+	at := w.Len() + len(text)
+	w.WriteString(text)
+	if b < len(l.clusters) {
+		w.WriteString(l.clusters[b])
+		b++
+	}
+	var buf [8]string
+	mid := cutInto(buf[:0], w.String(), l.method)
+	for b < len(l.clusters) && len(mid) > 0 {
+		last := mid[len(mid)-1]
+		if c, _ := firstCluster(last+l.clusters[b], l.method); c == last {
+			break // the last cluster and the next stay apart
+		}
+		mid = cutInto(mid[:len(mid)-1], last+l.clusters[b], l.method)
+		b++
+	}
+	pos, n := a, 0
+	for _, c := range mid {
+		if n < at {
+			pos++
+		}
+		n += len(c)
+	}
+	after := len(l.clusters) - b
+	var wbuf [8]int
+	ws := wbuf[:0]
+	for _, c := range mid {
+		ws = append(ws, sanitize.StringWidth(l.method, c))
+	}
+	l.clusters = slices.Replace(l.clusters, a, b, mid...)
+	l.widths = slices.Replace(l.widths, a, b, ws...)
+	l.pos = pos
+	l.edit, l.tail = min(l.edit, a), min(l.tail, after)
+}
+
+// cutInto appends s's grapheme clusters under m to out.
+func cutInto(out []string, s string, m ansi.Method) []string {
+	for s != "" {
+		c, _ := firstCluster(s, m)
+		out = append(out, c)
+		s = s[len(c):]
+	}
+	return out
 }
 
 // set makes text the line's, its cursor at the cluster that starts at or
 // after byte at: an insert may join a cluster with the one before it.
 func (l *Line) set(text string, at int) {
-	l.clusters, l.pos = l.clusters[:0], 0
+	l.clusters, l.widths, l.pos, l.used, l.edit, l.tail = l.clusters[:0], l.widths[:0], 0, l.size(text), 0, 0
 	n := 0
 	for text != "" {
-		c, _ := ansi.FirstGraphemeCluster(text, l.method)
+		c, _ := firstCluster(text, l.method)
 		if n < at {
 			l.pos++
 		}
 		l.clusters = append(l.clusters, c)
+		l.widths = append(l.widths, sanitize.StringWidth(l.method, c))
 		n += len(c)
 		text = text[len(c):]
 	}
@@ -264,8 +355,7 @@ func (l *Line) cut(i, j int) {
 		l.pos = i
 		return
 	}
-	text := strings.Join(l.clusters[:i], "") + strings.Join(l.clusters[j:], "")
-	l.set(text, len(strings.Join(l.clusters[:i], "")))
+	l.splice(i, j, "")
 }
 
 // View is the part of the line that fits width cells with the cursor on

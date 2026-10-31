@@ -51,7 +51,7 @@ func Styled(s string) string { return safetext.Clean(s, styled) }
 // (docs/decisions/0014-PLAN-hardening.md Step 9, D8).
 func Truncate(s string, cells int, m ansi.Method, tail string) string {
 	cells = max(cells, 0)
-	if m.StringWidth(s) <= cells {
+	if StringWidth(m, s) <= cells {
 		return s
 	}
 	if m != ansi.WcWidth {
@@ -102,6 +102,18 @@ func byRune(s string, budget int, tail string, m ansi.Method) string {
 		b.WriteString(tail)
 	}
 	return b.String()
+}
+
+// StringWidth is s's width in cells under m. Printable ASCII is one cell a
+// byte under every method, so a string of it alone is counted without
+// parsing; any other byte gives the string to m.
+func StringWidth(m ansi.Method, s string) int {
+	for i := 0; i < len(s); i++ {
+		if c := s[i]; c < 0x20 || c > 0x7e {
+			return m.StringWidth(s)
+		}
+	}
+	return len(s)
 }
 
 // Token keeps only the runes allowed accepts, for an identifier or a name

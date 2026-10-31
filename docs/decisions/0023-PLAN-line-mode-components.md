@@ -2738,3 +2738,194 @@ this step were written first, in the same change.
   Steps 7a and 7b: 7b's 10 mutations killed, its gates on macOS, Linux and
   Windows, and CI passed on `main` at `a65d724`. Left as the PLAN left it:
   what D10 leaves out, and `stream/glamourmd`, which 0009's PLAN builds.
+
+### Step 7c: a key's cost (issue #13)
+
+*2026-10-30.* The owner approved 0023-MADR A12 and this step, "approve A12
+and 7c, issue 13 first, proceed"; this PLAN is `in-progress` again. Its
+prerequisite, the `perf` gate of A12 item 7, is
+0018-PLAN-python-verification-tools.md Step 10, which the owner committed
+with these records as `ef628ce`.
+
+**What changed,** by A12 item 4's numbers. The code is the scratch
+prototype of A12, carried into the tree, whose files were unchanged since
+the prototype's base, `d234bfa`, and reviewed and changed on the way in:
+
+1. `internal/sanitize`: `StringWidth`; `Truncate` checks its fit with it.
+2. `internal/lineinput`:
+   * `splice`, by `slices.Replace`. Its window is widened on the right,
+     and each widening step cuts only the last cluster with the next one
+     (A12 item 11; the prototype cut the whole window again).
+   * The kept size, `used`; `Insert`'s bound counted once.
+   * `Widths`; `Edited() (from, tail int)`.
+   * Every cluster cut through `firstCluster`, a variable a test counts
+     cuts through.
+3. to 6. `lineedit`:
+   * `layout.go`:
+     * `laid`, with `starts`, `bases` and `reach`; `relay`, `sync`;
+     * `rowText`, a row in one allocation; `headWidth`; the indents made
+       once;
+     * `layout`'s comment, gobble's rules, kept whole, which the
+       prototype had cut;
+     * the package-level `draw`, now unused, removed;
+     * the prototype's rule of reach for a line's last row removed, since
+       `max(fit, next)` already gives it (A12 item 11).
+   * `composer.go`:
+     * `laid()` relays from `Edited`;
+     * `viewInto(rows, l, width)` cuts the header at the width it draws
+       at. The prototype cut it at the Composer's own width even for
+       `View` at another, a fault found in review and not in any test of
+       the prototype;
+     * `draw` through a reused slice, `View` a new one; `NextEvent`'s
+       queue kept; `noValues`.
+7. `inline/region.go`:
+   * `Draw` keeps the rows in a reused slice; `window` cuts only the rows
+     shown, into the slice not drawn.
+   * One painting path, `paintWrapped`, for `Draw`, `Print` and `redraw`.
+     Its builder's size is reserved once, from the rows that change
+     (`size`; A12 item 11).
+   * `csi`; `shared`'s byte-by-byte prefix with no back-off (A12 item 11);
+     `liftRows` and `writeRow` measure through `StringWidth`.
+8. `safetext/clean.go`: printable ASCII returned before the parser.
+9. `keymap`: `entry.may`, its fields made in `build`; `keyEvent.name`;
+   `foldCode`, which `Matches` and `matchName` share; `decide` skips with
+   `may`.
+
+Docs: `docs/architecture.md`'s `internal/lineinput` and
+`internal/sanitize` rows; "Migrating to `v2.7.0`"; `README.md`'s current
+release. A12 gains item 11, the facts this step corrected.
+
+**Tests:**
+
+* **New:** `FuzzStringWidth`, `FuzzSplice`, `TestSpliceFlagRun`,
+  `TestSpliceJoinsPastOne`, `FuzzRelay` (with the prototype's seed
+  `486e1317f0fb01f7`), `TestRelayLead`, `TestViewIsACopy`,
+  `FuzzRegionBytes` (against `v2.6.2`'s region in
+  `inline/oldregion_test.go`), `TestRegionDrawBudget`, `FuzzMay`,
+  `TestKeyBudget`, and `TestPerfKeys`, built with the `perf` tag.
+* **Benchmarks:** `lineedit`'s `BenchmarkKeyDraw`, issue #13's own, and
+  `BenchmarkKeyStart`, `BenchmarkKeyLong`, `BenchmarkUpDown`; `inline`'s
+  `BenchmarkRegionDraw`.
+* **The relay's harness:** its continuation mark is four cells wide and
+  its prompt two, so that a lead's width matters. It is bounded to 512
+  bytes and 64 edits a run, and so is `FuzzSplice`'s, with inserts of 64
+  bytes.
+  * Unbounded, a 15 KB input took 28 s and the fuzzer reported it as
+    hung. It ran 3,801 edits to 98,608 clusters, each checked against the
+    whole text cut again.
+  * The `Line` alone ran them in 100 ms, timed on a scratch copy.
+* **Existing:** every test, golden and fuzz target of the module passes
+  (`go test ./...`). One changed: `TestLayoutMarks` passes the `Line`'s
+  widths to `layout`.
+* **Literals:** the Write tool turned `\u200d` and `\u0301` in two test
+  files into the characters themselves, which staticcheck refused
+  (ST1018). They are escapes again.
+
+**Seen failing,** through `tools.verify mutate` on scratch copies, 18
+killed of 18:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| 7c.1 `StringWidth` takes 0x7f as printable | `FuzzStringWidth/seed#6`: `"\x7f": 1, want 0` |
+| 7c.2b the splice's window not widened | `TestSpliceJoinsPastOne`: `["👨\u200d" "👩"], want ["👨\u200d👩"]`; `FuzzSplice/seed#2` |
+| 7c.3 transpose's text not counted | `FuzzSplice/seed#0`: "used 0, text 8 runes" |
+| 7c.4 transpose's widths not kept | `FuzzSplice/seed#0`: index out of range |
+| 7c.5 `Edited`'s tail past the last change | `FuzzSplice/seed#0`: "tail 1 past the unchanged end, 0" |
+| 7c.6 reach as `fit` alone | `FuzzRelay/486e1317f0fb01f7` |
+| 7c.8 resync without the lead's check | `TestRelayLead`: "width 8: relaid ["> awords" "    fill" …" |
+| 7c.9 resync moving its own line's start | `FuzzComposer/seed#0`: index out of range [-1] |
+| 7c.10 `relay` keeps a row whose reach is the edit | `TestWords`: slice bounds out of range |
+| 7c.11 `headWidth` adds a mark's width | `TestLayoutMarks`: "after the selector the cursor is at {0 2}; want column 3" |
+| 7c.12 `View` gives the reused slice | `TestViewIsACopy`: "View's rows changed under the caller" |
+| 7c.13 the shared loop takes a byte that is not printable ASCII | `FuzzRegionBytes/seed#3`, and an existing region test: "want it from the cluster's start" |
+| 7c.14 `window` not reusing its slice | `TestRegionDrawBudget`: "2.0 allocations; want at most 1" |
+| 7c.15 the builder not sized | `TestRegionDrawBudget`: "3.0 allocations; want at most 1" |
+| 7c.16 `Clean`'s return takes 0x7f | `TestControls`: `Clean("a\x7fb") = "a\x7fb", want "ab"` |
+| 7c.17 `may` refuses a match by text | `FuzzMay/seed#4`: "may refused ? for ?, which Matches takes" |
+| 7c.18 each widening step cuts the whole window again | `TestSpliceFlagRun`: "cut 502499 clusters; want at most 8000" |
+
+Three planned mutations changed on the way:
+
+* **7c.7, a line's last row not reaching its end, survived.** The rule is
+  redundant, so it was removed (A12 item 11). 7c.6 tests reach as a
+  whole.
+* **The first 7c.13, `shared` without its back-off, survived** even with
+  a seed made for it: the back-off was redundant, by x/ansi's decoder (A12
+  item 11). It was removed, and 7c.13 tests the fast loop instead.
+* **The PLAN's "`window` cutting to the width after it takes the
+  height"** changes neither a byte nor an allocation, only time, so no
+  test can kill it. 7c.14 and 7c.15 are its budget mutations.
+
+A seed or test was added for each mutation that survived its first run:
+`TestRelayLead`, `TestViewIsACopy`, `TestRegionDrawBudget`, the transpose
+in `FuzzSplice`, `FuzzMay`'s text seed, and `FuzzRegionBytes`'s two seeds.
+
+**Fuzzing,** on macOS, 5 minutes each unless noted:
+
+| Target | Inputs |
+| :--- | :--- |
+| `FuzzStringWidth` | 48.1 million |
+| `FuzzRelay` | 14.2 million |
+| `FuzzRegionBytes` | 9.1 million |
+| `FuzzMay` | 42.7 million |
+| `FuzzComposer` | 2.7 million, and 1.6 million in 2 minutes after the splice's change |
+| `FuzzLine` | 19.3 million, and 12.2 million in 2 minutes after it |
+| `FuzzSplice` | 50.9 million, on the final code with its bound |
+
+**Found, and not this step's:**
+
+* *Found:* `FuzzChooser`, 4 minutes in, failed: "width 13, row 0: the
+  screen shows "❯"; want "❯ \u0600"". U+0600, ARABIC NUMBER SIGN, is
+  Prepend, so it joins the character after it.
+* It fails the same at `HEAD` (`ef628ce`), in a scratch export: the code
+  this step changes does not cause it.
+* The input is kept outside the tree, and not as a seed, since it would
+  fail `pick`'s tests until it is fixed.
+* *Waiting:* for the owner's word, as a fault in `pick`'s drawing of a
+  Prepend character, outside A12.
+
+**`FuzzSplice` found a real cost** first: about 2,500 flag letters inserted
+one by one took 18 s, since the prototype's splice cut its whole window
+again at each widening step. A12 item 11 has it, and `TestSpliceFlagRun`
+holds it.
+
+**Gates,** on the final code:
+
+| Host | `gates` | `release-check` | `perf`, the issue's key, median of five |
+| :--- | :--- | :--- | :--- |
+| macOS | 22 passed, 0 failed, 0 skipped, 974 s | 419 file(s) clean, with `apicheck` and the examples gate | 1.43 µs, 1.411 to 1.459 µs, budget 4.5 µs |
+| `remote linux` | 21 passed, 0 failed, 1 skipped, 949 s | 428 file(s) clean | 4.994 µs, 4.723 to 5.963 µs, budget 15 µs |
+| `remote windows` | 21 passed, 0 failed, 1 skipped, 2570 s | 428 file(s) clean | 2.298 µs, 1.187 to 3.933 µs, budget 4.2 µs |
+
+* The skip on each remote host is `gofmt`, which is given no files there.
+* The remote hosts ran before `FuzzSplice`'s bound was added, a change to
+  that test alone; macOS ran after.
+* **Windows' times split in two,** in both its runs: near gobble's own
+  1.4 µs, or near 3.9 µs. Its other benchmarks spread by under 7%. The
+  median passes, but the slowest run is within 7% of the budget.
+* `make apicheck`: "against v2.6.2, 0 incompatible change(s)".
+* apidiff at the `Makefile`'s pin, compatible changes included, lists four
+  additions, all from 0024-PLAN-terminal-text-and-convention-opt-outs.md
+  Step 1, already on `main`: `termcap.ReasonUnknownQuery`,
+  `WithoutGatedQueries`, `WithoutQueries` and `WithoutQuery`. This step
+  adds none.
+* The identifier scan, the records, disclosure and CI-filter checks, and
+  markdownlint: clean.
+
+**The benchmarks,** the `perf` gate's medians of five on each host, the
+same day:
+
+| Benchmark | macOS | Linux | Windows | macOS at `d234bfa` |
+| :--- | :--- | :--- | :--- | :--- |
+| `KeyDraw`, the issue's | 1.43 µs, 4 allocations, 264 B | 4.99 µs | 2.30 µs | 14.53 µs, 52 allocations, 10,092 B |
+| `KeyStart` | 7.13 µs, 5, 304 B | 15.0 µs | 16.3 µs | 82.73 µs, 228 |
+| `KeyLong` | 4.40 µs, 4, 216 B | 10.6 µs | 11.2 µs | 228.51 µs, 552 |
+| `UpDown` | 1.18 µs, 2, 72 B | 2.81 µs | 2.70 µs | 14.91 µs, 91 |
+
+gobble's editor at `6c5eb02`, on macOS the same day: 1.55 µs, 8
+allocations and 808 B a key.
+
+**Not done here, and the release:** the owner's commit, push and tag; CI
+on both; the smoke test of Step 6 against `v2.7.0`; issue #13 told with
+the three hosts' numbers. This step stays open for them, and the PLAN
+`in-progress`.

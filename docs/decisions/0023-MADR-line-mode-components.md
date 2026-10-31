@@ -1814,11 +1814,12 @@ which that PLAN's deviation 11 holds until a tag carries the fix.
       * `shared` compares printable ASCII byte by byte, then backs off one
         byte when the byte after it, in either row, is not printable
         ASCII and could join it into one cluster. It then decodes from
-        there as before.
+        there as before. *Corrected by item 11: there is no back-off.*
       * Widths go through item 1.
       * The synchronized update is written in the drawing's own builder,
         a CSI's number with `strconv.Itoa` and no concatenation, line
-        feeds without `strings.Repeat`.
+        feeds without `strings.Repeat`. *Added by item 11:* the builder's
+        size is reserved once.
    8. **`safetext.Clean` returns printable ASCII as it is,** before its
       parser: no rule removes, replaces or rewrites a printable ASCII
       character. It already returned such text unchanged and allocated
@@ -1872,7 +1873,7 @@ which that PLAN's deviation 11 holds until a tag carries the fix.
    | The issue's key | 14.53 µs, 52 allocations, 10,092 B | 1.381 µs, 6, 216 B | 10.5 times |
    | `View` | 6.57 µs, 42, 9,368 B | 0.339 µs, 1, 48 B | 19.4 times |
    | `Region.Draw` | 2.02 µs, 5, 168 B | 0.332 µs, 3, 112 B | 6.1 times |
-   | A key at the start of 20 rows | 82.73 µs, 228, 90,964 B | 6.916 µs, 8, 448 B | 12.0 times |
+   | A key at the start of 20 rows | 82.73 µs, 228, 90,964 B | 6.916 µs, 8 (8.5, item 11), 448 B | 12.0 times |
    | A key at the end of about 4,000 runes | 228.51 µs, 552, 290,198 B | 4.223 µs, 6, 184 B | 54.1 times |
    | Up and down | 14.91 µs, 91, 19,000 B | 1.208 µs, 4, 120 B | 12.3 times |
 
@@ -1917,6 +1918,40 @@ which that PLAN's deviation 11 holds until a tag carries the fix.
    owner put this one first ("issue 13 first"); gobble waits on it.
 10. **Issue #13** is told what is found and proposed, with the numbers; it
     is told again when a tag carries the change.
+11. **Corrected 2026-10-30, by
+    [0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
+    Step 7c,** before its code was committed:
+    * **`shared` needs no back-off.** x/ansi's `decodeSequence`
+      (`parser_decode.go`) returns a printable ASCII byte in the normal
+      state as a sequence of one byte, whatever follows it, so `v2.6.2`'s
+      loop steps over a shared printable ASCII prefix byte by byte and
+      stops where the byte-by-byte comparison stops. Item 4.7's reason, a
+      mark joining the last character, does not hold for this decoder:
+      `v2.6.2`'s `shared` of "abc" and "abc" with U+0301 is 3, under both
+      methods. The back-off is removed, and `FuzzRegionBytes` holds the
+      result to `v2.6.2`'s, byte for byte.
+    * **`KeyStart` made 8.5 allocations a key, not 8.** The benchmark's
+      "allocs/op" rounds down, and the budget test counts exactly, so item
+      7's budget failed for it as the prototype stood. The region's builder
+      grew about three times a drawing. It now reserves its size once,
+      from the rows that change, so a drawing that changes one row
+      allocates once. With it, the issue's key makes 4 allocations a key,
+      `KeyStart` 5, `KeyLong` 4 and up and down 2. The budgets of item 7
+      are unchanged.
+    * **A line's last row needs no rule of its own for its reach:** its
+      next row's start is the line's end, so item 3's larger of the two
+      already gives it.
+    * **The splice's widening was quadratic in a run of flags.**
+      `FuzzSplice`, 3 minutes in, found about 2,500 flag letters inserted
+      one at a time taking 18 s: an insert into a run of them pairs every
+      letter after it anew, and the prototype cut the whole window again
+      at each step. Text added after a boundary already found does not
+      move it, since each boundary depends on its left context and the one
+      character after it, so each step now cuts only the last cluster with
+      the next. The input takes 1.2 s, nearly all of it the test's own
+      checks. `TestSpliceFlagRun` counts the cuts one insert into 2,000
+      letters makes, at most 8,000; cutting the whole window gives
+      502,499.
 
 ## More Information
 

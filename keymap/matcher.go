@@ -54,7 +54,8 @@ type keyEvent struct {
 	key     termkey.KeyEvent // normalised, for matching
 	raw     termkey.KeyEvent // as it arrived, for Replay
 	release bool
-	text    bool // AltGr text, which no binding matches
+	text    bool   // AltGr text, which no binding matches
+	name    string // the key's name, as Stroke.Matches reads it, for entry.may
 }
 
 // event is k as the dispatcher matches it.
@@ -65,7 +66,7 @@ func (d *Dispatcher) event(k termkey.KeyEvent) keyEvent {
 		f, goos = d.k.settings.Features, d.k.goos()
 	}
 	n, _ := Normalize(k, f, goos)
-	return keyEvent{key: n, raw: k, release: k.Release, text: isAltGr(k, goos)}
+	return keyEvent{key: n, raw: k, release: k.Release, text: isAltGr(k, goos), name: matchName(n)}
 }
 
 // NewDispatcher is a dispatcher over k. A nil k matches nothing.
@@ -212,6 +213,9 @@ func (k *Keymap) decide(p Path, ctx when.Context, keys []keyEvent) (full, longer
 	for _, scope := range slices.Backward(p) {
 		decided := false
 		for _, e := range k.scopes[scope] {
+			if !e.may(keys[0]) {
+				continue
+			}
 			n := min(len(e.Keys), len(keys))
 			if !matchAll(e.Keys[:n], keys[:n]) || !e.holds(ctx) {
 				continue

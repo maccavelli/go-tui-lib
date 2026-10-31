@@ -7,6 +7,67 @@ needs a major version, at a new module path
 ([AGENTS.md, API conventions](../../AGENTS.md#api-conventions), rule 1).
 Up to `v0.12.0`, a deprecated name was removed in the next minor release.
 
+## Migrating to `v2.7.0`
+
+`v2.7.0` is a minor release. It adds four names to `termcap` and
+deprecates one, and makes the line mode's editing and drawing faster.
+Nothing is removed or retyped, and every drawing is byte for byte what
+it was: `make apicheck` against `v2.6.2` reports 0 incompatible changes
+([0023-PLAN-line-mode-components](../decisions/0023-PLAN-line-mode-components.md)
+Step 7c;
+[0024-PLAN-terminal-text-and-convention-opt-outs](../decisions/0024-PLAN-terminal-text-and-convention-opt-outs.md)
+Step 1). A program on `v2.6.2` needs no change:
+
+```bash
+go get github.com/maccavelli/go-tui-lib/v2@v2.7.0
+```
+
+### Added
+
+- **`termcap.WithoutQuery(names...)`** leaves the named queries out of the
+  probe's batch and sends the rest. The built-in queries' names are
+  `kitty-keyboard`, `mode-2031`, `mode-2048`, `mode-1004`, `dsr-996`,
+  `background`, `da2`, `xtversion`, `notify-query`, `kitty-graphics`,
+  `foreground`, `palette`, `mode-2026` and `mode-2027`. A `WithQuery`'s
+  `Name` names it too. DA1, the sentinel, has no name. A name no query has
+  sends nothing, and each query fact says why, with
+  **`termcap.ReasonUnknownQuery`**
+  ([0024-MADR](../decisions/0024-MADR-opt-in-and-opt-out-coverage.md) D5).
+- **`termcap.WithoutGatedQueries()`** never sends the gated queries, even
+  where the heuristic would; it wins over `WithoutHeuristic`.
+- **`termcap.WithoutQueries()`** sends nothing, as `WithDisabled` did, by
+  the rule's name for an option that turns a default off.
+
+### Deprecated
+
+- **`termcap.WithDisabled`:** use `WithoutQueries`. It stays until `v3`.
+
+### Changed
+
+- **The probe reads its environment as its own system does.** A probe
+  given `WithGOOS("windows")` matches variable names in any case, as
+  Windows does, on any host; one given another system matches them
+  exactly. `termcap.FromEnv` matches by its `goos` argument the same way.
+  Only a probe whose system a program set to another changes.
+  `Env.LookupEnv`, on its own, follows the running system as before
+  ([0024-MADR](../decisions/0024-MADR-opt-in-and-opt-out-coverage.md) A2).
+- **`lineedit`, `inline` and the line `ask` and `pick` edit are faster,
+  and allocate less** ([0023-MADR](../decisions/0023-MADR-line-mode-components.md)
+  A12, for issue #13).
+  - A key typed and drawn, the issue's benchmark, takes 1.43 µs, 4
+    allocations and 264 bytes on an Apple M1 Pro, from 14.5 µs, 52 and
+    10,092.
+  - A key at the end of a text near the 4,096-rune bound takes 4.4 µs, from
+    229 µs; one at the start of twenty rows, 7.1 µs, from 83 µs.
+  - On the Linux and Windows hosts the issue names, the key takes 5.0 µs
+    and 2.3 µs, against gobble-cli's budgets of 15 µs and 4.2 µs.
+
+  The Composer keeps its layout and lays out again only the rows an edit
+  reaches. The line splices its clusters and keeps their widths. The
+  region draws each changed row once into one buffer. The dispatcher
+  skips the bindings a key cannot match. Tests hold each key to 8
+  allocations and 808 bytes.
+
 ## Migrating to `v2.6.2`
 
 `v2.6.2` is a patch: nothing exported changes, no default changes, and
