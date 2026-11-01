@@ -169,6 +169,21 @@ exports. Its amendment of 2026-10-25 (A5.2) renamed A2's `Input`, what a
 provider is asked, to `Search`, since `termkey.Input` is exported in
 `v2.0.0`.
 
+0009's amendments of 2026-11-01 (A6 to A8, and its PLAN's D1) reserve
+these, which its PLAN builds: in `frame`, `FrameMsg`, `Queue`, `Snapshot`,
+`Pacer`, `PacerFunc`, `Release`, `Gear`, `AdaptiveOption`, `Scheduler`,
+`Coalescer`, `Demand`, `Ticks`, `Output`, `OutputOption`, `OutputEvent`,
+`Upgrader` and `UpgradeMsg`; in `inputfilter`, `PasteBurst`,
+`PasteBurstConfig`, `BurstAction`, `Flusher` and
+`ClipboardImageRequestMsg`; in `inputfilter/inputfiltertea`, `Filter` and
+`CoalescedWheelMsg`; in `stream`, `InterpretOptions`, `InterpretRow`,
+`Scanner`, `Block`, `BlockKind`, `Doc`, `Renderer`, `RendererFunc`,
+`Buffer`, `RenderView`, `Highlighter`, `HighlighterFunc`, `Bounded` and
+`Writer` (A8); in
+`stream/streamtea`, `DocPane`; and `theme.Theme`'s method `ID`. A1's
+`safetext.Row` is not among them: it is `ask.Row`'s name, and
+`Interpret`'s row is `stream.InterpretRow` (0009-MADR A6 item 3, A7 Q13).
+
 One planned pair is deliberate: `Renderer`, the interface in `stream`,
 and the type in `stream/glamourmd` that implements it. It is added to
 "Deliberate" and to `sharedNames` when the adapter is built.

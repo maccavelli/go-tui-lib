@@ -1424,12 +1424,99 @@ one question. Every fact was re-read on 2026-11-01.
     and `Fast` at the scheduler's frame rate (grok's `TickDemand`); the
     `Coalescer`'s maximum wait is 100 ms (Kilo); `Writer` reports a stall
     after 5 s (grok). Each is an option, and a row of the defaults guide.
+    *Corrected 2026-11-01, by
+    [0009-PLAN-streaming-content-engine.md](0009-PLAN-streaming-content-engine.md)
+    D1:* the two ticks are the fields of a value, `frame.Ticks`, whose
+    zero fields take the defaults, not options.
 12. **What does not change:** A6, as committed, but for items 2, 3 and 9's
     readings of §5 and A5 above; option A; every other section.
 13. **Answered 2026-11-01** (picked from options): Q13 "stream
     (Recommended)". `Interpret`, `InterpretOptions` and `InterpretRow` are
     `stream`'s; A1's "§2, `safetext` gains … an interpreter" and its Q6
     read so; `safetext` keeps its narrow rule.
+
+### A8 (2026-11-01): a plain streaming writer, `stream.Writer`
+
+*Status: accepted (2026-11-01),* Q14 answered with its recommendation
+(item 8). Proposed the same day, after the owner said "we need a plain
+streaming wrapper to enhance extensibility and flexibility", during
+[0009-PLAN-streaming-content-engine.md](0009-PLAN-streaming-content-engine.md)
+Step 1, and chose "An io.Writer around the stream (Recommended)" over one
+handle over the whole engine and a pipeline of stages.
+
+1. **The need.** `stream.Printer` gives strings: `Write(chunk) string`
+   and `Flush() string` (`stream/printer.go`). A program copies each to
+   its destination itself, and keeps the tail for the reply's end. Nothing
+   lets the standard library's composition reach the stream: `io.Copy`
+   from a reply's body, `io.MultiWriter` to a terminal and a log,
+   `bufio`, a pipe, or a CI job's output.
+2. **The decision: `stream.Writer`,** an `io.WriteCloser` and
+   `io.StringWriter` over a `Printer`:
+
+   ```go
+   func NewWriter(dst io.Writer, o ...Option) *Writer
+   func (w *Writer) Write(p []byte) (int, error)
+   func (w *Writer) WriteString(s string) (int, error)
+   func (w *Writer) Close() error
+   ```
+
+   * **Options** are `stream.Option`, passed to its `Printer`:
+     `WithMarkup`, `WithWidth`, `WithMethod`, `WithRules`,
+     `WithoutTableLayout`, and one more, `WithCRLF()`, which ends each line
+     with CR LF, for a terminal in raw mode written without an
+     `inline.Region`; the `Printer` honours it too. With no option, the
+     output is the input cleaned by `safetext.Text`, unstyled and
+     unwrapped: plain.
+   * **Each `Write`** gives its bytes to the `Printer`, and writes what is
+     now stable to `dst` in one `dst.Write`. The output is the same for any
+     split of the input, the `Printer`'s own property.
+   * **`Close`** writes what the `Printer` still holds, ending the reply,
+     and does not close `dst`, which is the program's, as `gzip.Writer`'s
+     `Close` leaves its writer open. A second `Close` returns nil; a
+     `Write` after it returns `ErrClosed`.
+   * **Errors are sticky:** once `dst` fails, every later `Write` and
+     `Close` returns that error, as `bufio.Writer`'s does. A `Write` whose
+     own `dst.Write` fails returns `len(p)`, since the `Printer` holds its
+     bytes, and the error.
+   * **Used on one goroutine,** as the `Printer` is; `io.Copy` uses one.
+   * **Over the `Printer` alone.** A `Doc` re-renders its tail, and an
+     append-only destination cannot take a line back, so the writer is the
+     line-stable form's. A program that draws a `Doc` draws it.
+3. **Extensibility, the standard library's way.** The destination is any
+   `io.Writer`, so a program tees, buffers, counts, compresses or
+   redirects the output with what Go already has; the styling is
+   `Markup`, which is data; the cleaning is `Rules`, never below the floor.
+   No new hook is added.
+4. **Q14. The type's name.** `stream.Writer` and A1's `frame.Writer`, both
+   exported, would be one name in two packages, which
+   `TestNoTypeNameMeansTwoThings` refuses unless `sharedNames` and the
+   glossary allow it, and the glossary's rule is that one name means one
+   thing. `python3 -m tools.verify names` finds `stream.Writer`,
+   `stream.LineWriter` and `frame.Output` free today, since `frame.Writer`
+   is reserved and not built.
+   * **Recommended: `stream.Writer`, and A1's `frame.Writer` becomes
+     `frame.Output`,** with `NewOutput`, `OutputOption` and
+     `OutputEvent`: what it wraps is a program's terminal output, given to
+     `tea.WithOutput`, and `stream.Writer` reads as Go's `bufio.Writer`
+     and `tabwriter.Writer` do.
+   * **`stream.LineWriter`,** keeping `frame.Writer` as A1 named it.
+   * **Both `Writer`,** each added to `sharedNames` and the glossary's
+     "Deliberate".
+5. **Defaults:** each line ends with LF (`stream.WithCRLF`); `Close`
+   leaves the destination open (decided here, the destination being the
+   program's).
+6. **Order.** It needs the `Printer` alone, which exists: a step of its
+   own, A8.1, after Step A1.1 and before Step 3.
+7. **Versioning.** An addition to `stream`, released with the root's
+   minor release of PLAN Step 8; `make apicheck` stays at 0 incompatible
+   changes.
+8. **Answered 2026-11-01** (picked from options): Q14 "stream.Writer;
+   frame's → Output (Recommended)". The writer is `stream.Writer`. A1's
+   `frame.Writer`, `NewWriter`, `WriterOption` and `WriterEvent`, and
+   A6's and A7's mentions of `Writer` (A6 items 4 and 8, A7 items 10 and
+   11), read `frame.Output`, `NewOutput`, `OutputOption` and
+   `OutputEvent`; neither is built, so nothing breaks. `python3 -m
+   tools.verify names` over the four: "names: 4 planned name(s), clean".
 
 ## More Information
 

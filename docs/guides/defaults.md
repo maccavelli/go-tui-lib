@@ -315,6 +315,48 @@ record that is not there.
 | A paragraph's line | held until the next line comes, or the reply ends | `stream.Printer.Flush` | decided (0023-MADR-line-mode-components.md A3, Q10) |
 | A table | held until a blank line or another block ends it | `stream.Printer.Flush` | decided (0023-MADR-line-mode-components.md D7, A6) |
 | A link | its text in the `Link` style and its destination in the `URL` style, no OSC 8 | `stream.Markup` | decided (0023-MADR-line-mode-components.md A6) |
+| A long run with no blank line | cut after 2 KiB, at the next line where its block may be split | `stream.WithRelaxAfter` | planned (0009-PLAN-streaming-content-engine.md Step 5) |
+| An unclosed emphasis, backtick run, strikethrough or link at a partial line's end | held back until it closes or the line ends | `stream.WithoutInlineHoldback` | planned (0009-PLAN-streaming-content-engine.md Step 5) |
+| The partial last line | shown, when no complete line is queued | `stream.WithoutPartialLine` | planned (0009-PLAN-streaming-content-engine.md Step 5) |
+| `Interpret`'s bounds | 50,000 rows, the oldest dropped past them; 8,192 columns a row | `stream.InterpretOptions` | planned (0009-PLAN-streaming-content-engine.md Step A1.1) |
+| A line's end, from a `Printer` or a `Writer` | LF | `stream.WithCRLF` | planned (0009-PLAN-streaming-content-engine.md Step A8.1) |
+| Code shown plain | over 512 KiB, 10,000 lines or 4 KiB in one line | the options Step A1.4 names | planned (0009-PLAN-streaming-content-engine.md Step A1.4) |
+| Live tool output that `Bounded` keeps | its head and tail past a byte limit, each line capped | the options Step A1.4 names | planned (0009-PLAN-streaming-content-engine.md Step A1.4) |
+
+## frame and frame/frametea
+
+| Behaviour | Default | Control | Status |
+| :--- | :--- | :--- | :--- |
+| A frame's rate | 60 a second, clamped to 1 to 120, as Bubble Tea's | `frame.WithFPS` | planned (0009-PLAN-streaming-content-engine.md Step 3) |
+| When the adaptive pacer catches up | at 8 items queued, or the oldest 120 ms old | `frame.WithCatchUpDepth`, `frame.WithCatchUpAge` | planned (0009-PLAN-streaming-content-engine.md Step 3) |
+| When it eases back | once at most 2 items and 40 ms have held for 250 ms | `frame.WithSmoothDepth`, `frame.WithSmoothAge`, `frame.WithHold` | planned (0009-PLAN-streaming-content-engine.md Step 3) |
+| Catching up again within that hold | only at 64 items, or 300 ms | `frame.WithSevereDepth`, `frame.WithSevereAge` | planned (0009-PLAN-streaming-content-engine.md Step 3) |
+| The scheduler's goroutine | one, while a frame is due, from `NewScheduler` to `Close` | `frame.Scheduler.Close` | planned (0009-PLAN-streaming-content-engine.md Step 3) |
+| Push delivery's goroutine | one for each `Forward`, until its stop or the scheduler's `Close` | `frame/frametea.Forward` | planned (0009-PLAN-streaming-content-engine.md Step 3) |
+| A coalescer's wait when no frame comes | 100 ms | `frame.NewCoalescer` | planned (0009-PLAN-streaming-content-engine.md Step A1.2) |
+| Animation ticks | 83 ms for a slow animation, one frame at 60 fps for a fast one, none when nothing animates | `frame.Ticks` | planned (0009-PLAN-streaming-content-engine.md Step A1.2) |
+| A stalled terminal | reported once after 5 s with no write completing | `frame.WithStallAfter` | planned (0009-PLAN-streaming-content-engine.md Step A1.2) |
+| An upgrade's goroutine | one for each job, cancelled when replaced and on `Close` | `frame.Upgrader.Close` | planned (0009-PLAN-streaming-content-engine.md Step A1.2) |
+
+## inputfilter and inputfilter/inputfiltertea
+
+| Behaviour | Default | Control | Status |
+| :--- | :--- | :--- | :--- |
+| Wheel notches | summed, at most one message every 16 ms | `inputfilter/inputfiltertea.WithoutWheelCoalescing`, `inputfilter/inputfiltertea.WithInterval` | planned (0009-PLAN-streaming-content-engine.md Step 4) |
+| Mouse motion | one sample every 16 ms | `inputfilter/inputfiltertea.WithoutMotionThrottle` | planned (0009-PLAN-streaming-content-engine.md Step 4) |
+| Paste-burst detection | off; when on, codex's 3 characters at most 8 ms apart, flushed after 8 ms idle, 60 ms on Windows | `inputfilter/inputfiltertea.WithPasteBurst`, `inputfilter.PasteBurstConfig` | planned (0009-PLAN-streaming-content-engine.md Step 4) |
+| The flush driver's goroutine | one, while a flush is due, until `Close` | `inputfilter.Flusher.Close` | planned (0009-PLAN-streaming-content-engine.md Step 4) |
+| The filter's drain goroutine | one for each held message, sending through the program's `Send` | `inputfilter/inputfiltertea.Filter.Attach` | planned (0009-PLAN-streaming-content-engine.md Step 4) |
+| Wheel events a notch | 1 | `inputfilter/inputfiltertea.WithWheelProfile` | planned (0009-PLAN-streaming-content-engine.md Step A1.3) |
+| Typeahead | none held, none dropped | `inputfilter.Capture`, `inputfilter.Quarantine` | planned (0009-PLAN-streaming-content-engine.md Step A1.3) |
+
+## stream/streamtea
+
+| Behaviour | Default | Control | Status |
+| :--- | :--- | :--- | :--- |
+| Following the tail | on, until the user scrolls up; again at the bottom | `stream/streamtea.WithoutFollow` | planned (0009-PLAN-streaming-content-engine.md Step 6) |
+| The pane's keys | up, down, pgup, pgdown, home and end, in the "kind:docpane" scope | `stream/streamtea.DefaultRules` | planned (0009-PLAN-streaming-content-engine.md Step 6) |
+| How queued lines are released | the adaptive pacer | `stream/streamtea.WithPacer` | planned (0009-PLAN-streaming-content-engine.md Step 6) |
 
 ## transcript
 

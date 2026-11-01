@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in-progress
 date: 2026-11-01
 associated-madr: "0009-MADR-streaming-content-engine.md"
 ---
@@ -156,8 +156,9 @@ test has passed from the proxy.
 | 1 | 1 | `docs/decisions/0009-*`, `docs/README.md`, `docs/guides/defaults.md`, `docs/glossary.md` | records, the planned defaults, the reserved names |
 | — | 2 | `safetext/`, `glyph/` | done by 0020-PLAN Step 4 |
 | 2 | A1.1 | `stream/` | `Interpret`, `InterpretOptions`, `InterpretRow` (Q13) |
+| 2a | A8.1 | `stream/` | `stream.Writer`, a plain streaming writer (MADR A8; *waits for the owner's approval*) |
 | 3 | 3 | `frame/`, `frame/frametea/`, `internal/conformance/` | the pacing core, the scheduler, and their adapter |
-| 4 | A1.2 | `frame/`, `frame/frametea/` | `Coalescer`, `Demand`, `Writer`, `Upgrader` |
+| 4 | A1.2 | `frame/`, `frame/frametea/` | `Coalescer`, `Demand`, ~~`Writer`~~ `Output` (Q14), `Upgrader` |
 | 5 | 4 | `inputfilter/`, `inputfilter/inputfiltertea/`, `internal/conformance/`, `workspace/render.go` | the wheel, motion and paste-burst cores, their driver, the filter, and `local`'s extension point |
 | 6 | A1.3 | `inputfilter/`, `inputfilter/inputfiltertea/` | A1's input stages, measured first |
 | 7 | 5 | `stream/`, `stream/streamtest/` | `Scanner` out of the `Printer`; `Doc`, `Renderer`, `Plain`, `Buffer`, `Doc.Pull`; `CheckRenderer` |
@@ -273,7 +274,7 @@ test has passed from the proxy.
     `AdaptiveOption`); a scheduler's timer goroutine, from `NewScheduler`
     to `Close` (not building one, `Scheduler.Close`); the `Coalescer`'s
     100 ms wait (`NewCoalescer`'s `maxWait`); `Demand`'s 83 ms `Slow` tick
-    (`frame.WithSlowTick`); `Writer`'s 5 s stall (`frame.WithStallAfter`);
+    ~~(`frame.WithSlowTick`)~~ (`frame.Ticks`, D1); ~~`Writer`'s~~ `Output`'s (Q14) 5 s stall (`frame.WithStallAfter`);
     `Upgrader`'s goroutine a job (`Upgrader.Close`);
   * `inputfilter`: wheel coalescing and the motion throttle on, at 16 ms
     (`inputfiltertea.WithoutWheelCoalescing`,
@@ -360,6 +361,54 @@ test has passed from the proxy.
 * **Docs:** `stream`'s package documentation; `docs/architecture.md`'s
   `stream` row.
 
+### Step A8.1: `stream.Writer`, a plain streaming writer (0009-MADR A8)
+
+*Added 2026-11-01 for 0009-MADR A8, accepted with Q14 answered:* it runs
+after Step A1.1 and before Step 3, once the owner approves this step. The
+type is `stream.Writer` (Q14).
+
+* **Facts re-read:** the `Printer`'s API (`NewPrinter`, `Write`, `Flush`)
+  and options; `TestAnySplit` and `FuzzPrinter`; `io.Writer`'s contract
+  and `testing/iotest`'s readers and writers.
+* **The API,** as A8 item 2 gives it, with `ErrClosed`, and the option
+  `WithCRLF()`, which the `Printer` honours too.
+* **Behaviour:** each `Write` and `WriteString` passes its input to the
+  `Printer` and writes what is now stable in one `dst.Write`; `Close`
+  writes the `Printer`'s `Flush`, leaves `dst` open, and makes a later
+  `Write` return `ErrClosed`; a second `Close` returns nil; a `dst` error
+  is sticky.
+* **Tests:**
+  * `io.Copy` of `testdata/reply.txt` into a `Writer` over a
+    `bytes.Buffer`, through `iotest.OneByteReader`, `iotest.HalfReader`
+    and a plain reader, gives the `Printer`'s `Write` and `Flush` output
+    byte for byte, at widths 0, 60 and 100, with and without
+    `DefaultMarkup`;
+  * with no option, the output is the input cleaned by `safetext.Text`;
+  * `WriteString` equals `Write`;
+  * `WithCRLF`: every line ends with CR LF and no LF stands alone, from the
+    `Writer` and from the `Printer`;
+  * a destination that fails after some bytes: that `Write` returns
+    `len(p)` and the error, and every later `Write` and `Close` the same
+    error;
+  * `Close` leaves a destination that counts its `Close` calls at 0; a
+    `Write` after `Close` returns `ErrClosed`; a second `Close` nil;
+  * `FuzzWriter`: any split of any input, through `Write`, equals the
+    `Printer`'s output for the whole;
+  * `ExampleWriter`: `io.Copy` of a Markdown reply from a reader.
+* **Benchmark:** `io.Copy` of `testdata/reply.txt` through the `Writer`,
+  its allocations beside `BenchmarkReplyRender`'s.
+* **Mutations:** `Write` holding stable lines back (the copy test);
+  `Close` not flushing (the copy test's tail); the error not sticky;
+  `Close` closing `dst`; `WithCRLF` ignored; a `Write` after `Close`
+  accepted.
+* **Defaults:** rows built in `stream`'s section: each line's end, LF
+  (`stream.WithCRLF`); the destination at `Close`, left open (decided,
+  0009-MADR A8).
+* **Docs:** `stream`'s package documentation; the line-mode guide's "Stream
+  a reply", a writer for plain output; `docs/architecture.md`'s `stream`
+  row; `docs/glossary.md`, Q14's names.
+* **Gates,** as rule 5.
+
 ### Step 3: `frame`, its scheduler, and `frame/frametea`
 
 * **Facts re-read:** Bubble Tea's frame-rate bounds (`renderer.go:13-14`,
@@ -422,6 +471,10 @@ test has passed from the proxy.
 
   A program re-arms `Wait` on each `FrameMsg`:
   `return m, tea.Batch(m.pane.Update(msg), frametea.Wait(m.frames))`.
+  *Added 2026-11-01 (D2):* `Forward` starts one goroutine, which reads
+  `Frames` and calls `send`, started by `WaitGroup.Go` and ended by its
+  `stop` or by the scheduler's `Close`; `stop` waits for it, and is
+  idempotent.
 * **Tests,** inside `synctest.Test`:
   * 1,000 `Request`s from 10 goroutines within one frame deliver one
     `FrameMsg`;
@@ -433,7 +486,8 @@ test has passed from the proxy.
   * `Close` closes `Frames`, a second `Close` returns nil, and no
     goroutine is left (the bubble ends);
   * `frametea.Wait` returns the frame, and nil after `Close`;
-    `Forward`'s `stop` ends delivery.
+    `Forward`'s `stop` ends delivery; *(D2)* `Forward`'s goroutine is gone
+    after `stop`, and after `Close` with no `stop`, the bubble ending.
 * **The pacer's table,** codex's transitions: CatchUp entered at depth 8
   and at age 120 ms; left only when depth ≤ 2 and age ≤ 40 ms have held
   250 ms; no re-entry within 250 ms but at depth 64 or age 300 ms; an
@@ -450,11 +504,16 @@ test has passed from the proxy.
 * **Defaults:** the `frame` rows of Step 1 that this step builds become
   `built`.
 
-### Step A1.2: `Coalescer`, `Demand`, `Writer` and `Upgrader`
+### Step A1.2: `Coalescer`, `Demand`, `Output` and `Upgrader`
+
+*Renamed 2026-11-01 (0009-MADR A8, Q14):* A1's `frame.Writer` is
+`frame.Output`, with `NewOutput`, `OutputOption` and `OutputEvent`, so
+that `stream.Writer` (Step A8.1) is the one `Writer`. This step's text
+uses the new names.
 
 * **Facts re-read:** 0003-REPORT §8.17's numbers (83 ms, 5 s, 100 ms);
   Bubble Tea's renderer writing changes only (`cursed_renderer.go:643`;
-  ultraviolet `terminal_renderer.go:111-117`), on which `Writer` rests
+  ultraviolet `terminal_renderer.go:111-117`), on which `Output` rests
   (A7 item 10).
 * **The API** (`frame` unless named):
 
@@ -467,14 +526,20 @@ test has passed from the proxy.
 
   type Demand uint8 // None, Slow, Fast: tokens "none", "slow", "fast"
   func Combine(d ...Demand) Demand // the greatest
-  func (d Demand) Interval(fps int) time.Duration // 0 for None; 83 ms for Slow; a frame for Fast
+  // Ticks is how often each demand ticks; a zero field takes its default
+  // (D1).
+  type Ticks struct {
+  	Slow time.Duration // 0: 83 ms
+  	Fast time.Duration // 0: one frame at 60 fps
+  }
+  func (t Ticks) Interval(d Demand) time.Duration // 0 for None
 
-  // Writer wraps the output a program gives tea.WithOutput. Safe for
+  // Output wraps the output a program gives tea.WithOutput. Safe for
   // concurrent use.
-  func NewWriter(w io.Writer, o ...WriterOption) *Writer // WithStallAfter(5 s)
-  func (w *Writer) Write(p []byte) (int, error)
-  func (w *Writer) Events() <-chan WriterEvent // Stalled, Resumed
-  func (w *Writer) Close() error
+  func NewOutput(w io.Writer, o ...OutputOption) *Output // WithStallAfter(5 s)
+  func (o *Output) Write(p []byte) (int, error)
+  func (o *Output) Events() <-chan OutputEvent // Stalled, Resumed
+  func (o *Output) Close() error
 
   // Upgrader runs costly renders off the event loop. Safe for concurrent use.
   func NewUpgrader[K comparable, R any]() *Upgrader[K, R]
@@ -488,10 +553,12 @@ test has passed from the proxy.
   }
   ```
 
-  `frame/frametea` adds `TickCmd(d frame.Demand, fps int) tea.Cmd`, nil
+  *Corrected 2026-11-01 (D1):* ~~`Demand.Interval(fps int)`~~ is
+  `Ticks.Interval`, above. `frame/frametea` adds ~~`TickCmd(d frame.Demand,
+  fps int) tea.Cmd`~~ `TickCmd(d frame.Demand, t frame.Ticks) tea.Cmd`, nil
   for `None`; `WaitUpgrade(u) tea.Cmd`; and `CoalesceCmd(due time.Time)
   tea.Cmd`, the tick for a `Coalescer`'s deadline.
-* **`Writer`** writes on its own goroutine; while a write is in flight it
+* **`Output`** writes on its own goroutine; while a write is in flight it
   appends later writes to one pending buffer, written whole after, and
   drops nothing (A7 item 10). `Write` returns `len(p)` and the error of an
   earlier write, if any. A write in flight longer than the stall time
@@ -503,14 +570,14 @@ test has passed from the proxy.
   after the earlier and before the later, for every interleaving of a
   generated sequence; the maximum wait applies a batch when no frame
   comes; `Combine` is the greatest; `Interval(None)` is 0 and `TickCmd`
-  nil; an idle program whose demand is `None` arms no timer; `Writer` over
+  nil; an idle program whose demand is `None` arms no timer; `Output` over
   a writer that blocks makes many draws one write, sends one `Stalled`
   after 5 s and one `Resumed`, and the bytes written equal the bytes
   given, in order; `Upgrader` replaces, cancels, drops stale results, and
   leaves no goroutine after `Close`.
 * **Mutations:** the barrier not flushing first; `TickCmd(None)` a
-  command; `Writer` dropping the pending buffer (the byte count);
-  `Writer` writing a second time while one is in flight; `Upgrader`
+  command; `Output` dropping the pending buffer (the byte count);
+  `Output` writing a second time while one is in flight; `Upgrader`
   keeping a stale result; `Upgrader` not cancelling the replaced job.
 
 ### Step 4: `inputfilter`, its driver, `inputfilter/inputfiltertea`, and the extension point
@@ -873,7 +940,8 @@ Four parts, each passing its tests before the next.
 * `make apicheck` reports 0 incompatible changes at every step.
 * `python3 -m tools.verify names` reports no clash at every step.
 * Every driver's test runs inside `testing/synctest`, and none leaves a
-  goroutine; no adapter starts one but `inputfiltertea`'s drain send.
+  goroutine; no adapter starts one but `inputfiltertea`'s drain send *and,
+  added 2026-11-01 (D2), `frametea.Forward`'s reader*.
 * The root `go.mod` has no glamour, goldmark, chroma or bluemonday line;
   `stream/glamourmd/go.mod` requires exactly the root's tag and glamour,
   with no `replace`; `go mod tidy -diff` is clean in both modules.
@@ -893,4 +961,82 @@ Four parts, each passing its tests before the next.
 
 ## Execution Record
 
-None yet.
+*2026-11-01.* The owner committed A7 and the rewritten PLAN (`7c23536`)
+and said "committed, approved to proceed".
+
+### Step 1: records, the planned defaults and the reserved names
+
+* **Deviation D1, 2026-11-01: the slow tick's control.**
+  * **Found** while naming Step 1's rows: Step 1 named
+    `frame.WithSlowTick`, and Step A1.2's API had no such option, its
+    `Demand.Interval(fps)` fixing 83 ms, so the default had no control
+    (AGENTS.md, API convention 12). The PLAN's own text, not the tree.
+  * **Resolutions offered:** a `frame.Ticks` value, its zero fields taking
+    the defaults (recommended); options on `TickCmd`; or a `decided` row
+    with no control.
+  * **Chosen by the owner,** 2026-11-01: "A frame.Ticks value
+    (Recommended)". Step A1.2's sketch and Step 1's row are corrected;
+    0009-MADR A7 item 11 is annotated. `python3 -m tools.verify names`
+    over the 41 planned names, `Ticks` among them: "names: 41 planned
+    name(s), clean". No file is added to the step.
+* **Deviation D2, 2026-11-01: `frametea.Forward`'s goroutine.**
+  * **Found** with D1: `Forward` must read `Frames` on a goroutine to call
+    `send`, and Verification allowed no adapter goroutine but
+    `inputfiltertea`'s drain send.
+  * **Resolutions offered:** keep `Forward` and list its goroutine
+    (recommended); drop it; or move it to the core.
+  * **Chosen by the owner,** 2026-11-01: "Keep Forward, list it
+    (Recommended)". Step 3's adapter and tests, Verification, and Step
+    1's rows say so. No file is added to the step.
+* **A new requirement, 2026-11-01,** during this step: the owner's "we
+  need a plain streaming wrapper to enhance extensibility and
+  flexibility", then "An io.Writer around the stream (Recommended)" and,
+  for Q14, "stream.Writer; frame's → Output (Recommended)". 0009-MADR A8
+  records it, accepted; Step A8.1 is added, after Step A1.1, and waits
+  for the owner's approval; Step A1.2 is renamed for Q14. This step's
+  records carry them: A8, Step A8.1, the `stream.WithCRLF` row, and the
+  reserved names. No source changes.
+
+**What changed:**
+
+* This PLAN `in-progress`; `docs/README.md`'s rows for the MADR (A6 to A8
+  accepted) and the PLAN (in progress, Step 1).
+* `docs/guides/defaults.md`: seven rows added to `stream`'s section,
+  three for Step 5, one each for Steps A1.1 and A8.1, and two for Step
+  A1.4's limits, whose options that step names; and three sections, `frame and frame/frametea`
+  (10 rows), `inputfilter and inputfilter/inputfiltertea` (7) and
+  `stream/streamtea` (3). Every row is `planned`, citing this PLAN and
+  its step.
+* `docs/glossary.md`, "Names the planned records must not take": the
+  names A6 to A8 and D1 reserve, and why `safetext.Row` is not one.
+* 0009-MADR: A7 item 11 annotated (D1); A8 and its answer.
+
+**Checks:**
+
+* `TestDefaultsInventory` passes with the new rows. Two mutations, on
+  scratch copies, show it reads them:
+  * a `frame` row marked `built`: "docs/guides/defaults.md:329 (A frame's
+    rate): built, but no package frame: no required module provides
+    package github.com/maccavelli/go-tui-lib/v2/frame";
+  * a `stream/streamtea` row citing a PLAN that does not exist:
+    "docs/guides/defaults.md:358 (How queued lines are released): planned
+    by 0009-PLAN-streaming-engine.md, which does not exist".
+
+  `mutate: 2 killed, 0 survived, 0 errors`.
+* `python3 -m tools.verify names` over the PLAN's planned types with
+  `Ticks` (41) and over A8's four: clean.
+* `make markdownlint check-records docs-check disclosure-check`: clean;
+  the identifier scan: clean.
+* **Gates,** `python3 -m tools.verify gates` with the step's five files,
+  over the records as this step leaves them, A8 included:
+
+  | Host | `gates` |
+  | :--- | :--- |
+  | macOS | 21 passed, 0 failed, 1 skipped (`gofmt`, no Go files) in 848 s |
+  | `remote linux` | 21 passed, 0 failed, 1 skipped (`gofmt`) in 1214 s |
+  | `remote windows` | 21 passed, 0 failed, 1 skipped (`gofmt`) in 2608 s |
+
+  A first run on macOS and Linux, before A8 was written, passed the same;
+  the first Windows run was stopped for the rerun above.
+* **Step 1 complete, 2026-11-01,** for the owner's commit. Step A1.1 is
+  next; Step A8.1, after it, waits for the owner's approval.
