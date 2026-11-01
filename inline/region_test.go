@@ -2,6 +2,7 @@ package inline_test
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -217,6 +218,82 @@ func TestPrint(t *testing.T) {
 	empty := newHost(t, 30, 4, ansi.WcWidth)
 	empty.write(empty.r.Print("only text"))
 	empty.wantLines("a print with nothing drawn", "only text")
+}
+
+// TestPrintFoldsUpdate: a text that holds its own synchronized updates is
+// written inside the region's, its mode 2026 sequences dropped: one update,
+// or under WithSynchronized(false) none, with rows drawn, with none, and in
+// the redraw after an awaited report; the screen the same in each
+// (0023-MADR A14 item 3).
+func TestPrintFoldsUpdate(t *testing.T) {
+	const text = "\x1b[?2026hone\r\ntwo\r\n\x1b[?2026l\x1b[?2026hthree\x1b[?2026l"
+	for _, sync := range []bool{true, false} {
+		for _, c := range []struct {
+			name  string
+			print func(h *host) string
+			want  []string
+		}{
+			{"rows drawn", func(h *host) string {
+				h.write(h.r.Draw([]string{"> ab"}, 0, 4))
+				return h.r.Print(text)
+			}, []string{"one", "two", "three", "> ab"}},
+			{"nothing drawn", func(h *host) string { return h.r.Print(text) }, []string{"one", "two", "three"}},
+			{"a report awaited", func(h *host) string {
+				h.write(h.r.Draw([]string{"> ab"}, 0, 4))
+				h.write(h.r.Resize(10, h.now))
+				h.scr.Resize(10, inline.ReflowDown)
+				if out := h.r.Print(text); out != "" {
+					t.Fatalf("a print while the report is awaited wrote %q", out)
+				}
+				var out string
+				for _, in := range h.dec.Flush(h.dec.Decode(h.replies, nil)) {
+					if b, ok := h.r.HandleInput(in, h.now); ok {
+						out += b
+					}
+				}
+				return out
+			}, []string{"one", "two", "three", "> ab"}},
+		} {
+			h := newHost(t, 20, 6, ansi.WcWidth, inline.WithSynchronized(sync))
+			out := c.print(h)
+			on, off := strings.Count(out, "\x1b[?2026h"), strings.Count(out, "\x1b[?2026l")
+			if sync && (on != 1 || off != 1 || !strings.HasPrefix(out, "\x1b[?2026h") || !strings.HasSuffix(out, "\x1b[?2026l")) {
+				t.Errorf("%s: %q; want one synchronized update, from the first byte to the last", c.name, out)
+			}
+			if !sync && on+off != 0 {
+				t.Errorf("%s, unsynchronized: %q; want no mode 2026", c.name, out)
+			}
+			h.write(out)
+			h.wantLines(c.name, c.want...)
+			if h.scr.Synchronized {
+				t.Errorf("%s: mode 2026 left on", c.name)
+			}
+		}
+	}
+}
+
+// TestPrintHome: a text that ends with the cursor home is at a line's start,
+// and gets no line end: the region is drawn on the row the text leaves the
+// cursor on. One that ends with a line end after it keeps it
+// (0023-MADR A14 item 4).
+func TestPrintHome(t *testing.T) {
+	for _, c := range []struct {
+		text string
+		want []string
+	}{
+		{"\x1b[2J\x1b[H", []string{"> ab"}},
+		{"\x1b[2J\x1b[Hfirst\n", []string{"first", "> ab"}},
+		{"\x1b[2J\x1b[H\n", []string{"", "> ab"}},
+	} {
+		h := newHost(t, 20, 6, ansi.WcWidth)
+		h.write("old\r\nrows\r\n")
+		h.write(h.r.Draw([]string{"> ab"}, 0, 4))
+		h.write(h.r.Print(c.text))
+		h.wantLines(strconv.Quote(c.text), c.want...)
+		if row := len(c.want) - 1; h.scr.Row != row || h.scr.Col != 4 {
+			t.Errorf("%q: the cursor is at %d,%d; want %d,4", c.text, h.scr.Row, h.scr.Col, row)
+		}
+	}
 }
 
 // TestCommit: the rows stay in the scrollback, whole, the cursor below

@@ -80,6 +80,12 @@ func (t *Transcript) AddDrawn(f func(width int) string) {
 
 // AddReply keeps p, a reply, drawn again from its cleaned source by p.At at
 // each reprint's width. Its size is its source's, as the reply grows.
+//
+// From then on p is part of the Transcript's state: each Add reads every
+// kept reply's Source, and a reprint calls At. So every call on p, Write,
+// Flush and SetWidth among them, is serialized with the Transcript's own
+// calls, on its goroutine or under the host's lock
+// (docs/decisions/0023-MADR-line-mode-components.md A14 item 7).
 func (t *Transcript) AddReply(p *stream.Printer) {
 	if p != nil {
 		t.add(piece{reply: p})
@@ -164,13 +170,32 @@ func (t *Transcript) HandleTimeout(now time.Time, idle bool) string {
 		return ""
 	}
 	t.pending = false
-	return t.reprint()
+	return t.redraw()
 }
 
-// reprint is SGR 0, then the clear and the pieces at the width, as one
-// synchronized update, after the notice when anything was left out
-// (D9, A3 item 15).
-func (t *Transcript) reprint() string {
+// Reprint gives the reprint on demand, for a host's redraw key or command:
+// idle, the reprint now at the last Resize's width, the bytes HandleTimeout
+// would give, ending a settle in progress so that no second follows. Not
+// idle, it gives "" and ends the settle, and the reprint is due at the next
+// HandleTimeout with idle true: a reply's Printer still holding a line
+// would print it again after a reprint that drew it. Before the first
+// Resize it gives "" and changes nothing
+// (docs/decisions/0023-MADR-line-mode-components.md A14 item 6).
+func (t *Transcript) Reprint(idle bool) string {
+	if t.width == 0 {
+		return ""
+	}
+	t.settling, t.pending = false, !idle
+	if !idle {
+		return ""
+	}
+	return t.redraw()
+}
+
+// redraw is the reprint: SGR 0, then the clear and the pieces at the
+// width, as one synchronized update, after the notice when anything was
+// left out (D9, A3 item 15).
+func (t *Transcript) redraw() string {
 	t.trim()
 	text, cut := t.render(t.width)
 	var b strings.Builder

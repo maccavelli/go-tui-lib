@@ -64,11 +64,11 @@ func (h *host) resize(cols int, now time.Time) {
 }
 
 // idle reprints the conversation once a resize has settled, when the
-// reply holds nothing back.
+// reply holds nothing back, with the composer below it, as one update.
 func (h *host) idle(now time.Time) {
 	idle := h.reply == nil || h.reply.Idle()
 	if out := h.tr.HandleTimeout(now, idle); out != "" {
-		h.write(h.region.Clear() + out + h.region.Draw(h.c.View(h.cols)))
+		h.write(h.region.Print(out))
 	}
 }
 

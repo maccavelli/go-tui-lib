@@ -23,6 +23,7 @@ const (
 	eraseBelow  = "\x1b[J"
 	eraseRight  = "\x1b[K"
 	resetStyle  = "\x1b[m"
+	cursorHome  = "\x1b[H"
 )
 
 // Region is the rows a component draws below the terminal's scrollback,
@@ -118,11 +119,17 @@ func (r *Region) paintWrapped(prefix string) string {
 
 // Print returns the bytes that write text above the region and draw the
 // region again below it, as x/term's Terminal.Write does: a streaming
-// reply prints above a composer so. Its line ends are written as CRLF, and
-// it ends on a line of its own. While a resize waits for the cursor
-// report, the text waits too, and the report's redraw writes it.
+// reply prints above a composer so. The text may instead clear the screen
+// and send the cursor home, as a transcript's reprint does; the region is
+// drawn again where the text leaves the cursor. Its line ends are written
+// as CRLF, and it ends on a line of its own, unless it ends with the
+// cursor home (CSI H). The text is written inside the region's own update,
+// so its mode 2026 sequences are dropped: whether it is synchronized is
+// WithSynchronized's alone (docs/decisions/0023-MADR-line-mode-components.md
+// A14). While a resize waits for the cursor report, the text waits too,
+// after any held before it, and the report's redraw writes them in order.
 func (r *Region) Print(text string) string {
-	t := lines(text)
+	t := lines(strings.ReplaceAll(strings.ReplaceAll(text, syncOn, ""), syncOff, ""))
 	if r.awaiting {
 		r.held = append(r.held, t)
 		return ""
@@ -481,17 +488,20 @@ func (r *Region) wrap(s string) string {
 }
 
 // lines is text with its line ends written as CRLF, ending on a line of
-// its own, and its styles reset when it holds any.
+// its own unless it ends with the cursor home, at a line's start already,
+// and its styles reset when it holds any.
 func lines(text string) string {
 	if text == "" {
 		return ""
 	}
 	t := strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\n", "\r\n")
+	end := "\r\n"
+	if strings.HasSuffix(t, cursorHome) {
+		end = ""
+	}
+	t = strings.TrimSuffix(t, "\r\n")
 	if styled(t) {
-		t = strings.TrimSuffix(t, "\r\n") + resetStyle + "\r\n"
+		t += resetStyle
 	}
-	if !strings.HasSuffix(t, "\r\n") {
-		t += "\r\n"
-	}
-	return t
+	return t + end
 }

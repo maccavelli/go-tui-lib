@@ -328,14 +328,14 @@ record that is not there.
 | The reprint as one synchronized update | mode 2026 set and reset | `transcript.WithSynchronized` | built |
 | How `AddText`'s text and the notice are cleaned | `safetext.Text`, never less | `transcript.WithRules` | built |
 | The notice when a reprint left output out | "(earlier output is not shown again)", unstyled | `transcript.WithCatalog`, `transcript.Messages`, `transcript.WithNoticeStyle` | built |
-| When a reprint is made | once the last resize has settled and the host says its output is idle | `transcript.Transcript.HandleTimeout` | decided (0023-MADR-line-mode-components.md D9, A8) |
+| When a reprint is made | once the last resize has settled and the host says its output is idle, or when the host asks | `transcript.Transcript.HandleTimeout`, `transcript.Transcript.Reprint` | decided (0023-MADR-line-mode-components.md D9, A8) |
 
 ## inline and inline/inlinetest
 
 | Behaviour | Default | Control | Status |
 | :--- | :--- | :--- | :--- |
 | How text is measured | `ansi.WcWidth` | `inline.WithMethod` | built |
-| Each drawing one synchronized update, the cursor hidden | on | `inline.WithSynchronized` | built |
+| Each drawing one synchronized update, the cursor hidden, a `Print`'s text inside it, its own mode 2026 sequences dropped | on | `inline.WithSynchronized` | built |
 | A cursor query on a resize | `CSI 6 n` sent | `inline.WithoutCursorQuery` | built |
 | The wait for the cursor report | 150 ms | `inline.WithReportWait`, `inline.DefaultReportWait` | built |
 | How the terminal re-wraps, when the report does not say | a re-wrap | `inline.WithReflow` | built |

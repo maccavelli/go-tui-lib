@@ -209,7 +209,11 @@ func session() ([]string, error) {
 - **Text above the live rows** goes through `region.Print(text)`: it clears
   the region, writes the text, and draws the region again below it, so a
   reply streams above the line being typed with no lock, both on the
-  host's loop. Its line breaks are written as CR LF.
+  host's loop. Its line breaks are written as CR LF. The text and the
+  region are one synchronized update: the region drops the text's own
+  mode 2026 sequences, so `WithSynchronized` alone decides. The text may
+  clear the screen and send the cursor home, as a transcript's reprint
+  does, and the region is drawn below wherever it leaves the cursor.
 - **A resize follows the terminal's re-wrap.** On `Resize` the region asks
   where the cursor is (`CSI 6 n`) and takes the report out of the input
   that reaches the component's `HandleInput`. With no report within
@@ -401,6 +405,9 @@ new width:
 - `HandleTimeout(now, idle)` gives the reprint once the settle has passed
   and the host says its output is idle, at a line's start with nothing
   held; until then it gives "". Call it at each idle point.
+- `Reprint(idle)` gives the reprint on demand, for a redraw key or
+  command. Not idle, it gives "" and the next idle `HandleTimeout` gives
+  it, since a reply's held line would otherwise print twice.
 
 This is the host's side of it, on the loop's goroutine, as
 `ExampleTranscript` runs it on a test screen:
@@ -455,19 +462,30 @@ func (h *host) resize(cols int, now time.Time) {
 }
 
 // idle reprints the conversation once a resize has settled, when the
-// reply holds nothing back.
+// reply holds nothing back, with the composer below it, as one update.
 func (h *host) idle(now time.Time) {
     idle := h.reply == nil || h.reply.Idle()
     if out := h.tr.HandleTimeout(now, idle); out != "" {
-        h.write(h.region.Clear() + out + h.region.Draw(h.c.View(h.cols)))
+        h.write(h.region.Print(out))
     }
 }
 ```
 
 - **Drain the Composer's events before writing your own bytes,** so they
   reach the terminal in order.
-- **Around the reprint,** the region is removed with `Clear` and drawn
-  again with `Draw`, from the Composer's `View`.
+- **Write the reprint with `region.Print`,** at the prompt and mid-turn
+  alike: the reprint and the region drawn below it are one synchronized
+  update, so the prompt never leaves the screen. While the region waits
+  for its cursor report, the reprint waits with it, and the report's
+  redraw writes it. Before `v2.9.0`, the recipe was
+  `region.Clear() + out + region.Draw(…)`; it still draws the same screen,
+  in three frames.
+- **A redraw key.** `lineedit`'s `WithClearScreen` is off by default; a
+  host that keeps a transcript reads its own key and writes
+  `region.Print(tr.Reprint(idle))`.
+- **A kept reply is the transcript's state.** `AddReply`'s Printer is read
+  by every `Add…` and by each reprint, so its `Write`, `Flush` and
+  `SetWidth` are on the transcript's goroutine, or under your lock.
 - **The reprint clears the scrollback** (`CSI 3 J`), and with it what came
   before the program: that is the price of rows that line up.
   `WithoutScrollbackClear` keeps the scrollback, and the old rows in it at

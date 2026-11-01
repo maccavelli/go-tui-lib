@@ -31,9 +31,15 @@
 // and the old rows in it. kitty clears the scrollback on CSI 3 J though its
 // terminfo leaves E3 out, and iTerm2 may ask the user first.
 //
-// Before writing the reprint, a host removes its inline.Region with Clear,
-// and after it draws the region again. A Transcript does no I/O and is used
-// on one goroutine.
+// Reprint gives the reprint on demand, for a host's redraw key or command;
+// idle false defers it to the next idle HandleTimeout.
+//
+// A host with an inline.Region writes the reprint with the region's Print,
+// at the prompt and mid-turn alike: Print writes it inside the region's own
+// update, drawing the region again below it, as one synchronized update
+// (docs/decisions/0023-MADR-line-mode-components.md A14). A host with no
+// region writes it as it is. A Transcript does no I/O and is used on one
+// goroutine, with the Printers AddReply keeps.
 //
 // The package links no Charm module but x/ansi.
 //

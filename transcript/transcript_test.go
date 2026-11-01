@@ -5,6 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/x/ansi"
+
+	"github.com/maccavelli/go-tui-lib/v2/inline/inlinetest"
 	"github.com/maccavelli/go-tui-lib/v2/msgcat"
 	"github.com/maccavelli/go-tui-lib/v2/safetext"
 	"github.com/maccavelli/go-tui-lib/v2/stream"
@@ -251,6 +254,80 @@ func TestSettle(t *testing.T) {
 	}
 	if got := tr.HandleTimeout(t0.Add(2*time.Second), true); got != "" {
 		t.Fatalf("a second reprint for one settled resize: %q", got)
+	}
+}
+
+// TestReprintOnDemand: Reprint gives, idle, the reprint now, the bytes a
+// settled HandleTimeout gives, and ends a settle; not idle, it gives "" and
+// the next idle HandleTimeout gives the reprint, so that a line a reply's
+// Printer holds shows once; before the first Resize, "" (0023-MADR A14 item
+// 6).
+func TestReprintOnDemand(t *testing.T) {
+	pieces := func() *transcript.Transcript {
+		tr := transcript.NewTranscript()
+		tr.AddText("x\n")
+		p := stream.NewPrinter(stream.WithWidth(80))
+		p.Write("a reply long enough to be wrapped at twenty columns\n")
+		p.Flush()
+		tr.AddReply(p)
+		return tr
+	}
+	tr := pieces()
+	if got := tr.Reprint(true); got != "" {
+		t.Fatalf("before the first Resize: %q", got)
+	}
+	tr.Resize(20, t0)
+	if got, want := tr.Reprint(true), reprint(t, pieces(), 20); got != want {
+		t.Fatalf("idle: %q; want what a settled HandleTimeout gives, %q", got, want)
+	}
+
+	tr.Resize(40, t0)
+	if _, ok := tr.Timeout(); !ok {
+		t.Fatal("no settle after a resize")
+	}
+	if got := body(t, tr.Reprint(true)); !strings.Contains(got, "a reply long enough to be wrapped at\n") {
+		t.Fatalf("during the settle, not at the new width: %q", got)
+	}
+	if _, ok := tr.Timeout(); ok {
+		t.Fatal("a deadline after Reprint ended the settle")
+	}
+	if got := tr.HandleTimeout(t0.Add(time.Hour), true); got != "" {
+		t.Fatalf("a second reprint after Reprint: %q", got)
+	}
+
+	tr.Resize(30, t0)
+	if got := tr.Reprint(false); got != "" {
+		t.Fatalf("not idle: %q", got)
+	}
+	if _, ok := tr.Timeout(); ok {
+		t.Fatal("a deadline while the reprint waits for idle")
+	}
+	if got := tr.HandleTimeout(t0, true); got == "" {
+		t.Fatal("no reprint at the next idle HandleTimeout")
+	}
+	if got := tr.HandleTimeout(t0.Add(time.Hour), true); got != "" {
+		t.Fatalf("a second reprint: %q", got)
+	}
+
+	scr := inlinetest.NewScreen(40, 10, ansi.WcWidth)
+	scr.Cooked = true
+	write := func(s string) { _, _ = scr.Write([]byte(s)) }
+	tr = transcript.NewTranscript()
+	tr.Resize(40, t0)
+	p := stream.NewPrinter(stream.WithWidth(40))
+	tr.AddReply(p)
+	write(p.Write("a first line\na line held back\n"))
+	write(tr.Reprint(p.Idle()))
+	write(p.Flush())
+	write(tr.HandleTimeout(t0, p.Idle()))
+	shown := 0
+	for _, l := range scr.Lines() {
+		if strings.TrimRight(l, " ") == "a line held back" {
+			shown++
+		}
+	}
+	if shown != 1 {
+		t.Fatalf("the held line shown %d times; want once:\n%s", shown, scr.Text())
 	}
 }
 

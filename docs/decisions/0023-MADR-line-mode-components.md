@@ -2036,7 +2036,9 @@ starting with U+0600 draws "❯" instead of "❯ \u0600"".
 
 ### A14 (2026-11-01): a reprint and a drawn region in one update, a reprint on demand, and a kept Printer (issue #14)
 
-*Status: proposed (2026-11-01),* for issue #14, filed for gobble-cli's
+*Status: accepted (2026-11-01),* the owner's "committed, proceed", after
+the records were committed (`ad6210e`). Proposed the same day, for issue
+#14, filed for gobble-cli's
 `0035-PLAN-pin-current-sibling-releases-and-remove-gobble-copies.md` P18
 (its deviation 13), after the owner's "proceed with #14, determine the
 best, most idiomatic API shape for this based on the current codebase

@@ -2,6 +2,7 @@ package transcript_test
 
 import (
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/maccavelli/go-tui-lib/v2/inline"
 	"github.com/maccavelli/go-tui-lib/v2/inline/inlinetest"
 	"github.com/maccavelli/go-tui-lib/v2/stream"
+	"github.com/maccavelli/go-tui-lib/v2/termkey"
 	"github.com/maccavelli/go-tui-lib/v2/transcript"
 	"github.com/maccavelli/go-tui-lib/v2/tuitest"
 )
@@ -133,5 +135,208 @@ func TestHostReprint(t *testing.T) {
 		if ansi.WcWidth.StringWidth(l) > 40 {
 			t.Errorf("row %q is wider than 40", l)
 		}
+	}
+}
+
+// conversation is TestHostReprint's state, a reply streamed above a one-row
+// region and ended, the screen narrowed from 60 columns to 40, as frames
+// writes the due reprint.
+type conversation struct {
+	t      *testing.T
+	scr    *inlinetest.Screen
+	region *inline.Region
+	tr     *transcript.Transcript
+	due    time.Time
+	dec    termkey.Decoder
+	asked  []byte // what the screen answered
+}
+
+// reprinted is the screen a due reprint leaves, the prompt at its end.
+var reprinted = []string{
+	"> explain the reprint",
+	"The transcript keeps every piece the",
+	"program has shown, and draws it again at",
+	"the new width once resizing settles.",
+	"",
+	"It clears the scrollback so the rows",
+	"line up.",
+	">",
+}
+
+func newConversation(t *testing.T, ro []inline.Option, to ...transcript.Option) *conversation {
+	t.Helper()
+	c := &conversation{t: t, scr: inlinetest.NewScreen(60, 12, ansi.WcWidth)}
+	c.scr.Answer = func(reply string) { c.asked = append(c.asked, reply...) }
+	c.region = inline.NewRegion(append([]inline.Option{inline.WithReportWait(time.Hour)}, ro...)...)
+	c.tr = transcript.NewTranscript(to...)
+	now := t0
+	c.write(c.region.Resize(60, now))
+	c.tr.Resize(60, now)
+	prompt := []string{"> "}
+	c.write(c.region.Draw(prompt, 0, 2))
+	c.tr.AddText("> explain the reprint\n")
+	c.write(c.region.Print("> explain the reprint\n"))
+	c.write(c.region.Draw(prompt, 0, 2))
+	p := stream.NewPrinter(stream.WithWidth(60))
+	c.tr.AddReply(p)
+	for _, chunk := range []string{"The transcript keeps every piece the program has shown, ", "and draws it again at the new width once resizing settles.\n", "\nIt clears the scrollback ", "so the rows line up.\n"} {
+		if out := p.Write(chunk); out != "" {
+			c.write(c.region.Print(out))
+			c.write(c.region.Draw(prompt, 0, 2))
+		}
+	}
+	c.write(c.region.Print(p.Flush()))
+	c.write(c.region.Draw(prompt, 0, 2))
+	now = now.Add(time.Second)
+	c.scr.Resize(40, inline.ReflowDown)
+	c.write(c.region.Resize(40, now))
+	c.tr.Resize(40, now)
+	p.SetWidth(40)
+	c.due, _ = c.tr.Timeout()
+	return c
+}
+
+func (c *conversation) write(s string) { _, _ = c.scr.Write([]byte(s)) }
+
+// reprint is the due reprint.
+func (c *conversation) reprint() string {
+	c.t.Helper()
+	out := c.tr.HandleTimeout(c.due, true)
+	if out == "" {
+		c.t.Fatal("no reprint once the resize settled with the host idle")
+	}
+	return out
+}
+
+// answered gives the region what the screen answered, and the redraw.
+func (c *conversation) answered() string {
+	var out string
+	for _, in := range c.dec.Flush(c.dec.Decode(c.asked, nil)) {
+		if b, ok := c.region.HandleInput(in, c.due); ok {
+			out += b
+		}
+	}
+	c.asked = nil
+	return out
+}
+
+// frames writes out a frame at a time, split after each ESU (CSI ? 2026 l),
+// where a terminal presents what the update drew, and wants the screen at
+// every frame's end to be want, the cursor at row and col.
+func (c *conversation) frames(what, out string, want []string, row, col int) {
+	c.t.Helper()
+	for i, rest := 0, out; rest != ""; i++ {
+		f := rest
+		if n := strings.Index(rest, "\x1b[?2026l"); n >= 0 {
+			f = rest[:n+len("\x1b[?2026l")]
+		}
+		rest = rest[len(f):]
+		c.write(f)
+		var got []string
+		for _, l := range c.scr.Lines() {
+			got = append(got, strings.TrimRight(l, " "))
+		}
+		for len(got) > 0 && got[len(got)-1] == "" {
+			got = got[:len(got)-1]
+		}
+		if !slices.Equal(got, want) || c.scr.Row != row || c.scr.Col != col {
+			c.t.Fatalf("%s, frame %d: the screen is\n%q\nthe cursor at %d,%d; want\n%q\nat %d,%d", what, i+1, got, c.scr.Row, c.scr.Col, want, row, col)
+		}
+	}
+}
+
+// updates wants out to be one synchronized update, from its first byte to
+// its last, or with sync false to hold no mode 2026 sequence.
+func updates(t *testing.T, what, out string, sync bool) {
+	t.Helper()
+	on, off := strings.Count(out, "\x1b[?2026h"), strings.Count(out, "\x1b[?2026l")
+	if sync && (on != 1 || off != 1 || !strings.HasPrefix(out, "\x1b[?2026h") || !strings.HasSuffix(out, "\x1b[?2026l")) {
+		t.Errorf("%s: %d BSU, %d ESU in %q; want one synchronized update, first to last", what, on, off, out)
+	}
+	if !sync && on+off != 0 {
+		t.Errorf("%s: %d BSU, %d ESU; want none", what, on, off)
+	}
+}
+
+// TestHostReprintFrames: issue #14. A host writes the due reprint with its
+// region's Print, from a Transcript with its defaults, and every frame the
+// terminal presents shows the reprint with the prompt below it: one
+// synchronized update at the prompt, and mid-turn with no region drawn; the
+// region redraws in place and prints above itself after it, through a
+// narrowing and a widening; while the region awaits its cursor report the
+// reprint waits for the report's redraw; and under either WithSynchronized
+// (false) the screen is the same (0023-MADR A14).
+func TestHostReprintFrames(t *testing.T) {
+	t.Run("at the prompt", func(t *testing.T) {
+		c := newConversation(t, []inline.Option{inline.WithoutCursorQuery()})
+		out := c.region.Print(c.reprint())
+		updates(t, "the reprint and the region", out, true)
+		c.frames("the reprint and the region", out, reprinted, 7, 2)
+
+		c.write(c.region.Draw([]string{"> ab"}, 0, 4))
+		c.write(c.region.Print("printed above\n"))
+		c.write(c.region.Draw([]string{"> ab"}, 0, 4))
+		now := c.due.Add(time.Second)
+		c.scr.Resize(30, inline.ReflowDown)
+		c.write(c.region.Resize(30, now))
+		c.write(c.region.Draw([]string{"> abc"}, 0, 5))
+		c.scr.Resize(50, inline.ReflowDown)
+		c.write(c.region.Resize(50, now.Add(time.Second)))
+		c.write(c.region.Print("after widening\n"))
+		c.write(c.region.Draw([]string{"> abcd"}, 0, 6))
+		var rows []string
+		for _, l := range c.scr.Lines() {
+			if l = strings.TrimRight(l, " "); l != "" {
+				rows = append(rows, l)
+			}
+		}
+		if n := len(rows); n < 3 || !slices.Equal(rows[n-3:], []string{"printed above", "after widening", "> abcd"}) {
+			t.Fatalf("after a narrowing and a widening, the rows are %q", rows)
+		}
+		if prompts := slices.IndexFunc(rows, func(l string) bool { return strings.HasPrefix(l, "> ab") }); prompts != len(rows)-1 {
+			t.Fatalf("a prompt row left above the region: %q", rows)
+		}
+		if c.scr.Col != 6 {
+			t.Fatalf("the cursor is at column %d; want 6", c.scr.Col)
+		}
+	})
+
+	t.Run("mid-turn", func(t *testing.T) {
+		c := newConversation(t, []inline.Option{inline.WithoutCursorQuery()})
+		direct := c.reprint()
+		if !strings.HasPrefix(direct, "\x1b[0m\x1b[?2026h") || !strings.HasSuffix(direct, "\x1b[?2026l") {
+			t.Fatalf("the Transcript's own reprint is not synchronized: %q", direct)
+		}
+		c.write(c.region.Clear())
+		out := c.region.Print(direct)
+		updates(t, "the reprint, no region drawn", out, true)
+		c.frames("the reprint, no region drawn", out, reprinted[:len(reprinted)-1], 7, 0)
+	})
+
+	t.Run("the report awaited", func(t *testing.T) {
+		c := newConversation(t, nil)
+		if out := c.region.Print(c.reprint()); out != "" {
+			t.Fatalf("a reprint while the report is awaited wrote %q", out)
+		}
+		out := c.answered()
+		updates(t, "the report's redraw", out, true)
+		c.frames("the report's redraw", out, reprinted, 7, 2)
+	})
+
+	for _, u := range []struct {
+		name string
+		ro   []inline.Option
+		to   []transcript.Option
+		sync bool
+	}{
+		{"the region unsynchronized", []inline.Option{inline.WithoutCursorQuery(), inline.WithSynchronized(false)}, nil, false},
+		{"the transcript unsynchronized", []inline.Option{inline.WithoutCursorQuery()}, []transcript.Option{transcript.WithSynchronized(false)}, true},
+	} {
+		t.Run(u.name, func(t *testing.T) {
+			c := newConversation(t, u.ro, u.to...)
+			out := c.region.Print(c.reprint())
+			updates(t, u.name, out, u.sync)
+			c.frames(u.name, out, reprinted, 7, 2)
+		})
 	}
 }

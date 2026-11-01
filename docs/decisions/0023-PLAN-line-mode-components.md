@@ -48,7 +48,7 @@ code's at `5fb6928`; a step that relies on one cites it.
 | 7b | `scripts/go-examples.py`, `scripts/go-precheck.py` and their tests, `testdata/frameworks/`, the examples of `ask/`, `lineedit/` and `transcript/`, `docs/`, `AGENTS.md` | the line-mode guide's excerpts held to the examples (0023-MADR A11) | none |
 | 7c | `internal/sanitize/`, `internal/lineinput/`, `lineedit/`, `inline/`, `safetext/clean.go`, `keymap/`, `docs/`; *approved 2026-10-30* | a key's cost, issue #13 (0023-MADR A12) | the next minor, `v2.7.0` |
 | 7d | `inline/inlinetest/`, `pick/testdata/fuzz/`, `docs/`, `README.md`; *approved 2026-10-31* | the test screen's lines keep a cluster that ends in a space (0023-MADR A13) | a patch, `v2.7.1` |
-| 7e | `inline/`, `transcript/`, `docs/`, `README.md`; *proposed 2026-11-01* | a reprint and a drawn region in one update, a reprint on demand, a kept Printer (issue #14, 0023-MADR A14) | the next minor, `v2.9.0` |
+| 7e | `inline/`, `transcript/`, `docs/`, `README.md`; *approved 2026-11-01* | a reprint and a drawn region in one update, a reprint on demand, a kept Printer (issue #14, 0023-MADR A14) | the next minor, `v2.9.0` |
 
 Each step's package joins `cores` and the `charmfree` files in the commit
 that builds it; the `<pkg>tea` packages are not cores. Each step adds its
@@ -653,9 +653,9 @@ removed or retyped.
 
 ### Step 7e: a reprint and a drawn region in one update (issue #14)
 
-*Added 2026-11-01, for 0023-MADR A14, proposed:* it waits for the owner's
-approval of A14 and this step. One exported name is added,
-`Transcript.Reprint`.
+*Added 2026-11-01, for 0023-MADR A14, and approved the same day:*
+"committed, proceed", after the records were committed (`ad6210e`). One
+exported name is added, `Transcript.Reprint`.
 
 * **Facts re-read** at the tree the step starts on, each a deviation if
   changed: `inline/region.go`'s `Print`, `lines` and `wrap`;
@@ -699,10 +699,14 @@ approval of A14 and this step. One exported name is added,
     `HandleTimeout(now, true)` gives the reprint; a held reply line shown
     once on a screen.
   * `inline/bytes_test.go`, `FuzzRegionBytes`: `Print` is held to v2.6.2's
-    region on the text with its mode 2026 sequences dropped. An op whose
+    region on the text with its mode 2026 sequences dropped. ~~An op whose
     text, so dropped, ends with `CSI H` has its bytes held by
-    `TestPrintHome` instead, and the ops after it are compared as before.
-    A seed whose text holds BSU and ESU.
+    `TestPrintHome` instead, and the ops after it are compared as before.~~
+    *Corrected 2026-11-01 (D32):* a print whose text, so dropped, ends
+    with `CSI H` records v2.6.2's line-wrapped text and A14's; wherever
+    the first comes out, in that op or a later one, `want` takes the second
+    in its place, in order, and every op is compared byte for byte. A seed
+    whose text holds BSU and ESU, and D32's input.
   * Every existing test, golden and example passes unchanged.
   * `FuzzRegion`, `FuzzRegionBytes` and `transcript`'s fuzz target run 5
     minutes each.
@@ -759,8 +763,8 @@ approval of A14 and this step. One exported name is added,
   patch, `v2.6.1`, after Step 6a. *Added 2026-10-29 (D28):* and a patch,
   `v2.6.2`, after Step 7a. *Added 2026-10-30 (A11):* Step 7b releases
   nothing. *Added 2026-10-31 (A12, A13):* a minor, `v2.7.0`, after Step
-  7c, and a patch, `v2.7.1`, after Step 7d. *Added 2026-11-01 (A14),
-  proposed:* a minor, `v2.9.0`, after Step 7e.
+  7c, and a patch, `v2.7.1`, after Step 7d. *Added 2026-11-01 (A14):* a
+  minor, `v2.9.0`, after Step 7e.
 * **Rollback.** Before a push, each step is one local commit. After it, a
   patch release fixes forward. Every change is an addition.
 
@@ -3285,3 +3289,129 @@ stays open for them, and the PLAN `in-progress`.
   [0018-PLAN-python-verification-tools.md](0018-PLAN-python-verification-tools.md)
   Step 11, and D31's fuzz finding on the tag, in 0020-PLAN Step 14. Both
   are proposed.
+
+### Step 7e: a reprint and a drawn region in one update (issue #14)
+
+*2026-11-01.* The owner committed 0023-MADR A14 and this step, as proposed
+(`ad6210e`), and said "committed, proceed".
+
+**Facts re-read** at `ad6210e`: nothing under `inline/`, `transcript/`,
+`stream/` or `docs/guides/line-mode.md` changed since `f2c13d0`, where A14's
+probe and prototype ran, so A14 item 1's table and item 13's results hold.
+No library code calls `Region.Print` outside tests.
+
+**What changed:**
+
+* `inline/region.go`: `Print` drops every `CSI ? 2026 h` and
+  `CSI ? 2026 l` from its text, synchronized or not, before `lines`;
+  `lines` adds no line end to a text that ends with `CSI H` (the constant
+  `cursorHome`), its other texts as before. `Print`'s documentation says
+  what it takes, as A14 item 5.
+* `transcript/transcript.go`: `Reprint(idle bool) string`, as A14 item 6;
+  `AddReply`'s documentation, as item 7. The unexported `reprint`, which
+  builds the bytes, is renamed `redraw`: revive's `confusing-naming`
+  refused a method differing from `Reprint` only by case
+  ("transcript/transcript.go:198:22: confusing-naming: Method 'reprint'
+  differs only by capitalization to method 'Reprint' in the same source
+  file"). No record names it.
+* `transcript/doc.go`: the recipe, `region.Print` of the reprint at either
+  call site, `Reprint`, and the kept Printers in "used on one goroutine".
+* `transcript/example_test.go`: `idle` writes `h.region.Print(out)`; its
+  output is unchanged.
+* `docs/guides/line-mode.md`: "One reader, one region" says what `Print`
+  takes; "Print the conversation again on a resize" gains `Reprint`, the
+  new recipe and the old one's three frames, a redraw key, and a kept
+  reply's goroutine. `docs/guides/defaults.md`: the two rows of A14 item
+  11.
+
+**Tests:**
+
+* `inline/region_test.go`: `TestPrintFoldsUpdate`, under both
+  `WithSynchronized`, with rows drawn, with none, and in the redraw after
+  an awaited report; `TestPrintHome`, three texts.
+* `transcript/host_test.go`: `TestHostReprintFrames`, five subtests: at the
+  prompt, then a `Draw` and a `Print` through a narrowing to 30 and a
+  widening to 50; mid-turn, the region cleared, the Transcript's own
+  reprint synchronized and `Print`'s one update; the report awaited; the
+  region unsynchronized, no mode 2026; the Transcript unsynchronized, the
+  region's one update. Each splits the bytes at every ESU and wants the
+  whole screen and the cursor at every frame's end. `TestHostReprint`
+  stays, with the old recipe.
+* `transcript/transcript_test.go`: `TestReprintOnDemand`.
+* `inline/bytes_test.go`: `FuzzRegionBytes` as D32 corrected it; a seed
+  with BSU and ESU in a print and a print ending with `CSI H`; and
+  `testdata/fuzz/FuzzRegionBytes/9c03efb60b56bdd8`, D32's input.
+* Every existing test, golden and example passed unchanged.
+
+**Mutations,** on scratch copies, `python3 -m tools.verify mutate`, each
+killed, the failure quoted:
+
+| Mutation | Killed by |
+| :--- | :--- |
+| 7e.1 `Print` not dropping the sequences | `TestPrintFoldsUpdate`: "rows drawn: … want one synchronized update, from the first byte to the last", and the five other cases |
+| 7e.2 dropping them only while synchronized | `TestPrintFoldsUpdate`: "rows drawn, unsynchronized: … want no mode 2026", and two more |
+| 7e.3 dropping only the first of each | `TestPrintFoldsUpdate`, all six cases |
+| 7e.4 `lines` adding a line end after `CSI H` | `TestPrintHome`: ""\x1b[2J\x1b[H": the screen is …"; after D32, also `FuzzRegionBytes`, seed 4 and D32's input |
+| 7e.5 `Reprint` ignoring `idle` | `TestReprintOnDemand`: "not idle: "\x1b[0m\x1b[?2026h…"" |
+| 7e.5b a host reprinting while a line is held, `Reprint(true)` | `TestReprintOnDemand`: "the held line shown 2 times; want once" |
+| 7e.6 `Reprint` leaving the settle | `TestReprintOnDemand`: "a deadline after Reprint ended the settle" |
+| 7e.7 `Reprint` not idle and not due after | `TestReprintOnDemand`: "no reprint at the next idle HandleTimeout" |
+| 7e.8 the frames test against the old recipe | `TestHostReprintFrames/at_the_prompt`: "the reprint and the region, frame 1: the screen is …, the cursor at 8,0" |
+| 7e.9 `Print` not waiting for the awaited report | `TestHostReprintFrames/the_report_awaited`: "a reprint while the report is awaited wrote …", and `TestPrintFoldsUpdate` |
+| 7e.10 `FuzzRegionBytes` without D32's rewrite | `FuzzRegionBytes`, seed 4 and D32's input |
+
+7e.5b and 7e.9 were added when 7e.5 failed `TestReprintOnDemand` before its
+held-line check, and no mutation had reached `Print`'s wait. 7e.4 against
+`FuzzRegionBytes` first survived: D32 below.
+
+* **Deviation D32, 2026-11-01: `FuzzRegionBytes`'s rule for a text that
+  ends with `CSI H`.**
+  * **Found** by the first 5-minute run of `FuzzRegionBytes`, after 15 s:
+    the input `testdata/fuzz/FuzzRegionBytes/9c03efb60b56bdd8`, ops "0$C07"
+    on the one piece "\x1b[H" at width 5. A draw, a resize that awaits the
+    report, `Print("\x1b[H")`, a draw and a `Commit`. The step's rule left
+    the print uncompared, "and the ops after it are compared as before",
+    but `Print` held the text, and the `Commit` wrote it: "got
+    …\x1b[J\x1b[H\x1b[m\x1b[H\x1b[m\r\n… want
+    …\x1b[J\x1b[H\x1b[m\r\n\x1b[H\x1b[m\r\n…". The region was right,
+    by A14 item 4; the harness was not.
+  * **Resolutions offered:** rewrite `want` exactly, wherever such a
+    text's v2.6.2 bytes come out (recommended); stop comparing the rest of
+    such an input, which weakens the target; or drop A14 item 4.
+  * **Chosen by the owner,** 2026-11-01: "Rewrite want exactly
+    (Recommended)". Step 7e's bullet is corrected. No file is added to the
+    step's scope; A14 does not change.
+  * **Built:** each such print records v2.6.2's bytes for its text,
+    `oldLines`, and A14's, those without their last CR LF; after every op,
+    the pending ones are found in `want` in order and replaced, and a pair
+    not found waits for a later op.
+  * **A second finding, in the fix:** the first version took A14's bytes
+    from `lines`, the function under test, and 7e.4 survived it: a mutated
+    `lines` gave the harness its own answer. A14's bytes are now
+    v2.6.2's without their last CR LF, and 7e.4 is killed.
+  * The input is kept as a seed.
+
+**Fuzzing,** 5 minutes each: `FuzzRegion`, 4,237,070 executions, no
+failure; `FuzzTranscript`, 3,122,247, no failure; `FuzzRegionBytes`, D32's
+failure at 15 s, then, after D32, 13,770,266, no failure.
+
+**Gates,** over the tree as this step leaves it:
+
+| Host | `gates` |
+| :--- | :--- |
+| macOS | 21 passed, 1 skipped (`gofmt`, no files given); then `gofmt`, `pre-add-check` and `perf` over the step's eight Go files, 3 passed, `KeyDraw` 1.533 µs against 4.5 µs |
+| `remote linux` | 21 passed, 1 skipped (`gofmt`) |
+| `remote windows` | 21 passed, 1 skipped (`gofmt`) |
+
+* `make apicheck`: "against v2.8.0, 0 incompatible change(s)". apidiff at
+  the `Makefile`'s pin, compatible changes included: one, "./transcript.
+  (*Transcript).Reprint: added".
+* The pre-add check of every changed Go file, `make modernize`, the
+  documents' checks, the excerpt check and `TestDefaultsInventory` among
+  them, and the identifier scan: clean.
+
+**Not done here, and the release:** the owner's commit; the disclosure
+guard; the owner's push and CI; the release `v2.9.0` under rule 4, its
+notes in "Migrating to `v2.9.0`", `README.md`'s current release, the smoke
+test with its control; and issue #14 told. This step stays open for them,
+and the PLAN `in-progress`.
