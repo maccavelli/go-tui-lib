@@ -1,6 +1,6 @@
 ---
-status: in-progress
-date: 2026-10-30
+status: complete
+date: 2026-10-31
 associated-madr: "0024-MADR-opt-in-and-opt-out-coverage.md"
 ---
 # Close the terminal, text and convention gaps, and adopt the message catalogue
@@ -888,3 +888,33 @@ on it; the smoke test from the proxy; and the close-out: this PLAN
 `complete`, the MADR's More Information recording every part built, and
 the index rows. This step stays open for them, and the PLAN
 `in-progress`.
+
+**The release, `v2.8.0`:**
+
+* The owner committed the step (`8f0ff42`). The disclosure guard, run over
+  `071adc0`, `c10b392`, `c098544`, `ca5fd68` and `8f0ff42` before the
+  push, exited 0 with nothing to report, and the owner pushed `main`. CI
+  run 41253075496 passed: `modules`, `gates`, and `test` on macOS 15,
+  Ubuntu 24.04 and Windows 2025. Docs run 41253075563 passed.
+* The owner tagged `8f0ff42` `v2.8.0`, annotated, and pushed the tag. Its
+  CI run, 41254648326, passed the same five jobs.
+* The proxy serves `v2.8.0` at `8f0ff42`. The consumer smoke test,
+  `smoke28.py proxy`, in a scratch module outside the repository with
+  `GOWORK` empty, required the tag by `go get`, then ran `go mod tidy`,
+  `go vet` and `go build`. The program:
+  * a probe `WithoutQuery("da2")` wrote a batch with no DA2, ending with
+    DA1;
+  * a picker `WithCatalog` showed "nothing here" for no results;
+  * a bare overlay of 10 by 1 was told 10 by 1 and drew its text.
+* Its control, `-control`, expecting `v2.7.1`'s behaviour, exited 1: "the
+  batch holds DA2: false, want true".
+* **Step 6 complete, 2026-10-31.**
+* **This PLAN is complete, 2026-10-31.** Its Verification holds: every
+  step's mutations were killed, each failure quoted; the gates passed on
+  macOS, Linux and Windows at every step; `make apicheck` reported 0
+  incompatible changes, and `WithDisabled` stays; `TestDefaultsInventory`
+  passes with no `planned` row; without a new option every golden and
+  test passed unchanged; the identifier scan found nothing. Step 1 was
+  released in `v2.7.0`, Steps 2 to 6 in `v2.8.0`. With 0024-PLAN's first,
+  `command-and-control-opt-outs`, complete since `v2.2.0`, every part of
+  the MADR is built, which its More Information records.

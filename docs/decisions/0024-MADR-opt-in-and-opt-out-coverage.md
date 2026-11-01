@@ -644,3 +644,9 @@ A later record may bring the metadata in.
   catalogue's adoption are
   [0024-PLAN-terminal-text-and-convention-opt-outs.md](0024-PLAN-terminal-text-and-convention-opt-outs.md),
   approved 2026-10-30.
+* **Released, 2026-10-31:** D5's probe queries and A2, by that PLAN's Step
+  1, in `v2.7.0` (tag at `b8a2021`); D5's views and `termsvc`'s limits,
+  D6, D7, A1's three gaps, A3, A4 and the catalogue's adoption, by its
+  Steps 2 to 6, in `v2.8.0` (tag at `8f0ff42`). Every part of this record
+  is built: both PLANs are complete, and no row of the inventory is
+  `planned`.
