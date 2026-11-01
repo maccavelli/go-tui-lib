@@ -1,6 +1,6 @@
 ---
-status: complete
-date: 2026-10-31
+status: in-progress
+date: 2026-11-01
 associated-madr: "0023-MADR-line-mode-components.md"
 ---
 # Implement the line-mode question, picker, composer and transcript
@@ -48,6 +48,7 @@ code's at `5fb6928`; a step that relies on one cites it.
 | 7b | `scripts/go-examples.py`, `scripts/go-precheck.py` and their tests, `testdata/frameworks/`, the examples of `ask/`, `lineedit/` and `transcript/`, `docs/`, `AGENTS.md` | the line-mode guide's excerpts held to the examples (0023-MADR A11) | none |
 | 7c | `internal/sanitize/`, `internal/lineinput/`, `lineedit/`, `inline/`, `safetext/clean.go`, `keymap/`, `docs/`; *approved 2026-10-30* | a key's cost, issue #13 (0023-MADR A12) | the next minor, `v2.7.0` |
 | 7d | `inline/inlinetest/`, `pick/testdata/fuzz/`, `docs/`, `README.md`; *approved 2026-10-31* | the test screen's lines keep a cluster that ends in a space (0023-MADR A13) | a patch, `v2.7.1` |
+| 7e | `inline/`, `transcript/`, `docs/`, `README.md`; *proposed 2026-11-01* | a reprint and a drawn region in one update, a reprint on demand, a kept Printer (issue #14, 0023-MADR A14) | the next minor, `v2.9.0` |
 
 Each step's package joins `cores` and the `charmfree` files in the commit
 that builds it; the `<pkg>tea` packages are not cores. Each step adds its
@@ -650,6 +651,91 @@ removed or retyped.
   * `README.md`'s current release;
   * the smoke test of Step 6, against the tag.
 
+### Step 7e: a reprint and a drawn region in one update (issue #14)
+
+*Added 2026-11-01, for 0023-MADR A14, proposed:* it waits for the owner's
+approval of A14 and this step. One exported name is added,
+`Transcript.Reprint`.
+
+* **Facts re-read** at the tree the step starts on, each a deviation if
+  changed: `inline/region.go`'s `Print`, `lines` and `wrap`;
+  `transcript/transcript.go`'s `HandleTimeout`, `reprint` and `trim`;
+  `stream.Printer.At`'s documentation; the recipe in `transcript/doc.go`,
+  `transcript/example_test.go` and `docs/guides/line-mode.md`.
+* **Code:**
+  1. `inline/region.go`: `Print` drops every `CSI ? 2026 h` and
+     `CSI ? 2026 l` from its text, synchronized or not; `lines` adds no line
+     end to a text that ends with `CSI H`. `Print`'s documentation, as A14
+     item 5.
+  2. `transcript/transcript.go`: `Reprint(idle bool) string`, as A14 item
+     6; `AddReply`'s documentation, as item 7.
+  3. `transcript/doc.go`: the recipe, `region.Print` of the reprint at
+     either call site; the kept Printers in "used on one goroutine".
+  4. `transcript/example_test.go`: `idle` writes `h.region.Print(out)`; its
+     output is unchanged.
+* **Tests:**
+  * `inline/region_test.go`:
+    * `TestPrintFoldsUpdate`: a text holding BSU and ESU, under each
+      `WithSynchronized`, with rows drawn, with none, and while a report is
+      awaited. Synchronized, the bytes hold one BSU, first, and one ESU,
+      last; unsynchronized, neither. The screen at the end is the same.
+    * `TestPrintHome`: a text that ends with `CSI H` gets no line end, and
+      on a screen the region is drawn on the first row; one that ends with
+      `CSI H` and a line end keeps it.
+  * `transcript/host_test.go`, `TestHostReprintFrames`: `TestHostReprint`'s
+    state with the Transcript's defaults, the reprint written by
+    `region.Print`, split at every ESU, the prompt row asserted at every
+    frame's end; the same Transcript mid-turn, nothing drawn, one update;
+    then a `Draw` in place and a `Print` above it, through a narrowing and a
+    widening; the report awaited; and each `WithSynchronized(false)`, no
+    mode 2026 sequence and the same screen. Its frame assertion is run
+    against the old recipe on a scratch copy, and fails there.
+    `TestHostReprint` stays, with the old recipe, whose screen at the end is
+    still right.
+  * `transcript/transcript_test.go`, `TestReprintOnDemand`: "" before the
+    first `Resize`; idle, the bytes a settled `HandleTimeout` gives for the
+    same pieces; it ends a settle, `Timeout` gives no deadline and the next
+    `HandleTimeout` gives ""; not idle, "", then the next
+    `HandleTimeout(now, true)` gives the reprint; a held reply line shown
+    once on a screen.
+  * `inline/bytes_test.go`, `FuzzRegionBytes`: `Print` is held to v2.6.2's
+    region on the text with its mode 2026 sequences dropped. An op whose
+    text, so dropped, ends with `CSI H` has its bytes held by
+    `TestPrintHome` instead, and the ops after it are compared as before.
+    A seed whose text holds BSU and ESU.
+  * Every existing test, golden and example passes unchanged.
+  * `FuzzRegion`, `FuzzRegionBytes` and `transcript`'s fuzz target run 5
+    minutes each.
+* **Mutations,** each killing a named test:
+  * `Print` not dropping the sequences: `TestPrintFoldsUpdate` and
+    `TestHostReprintFrames`;
+  * dropping them only while synchronized: `TestPrintFoldsUpdate`'s
+    unsynchronized case;
+  * dropping only the first of each: `TestPrintFoldsUpdate`;
+  * `lines` adding a line end after `CSI H`: `TestPrintHome`;
+  * `Reprint` ignoring `idle`: `TestReprintOnDemand`'s held line;
+  * `Reprint` leaving the settle: `TestReprintOnDemand`;
+  * `Reprint` not idle and not due after: `TestReprintOnDemand`.
+* **Docs:** `docs/guides/line-mode.md`, "Print the conversation again on a
+  resize": the recipe, `Reprint` and a redraw key (`lineedit`'s
+  `WithClearScreen` is off by default, so the host's own key reprints), and
+  a kept Printer's goroutine; "One reader, one region": what `Print` takes;
+  `docs/guides/defaults.md`'s two rows (A14 item 11).
+* **Gates:** `python3 -m tools.verify gates` on macOS, and through `remote
+  linux` and `remote windows`; `make apicheck` 0 incompatible changes, one
+  addition; the identifier scan.
+* **The release,** `v2.9.0`, under rule 4, or whichever the owner names
+  (A14 item 12):
+  * notes in `docs/guides/migrating.md`, "Migrating to `v2.9.0`":
+    `Reprint`; `Print` drops its text's mode 2026 sequences, and adds no
+    line end after `CSI H`; the recipe, the old one still right in three
+    frames;
+  * `README.md`'s current release;
+  * the smoke test of Step 6, against the tag, with a due reprint written
+    by `region.Print` in one update, and a control that expects
+    `v2.8.0`'s two;
+  * issue #14 told, for the owner to close.
+
 ## Verification
 
 * Every step's mutations are killed, each failure quoted in the record.
@@ -673,7 +759,8 @@ removed or retyped.
   patch, `v2.6.1`, after Step 6a. *Added 2026-10-29 (D28):* and a patch,
   `v2.6.2`, after Step 7a. *Added 2026-10-30 (A11):* Step 7b releases
   nothing. *Added 2026-10-31 (A12, A13):* a minor, `v2.7.0`, after Step
-  7c, and a patch, `v2.7.1`, after Step 7d.
+  7c, and a patch, `v2.7.1`, after Step 7d. *Added 2026-11-01 (A14),
+  proposed:* a minor, `v2.9.0`, after Step 7e.
 * **Rollback.** Before a push, each step is one local commit. After it, a
   patch release fixes forward. Every change is an addition.
 

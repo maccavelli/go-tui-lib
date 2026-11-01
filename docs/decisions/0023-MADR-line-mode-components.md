@@ -2034,6 +2034,151 @@ starting with U+0600 draws "❯" instead of "❯ \u0600"".
    * Items 2 and 3 hold for the first. `FuzzChooser`, which found the
      fault, measures with `ansi.WcWidth`.
 
+### A14 (2026-11-01): a reprint and a drawn region in one update, a reprint on demand, and a kept Printer (issue #14)
+
+*Status: proposed (2026-11-01),* for issue #14, filed for gobble-cli's
+`0035-PLAN-pin-current-sibling-releases-and-remove-gobble-copies.md` P18
+(its deviation 13), after the owner's "proceed with #14, determine the
+best, most idiomatic API shape for this based on the current codebase
+facts".
+
+1. **The issue's measurement holds at `f2c13d0`, with one correction.** A
+   probe in a scratch module outside the repository, with
+   `TestHostReprint`'s state, split each case's bytes at every ESU
+   (`CSI ? 2026 l`), where a terminal presents a frame, and read the test
+   screen after each:
+
+   | How the host writes the due reprint | BSU / ESU | Frames | The prompt below the reprint, at each frame's end |
+   | :--- | :--- | :--- | :--- |
+   | A. The recipe: `region.Clear() + out + region.Draw(…)` | 3 / 3 | 3 | absent, absent, present |
+   | B. `region.Print(out)` | 2 / 2 | 2 | absent, absent |
+   | C. `region.Print(out)`, the Transcript `WithSynchronized(false)` | 1 / 1 | 1 | present, the cursor at its column |
+   | D. C's Transcript, nothing drawn (after `Commit`) | 1 / 1 | 1 | no region |
+   | E. C, with nothing kept | 1 / 1 | 1 | the prompt on the second row, the first blank |
+   | F. C, the region awaiting its cursor report | 1 / 1, in the report's redraw | 1 | present |
+   | H. B, the region `WithSynchronized(false)` | 1 / 1 | 2 | absent, absent |
+
+   * **The correction, B:** the issue has the prompt present at B's second
+     frame. It is drawn, one row too low. `lines` (`inline/region.go`)
+     sees a text that ends with the reprint's ESU, not a line end, and adds
+     `SGR 0` and CR LF, a blank row between the reprint and the region. H
+     shows the same.
+   * **E:** `lines` gives every text a line end, and a reprint of nothing
+     ends with the cursor home, `CSI H`, already at a line's start.
+   * **F:** `Print` holds the reprint while the report is awaited, as it
+     holds any text, and the report's redraw writes what it held, then the
+     reprint, then the rows, in one update. The held text is cleared by the
+     reprint, which holds it when the host kept it.
+   * After C, a `Draw` redraws in place, and a `Print` writes above the
+     region, through a narrowing and a widening.
+2. **The issue's premise, corrected.** "One `Transcript` serves both, so a
+   host cannot have both" holds for a host that writes the mid-turn reprint
+   past the region. `Print` with nothing drawn is one synchronized update of
+   its text (D, `wrap`), so one Transcript under `WithSynchronized(false)`,
+   written through `Print` at both call sites, gives one frame at each
+   today. What is wrong is the pairing's default: with the Transcript's
+   default, synchronized, the library's own region draws it in two frames
+   and a row low (B), and the documented recipe takes three (A).
+3. **The decision: the region is the frame.** `Region.Print` writes its text
+   inside the region's own update, so it drops every `CSI ? 2026 h` and
+   `CSI ? 2026 l` the text holds. Mode 2026 does not nest: inside an update,
+   a BSU does nothing and an ESU ends the update early. Whether what `Print`
+   writes is one update is the region's `WithSynchronized` alone.
+   * With the Transcript's defaults, `region.Print(out)` is one update at
+     the prompt, and mid-turn with nothing drawn (the prototype, item 13).
+   * A host that writes a reprint without a Region keeps the Transcript's
+     own update, as today.
+   * Under the region's `WithSynchronized(false)`, `Print` writes no mode
+     2026 sequence at all: the issue's criterion 5.
+   * It is the kind of change `lines` makes already: `Print` writes its
+     text's line ends as CR LF and resets its styles at its end. No library
+     code calls `Print` outside tests; hosts do.
+4. **A text that ends with the cursor home is at a line's start.** `Print`
+   adds no line end to a text that ends with `CSI H`, so the reprint of a
+   Transcript with nothing kept leaves the region on the first row (E).
+   Every other text ends on a line of its own, as before.
+5. **`Print`'s documentation says what it takes:** text written above the
+   region, or a text that clears the screen and homes the cursor, as a
+   reprint does. The region is drawn again where the text leaves the
+   cursor. While a report is awaited, the text is held with any before it,
+   and the report's redraw writes them in order, in its one update (the
+   issue's criterion 4).
+6. **`func (t *Transcript) Reprint(idle bool) string`, a reprint on
+   demand** (the issue's item 2), for a host's redraw key or command, or a
+   test:
+   * idle, it gives the reprint now, at the last `Resize`'s width, the
+     bytes `HandleTimeout` would give, and ends a settle in progress, so
+     that no second reprint follows;
+   * not idle, it gives "", ends the settle, and the reprint is due at the
+     next `HandleTimeout(now, true)`, as a reprint still due after a settle
+     is (A8 item 4);
+   * before the first `Resize`, it gives "" and changes nothing.
+
+   It takes `idle` for the reason `HandleTimeout` does. `Printer.At` draws a
+   reply's whole source, a line the Printer still holds among it, and the
+   Printer's `Flush` then prints that line again: in the prototype, a
+   reprint while a line was held, then the `Flush`, would show it twice.
+   With `Reprint(p.Idle())`, it shows once. The name is a method's; no type
+   is added, and the glossary is not touched.
+7. **A kept Printer is the Transcript's state** (the issue's item 3).
+   `AddReply`'s documentation says so: every `AddText`, `AddDrawn` and
+   `AddReply` reads each kept reply's `Source` (`trim`), and a reprint calls
+   its `At`, so every call on a kept Printer, `Write`, `Flush` and
+   `SetWidth` among them, is serialized with the Transcript's calls: on its
+   goroutine, or under the host's lock. The package documentation's "used
+   on one goroutine" says it covers its kept Printers. No lock is added; the
+   issue does not ask for one.
+8. **The recipe.** `transcript`'s package documentation, the line-mode
+   guide's "Print the conversation again on a resize" and
+   `ExampleTranscript`'s `idle` write `region.Print(out)`. The old recipe
+   still draws the same screen at its end, in three frames: no program
+   breaks.
+9. **Tests,** for the issue's criteria 1 to 7: the frames of a due reprint
+   on `inlinetest.Screen`, the prompt asserted at every frame's end, at the
+   prompt and mid-turn, from one Transcript with its defaults; the region
+   after it, through a narrowing and a widening; the report's wait; each
+   `WithSynchronized(false)`; and `Reprint`. The frames test fails against
+   the old recipe.
+10. **Considered and left:**
+    * **Documentation alone, C:** it works today, but the Transcript's
+      default stays wrong for the library's own region, and nothing tells a
+      host who keeps it.
+    * **The issue's A, `Region.Reprint(text)`:** a second name for what
+      `Print` does, and `Print` stays wrong for a synchronized text.
+    * **The issue's B, `Transcript.HandleTimeoutWith(now, idle, *inline.Region)`:**
+      `transcript`'s closure gains `inline`, `termcap` and `termkey`; it
+      repeats `Print`'s wait for the report; a host with no Region cannot
+      use it; and the mid-turn site stays a different call.
+    * **An unsynchronized reprint per call:** a twin of `HandleTimeout`
+      and of `Reprint`, and the host still chooses at each site.
+    * **The Transcript's `WithSynchronized` off by default:** it changes
+      the bytes of every host that writes the reprint without a region.
+    * **Dropping the sequences only while the region is synchronized:** H
+      stays two frames and a row low.
+    * **`Reprint()` without `idle`:** the line shown twice, item 6.
+11. **Defaults.** None is added. The fold writes nothing; it removes bytes
+    that broke the region's own default, one update a drawing. In
+    `docs/guides/defaults.md`, `inline`'s row "Each drawing one
+    synchronized update" says `Print`'s text joins it, and `transcript`'s
+    row "When a reprint is made" names `Transcript.Reprint`.
+12. **The release.** `Reprint` is an addition, so the next minor, `v2.9.0`,
+    or whichever release the owner names; `make apicheck` stays at 0
+    incompatible changes. `Print`'s bytes change only for a text that holds
+    a mode 2026 sequence, or ends with `CSI H`.
+13. **The prototype,** on a scratch export of `f2c13d0`, changed `Print`,
+    `lines` and added `Reprint`:
+    * B, with the Transcript's defaults, is 1 / 1 and one frame, the prompt
+      present and the cursor at its column; D the same, with nothing drawn;
+      E puts the prompt on the first row; F is one frame; H is no sequence
+      and one frame, the prompt present.
+    * `Reprint(false)` while a line was held gave "", and the next idle
+      `HandleTimeout` the reprint, the line shown once; `Reprint(true)`
+      during a settle gave the reprint and left no deadline.
+    * `ExampleTranscript`, its `idle` writing `region.Print(out)`, gives its
+      output unchanged. Every test, golden and example of `inline`,
+      `inlinetest`, `transcript`, `lineedit`, `lineedittea`, `pick`, `ask`
+      and `asktea` passes unchanged.
+
 ## More Information
 
 * Issues of this repository: #7, #8, #9 and #10, each with gobble's
