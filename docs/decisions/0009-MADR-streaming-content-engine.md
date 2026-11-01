@@ -1303,6 +1303,134 @@ and three questions of its own. Every fact below was re-read at `114bee8` on 202
    the root, `v2.x`. The adapter requires a published root release, and is
    tagged `stream/glamourmd/v0.1.0` after it (0010-MADR §3).
 
+### A7 (2026-11-01): `Interpret` and the narrow closure, the pane's keys and theme, and the facts the PLAN builds on
+
+*Status: accepted (2026-11-01),* Q13 answered with its recommendation
+(item 13). Proposed the same day, after the owner asked again to
+"analyze the codebase and environment, ensure the madr and plan are
+accurate, up-to-date, grounded in current facts and research", and that
+"the plan is actionable, detailed, and adherent to idiomatic go and best
+practices and standards". It reads A6 as committed (`6365db5`), and asks
+one question. Every fact was re-read on 2026-11-01.
+
+1. **`Interpret` cannot live in `safetext`.** A1 put it there (Q6), and
+   needs `x/ansi` to advance by cell width. `safetext` is a narrow core:
+   it may import the standard library, `glyph` and `internal/enum` alone
+   (AGENTS.md, "Dependencies";
+   [0021-MADR-termkey-closure-gate.md](0021-MADR-termkey-closure-gate.md)
+   A1), held by the depguard rule `safetextstd` (`.golangci.yml:165`) and
+   by `TestNarrowClosures`, whose list allows `safetext` "glyph" and
+   "internal/enum" only (`internal/conformance/charmfree_test.go:210`).
+   0020-MADR D9 left `Interpret` out of `safetext` for that reason. Q13
+   asks where it goes.
+2. **The pane's keys are the keymap's.** §5's `PaneKeys`, `WithKeys` and
+   `Keys() []key.Binding` predate
+   [0007-MADR-keymap-engine.md](0007-MADR-keymap-engine.md) and 0008-MADR
+   A3's keys as commands. Every pane built since binds its keys so:
+   `palette` exports its command IDs and its scope, `PickerScope`
+   ("kind:picker"), and `DefaultRules() []keymap.Default`, and the picker
+   runs its commands as a `workspace.CommandConsumer`
+   (`palette/keys.go`). So `DocPane`:
+   * exports its command IDs (`streamtea.ScrollUpID`, `ScrollDownID`,
+     `PageUpID`, `PageDownID`, `TopID`, `BottomID`) and its scope,
+     `DocPaneScope` ("kind:docpane"), which it names as a
+     `workspace.KeyContexter`;
+   * gives `DefaultRules() []keymap.Default`, for the program's one keymap
+     beside `workspace.DefaultRules()`: up, down, pgup, pgdown, home and
+     end, none of them ctrl+c;
+   * runs those commands itself, as a `workspace.CommandConsumer`.
+
+   §5's `PaneKeys` and `WithKeys`, and A6 item 4's "the pane's keys
+   (`PaneKeys`)", read so. A program rebinds or removes a key in its
+   keymap, which is the control.
+3. **The pane reads its workspace, as the panes built since do.**
+   `NewDocPane(w *workspace.Workspace, d *stream.Doc, o ...Option)`, and
+   at each draw it reads `w.Theme()` and `w.WidthMethod()`, as `palette`'s
+   picker (`palette/view.go:23`, `:45`) and `lineedittea`'s
+   `ComposerPane` (`lineedit/lineedittea/pane.go:47`) do. No message
+   carries the theme: the workspace has none, and `Theme()` is its
+   accessor. §5's "measures with the workspace's width method" holds,
+   through `WidthMethod()`.
+4. **`theme.Theme.ID`, A6's Q9, has two edges** the PLAN must hold:
+   * `Theme`'s fields are exported, so a program can change a copy after
+     `New`; the copy keeps its ID. `Theme`'s documentation says to build
+     a changed theme with `New`, and `ID`'s says what a copy keeps.
+   * A `Theme` built as a literal, not by `New`, has ID 0. A cache keyed
+     by a theme never reuses an entry under ID 0, so a hand-built theme
+     always draws right, at the cost of its cache.
+5. **glamour, re-read at `v2.0.1`** (`charm.land/glamour/v2`, MIT): every
+   fact A2 relies on holds. `WithWordWrap` (`glamour.go:173`) fixes a
+   renderer's width; `WithStyles` (`:146`) takes the `StyleConfig`;
+   `WithEmoji()` (`:208`) takes no argument, and `WithChromaFormatter`
+   (`:216`) a name; `WithEnvironmentConfig` (`:122`), `WithStylePath`
+   (`:129`) and `WithStylesFromJSONFile` (`:162`) are the options the
+   adapter never uses. `ansi/style.go` has `Document`'s `Margin *uint`
+   (`:72`), `CodeBlock`'s `Theme string` and `Chroma *Chroma` (`:78-79`),
+   and the table's `CenterSeparator`, `ColumnSeparator` and
+   `RowSeparator` (`:91-93`); `ansi/table.go:116` dereferences
+   `CenterSeparator` with no nil check; `ansi/codeblock.go:15` names the
+   chroma style "charm", which `:90` registers. Its `go.mod` states
+   `go 1.25.8` and requires lipgloss `v2.0.4`, `x/ansi` `v0.11.7`,
+   chroma `v2.14.0`, goldmark `v1.7.8` and an ultraviolet of 2025-12-05;
+   the adapter's module selects the root's newer lipgloss `v2.0.6`,
+   `x/ansi` `v0.11.8` and ultraviolet, so its tests run at those.
+6. **`Doc` shares `stream.Option`, compatibly.** `apidiff`, at the
+   `Makefile`'s pin, over a package whose opaque `Option` interface gains
+   a second unexported method, reports "Compatible changes: - Doc: added"
+   and nothing incompatible. A6 item 4's "`make apicheck` confirms" is so
+   confirmed; the step still runs it.
+7. **Go and the standards.** The toolchain on the development host is Go
+   1.27.3; the floor stays 1.27.2. `testing/synctest` (`Test`, `Wait`,
+   `Sleep`), `sync.WaitGroup.Go` and `iter` are in it, so the drivers of
+   A6 item 8 are tested in a bubble with fake time, and a goroutine is
+   started through a `WaitGroup` that `Close` waits on. `ansi.Method`'s
+   zero value is `ansi.WcWidth`, so an options struct with a `Method`
+   field measures as the terminal does by default. CommonMark 0.31.2, of
+   2024-01-28, is still the newest version of the specification
+   (<https://spec.commonmark.org/>), so §4's cut rules cite it unchanged.
+8. **Owner question.**
+   * **Q13. Where `Interpret` lives.**
+     * **Recommended: `stream`,** as `stream.Interpret`,
+       `stream.InterpretOptions` and `stream.InterpretRow` (Q11's name
+       kept). `stream` is a core that imports `x/ansi` already, and A1's
+       `Bounded`, which holds live tool output, is there too. Bad, because
+       `stream` was a Markdown package, and becomes the package for
+       streamed content of both kinds.
+     * **Widen `safetext`'s rule** to admit `x/ansi`, by amending 0021-MADR
+       A1, `safetextstd` and `TestNarrowClosures`. Keeps A1's place; every
+       program that cleans a string then links `x/ansi` and its four
+       modules, which the narrow rule exists to prevent.
+     * **A package of its own,** a core named for it, such as `termtext`,
+       allowed `x/ansi`. Keeps both packages to one job; one more package.
+9. **`Buffer` and `Doc.Pull` stay in `stream`.** A5 moved them to
+   `stream/streamtea` because they name `frame`, which §1 made a Bubble Tea
+   package. A6 item 8 makes `frame` a core, so they name no Charm type,
+   and 0020-MADR D2 keeps such a declaration in its core: `Buffer`,
+   `NewBuffer(*frame.Scheduler)` and `Doc.Pull(*Buffer, frame.Pacer,
+   time.Time)` are `stream`'s, which then imports `frame`, a core. A
+   line-mode host feeds a `Doc` from a network goroutine through them too.
+   `stream/streamtea` holds `DocPane` and its keys alone.
+10. **`Writer` never drops a write.** grok's drawer skips a frame while
+    the terminal is busy (0003-REPORT §8.17). A1's `Writer` is an
+    `io.Writer` under `tea.WithOutput`, and Bubble Tea v2's renderer
+    (`cursed_renderer.go:643`, ultraviolet's `TerminalRenderer`) writes
+    "the minimal necessary escape sequences to transition the terminal to
+    the new buffer state" (`terminal_renderer.go:111-117`), so a dropped
+    write would leave the screen wrong. While one write is in flight, `Writer` appends the writes after
+    it to one pending buffer, written whole when the first completes: many
+    draws become one write, and no byte is lost, as A1's test says. A
+    write's error is returned by the next `Write` and by `Close`.
+11. **Defaults the research gives:** `Demand`'s `Slow` ticks every 83 ms
+    and `Fast` at the scheduler's frame rate (grok's `TickDemand`); the
+    `Coalescer`'s maximum wait is 100 ms (Kilo); `Writer` reports a stall
+    after 5 s (grok). Each is an option, and a row of the defaults guide.
+12. **What does not change:** A6, as committed, but for items 2, 3 and 9's
+    readings of §5 and A5 above; option A; every other section.
+13. **Answered 2026-11-01** (picked from options): Q13 "stream
+    (Recommended)". `Interpret`, `InterpretOptions` and `InterpretRow` are
+    `stream`'s; A1's "§2, `safetext` gains … an interpreter" and its Q6
+    read so; `safetext` keeps its narrow rule.
+
 ## More Information
 
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md):

@@ -97,633 +97,799 @@ ID. In short:
   ultraviolet joins input split within 50 ms, which Step A1.3 measures
   before building its reassembly.
 
+*Rewritten later on 2026-11-01, for
+[0009-MADR-streaming-content-engine.md](0009-MADR-streaming-content-engine.md)
+A6 as committed (`6365db5`) and A7 (proposed):* the Goal, Scope, rules,
+Implementation Steps, Verification and Rollout below replace the text
+those notes annotated, so that each step can be run as written. The text
+they replace, with every note it carried, is this file at `6365db5`. Each
+step keeps its number, since records cite them (0010-MADR Step 7,
+0020-MADR Steps 2 and A1.1, and 0009-MADR Steps 7 and A1.1 to A1.4); the
+steps run in the order the
+Scope table gives. Where a step names a type, it uses A4's, A6's and A7's
+names, and `Interpret`'s package is `stream`, Q13's answer.
+
 ## Goal
 
-Ship `safetext`, `frame`, `inputfilter`, `stream` and `stream/glamourmd`,
-so that pi-go can stream an agent's Markdown into a workspace pane:
+Build what 0009-MADR decides and is not yet built, as amended to A7:
 
-* at O(delta) cost per chunk;
-* with an exact final frame;
-* with nothing from the stream reaching the terminal as a control sequence;
-* with wheel floods and typed pastes coalesced before they queue.
+* `frame` and `inputfilter`, Charm-free cores, each a pure layer and a
+  goroutine-backed driver over it (A6 item 8), with their adapters
+  `frame/frametea` and `inputfilter/inputfiltertea`;
+* `stream`'s `Scanner`, `Doc`, `Renderer`, `Plain`, `Buffer`,
+  `Interpret` (Q13) and A1's additions, with the test kit
+  `stream/streamtest`;
+* `stream/streamtea`'s `DocPane`, keyed to `theme.Theme.ID` (A6 Q9);
+* the workspace's extension point for mouse messages (§6);
+* `stream/glamourmd`, a nested module (A2).
 
-Done means every item under Verification holds, CI is green on the pushed
-tree, and the owner can tag the release.
+So that a TUI streams an agent's Markdown into a workspace pane at
+O(delta) cost a chunk, with an exact final frame, with nothing from the
+stream reaching the terminal as a control sequence, and with wheel floods
+and typed pastes coalesced before they queue; and so that a line-mode host
+paces its output, feeds a `Doc` from another goroutine and detects a paste
+with no Bubble Tea.
+
+Done means every item under Verification holds, CI is green on each
+pushed step, the owner has tagged the root's minor release and the
+adapter's `stream/glamourmd/v0.1.0`, and each release's consumer smoke
+test has passed from the proxy.
 
 ## Scope
 
-### In scope
+### Prerequisites
 
-| Step | Paths | What |
-| :--- | :--- | :--- |
-| 1 | `docs/decisions/0009-*`, `docs/README.md` | accept the records |
-| 2 | `safetext/`; `glyph/` (`Set.Control`) | streaming sanitizer, URL check |
-| 3 | `frame/` | scheduler, generic queue, drain policies |
-| 4 | `inputfilter/`; `workspace/render.go` (`local`) | wheel and motion coalescing, paste bursts, mouse extension point |
-| 5 | `stream/` (`Doc`, `Buffer`, `Plain`, the cut scanner) | the stable-prefix engine |
-| 6 | `stream/` (`Pane`) | a workspace pane over a `Doc` |
-| 7 | `stream/glamourmd/` (its own `go.mod` and `go.sum`); `go.work` | the glamour adapter, as a nested module (MADR A2) |
-| 8 | `stream/example_test.go`, `docs/guides/streaming-content.md`, `docs/` | the example, the guide, close-out |
-| A1.1 | `safetext/` | `Command` and `StatusLine` presets, `Policy` fields, `Interpret` (A1) |
-| A1.2 | `frame/` | `Coalescer`, `Demand`, `Writer`, `Upgrader` (A1) |
-| A1.3 | `inputfilter/` | the stage chain, typeahead, paste normalisation, wheel profile (A1) |
-| A1.4 | `stream/` | `RenderView`, the dialect rules, `Highlighter`, `FitTable`, `Bounded` (A1) |
+* 0009-MADR A7 accepted, with Q13 answered (done, 2026-11-01), and this
+  PLAN approved by the owner.
+* Done already: Step 2 (`safetext`, by
+  [0020-PLAN-charm-free-cores-glyphs-and-safetext.md](0020-PLAN-charm-free-cores-glyphs-and-safetext.md)
+  Step 4, `v1.13.0`); `stream` a core, with `Printer`, `Markup` and
+  `Style` (by
+  [0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
+  Step 5, `v2.6.0`); the nested-module tooling (by
+  [0010-PLAN-nested-adapter-modules.md](0010-PLAN-nested-adapter-modules.md)).
 
-~~`go.mod` gains `charm.land/glamour/v2` v2.0.1, or its newest release on the
-day, in Step 7 and no other step.~~ *2026-10-02 (MADR A2):* the root
-`go.mod` never gains glamour. `stream/glamourmd/go.mod` requires
-`charm.land/glamour/v2` v2.0.1, or its newest release on the day, and a
-published root version, in Step 7. Steps 2–6 and A1.1–A1.4 add no module.
-Q6–Q8 of A1 kept `Interpret`, `Writer`, `Upgrader` and `FitTable` at the
-paths above.
+### In scope, in the order the steps run
 
-*2026-11-01 (MADR A6):* Step 2's row and A1.1's but for `Interpret` are
-done (0020-PLAN Step 4). Step 5's `Buffer` and `Doc.Pull`, and Step 6's
-pane, are in `stream/streamtea` (MADR A5); Step 5 adds
-`stream/streamtest` (MADR A2). Steps 3, 4, A1.2 and A1.3 also write
-`frame/frametea` and `inputfilter/inputfiltertea` (Q10); Step 6 adds
-`theme.Theme.ID` (`theme/`, Q9). Every step adds its defaults' rows to
-`docs/guides/defaults.md`, and its message IDs, where it shows text.
+| Order | Step | Packages and paths | What |
+| :--- | :--- | :--- | :--- |
+| 1 | 1 | `docs/decisions/0009-*`, `docs/README.md`, `docs/guides/defaults.md`, `docs/glossary.md` | records, the planned defaults, the reserved names |
+| — | 2 | `safetext/`, `glyph/` | done by 0020-PLAN Step 4 |
+| 2 | A1.1 | `stream/` | `Interpret`, `InterpretOptions`, `InterpretRow` (Q13) |
+| 3 | 3 | `frame/`, `frame/frametea/`, `internal/conformance/` | the pacing core, the scheduler, and their adapter |
+| 4 | A1.2 | `frame/`, `frame/frametea/` | `Coalescer`, `Demand`, `Writer`, `Upgrader` |
+| 5 | 4 | `inputfilter/`, `inputfilter/inputfiltertea/`, `internal/conformance/`, `workspace/render.go` | the wheel, motion and paste-burst cores, their driver, the filter, and `local`'s extension point |
+| 6 | A1.3 | `inputfilter/`, `inputfilter/inputfiltertea/` | A1's input stages, measured first |
+| 7 | 5 | `stream/`, `stream/streamtest/` | `Scanner` out of the `Printer`; `Doc`, `Renderer`, `Plain`, `Buffer`, `Doc.Pull`; `CheckRenderer` |
+| 8 | 6 | `theme/`, `stream/streamtea/` | `Theme.ID`; `DocPane` |
+| 9 | A1.4 | `stream/`, `stream/streamtea/` | `RenderView`, the dialect, `Highlighter`, `FitTable`, `Bounded` |
+| 10 | 8 | examples, `docs/`, `README.md` | the guide and the root's minor release |
+| 11 | 7 | `stream/glamourmd/`, `go.work`, `docs/`, `docs/glossary.md`, `internal/conformance/` | the glamour adapter, a nested module, and its release |
+
+* The root `go.mod` gains no requirement in any step. `stream/glamourmd`'s
+  `go.mod` requires the root's tag and `charm.land/glamour/v2`, in Step 7
+  alone (A2).
+* Each new core joins `cores` in `internal/conformance/charmfree_test.go`
+  in the commit that builds it; an adapter does not. `stream`'s allowed
+  imports grow by `frame` in Step 5 (A7 item 9).
+* Each step adds its defaults' rows to `docs/guides/defaults.md`, turning
+  Step 1's `planned` rows `built`, and its message IDs and English
+  defaults, through `msgcat`, where it shows a user text.
 
 ### Out of scope
 
 * A virtualized transcript of many `Doc`s, watermark pruning, and inline
-  scrollback with OSC 133. Each is a later record (MADR option D and
-  0003-REPORT §7). The owner chose an `inline` record on 2026-10-02
-  (0003-REPORT §11.2).
-* Syntax highlighting other than glamour's own chroma use. A1.4 adds the
-  `Highlighter` interface only; a lexer adapter needs its own dependency
-  record.
-* Re-sending the mouse modes on focus-in, which belongs to the planned
-  `termmode` record (MADR A1, "What does not change").
+  scrollback with OSC 133; the line mode's `transcript` is 0023's.
+* A syntax-highlighting lexer: A1.4 adds the `Highlighter` interface only,
+  and a lexer needs a dependency record of its own.
+* Re-sending the mouse modes on focus-in, the planned `termmode` record's.
 * Images, and the terminal services of
   [0005-MADR-terminal-capabilities-and-services.md](0005-MADR-terminal-capabilities-and-services.md).
-* Any change in pi-go.
+* Moving the tree to Bubble Tea `v2.1.x` or `x/ansi` `v0.11.9` (A6 item
+  2): a change of its own.
+* Any change in pi-go or gobble-cli.
 * `git push` and tags, which are the owner's.
 
 ## Rules for every step
 
-1. **Order.** Each step's package compiles, passes its tests and passes the
-   pre-add gate before the next step starts.
-2. **Mutation proofs.** Each step names mutations of its key invariants.
-   Each is applied to a scratch copy and must make a named test fail. A
-   mutation that survives, or does not compile, is replaced and recorded.
-3. **Checks per step:**
-   * `make pre-add-check FILES=…`;
-   * `make lint`;
-   * `go test -race -count=1 ./...`;
-   * `LC_ALL=C go test ./...`;
-   * the Windows test host on a scratch copy;
-   * `go mod tidy -diff`.
-4. **Conventions.** Every package follows 0001-MADR §6. In particular,
-   nothing writes to `os.Stdout` or `os.Stderr`, nothing sets the alternate
-   screen or installs a signal handler, and every glyph comes from `glyph`.
-5. **Commit.** One commit per step, made by the owner. At the end of each
-   step the agent stops with the pre-add checks passed and the step's
-   evidence in the execution record, and stages and commits nothing. The
-   owner commits with `git commit --no-edit` and pushes. (2026-10-02: the
-   org rules forbid agent commits to `main`, and the owner chose this over
-   a `feature/` branch.)
-6. *Added 2026-11-01 (MADR A6):* **The tools.** Each step's checks run as
-   `python3 -m tools.verify gates` with the step's files, on macOS and
-   through `remote linux` and `remote windows`; its mutations through
-   `python3 -m tools.verify mutate`; its planned type names through
-   `python3 -m tools.verify names` before any code; and the identifier
-   scan through `python3 -m tools.verify scan`. They cover rule 3's
-   checks.
-7. *Added 2026-11-01 (MADR A6):* **The conventions written since.** Each
-   step follows AGENTS.md's API conventions: hooks with a `…Func`, opaque
-   options named `With…`, `Without…` or `On…`, enums from `internal/enum`,
-   each default a row of `docs/guides/defaults.md` with its control, each
-   string a user is shown a message ID with an English default, the
-   stability line, and `make apicheck` at 0 incompatible changes. Each
-   step re-reads, at the tree it starts on, the facts it relies on, and
-   records a change as a deviation before any code.
+1. **One step, one commit, the owner's.** The agent stops at the end of
+   each step with its evidence in the Execution Record, stages nothing,
+   and commits nothing; the owner commits with `git commit --no-edit` and
+   pushes. The next step starts after the owner's "proceed".
+2. **Facts first.** A step re-reads, at the tree it starts on, each fact
+   it names under "Facts re-read", and records a change as a dated
+   deviation, with the owner's choice, before any code.
+3. **Names first.** `python3 -m tools.verify names` over the step's
+   planned type names reports no clash before any code.
+4. **Every new test is seen failing.** Each mutation the step names runs
+   through `python3 -m tools.verify mutate` on scratch copies, and must
+   fail the test it names; the failure is quoted in the record. A mutation
+   that survives, or does not compile, is replaced and recorded.
+5. **Gates.** `make pre-add-check FILES="…"` over the step's Go files;
+   `python3 -m tools.verify gates` with the step's files on macOS, and
+   through `remote linux` and `remote windows`; `make apicheck` at 0
+   incompatible changes; `python3 -m tools.verify scan --base HEAD`; and
+   `make markdownlint check-records docs-check disclosure-check` when the
+   step changes a document. Each fuzz target the step adds or changes
+   runs 5 minutes.
+6. **Conventions.** AGENTS.md's TUI conventions 1 to 6 and API conventions
+   1 to 12 hold for every exported name: opaque options named `With…`,
+   `Without…` or `On…`; a hook with its `…Func`; enums from
+   `internal/enum`; `Err…` sentinels; each package's stability line; each
+   default a row with its control; each string a user is shown a message
+   ID.
+7. **Cores and adapters** (0020-MADR D1 to D3): a declaration whose
+   signature, fields or methods name a Charm type is the adapter's, and
+   only then; every effect has a core form the adapter wraps; the adapter
+   holds conversions, not logic.
+
+## Go practice for every step
+
+* **Zero values.** A type whose zero value can be ready is (`Queue[T]`,
+  `Scanner`, `InterpretOptions`); one with an invariant has its `NewX`.
+  An options struct's zero value takes the defaults.
+* **Concurrency is stated.** A type's documentation says either "safe for
+  concurrent use" or "used on one goroutine". A driver starts each
+  goroutine with `sync.WaitGroup.Go` and waits for it in `Close`; `Close`
+  is idempotent and returns an `error`, as `io.Closer` does; no goroutine
+  runs without work; a channel is exposed receive-only, and closed by its
+  sender alone; a `time.Timer` is stopped and reset without draining, as
+  Go's timers have allowed since 1.23.
+* **Contexts.** A job that may be abandoned takes a `context.Context` as
+  its first parameter, cancelled when it is replaced and on `Close`.
+* **Time.** The pure layer takes `now time.Time` and never reads a clock;
+  a driver reads the real clock, and stamps what it emits, so the host's
+  `now` and the driver's agree.
+* **Generics and iterators.** `Queue[T any]`, `Coalescer[T any]` and
+  `Upgrader[K comparable, R any]`; a drain is an `iter.Seq[T]`; `slices`
+  and `maps` over hand-written loops.
+* **Errors and panics.** An error wraps its cause with `%w`; untrusted
+  input never panics; a panic marks a programmer's error only, as
+  `palette`'s fixed key sequences do.
+* **No global mutable state, no `init`.** `theme.Theme.ID`'s counter is
+  the one package-level variable, a `sync/atomic` `Uint64`.
+* **Tests.** Table-driven; drivers inside `testing/synctest.Test`, where a
+  goroutine left blocked fails the test; `-race`; fuzz targets for every
+  parser and every "the same for any split" property; goldens through
+  `tuitest`'s matrix, {colour, no colour} × {UTF-8, ASCII} × 60 and 100
+  columns; benchmarks with `b.Loop`, and allocation budgets held by a test
+  where the MADR sets one.
+* **Documentation.** Every exported name has a comment that begins with
+  its name; each package has an `Example…`; a guide's Go block is a
+  `// guide:` region of one, which the examples gate holds.
 
 ## Implementation Steps
 
-### Order and changes, as revised on 2026-11-01 (MADR A6)
+### Step 1: records, the planned defaults and the reserved names
 
-*Accepted with A6, 2026-11-01; the PLAN waits for the owner's approval to
-execute.* The steps below keep their text; this is how each now reads. The
-order is Q12's answer.
-
-| Order | Step | Now |
-| :--- | :--- | :--- |
-| 1 | 1 | records: A6 accepted and Q9 to Q12 answered (done, 2026-11-01); this PLAN `in-progress`; `docs/README.md`; the `planned` rows of A6 item 4 in `docs/guides/defaults.md`; A6's names in `docs/glossary.md`'s "Names the planned records must not take" |
-| — | 2 | **done** by 0020-PLAN Step 4, `v1.13.0`; its tests are `safetext`'s |
-| 2 | A1.1 | `Interpret`, `InterpretOptions` and `InterpretRow` (Q11), alone; the rest of A1.1 is done (0020-PLAN Step 4) |
-| 3 | 3, A1.2 | `frame`, with A4's names (`FrameMsg`, `NewScheduler`, `Pacer` and `PacerFunc`, `Release`, `Gear`) and A1's types, split into the core `frame`, its pure pacing and, built on it, the goroutine-backed `Scheduler`, the `Coalescer`'s wait, `Writer` and `Upgrader`, and `frame/frametea`, the commands and `FrameMsg`'s delivery (Q10; MADR A6 item 8, as corrected); `frame` joins `TestCoresAreCharmFree` |
-| 4 | 4, A1.3 | `inputfilter` (`NewFilter`, A6's option names) and its A1 stages, and `local`'s extension point at `workspace/render.go:538`, split into the core `inputfilter`, the paste-burst machine over `termkey.Input`, the wheel sum and the motion throttle, and, built on them, the goroutine-backed driver of its timed flushes, and `inputfilter/inputfiltertea`, the `tea.WithFilter` function, `CoalescedWheelMsg` and `Attach` (Q10; MADR A6 item 8, as corrected); `inputfilter` joins `TestCoresAreCharmFree`; ultraviolet's joining of split input and its paste assembly measured first (A6 item 2) |
-| 5 | 5 | `stream`'s `Scanner`, moved out of the `Printer` with every `Printer` test, golden and fuzz target unchanged (A6 item 5); then `Doc` (`NewDoc`, `stream.Option`), `Renderer`, `RendererFunc` and `Plain` on `wrapProse`; `stream/streamtest`; `Buffer` and `Doc.Pull` in `stream/streamtea` |
-| 6 | 6 | `theme.Theme.ID`, stamped by `theme.New` (Q9), then `DocPane` in `stream/streamtea`, with `WithoutFollow` and `PaneKeys`, its caches keyed by the ID |
-| 7 | A1.4 | `RenderView`, the dialect rules, `Highlighter` and `HighlighterFunc`, `FitTable` from `layoutTable`, and `Bounded` with its marker's message ID |
-| 8 | 8 | the example, `docs/guides/streaming-content.md`, `docs/architecture.md`, the release notes in `docs/guides/migrating.md`; the owner tags the root's minor release |
-| 9 | 7 | `stream/glamourmd`, after that tag, as revised below |
-
-* **Step 7, re-read:** its `go.mod` states `go 1.27.2`, the floor
-  ([0016-MADR-go-1-27-2-for-go-2026-6604.md](0016-MADR-go-1-27-2-for-go-2026-6604.md)),
-  and requires the root `github.com/maccavelli/go-tui-lib/v2` at the
-  tagged `v2.x` release; the per-module loop is
-  `scripts/go-precheck.py`'s
-  ([0017-MADR-python-repository-scripts.md](0017-MADR-python-repository-scripts.md));
-  glamour's newest release on 2026-11-01 is `v2.0.1`, which the step
-  checks again. The renderer type and its constructor are A4's
-  (`NewRenderer`, `WithTheme`), and its cache is keyed by width,
-  `theme.Theme.ID` (Q9) and emoji.
-* **Every step's fuzz target** is found by `make fuzz` and CI's fuzz step
-  with no change to either.
-* **Q9** is answered: `theme.Theme.ID`, built in Step 6.
-* *Corrected 2026-11-01 (MADR A6 item 8):* rows 3 and 4 said the cores take
-  time in and give a deadline out, with the timer in `frame/frametea`. Each
-  core now holds its pure logic and a goroutine-backed driver built on it,
-  and the adapters convert. Steps 3, 4, A1.2 and A1.3 keep their tests
-  under `testing/synctest`; each driver's goroutine or timer gains a row
-  of `docs/guides/defaults.md`.
-
-### Step 1: records
-
-The owner accepts the MADR, answering Q1–Q5. Record the answers, set the
-MADR `accepted` and this PLAN `in-progress`, and update `docs/README.md`.
-The records this one builds on
-([0004-MADR-integrate-charm-v2-and-go-1-27.md](0004-MADR-integrate-charm-v2-and-go-1-27.md)
-for `ansi.Method`, and the records before it in the order) are complete
-first, or this step records which parts wait for them.
-
-*2026-10-02:* the answers are recorded and the MADR is accepted. This PLAN
-moves to `in-progress` when the owner approves its execution, and
-`docs/README.md` is updated then.
+* **Records:** 0009-MADR A7 `accepted`, with Q13's answer (done,
+  2026-11-01); this PLAN `in-progress`; `docs/README.md`'s rows.
+* **`docs/guides/defaults.md`:** a section for each of `frame`,
+  `frame/frametea`, `inputfilter`, `inputfilter/inputfiltertea` and
+  `stream/streamtea`, and rows added to `stream`'s, headed `Behaviour |
+  Default | Control | Status`, each `planned`, its control named as the
+  step will build it:
+  * `frame`: 60 fps (`frame.WithFPS`); each gear's threshold (its
+    `AdaptiveOption`); a scheduler's timer goroutine, from `NewScheduler`
+    to `Close` (not building one, `Scheduler.Close`); the `Coalescer`'s
+    100 ms wait (`NewCoalescer`'s `maxWait`); `Demand`'s 83 ms `Slow` tick
+    (`frame.WithSlowTick`); `Writer`'s 5 s stall (`frame.WithStallAfter`);
+    `Upgrader`'s goroutine a job (`Upgrader.Close`);
+  * `inputfilter`: wheel coalescing and the motion throttle on, at 16 ms
+    (`inputfiltertea.WithoutWheelCoalescing`,
+    `inputfiltertea.WithoutMotionThrottle`, `inputfiltertea.WithInterval`);
+    paste bursts off (`inputfiltertea.WithPasteBurst`), with codex's 3
+    characters, 8 ms gap and 8 ms idle, 60 ms on Windows
+    (`inputfilter.PasteBurstConfig`); the flush driver's timer
+    (`inputfilter.Flusher.Close`); typeahead off; one event a notch
+    (`inputfiltertea.WithWheelProfile`);
+  * `stream`: `RelaxAfter` 2 KiB (`stream.WithRelaxAfter`); inline
+    holdback and the partial line on (`stream.WithoutInlineHoldback`,
+    `stream.WithoutPartialLine`); `Interpret`'s 50,000 rows and 8,192
+    columns (`stream.InterpretOptions`); the highlighter's limits and
+    `Bounded`'s (their options, named in Step A1.4);
+  * `stream/streamtea`: following the tail (`streamtea.WithoutFollow`);
+    the pane's keys (`streamtea.DefaultRules`); its pacer, `Adaptive`
+    (`streamtea.WithPacer`).
+* **`docs/glossary.md`,** "Names the planned records must not take": the
+  names of A6 and A7 for `frame`, `frame/frametea`, `inputfilter`,
+  `inputfilter/inputfiltertea`, `stream` and `stream/streamtea`, and
+  `theme`'s `ID` method.
+* **Checks:** `python3 -m tools.verify names` over every type this PLAN
+  plans reports no clash; `TestDefaultsInventory` passes with the
+  `planned` rows; the documents' checks.
+* **A records commit,** with no source, under AGENTS.md's bootstrap
+  exception.
 
 ### Step 2: `safetext`
 
 *Done by 0020-PLAN Step 4, released in `v1.13.0` (MADR A6 item 1).*
+`safetext`'s own tests are its checks.
 
-* The API of MADR §2: `Policy`, `Text`, `Strict`, `Line`, `Clean`,
-  `Filter`, `NewFilter`, `SafeURL`, `URLs`. `glyph.Set` gains `Control`
-  (`␛`, ASCII `^`). The glyph package's reflection tests cover the new field
-  with no change.
-* **Tests:**
-  * a table with one row per sequence class: CSI, OSC ended by BEL, by ST
-    and by U+009C, DCS, SOS, PM, APC, nF escapes, a lone `ESC`, CAN and SUB
-    aborts, `ESC` inside a sequence, each C1 code point, each C0 control,
-    DEL, `\r\n`, a lone `\r`, invalid UTF-8, and bidi controls under `Text`
-    and `Strict`;
-  * codex's injection string, `"\x1b[2J\x1b]52;c;Y2xpcA==\x07\u009dhidden\u009c\r\n\t"`,
-    cleans to `"\n\t"` under `Text`;
-  * an OSC with no terminator hides at most `MaxString` bytes, and the text
-    after it survives;
-  * `Visible` shows exactly one `Control` glyph per removed sequence, from
-    the ASCII set under `glyph.ASCII()`;
-  * `SafeURL` refuses `javascript:`, a URL holding ESC, BEL or a space, and
-    one holding `ESC \`;
-  * `URLs` returns spans that slice cleaned text into the URLs.
-* **`FuzzClean`**, over arbitrary bytes, a policy and a split index:
-  * the output is valid UTF-8;
-  * it holds no 0x1B, no U+0080–U+009F, and no C0 control except those the
-    policy keeps;
-  * `Clean(Clean(x)) == Clean(x)`;
-  * `Write(x[:i])`, `Write(x[i:])`, `Close()` equals `Clean(x)`.
+### Step A1.1: `Interpret`, in `stream` (Q13)
 
-  The target joins `make fuzz` and the CI fuzz step.
-* **Differential test.** Over generated well-formed CSI, OSC and DCS
-  sequences mixed with text, `Clean` equals `ansi.Strip` followed by
-  removing the C0 controls `ansi.Strip` keeps.
-* **Benchmarks:** `Clean` over 1 MB of prose, and over 1 MB that is half
-  escape sequences.
-* **Mutations:**
-  * BEL no longer ends an OSC;
-  * C1 code points are passed through;
-  * the filter forgets its state between writes;
-  * `MaxString` is ignored;
-  * `SafeURL` accepts any scheme.
+* **Facts re-read:** `stream`'s imports; `x/ansi`'s `Method.StringWidth`
+  and its parser's `DecodeSequence`; `safetext`'s handling of invalid
+  UTF-8, which `Interpret` matches.
+* **The API:**
 
-### Step 3: `frame`
+  ```go
+  // InterpretOptions bounds Interpret. The zero value takes the defaults.
+  type InterpretOptions struct {
+  	Method  ansi.Method // how a cell is counted; the zero value is ansi.WcWidth
+  	MaxRows int         // 0 or less: DefaultInterpretRows
+  	MaxCols int         // 0 or less: DefaultInterpretCols
+  }
 
-* The API of MADR §3: `Msg`, `Scheduler` (`New`, `WithFPS`, `WithSend`,
-  `Request`, `RequestIn`, `Wait`, `Close`), `Queue[T]`, `Snapshot`,
-  `Policy`, `Plan`, `Mode`, `Adaptive` and its options, `Immediate`.
-* **Tests, inside `testing/synctest.Test`:**
-  * 1000 `Request` calls from 10 goroutines within one frame produce one
-    `Msg`;
-  * two requests a frame apart produce two `Msg`s at least 1/fps apart, at
-    60 and at 120 fps; `WithFPS(500)` is clamped to 120 and `WithFPS(0)`
-    becomes 60;
-  * `RequestIn(50ms)` followed by `Request()` delivers at once, and
-    `RequestIn(50ms)` alone delivers at 50 ms;
-  * `Close` makes a pending `Wait` return nil, and `synctest.Wait` then
-    finds no goroutine blocked in the package;
-  * `WithSend` delivers through the function and needs no `Wait`;
-  * `Seq` increases by one per delivered frame.
-* **Policy table.** Snapshots step through codex's transitions:
-  * enter CatchUp at depth 8 and at age 120 ms;
-  * no exit until depth ≤ 2 and age ≤ 40 ms have held for 250 ms;
-  * no re-entry within 250 ms, except at depth 64 or age 300 ms;
-  * an empty queue resets to Smooth.
-* **Queue.** `Drain` releases from the head only, in order; `Snapshot`
-  reports depth and the oldest age; it allocates nothing per item once it
-  has grown (a `testing.AllocsPerRun` check).
-* **Mutations:**
-  * the `due` channel is unbuffered;
-  * the frame-rate cap is skipped;
-  * the exit hold is ignored;
-  * the severe bypass is ignored;
-  * `Drain` releases from the tail.
+  // InterpretRow is one row of interpreted output.
+  type InterpretRow struct {
+  	Styled string // the row with its SGR, reset at its end
+  	Plain  string // the row's text alone, for copy and search
+  }
 
-### Step 4: `inputfilter`, and the workspace's mouse extension point
+  const (
+  	DefaultInterpretRows = 50_000
+  	DefaultInterpretCols = 8_192
+  )
 
-* The API of MADR §6: `Filter`, `New` and its options, `Attach`,
-  `CoalescedWheelMsg`, `PasteBurst`, `BurstAction`.
-* `workspace/render.go`'s `local` gains a case for a `tea.MouseMsg` with
-  `WithMouse(tea.Mouse) tea.Msg`. Its doc comment and
-  `docs/guides/building-workspaces.md` say so.
-* **Tests, with an injected clock:**
-  * 100 wheel-down notches within 16 ms reach the filter's caller as one
-    `CoalescedWheelMsg` with `DY == 100` once `Attach` flushes the
-    residual, and the first notch passes at once;
-  * up then down resets the sum;
-  * without `Attach`, the residual joins the next wheel event, as the
-    MADR documents;
-  * motion is throttled to one sample per interval, and clicks, releases
-    and keys pass untouched;
-  * `PasteBurst` passes codex's cases: a three-character burst, Enter
-    inside a burst, a burst ended by an arrow key, the slower Windows idle
-    timeout, and ordinary typing at 50 ms intervals passing through;
-  * a burst arrives as one `tea.PasteMsg`;
-  * after a `tea.PasteStartMsg`, detection is off;
-  * under interleaved keys, wheel events and drain messages, the order the
-    model sees equals the input order;
-  * the filter never calls `send` on the calling goroutine (a `send` that
-    panics when called on the event loop's goroutine stays silent).
-* **Workspace test.** A `CoalescedWheelMsg` over a pane reaches that pane
-  in local coordinates. A custom mouse type with `WithMouse` does too. One
-  without it is still dropped.
-* **Mutations:**
-  * the direction reset is removed;
-  * the filter returns every motion sample;
-  * the FIFO is bypassed for new input;
-  * `local` ignores `WithMouse`;
-  * `PasteStartMsg` does not disable detection.
+  // Interpret replays captured terminal output into rows (0009-MADR A1).
+  func Interpret(raw []byte, o InterpretOptions) []InterpretRow
+  ```
 
-### Step 5: `stream` engine
+* **Behaviour,** as A1 sets it: a grid of cells, each advanced by its
+  width under `Method`, a wide cluster taking two and a half-overwritten
+  one blanked; SGR in its `;` and `:` forms kept, and written once per
+  change of style; CR to column 0, overwriting; BS one cell back; HT to the
+  next multiple of 8; `CSI K` and `J` with 0, 1 and 2, and `A`, `B`, `C`,
+  `D` and `G`, each with a default of 1; every other sequence, OSC among
+  them, and every other control dropped; invalid UTF-8 one U+FFFD per
+  maximal subpart, as `safetext` writes it. Past `MaxCols`, a row is cut;
+  past `MaxRows`, the oldest rows go, so the output's tail is kept. Each
+  call starts afresh, so its result is a function of its input.
+* **Tests:** a table with one row per feature above; a progress bar
+  rewritten by CR ends as its last state; a wide rune advances two cells;
+  each cap; `Interpret` twice over the same bytes is equal.
+  `FuzzInterpret`: no row wider than `MaxCols` cells under `Method`;
+  `Styled` holds no sequence but SGR; `Plain` is `ansi.Strip(Styled)`;
+  `Plain` passes `safetext.IsClean` under `safetext.Line()`.
+* **Benchmark:** 1 MB of `go test -v` output with colour and a CR progress
+  bar, its allocations reported.
+* **Mutations:** one column a rune (the wide-rune row); CR not returning
+  to column 0 (the progress bar); HT to a multiple of 4; OSC kept
+  (`FuzzInterpret`); `MaxRows` ignored; the `:` form of SGR not read.
+* **Docs:** `stream`'s package documentation; `docs/architecture.md`'s
+  `stream` row.
 
-* The API of MADR §4: `Renderer`, `RendererFunc`, `Plain`, `Doc`, `New`,
-  its options, `Buffer`, `NewBuffer`, and `Doc.Pull`.
-* **The cut scanner** is unexported, line-oriented and table-tested on its
-  own:
-  * fences: backtick and tilde, longer closers, indented openers, info
-    strings, and an unclosed fence;
-  * list items with continuation lines, loose lists, and a new list after
-    a blank line;
-  * block quotes; HTML blocks of types 1–7; indented code;
-  * tables; setext headings; reference and footnote definitions.
-* **Property tests** over a block grammar (paragraphs, ATX and setext
-  headings, lists, fences, tables, quotes, HTML blocks, reference
-  definitions, long runs with no blank line) and random chunkings:
-  * **Chunking invariance.** The frame after the last chunk equals the
-    frame from one `Append` of the whole text, at the same width.
-  * **Finish exactness.** After `Finish`, `Render(w)` equals
-    `Renderer.Render(Source(), w)`.
-  * **Stated differences.** With a fake renderer whose output is
-    predictable, and no relaxed cut, the frame equals the one-shot frame
-    once runs of blank lines are collapsed.
-  * **Cost.** A counting renderer, calling `Render` after every 20-byte
-    chunk of 200 KB of prose with paragraphs, 200 KB with none, one
-    200 KB fence and one 200 KB list, proves:
-    * every committed byte reaches the renderer once at that width;
-    * no `Render` passes more than `RelaxAfter` plus the longest line of
-      tail.
+### Step 3: `frame`, its scheduler, and `frame/frametea`
 
-    A 200 KB table is the stated exception: its tail is the whole table.
-  * **Resize.** Changing width and back renders no segment more than twice.
-  * **Sanitizing.** No frame holds 0x1B except the styling the renderer
-    added, which a renderer that adds none proves.
-* **Holdback tests.** `Hello **wor` shows `"Hello "`; a closed `**world**`
-  shows; an unclosed backtick run, `~~` and `[label](http…` are held; the
-  partial line is hidden while complete lines are queued.
-* **Buffer.** Concurrent `Write`s from 8 goroutines under `-race` lose no
-  bytes and keep each writer's order. `Close` makes `Pull` call `Finish`.
-  Each `Write` that completes a line calls `Request`.
-* **Fuzz.** `FuzzDoc`, over arbitrary text and split points, finds no
-  panic, and checks chunking invariance and Finish exactness.
-* **`stream/streamtest`** (MADR A2, if accepted): the chunking-invariance
-  and Finish-exactness properties live in `CheckRenderer(t, r, o...)`,
-  built on `stream`'s exported API only, and `stream`'s tests call it with
-  `Plain`. A test that calls it with a renderer whose output depends on
-  where the source was cut must fail; that mutation is recorded.
-* **Benchmarks:** streaming 200 KB in 20-byte chunks with `Plain`,
-  reporting allocations, against a naive re-render of the whole source per
-  chunk.
-* **Mutations:**
-  * a cut is allowed inside a fence;
-  * the next-line check for list continuation is skipped;
-  * a reference definition does not drop the cache;
-  * `Finish` keeps the segmented render;
-  * the relaxed cut is never taken;
-  * a relaxed cut is taken inside a table;
-  * a list's relaxed cut drops the item number;
-  * `Append` skips the sanitizer.
+* **Facts re-read:** Bubble Tea's frame-rate bounds (`renderer.go:13-14`,
+  60 and 120); `tea.Cmd`'s shape; `testing/synctest`'s API.
+* **The pure layer** (`frame`), used on one goroutine, time passed in:
 
-### Step 6: `stream.Pane`
+  ```go
+  type FrameMsg struct {
+  	At  time.Time // when the frame fell due
+  	Seq uint64    // one more for each frame delivered
+  }
 
-* The API of MADR §5: `Pane`, `NewPane`, its options, `PaneKeys`, and the
-  `workspace` interfaces it implements (`Pane`, `Changer`, `Titled`,
-  `KeyMapper`).
-* **Tests, through a real `workspace.Workspace`:**
-  * the newest line stays visible while following; scrolling up stops
-    following; scrolling to the end resumes it;
-  * `Changed` is false after an unrelated message, and true after a
-    `Version`, size or scroll change, so the workspace does not ask for
-    `View` again otherwise;
-  * a `frame.Msg` pulls from an attached `Buffer`;
-  * `tea.MouseWheelMsg` and `CoalescedWheelMsg` scroll by their deltas;
-  * `View` is O(height): a benchmark at 10 000 lines and at 100 lines
-    differs by less than 2×;
-  * every binding in `PaneKeys` can be rebound or removed.
-* **Goldens** across the 0001 §6 matrix at 60 and 120 columns: mid-stream
-  with a partial line, mid-stream inside a table, finished, and scrolled
-  up with indicators.
-* **Mutations:**
-  * `Changed` always returns true;
-  * following ignores the user's scroll;
-  * the scroll indicators do not use `glyph`.
+  type Queue[T any] struct{ /* a ring of (T, time.Time) */ } // zero value ready
+  func (q *Queue[T]) Push(v T, at time.Time)
+  func (q *Queue[T]) Len() int
+  func (q *Queue[T]) Snapshot(now time.Time) Snapshot
+  func (q *Queue[T]) Drain(p Pacer, now time.Time) iter.Seq[T]
+
+  type Snapshot struct {
+  	Depth  int
+  	Oldest time.Duration
+  }
+  type Pacer interface{ Pace(s Snapshot, now time.Time) Release }
+  type PacerFunc func(s Snapshot, now time.Time) Release
+  type Release struct {
+  	Take int
+  	Gear Gear
+  }
+  type Gear uint8 // Smooth, CatchUp: tokens "smooth", "catch-up"
+
+  func Adaptive(o ...AdaptiveOption) Pacer // codex's two gears
+  func Immediate() Pacer                   // the whole queue each frame
+  ```
+
+  `Adaptive`'s options are `WithCatchUpDepth` (8), `WithCatchUpAge`
+  (120 ms), `WithSmoothDepth` (2), `WithSmoothAge` (40 ms), `WithHold`
+  (250 ms), `WithSevereDepth` (64) and `WithSevereAge` (300 ms), each
+  keeping its default at zero or less. The frame-rate arithmetic, when a
+  frame wanted at a time may be drawn after the last, is an unexported
+  function the scheduler calls, exported only if a step needs it.
+* **The driver** (`frame`), safe for concurrent use:
+
+  ```go
+  func NewScheduler(o ...Option) *Scheduler // WithFPS(n): 60; clamped to 1..120
+  func (s *Scheduler) Request()                  // as soon as the cap allows
+  func (s *Scheduler) RequestIn(d time.Duration) // the earliest deadline wins
+  func (s *Scheduler) Frames() <-chan FrameMsg   // capacity one: requests merge
+  func (s *Scheduler) Close() error              // closes Frames; idempotent
+  ```
+
+  One `time.Timer` under a mutex; a goroutine started by `WaitGroup.Go`
+  sends a due frame, stamped with the time it fell due, and stops; `Close`
+  stops the timer, waits, and closes `Frames`.
+* **The adapter** (`frame/frametea`):
+
+  ```go
+  func Wait(s *frame.Scheduler) tea.Cmd                           // one FrameMsg; nil once closed
+  func Forward(s *frame.Scheduler, send func(tea.Msg)) (stop func()) // push delivery, §3's WithSend
+  ```
+
+  A program re-arms `Wait` on each `FrameMsg`:
+  `return m, tea.Batch(m.pane.Update(msg), frametea.Wait(m.frames))`.
+* **Tests,** inside `synctest.Test`:
+  * 1,000 `Request`s from 10 goroutines within one frame deliver one
+    `FrameMsg`;
+  * frames come no closer than 1/fps, at 60 and 120 fps; `WithFPS(500)`
+    is 120 and `WithFPS(0)` is 60;
+  * `RequestIn(50ms)` alone delivers at 50 ms, and with a `Request` after
+    it at once, the cap allowing;
+  * `Seq` rises by one a frame, and `At` is the fake clock's due time;
+  * `Close` closes `Frames`, a second `Close` returns nil, and no
+    goroutine is left (the bubble ends);
+  * `frametea.Wait` returns the frame, and nil after `Close`;
+    `Forward`'s `stop` ends delivery.
+* **The pacer's table,** codex's transitions: CatchUp entered at depth 8
+  and at age 120 ms; left only when depth ≤ 2 and age ≤ 40 ms have held
+  250 ms; no re-entry within 250 ms but at depth 64 or age 300 ms; an
+  empty queue back to Smooth. `PacerFunc` adapts a function.
+* **The queue:** `Drain` takes from the head, in order; `Snapshot` gives
+  depth and the oldest's age; once grown, `Push` and `Drain` allocate
+  nothing an item (`testing.AllocsPerRun`).
+* **Mutations:** `Frames` unbuffered, or of capacity 2 (the merge test);
+  the cap skipped; the exit hold ignored; the severe bypass ignored;
+  `Drain` from the tail; `Close` not waiting for the goroutine (the
+  bubble); `Seq` not raised.
+* **Conformance:** `frame` joins `cores`; `TestCoresAreCharmFree` passes,
+  and fails on a scratch copy that imports Bubble Tea into `frame`.
+* **Defaults:** the `frame` rows of Step 1 that this step builds become
+  `built`.
+
+### Step A1.2: `Coalescer`, `Demand`, `Writer` and `Upgrader`
+
+* **Facts re-read:** 0003-REPORT §8.17's numbers (83 ms, 5 s, 100 ms);
+  Bubble Tea's renderer writing changes only (`cursed_renderer.go:643`;
+  ultraviolet `terminal_renderer.go:111-117`), on which `Writer` rests
+  (A7 item 10).
+* **The API** (`frame` unless named):
+
+  ```go
+  // Coalescer batches mergeable items a frame at a time; any other item is
+  // a barrier, which flushes the batch first. Used on one goroutine.
+  func NewCoalescer[T any](apply func([]T), mergeable func(T) bool, maxWait time.Duration) *Coalescer[T]
+  func (c *Coalescer[T]) Push(v T, now time.Time) (due time.Time, ok bool) // a deadline, when one is newly needed
+  func (c *Coalescer[T]) Flush()
+
+  type Demand uint8 // None, Slow, Fast: tokens "none", "slow", "fast"
+  func Combine(d ...Demand) Demand // the greatest
+  func (d Demand) Interval(fps int) time.Duration // 0 for None; 83 ms for Slow; a frame for Fast
+
+  // Writer wraps the output a program gives tea.WithOutput. Safe for
+  // concurrent use.
+  func NewWriter(w io.Writer, o ...WriterOption) *Writer // WithStallAfter(5 s)
+  func (w *Writer) Write(p []byte) (int, error)
+  func (w *Writer) Events() <-chan WriterEvent // Stalled, Resumed
+  func (w *Writer) Close() error
+
+  // Upgrader runs costly renders off the event loop. Safe for concurrent use.
+  func NewUpgrader[K comparable, R any]() *Upgrader[K, R]
+  func (u *Upgrader[K, R]) Submit(key K, gen uint64, fn func(context.Context) R)
+  func (u *Upgrader[K, R]) Results() <-chan UpgradeMsg[K, R]
+  func (u *Upgrader[K, R]) Close() error
+  type UpgradeMsg[K comparable, R any] struct {
+  	Key    K
+  	Gen    uint64
+  	Result R
+  }
+  ```
+
+  `frame/frametea` adds `TickCmd(d frame.Demand, fps int) tea.Cmd`, nil
+  for `None`; `WaitUpgrade(u) tea.Cmd`; and `CoalesceCmd(due time.Time)
+  tea.Cmd`, the tick for a `Coalescer`'s deadline.
+* **`Writer`** writes on its own goroutine; while a write is in flight it
+  appends later writes to one pending buffer, written whole after, and
+  drops nothing (A7 item 10). `Write` returns `len(p)` and the error of an
+  earlier write, if any. A write in flight longer than the stall time
+  sends `Stalled` once, and `Resumed` when it completes.
+* **`Upgrader`:** a newer `Submit` for a key cancels the older job's
+  context; a result whose generation is older than the newest submitted
+  for its key is dropped; `Close` cancels every job and waits.
+* **Tests,** inside `synctest.Test`: a barrier between deltas is applied
+  after the earlier and before the later, for every interleaving of a
+  generated sequence; the maximum wait applies a batch when no frame
+  comes; `Combine` is the greatest; `Interval(None)` is 0 and `TickCmd`
+  nil; an idle program whose demand is `None` arms no timer; `Writer` over
+  a writer that blocks makes many draws one write, sends one `Stalled`
+  after 5 s and one `Resumed`, and the bytes written equal the bytes
+  given, in order; `Upgrader` replaces, cancels, drops stale results, and
+  leaves no goroutine after `Close`.
+* **Mutations:** the barrier not flushing first; `TickCmd(None)` a
+  command; `Writer` dropping the pending buffer (the byte count);
+  `Writer` writing a second time while one is in flight; `Upgrader`
+  keeping a stale result; `Upgrader` not cancelling the replaced job.
+
+### Step 4: `inputfilter`, its driver, `inputfilter/inputfiltertea`, and the extension point
+
+* **Facts re-read:** `tea.MouseMsg` (`mouse.go:46`) and the paste
+  messages (`paste.go`); `local` at `workspace/render.go:538-556`;
+  `keymaptea.FromTea`, which converts a `tea.Key` to a
+  `termkey.KeyEvent`.
+* **The pure layer** (`inputfilter`), used on one goroutine, time passed
+  in:
+  * a wheel sum: notches added by direction, a change of direction
+    resetting it, the first passing at once and later ones at most one an
+    interval, carrying the sum, and a residual a caller can take;
+  * a motion throttle: one sample an interval;
+  * `PasteBurst`, over `termkey.Input`, with `PasteBurstConfig` (codex's
+    3 characters, 8 ms gap, 8 ms idle, 60 ms on Windows, the platform
+    from the config's `GOOS`), `Key(in termkey.Input, now time.Time)
+    BurstAction` and `Tick(now time.Time) (termkey.Input, bool)`, which
+    gives a burst as one `termkey.InputPaste`; Enter inside a burst a
+    newline; a bracketed paste turning detection off for good.
+* **The driver** (`inputfilter.Flusher`), safe for concurrent use: the
+  timed flushes, a wheel residual and a burst's idle end, on a
+  receive-only channel, with `Close`.
+* **The adapter** (`inputfilter/inputfiltertea`):
+
+  ```go
+  func NewFilter(o ...Option) *Filter // WithInterval(16 ms), WithoutWheelCoalescing,
+  	// WithoutMotionThrottle, WithPasteBurst(inputfilter.PasteBurstConfig), WithWheelProfile(n)
+  func (f *Filter) Filter(m tea.Model, msg tea.Msg) tea.Msg // for tea.WithFilter
+  func (f *Filter) Attach(send func(tea.Msg)) (stop func()) // the driver's flushes, and the FIFO's drain
+
+  type CoalescedWheelMsg struct {
+  	Pointer tea.Mouse
+  	DX, DY  int
+  }
+  func (m CoalescedWheelMsg) Mouse() tea.Mouse
+  func (m CoalescedWheelMsg) String() string
+  func (m CoalescedWheelMsg) WithMouse(t tea.Mouse) tea.Msg
+  func (m CoalescedWheelMsg) WheelDelta() (dx, dy int)
+  ```
+
+  A burst reaches the model as `tea.PasteMsg`. Order is kept by §6's FIFO,
+  drained through `send` from a goroutine the filter starts, so the event
+  loop never blocks on itself. `WheelDelta` lets a pane read any coalesced
+  wheel message without importing this package.
+* **`workspace`'s extension point:** `local` gains one case, a
+  `tea.MouseMsg` with `WithMouse(tea.Mouse) tea.Msg`, translated by calling
+  it; its comment and `docs/guides/building-workspaces.md` say so.
+* **Tests:** the pure layer with given times: 100 notches within 16 ms
+  give the full sum once the residual is taken, the first at once;
+  up then down resets; motion one an interval; clicks, releases and keys
+  untouched; `PasteBurst` passes codex's cases, a 3-character burst,
+  Enter inside, a burst ended by an arrow, Windows' longer idle, and
+  typing 50 ms apart passing through. The driver, inside `synctest.Test`:
+  the residual flushed after the last notch; no goroutine after `Close`.
+  The filter: a burst arrives as one `tea.PasteMsg`; after a
+  `tea.PasteStartMsg` detection is off; interleaved keys, wheel events and
+  drains keep their order; `send` is never called on the calling
+  goroutine. The workspace: a `CoalescedWheelMsg` over a pane arrives in
+  its local cells; a program's own type with `WithMouse` does too; one
+  without it is dropped.
+* **Mutations:** the direction reset removed; every motion sample passed;
+  the FIFO bypassed by new input; `local` ignoring `WithMouse`; a
+  `PasteStartMsg` leaving detection on; `Close` not waiting.
+* **Conformance:** `inputfilter` joins `cores`, and imports `termkey`, a
+  core.
+
+### Step A1.3: the input stages, measured first
+
+* **Measured before any code,** on a scratch module against the tree:
+  Bubble Tea's reading of an SGR mouse report and a focus report split at
+  each byte with gaps of 10, 60 and 200 ms, and of an X10 report past
+  column 95, fed through a pipe; and of a bracketed paste with CRLF and
+  lone CR. The record quotes what the model received. A stage the
+  measurement shows Bubble Tea already does, as ultraviolet's 50 ms join
+  may (A6 item 2), is not built, and the owner is told, as a deviation.
+* **The stages,** each over `termkey.Input` in `inputfilter`, with its
+  conversion in `inputfiltertea`, as A1 lists them: fragment reassembly
+  past the measured window; X10 repair; late probe replies swallowed by
+  matcher functions the caller gives, so `inputfilter` imports no
+  `termcap`; a bare Esc flushing what any stage holds; `Capture` and
+  `Quarantine` typeahead, neither on by default; paste normalisation,
+  CRLF and lone CR to LF, and an empty bracketed paste to
+  `ClipboardImageRequestMsg`, a plain struct in the core;
+  `PastedPath(s, goos string) (string, bool)`; grok's PowerShell burst
+  cases as `PasteBurstConfig` fields; and `WithWheelProfile`'s events a
+  notch, 1 by default.
+* **Tests:** each report split at every byte and in every two-way split
+  reaches the model as one message, or none for a swallowed reply, and no
+  stray key; a truncated report at the input's end is held, then given as
+  keys by the next bare Esc, never as a mouse event; `Capture` keeps text,
+  Backspace, Shift and Alt+Enter and pastes, and cuts at the first Esc;
+  `Quarantine` drops all input to its deadline; the paste cases;
+  `PastedPath`'s quoted, `file://`, drive and UNC forms, and prose
+  refused; a profile of 3 makes 3 events one notch.
+* **Mutations:** reassembly skipped; X10 repair skipped; late replies
+  passed as keys; Esc not flushing; CR left in a paste.
+
+### Step 5: `Scanner`, `Doc`, `Renderer`, `Plain`, `Buffer` and `stream/streamtest`
+
+Four parts, each passing its tests before the next.
+
+1. **`Scanner`, moved out of the `Printer`** (A6 item 5; 0023-MADR A6
+   item 2). The block state the `Printer` keeps in its own fields
+   (`fence`, `html`, `table`, `tableNL`, `paragraph`, `lazy`, `defs`) moves
+   into `Scanner`, whose zero value is a document's start:
+
+   ```go
+   type Scanner struct{ /* the open fence, HTML block, table, paragraph, containers */ }
+   func (s *Scanner) Scan(line string) Block // one complete line
+   type Block struct {
+   	Kind BlockKind // tokens from internal/enum
+   	Cut  bool      // a cut may fall before the next line, by §4's rule
+   	// … the fields §4's decisions need
+   }
+   ```
+
+   The `Printer` is rebuilt on it, and every one of its tests passes
+   unchanged, its goldens byte for byte: `TestApply` to
+   `TestParagraphContinues`, `FuzzPrinter`, `ExamplePrinter`, and
+   `TestReplyBudget`'s allocation budget.
+2. **`Doc`,** on `Scanner`, as §4 decides, with A4's and A6's names:
+
+   ```go
+   type Renderer interface{ Render(src string, width int) (string, error) }
+   type RendererFunc func(src string, width int) (string, error)
+   func Plain(m ansi.Method) Renderer // wraps with wrapProse, lays tables out with layoutTable
+
+   func NewDoc(r Renderer, o ...Option) *Doc // stream.Option: WithRules, WithMethod,
+   	// WithRelaxAfter(2 KiB), WithoutInlineHoldback, WithoutPartialLine
+   func (d *Doc) Append(s string)
+   func (d *Doc) Write(p []byte) (int, error)
+   func (d *Doc) Finish()
+   func (d *Doc) Reset()
+   func (d *Doc) Render(width int) string
+   func (d *Doc) Version() uint64
+   func (d *Doc) Finished() bool
+   func (d *Doc) Source() string
+   ```
+
+   `stream.Option` gains a second unexported method so that one option
+   applies to a `Printer` and a `Doc` (A6 item 4, A7 item 6); an option
+   that means nothing to one of them is documented as ignored by it.
+3. **`Buffer` and `Doc.Pull`,** in `stream` (A7 item 9):
+
+   ```go
+   func NewBuffer(s *frame.Scheduler) *Buffer           // safe for concurrent use
+   func (b *Buffer) Write(p []byte) (int, error)          // whole lines timestamped; a line requests a frame
+   func (b *Buffer) Close() error                        // the stream's end: Pull then calls Finish
+   func (d *Doc) Pull(b *Buffer, p frame.Pacer, now time.Time) bool // true while more is queued
+   ```
+
+4. **`stream/streamtest`** (A2): `CheckRenderer(t testing.TB, r
+   stream.Renderer, o ...stream.Option)`, built on `stream`'s exported API
+   alone, streaming generated documents in random chunks and reporting
+   chunking invariance and `Finish` exactness through `t`.
+
+* **Tests:** the scanner's table (fences of both characters, longer
+  closers, indented openers, info strings, an unclosed fence; list items
+  with continuations, loose lists, a new list after a blank; quotes; HTML
+  blocks of types 1 to 7; indented code; tables; setext headings;
+  reference and footnote definitions). The properties, over a block
+  grammar and random chunkings, through `CheckRenderer` with `Plain`:
+  chunking invariance; `Finish` exactness; the stated differences only,
+  with a fake renderer and no relaxed cut; the cost, by a counting
+  renderer over 200 KB of prose with paragraphs, prose with none, one
+  fence and one list, every committed byte rendered once a width and no
+  `Render` given more than `RelaxAfter` and a line of tail, a 200 KB table
+  the stated exception; a width changed and back rendering no segment
+  more than twice; no frame holding 0x1B that the renderer did not add.
+  Holdback: `Hello **wor` shows `Hello `; a closed `**world**` shows; an
+  open backtick run, `~~` and `[label](http…` are held; the partial line
+  hidden while lines are queued. `Buffer`: 8 goroutines writing under
+  `-race` lose no byte and keep each writer's order; a completed line
+  requests a frame; `Close` makes `Pull` call `Finish`. `FuzzDoc` over
+  text and split points: no panic, chunking invariance, `Finish`
+  exactness.
+* **Benchmark:** 200 KB in 20-byte chunks through `Plain`, its
+  allocations, against a whole re-render per chunk.
+* **Mutations:** a cut inside a fence; the list's next-line check
+  skipped; a reference definition keeping the cache; `Finish` keeping the
+  segmented render; the relaxed cut never taken; a relaxed cut inside a
+  table; a list's relaxed cut losing its number; `Append` skipping the
+  sanitizer; `CheckRenderer` with a renderer whose output depends on
+  where the source was cut (it must fail); the `Printer` built on a
+  `Scanner` that forgets the lazy continuation (`TestParagraphContinues`).
+
+### Step 6: `theme.Theme.ID` and `DocPane`
+
+* **Facts re-read:** `theme.New`, `theme.Theme`'s fields; the workspace's
+  `Theme()` and `WidthMethod()`; `palette`'s keys (`palette/keys.go`) as
+  the pattern of A7 item 2.
+* **`theme.Theme.ID`** (A6 Q9, A7 item 4): `func (t Theme) ID() uint64`,
+  stamped by `New` from a `sync/atomic` counter, unique a process; a
+  literal `Theme` has 0. `Theme`'s and `ID`'s documentation say that a
+  copy keeps its ID, and that a changed theme is built with `New`.
+* **`DocPane`** (`stream/streamtea`), used on the event loop:
+
+  ```go
+  func NewDocPane(w *workspace.Workspace, d *stream.Doc, o ...Option) *DocPane
+  	// WithTitle(s), WithoutFollow(), WithBuffer(*stream.Buffer), WithPacer(frame.Pacer)
+  func (p *DocPane) Update(msg tea.Msg) (workspace.Pane, tea.Cmd)
+  func (p *DocPane) View(width, height int) string
+  func (p *DocPane) Changed() bool
+  func (p *DocPane) Title() string
+  func (p *DocPane) KeyContexts() []command.Scope // DocPaneScope, "kind:docpane"
+  func (p *DocPane) ConsumesCommand(id command.ID) bool
+  func DefaultRules() []keymap.Default // up, down, pgup, pgdown, home, end
+  const (
+  	ScrollUpID   command.ID = "stream.scroll.up"
+  	ScrollDownID command.ID = "stream.scroll.down"
+  	PageUpID     command.ID = "stream.page.up"
+  	PageDownID   command.ID = "stream.page.down"
+  	TopID        command.ID = "stream.top"
+  	BottomID     command.ID = "stream.bottom"
+  )
+  ```
+
+  It follows the tail until scrolled up, and again at the bottom; it pulls
+  from its `Buffer` on each `frame.FrameMsg` with its pacer, `Adaptive` by
+  default; it scrolls by a `tea.MouseWheelMsg`, and by any mouse message
+  with `WheelDelta() (dx, dy int)`; it reads `w.Theme()` and
+  `w.WidthMethod()` at each draw, and keeps its lines by width, method and
+  theme ID, an ID of 0 never reused; its scroll marks come from the
+  theme's glyphs; `Changed` is true only after a new `Version`, size,
+  scroll or key.
+* **Tests:** `ID`: two `New`s differ, a copy keeps its ID, a literal is 0,
+  concurrent `New`s under `-race` are unique. `DocPane`, in a real
+  workspace with `workspace.DefaultRules()` and `DefaultRules()` in its
+  keymap: following, stopping and resuming; `Changed` false after an
+  unrelated message; a frame pulls; both wheel messages scroll; each
+  command moves as named, and a rebound key does too; a theme change
+  redraws, and a literal theme is never served from the cache; `View`
+  at 10,000 lines within 2× of 100 lines (a benchmark). Goldens across the
+  matrix: mid-stream with a partial line, inside a table, finished, and
+  scrolled up with its marks.
+* **Mutations:** `Changed` always true; following ignoring the user's
+  scroll; the cache keyed without the theme ID; an ID of 0 reused;
+  `ConsumesCommand` false for a scroll command; the marks not from the
+  glyphs.
+* **Conformance:** `stream/streamtea` is not a core; `theme`'s API
+  diff is one addition.
+
+### Step A1.4: `RenderView`, the dialect, `Highlighter`, `FitTable` and `Bounded`
+
+* **The API,** A1's, with A4's names: `Doc.View(width int) RenderView`,
+  its lines with their source offsets, links with IDs and cell ranges,
+  code blocks with their info and ranges, and table copy data;
+  `Highlighter` and `HighlighterFunc`; `FitTable` from `layoutTable`, with
+  A1's fallbacks to key/value records, stacked records and the source;
+  `Bounded`, with its byte, line and line-length limits as options.
+  `Bounded`'s omitted-lines marker is the message `stream.MsgOmitted`,
+  with `Messages()` and `WithCatalog`, `stream`'s first text a user is
+  shown; `DocPane` passes its catalogue on.
+* **Tests:** A1's: chunking invariance of `RenderView`; a wrapped link
+  keeping one ID across a tail re-render; `~**10%**` not struck, `~~x~~`
+  struck, an open `\(` held until `Finish` with math on; a counting
+  `Highlighter` highlighting each line of a growing fence once, both caches
+  dropped by a theme ID or width change, each limit showing code plain;
+  `FitTable` keeping numbers and URLs whole, padding a wide-glyph row
+  exactly, falling back as the width shrinks, with goldens across the
+  matrix and the ASCII border set; `Bounded` keeping head and tail,
+  closing a cut escape, and giving one omitted count at two widths.
+* **Mutations:** `RenderView` not cut back on a tail re-render; a single
+  `~` striking; the fence re-highlighted whole each line; `FitTable`
+  clipping by byte; `Bounded` counting rows instead of lines; the marker
+  not from the catalogue.
+
+### Step 8: the examples, the guide, and the root's release
+
+* **Examples,** each with `// guide:` regions: `ExampleDoc` (`stream`),
+  `ExampleScheduler` (`frame`), `ExampleFilter` (`inputfiltertea`), and
+  `ExampleDocPane` (`streamtea`), which streams an answer from a goroutine
+  through a `Buffer` into a `DocPane` in a workspace, and shows the one
+  line that re-arms `frametea.Wait`.
+* **`docs/guides/streaming-content.md`:** feeding a `Doc` from the event
+  loop or from goroutines; the scheduler, and why `Wait` is re-armed;
+  choosing a pacer; the filter, `Attach` and paste bursts; what `safetext`
+  removes and adding trusted links with `termsvc.Linker`; what may differ
+  before `Finish`; the line mode's use of the cores; `Interpret`,
+  `RenderView` and `Bounded`; and the `DocPane`'s commands.
+* **`docs/architecture.md`,** `README.md` and `docs/README.md`'s rows;
+  "Migrating to `v2.N.0`" in `docs/guides/migrating.md`.
+* **The release,** a minor of the root, under
+  [0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)'s
+  rule 4 and `docs/guides/releasing.md`: the API listed by `apidiff`; the
+  notes; the disclosure guard; the owner's push and tag; CI green on both;
+  and a consumer smoke test from the proxy, in a scratch module, that
+  streams a document into a `DocPane` and paces a line-mode reply with
+  `frame` and no Bubble Tea, whose closure for Linux, macOS and Windows
+  holds no Charm module but `x/ansi` for the cores, with a control that
+  fails against the release before.
 
 ### Step 7: `stream/glamourmd`, a nested module
 
-*Revised 2026-10-02 for MADR amendment A2.* The original step added glamour
-to the root `go.mod`; it now creates a nested module.
+* **Runs after Step 8's tag** (0010-MADR §3).
+* **Facts re-read,** each recorded before the requirement is added:
+  glamour's newest release (`v2.0.1` on 2026-11-01) and its `go.mod`; A7
+  item 5's lines in its source; each added module's licence, from its
+  licence file; `GOWORK=off govulncheck ./...` in the module, on a scratch
+  copy; the `StyleConfig` fields that set bullets, rules, quote bars and
+  table separators, and any glyph glamour draws that no field controls. A
+  finding stops the step for the owner.
+* **The module:** `stream/glamourmd/go.mod`, `module
+  github.com/maccavelli/go-tui-lib/stream/glamourmd`, `go 1.27.2`,
+  requiring `github.com/maccavelli/go-tui-lib/v2` at Step 8's tag and
+  `charm.land/glamour/v2`, with no `replace`; `go work use
+  ./stream/glamourmd` in the same commit; it imports the root's exported
+  packages only.
+* **The API** (A2, A4):
 
-* **Blocked** until MADR A2 and
-  [0010-MADR-nested-adapter-modules.md](0010-MADR-nested-adapter-modules.md)
-  are accepted, and Phases 2–5 of
-  [0010-PLAN-nested-adapter-modules.md](0010-PLAN-nested-adapter-modules.md)
-  are complete: the per-module loop in `scripts/go-precheck.sh`, `make` and
-  CI, the `go.work` check, and the per-module depguard rules. *Met
-  (MADR A3 item 3); the loop is now `scripts/go-precheck.py`, which the
-  `.sh` shim runs (MADR A6).*
-* **Order** (0010-MADR §3). This step runs last: after Steps 2–6,
-  A1.1–A1.4 and 8 have landed and the owner has tagged that root release,
-  so that the adapter can require a published root version. If it ran
-  before that tag existed, its `GOWORK=off` gates would fail by design, so
-  it waits.
-* **Documentation** for the adapter lands in this step: its package
-  documentation, a section in `docs/guides/streaming-content.md` on
-  `go get`ting the module and on `FromTheme`, and its `docs/README.md` and
-  `docs/architecture.md` rows.
-* Before the requirement is added, record in the execution record:
-  * glamour's newest release and its `go.mod` (0010-REPORT §9 found v2.0.1
-    on 2026-10-02);
-  * the licence of each module it adds to `stream/glamourmd/go.mod`, from
-    each module's licence file;
-  * `GOWORK=off govulncheck ./...` in `stream/glamourmd` with the
-    requirement, on a scratch copy;
-  * which `ansi.StyleConfig` fields set list bullets, rules, quote bars and
-    table separators, and any glyph glamour draws that no field controls
-    (MADR §7).
+  ```go
+  func NewRenderer(o ...Option) *Renderer // WithTheme(theme.Theme), WithStyle(ansi.StyleConfig),
+  	// WithEmoji(), WithChromaFormatter(name)
+  func (r *Renderer) Render(src string, width int) (string, error) // safe for concurrent use
+  ```
 
-  A finding there stops the step for the owner.
-* **The module:**
-  * `stream/glamourmd/go.mod`: `module
-    github.com/maccavelli/go-tui-lib/stream/glamourmd`, ~~`go 1.27.1`~~
-    `go 1.27.2` (*2026-11-01, MADR A6*), and `require` of the root,
-    `github.com/maccavelli/go-tui-lib/v2`, at the tagged release and of
-    `charm.land/glamour/v2`, with no `replace`;
-  * `go work use ./stream/glamourmd` adds it to `go.work`, in the same
-    commit;
-  * the package imports only the root's exported packages, never
-    `internal/`.
-* The API of MADR §7, as amended by A2: `New`, `Renderer.Render`,
-  `WithStyle`, `FromTheme`, `WithEmoji`, `WithChromaFormatter`. `FromTheme`
-  builds the `StyleConfig` from `theme` and `glyph`, with
-  `CodeBlock.Chroma` nil, `CodeBlock.Theme` a built-in chroma style name,
-  `Document.Margin` 0, and table separators from `glyph`. The adapter never
-  calls `WithEnvironmentConfig`, `WithStylePath` or
-  `WithStylesFromJSONFile`.
-* **Tests:**
-  * renderers are cached per (width, theme revision, emoji), at most four,
-    least recently used first out;
-  * concurrent `Render` calls under `-race`, at one key and at two, are
-    serialized per key through its lock, and no render sees another's
-    state;
-  * **chroma's global registry is not touched.** One test process renders
-    a code block with the dark theme, then with the light theme, and the
-    code colours of each follow its own theme. A second check finds no
-    style named `charm` in chroma's registry afterwards;
-  * `FromTheme` under the dark, light and unknown palettes, and the ASCII
-    and NoTTY profiles through `colorprofile`, gives goldens across the
-    matrix with no colour where rule 4 forbids it;
-  * the ASCII glyph set gives an all-ASCII render of a list, a rule, a
-    quote and a table, borders included;
-  * a style with `Row` and `Column` separators set renders a table without
-    a panic, because `CenterSeparator` is always set;
-  * the rendered output has no leading or trailing document margin;
-  * the Step 5 properties run again with this renderer, through
-    `streamtest.CheckRenderer` (MADR A2): chunking invariance and Finish
-    exactness must hold. The "stated differences" check is run and its
-    result recorded per construct, as the MADR says.
-* **Mutations:**
-  * the cache ignores width;
-  * the cache ignores the theme revision;
-  * the per-key lock is removed (caught by `-race`);
-  * `FromTheme` ignores the background;
-  * `CodeBlock.Chroma` is left set (the two-theme test must fail);
-  * `CenterSeparator` is left unset (the table test must panic or fail).
+  `WithTheme` builds the whole `StyleConfig` from the theme and its glyphs:
+  `Document.Margin` 0, `CodeBlock.Chroma` nil and `CodeBlock.Theme` a
+  built-in chroma style chosen by the background, the table's three
+  separators from `glyph`, `CenterSeparator` always set with the others.
+  The renderers are an LRU of four, keyed by width, `theme.Theme.ID` and
+  emoji, each behind its own lock. It never calls
+  `WithEnvironmentConfig`, `WithStylePath` or `WithStylesFromJSONFile`.
+* **Tests:** the cache by its key, at most four, the least recently used
+  out; concurrent `Render`s under `-race` at one key and at two; chroma's
+  registry never holds "charm" after renders under two themes, each
+  theme's code in its own colours; `WithTheme` under the dark, light and
+  unknown palettes and the ASCII and no-colour profiles, goldens across
+  the matrix; the ASCII glyphs give an all-ASCII list, rule, quote and
+  table; a table renders with no panic; no document margin;
+  `streamtest.CheckRenderer` with this renderer, chunking invariance and
+  `Finish` exactness, and the stated differences recorded construct by
+  construct.
+* **Mutations:** the cache ignoring the width; ignoring the theme ID;
+  the lock removed (`-race`); the background ignored; `CodeBlock.Chroma`
+  left set (the two-theme test); `CenterSeparator` unset (the table test).
+* **Glossary:** `Renderer` joins "Deliberate" and `sharedNames` (the
+  glossary's planned pair).
 * **Checks,** per 0010-MADR §4, in `stream/glamourmd` with `GOWORK=off`:
-  `go vet`, `go test -race`, `LC_ALL=C go test`, golangci-lint for linux,
-  darwin and windows, `go mod tidy -diff` and `govulncheck`. The tests also
-  run once in workspace mode. The root module's gates run unchanged, and
-  its `go mod tidy -diff` stays clean with no glamour line.
-
-### Steps A1.1 to A1.4: MADR amendment A1
-
-A1 is accepted, with Q6–Q8 answered and recorded in the MADR, so these
-steps run ~~after Step 7 and before Step 8~~ after Step 6 and before Step 8
-(*2026-10-02, MADR A2:* Step 7 now runs last, after the root release). Each
-step follows the rules for every step above.
-
-### Step A1.1: `safetext` presets and `Interpret`
-
-* The API of MADR A1, §2: `Command`, `StatusLine`, and the `Policy` fields
-  `Escape`, `KeepSGR` and `LinkSchemes`; `Interpret`, `InterpretOptions`
-  and `Row`.
-* **Tests:**
-  * `Command` escapes each C0 and C1 control, DEL and each listed bidi or
-    format code point, and removes nothing: a table with one row per code
-    point, including a Trojan Source sample whose escaped form shows the
-    real order;
-  * `Command` output is one line and holds no 0x1B;
-  * `StatusLine` keeps SGR, drops every other CSI, swallows DCS, SOS, PM
-    and APC, keeps `ESC ( B` from painting `(B`, and keeps OSC 8 only for
-    http, https and mailto with a host;
-  * the zero `Policy` and the `Text`, `Strict` and `Line` presets give the
-    same output as before A1 (the Step 2 tables pass unchanged);
-  * `Interpret`: SGR in `;` and `:` forms, a CR-overwritten progress bar
-    ending as its last state, BS, tabs, each listed CSI, an OSC dropped, a
-    wide rune advancing two cells, and the row and column caps;
-  * `Interpret` is deterministic: two calls over the same bytes are equal.
-* **`FuzzClean`** gains the new presets and `Escape`, and `FuzzInterpret`
-  checks that no output line is wider than the column cap and none holds a
-  sequence other than SGR.
-* **Mutations:**
-  * `Command` drops a control instead of escaping it;
-  * `StatusLine` keeps a non-SGR CSI;
-  * `StatusLine` accepts a `javascript:` link;
-  * `Interpret` advances one column per rune.
-
-### Step A1.2: `frame` additions
-
-* The API of MADR A1, §3: `Coalescer`, `NewCoalescer`, `Demand`, `Combine`,
-  `TickCmd`, `Writer`, `Upgrader`, `UpgradeMsg`.
-* **Tests, inside `testing/synctest.Test`:**
-  * a barrier pushed between deltas is applied after the earlier deltas and
-    before the later ones, for every interleaving of a generated sequence;
-  * the maximum wait applies a batch when no frame comes;
-  * `Combine` is the maximum; `TickCmd(None)` is nil; an idle program
-    whose views all report `None` schedules no timer;
-  * `Writer` over a writer that blocks collapses many draws into one, emits
-    one stall event after the configured time and one recovery event after
-    it unblocks, and loses no byte;
-  * `Upgrader`: a newer job for a key replaces an older one; a result with
-    an old generation is dropped; cancelling the context stops a job.
-* **Mutations:**
-  * the barrier does not flush first;
-  * `TickCmd(None)` returns a command;
-  * `Writer` sends a second frame while one is in flight;
-  * `Upgrader` keeps stale results.
-
-### Step A1.3: `inputfilter` stages
-
-* The API of MADR A1, §6: the stage options, `Capture`, `Quarantine`,
-  `ClipboardImageRequestMsg`, `PastedPath`, the new `PasteBurstConfig`
-  options and `WithWheelProfile`.
-* **Tests:**
-  * **Split at every byte boundary.** Each SGR mouse report, focus report,
-    corrupted X10 report and late probe reply is fed split at every byte
-    position, and in every two-way split. Each reaches the model as exactly
-    one message, or none for a swallowed reply, and no stray key.
-  * a bare Esc flushes a held fragment at once;
-  * `Capture` keeps text, Backspace, Shift and Alt+Enter, and pastes, and
-    cuts at the first Esc; `Quarantine` drops everything until its
-    deadline, then passes input;
-  * CRLF and lone CR become LF inside a bracketed paste; an empty
-    bracketed paste becomes `ClipboardImageRequestMsg`;
-  * `PastedPath` accepts a quoted path, `file://`, a drive letter and a UNC
-    path, unescapes backslashes except on Windows, and refuses prose;
-  * grok's PowerShell burst cases, including Enter followed by Ctrl+J;
-  * a profile of 3 events per notch turns 3 wheel events into one notch.
-* **Broken input.** A deliberately truncated SGR mouse report at the end of
-  the input is held, then flushed as keys by the next bare Esc, and never
-  reaches the model as a mouse event.
-* **Mutations:**
-  * fragment reassembly is skipped;
-  * the X10 repair is skipped;
-  * late replies pass as keys;
-  * Esc does not flush.
-
-### Step A1.4: `stream` additions
-
-* The API of MADR A1, §4: `Doc.View`, `RenderView`, `Highlighter`,
-  `FitTable`, `Bounded`, and the dialect rules.
-* **Tests:**
-  * the chunking-invariance property of Step 5 also holds for `RenderView`:
-    the line map, links, code blocks and tables after the last chunk equal
-    those of a one-shot `Append`;
-  * a link wrapped across rows keeps one ID, before and after a tail
-    re-render;
-  * `~**10%**` is not struck through; `~~x~~` is; an unclosed `\(` is held
-    until `Finish` when math is on;
-  * a counting `Highlighter` highlights each line of a growing open fence
-    once; a theme revision or a width change drops its caches; inputs past
-    each limit are shown plain;
-  * `FitTable` keeps numbers and URLs whole, pads a row with a wide glyph to
-    the exact width, and falls back to records, stacked records and source
-    as the width shrinks; goldens across the 0001 §6 matrix, including the
-    ASCII border set;
-  * `Bounded` keeps head and tail past its limit, closes an escape cut at
-    the head, and reports the same omitted count at two widths.
-* **Mutations:**
-  * `RenderView` is not cut back on a tail re-render;
-  * a single `~` strikes through;
-  * the open fence is re-highlighted whole on each line;
-  * `FitTable` clips by byte;
-  * `Bounded` counts omitted rows instead of lines.
-
-### Step 8: example, guide and close-out
-
-* `ExampleDoc_stream` streams a Markdown answer through a `Buffer` from a
-  goroutine, into a `stream.Pane` in a `SidebarRight` workspace, with
-  `frame.Scheduler`, and prints the finished frame. Its comment shows the
-  one line that re-arms `Wait`.
-* `docs/guides/streaming-content.md`:
-  * feeding a `Doc` from the event loop or from goroutines;
-  * the frame scheduler, and why `Wait` is re-armed;
-  * choosing a drain policy;
-  * the input filter, `Attach`, and paste bursts;
-  * what `safetext` removes, and adding trusted links;
-  * what may differ before `Finish`;
-  * if A1 landed: the `Command` and `StatusLine` presets, `Interpret`, the
-    coalescer and tick demand, the output `Writer`, the input stages, and
-    `RenderView`.
-* `docs/architecture.md` lists the ~~five~~ four root packages and their
-  imports; Step 7 adds `stream/glamourmd` as a nested module
-  (*2026-10-02, MADR A2*). `docs/README.md` gains rows. Release notes go in
-  the execution record. The owner then tags the root release, which Step 7
-  waits for.
+  vet, `-race`, `LC_ALL=C`, golangci-lint for three systems, `go mod
+  tidy -diff`, govulncheck; the tests once in workspace mode; the root's
+  gates unchanged, its `go.mod` with no glamour line.
+* **The release:** the owner's tag `stream/glamourmd/v0.1.0`; a smoke
+  test from the proxy, `go get` of the adapter in a scratch module and a
+  render; and a second scratch module with the root alone, whose `go.mod`,
+  `go.sum` and `go list -m all` hold no glamour, goldmark, chroma or
+  bluemonday.
 
 ## Verification
 
-* Every step's mutations are killed.
-* On the macOS development host and the Windows test host, all pass:
-  * `make pre-add-check`, `make lint` and `make vuln`;
-  * `go test -race -count=1 ./...`, `go test -shuffle=on -count=2 ./...`
-    and `LC_ALL=C go test ./...`;
-  * `make fuzz`, including `FuzzClean` and `FuzzDoc`, and `FuzzInterpret`
-    if A1 landed.
-* ~~`go mod tidy -diff` is clean. `go.mod` adds exactly
-  `charm.land/glamour/v2` as a direct requirement, and only in Step 7.~~
-  *2026-10-02 (MADR A2):* `go mod tidy -diff` is clean in every module, with
-  `GOWORK=off`. The root `go.mod` gains no requirement in any step, and has
-  no glamour, goldmark, chroma or bluemonday line. `stream/glamourmd/go.mod`
-  requires exactly the root, at a release version, and
-  `charm.land/glamour/v2`, and has no `replace`.
-* Every gate of 0010-MADR §4 passes for `stream/glamourmd` as well as the
-  root, and `go.work` lists both.
-* `internal/conformance` finds no `os.Stdout`, `os.Stderr`, `AltScreen` or
-  `signal.Notify` in the new packages.
-* No new package starts a goroutine outside `Scheduler`'s timer callback
-  and `inputfilter`'s drain send, and, if A1 landed, `Writer`'s writer and
-  `Upgrader`'s jobs. A test with `synctest` checks each. *Corrected
-  2026-11-01 (MADR A6 item 8):* these are in the cores `frame` and
-  `inputfilter`, with the flush driver's timer, and none is left after
-  `Close`; the adapters start none.
-* The identifier scan finds nothing.
-* After the owner's push, CI is green on all three operating systems.
-* *Added 2026-11-01 (MADR A6):* `TestCoresAreCharmFree` passes with
-  `stream`, `frame` and `inputfilter`, and fails on a scratch copy that
-  imports Bubble Tea into one of them;
-  `TestDefaultsInventory` passes with every row A6 item 4 lists, none left
-  `planned`; `make apicheck` reports 0 incompatible changes at each
-  release; `python3 -m tools.verify names` reports no clash.
+* Every step's mutations fail their named tests, each failure quoted.
+* `python3 -m tools.verify gates` passes on macOS, Linux and Windows for
+  every step, with the step's files.
+* `TestCoresAreCharmFree` passes with `stream`, `frame` and `inputfilter`,
+  and fails on a scratch copy that imports Bubble Tea into each;
+  `TestNarrowClosures` still holds `safetext` to its rule.
+* `TestDefaultsInventory` passes, with no row of this PLAN left `planned`
+  at Step 8.
+* `make apicheck` reports 0 incompatible changes at every step.
+* `python3 -m tools.verify names` reports no clash at every step.
+* Every driver's test runs inside `testing/synctest`, and none leaves a
+  goroutine; no adapter starts one but `inputfiltertea`'s drain send.
+* The root `go.mod` has no glamour, goldmark, chroma or bluemonday line;
+  `stream/glamourmd/go.mod` requires exactly the root's tag and glamour,
+  with no `replace`; `go mod tidy -diff` is clean in both modules.
+* The identifier scan finds nothing; CI is green on every push and on both
+  tags; both smoke tests pass from the proxy.
 
 ## Rollout and Rollback
 
-* **Rollout.** The steps land in order. pi-go adopts `stream.Pane`,
-  `frame` and `inputfilter` under its own records. The owner tags, in the
-  order 0010-MADR §3 sets:
-  1. the root release that carries Steps 2–6, A1.1–A1.4 and 8;
-  2. `stream/glamourmd/v0.1.0`, once Step 7's `go.mod` requires that root
-     release;
-  3. a consumer smoke test, in a scratch module outside the repository:
-     `go get github.com/maccavelli/go-tui-lib/stream/glamourmd@v0.1.0` and
-     `go build ./...`. A second scratch consumer that gets only the root
-     release has no glamour line in `go.mod`, `go.sum` or `go list -m all`.
-
-  Both results go in the execution record.
-* **Rollback.** Before the push, each step is one local commit. After it,
-  the packages are new and additive, so a fix goes forward in a patch
-  release. If glamour's graph proves unacceptable, `stream/glamourmd` is
-  not tagged again, its directory and `go.work` entry are removed, and
-  `stream` keeps working with `Plain` or a program's own renderer. Its
-  published tags stay, as tags are never deleted (0010-REPORT §1).
+* **Rollout.** Steps 1 to 8 land one commit each, unreleased until Step
+  8's minor release of the root; Step 7 then tags the adapter. A program
+  takes the root release with no change: every addition is new API.
+* **Rollback.** Before a push, a step is one local commit. After it, a
+  fix goes forward in a patch. If glamour's graph proves unacceptable, the
+  adapter is not tagged again, its directory and `go.work` line go, and
+  `stream` keeps working with `Plain` or a program's own `Renderer`; tags
+  are never deleted.
 
 ## Execution Record
 
