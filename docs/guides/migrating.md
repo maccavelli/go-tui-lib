@@ -7,6 +7,58 @@ needs a major version, at a new module path
 ([AGENTS.md, API conventions](../../AGENTS.md#api-conventions), rule 1).
 Up to `v0.12.0`, a deprecated name was removed in the next minor release.
 
+## Migrating to `v2.9.0`
+
+`v2.9.0` is a minor release, for issue #14. It adds one method,
+`transcript.Transcript.Reprint`, and changes what `inline.Region.Print`
+writes for two kinds of text, below. Nothing is removed or retyped: `make
+apicheck` against `v2.8.0` reports 0 incompatible changes
+([0023-MADR-line-mode-components.md](../decisions/0023-MADR-line-mode-components.md)
+A14,
+[0023-PLAN-line-mode-components.md](../decisions/0023-PLAN-line-mode-components.md)
+Step 7e). A program on `v2.8.0` needs no change:
+
+```bash
+go get github.com/maccavelli/go-tui-lib/v2@v2.9.0
+```
+
+### Added
+
+- **`Transcript.Reprint(idle bool) string`,** a reprint on demand, for a
+  redraw key or command: idle, the reprint now, at the last `Resize`'s
+  width, ending a settle; not idle, "", and the next idle `HandleTimeout`
+  gives it.
+
+### Changed
+
+- **`Region.Print` writes its text inside the region's own update.** It
+  drops every `CSI ? 2026 h` and `CSI ? 2026 l` the text holds, so
+  whether the output is synchronized is the region's `WithSynchronized`
+  alone. A transcript's reprint, synchronized by default, written with
+  `region.Print(out)`, is now one update with the region below it, at the
+  prompt and with nothing drawn; under `v2.8.0` it was two frames, the
+  prompt a row low.
+- **A text that ends with the cursor home (`CSI H`) gets no line end** from
+  `Print`, so the region is drawn on the row the text leaves the cursor on.
+
+### The recipe
+
+Write the due reprint with the region's `Print`:
+
+```go
+if out := tr.HandleTimeout(now, idle); out != "" {
+    write(region.Print(out))
+}
+```
+
+The recipe before `v2.9.0`, `region.Clear() + out + region.Draw(…)`, still
+draws the same screen, in three frames.
+
+### Documented
+
+- **A kept reply is the transcript's state:** after `AddReply(p)`, every
+  call on `p` is serialized with the Transcript's own calls.
+
 ## Migrating to `v2.8.0`
 
 `v2.8.0` is a minor release. It adds options, a type and fields across

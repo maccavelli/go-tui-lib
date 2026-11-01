@@ -18,7 +18,7 @@ pattern, used by every program that needs it.
 
 ## Status
 
-- **The current release is `v2.8.0`,** at the module path
+- **The current release is `v2.9.0`,** at the module path
   `github.com/maccavelli/go-tui-lib/v2`
   ([0020-MADR](docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
   A4.1). `v2.0.0` follows `v1.13.0`, which a `v1` user keeps; `v1.13.0` follows
@@ -151,7 +151,9 @@ pattern, used by every program that needs it.
   the new width. Both link no Charm module but `x/ansi`, and `pick`
   underlines the cells a query matched through `stream`'s `Markup`.
   `v2.6.1` makes the reprint and the printer faster, within gobble's
-  allocation budgets, which the tests hold.
+  allocation budgets, which the tests hold. Since `v2.9.0`, a reprint
+  written with the region's `Print` and the region below it are one
+  synchronized update, and `Reprint` reprints on demand.
   [The line-mode guide](docs/guides/line-mode.md) shows the loop that
   drives every line-mode component.
 - **The stack is Charm v2:** `charm.land/bubbletea/v2`,

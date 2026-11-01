@@ -3410,8 +3410,32 @@ failure at 15 s, then, after D32, 13,770,266, no failure.
   documents' checks, the excerpt check and `TestDefaultsInventory` among
   them, and the identifier scan: clean.
 
-**Not done here, and the release:** the owner's commit; the disclosure
-guard; the owner's push and CI; the release `v2.9.0` under rule 4, its
-notes in "Migrating to `v2.9.0`", `README.md`'s current release, the smoke
-test with its control; and issue #14 told. This step stays open for them,
-and the PLAN `in-progress`.
+**The owner's commit and push:** the owner committed the step
+(`439ee1b`) and pushed `main`, through the global pre-push guard, before
+the agent ran the guard itself. CI run 41329794200 passed: `modules`,
+`gates`, and `test` on macOS 15, Ubuntu 24.04 and Windows 2025. Docs run
+41329794184 passed.
+
+**The release, `v2.9.0`, prepared:**
+
+* `docs/guides/migrating.md`, "Migrating to `v2.9.0`": `Reprint` added;
+  `Print`'s two changes; the recipe, and the old one's three frames; a
+  kept reply's goroutine. `README.md`: the current release `v2.9.0`, and
+  the transcript bullet.
+* The API: one addition, `(*Transcript).Reprint`; `make apicheck`: 0
+  incompatible changes against `v2.8.0`.
+* **The smoke test, rehearsed** against the tree by a `replace`, in a
+  scratch module outside the repository with `GOWORK` empty
+  (`smoke29.py local`): a transcript's due reprint at 40 columns, written
+  with `region.Print`, is one synchronized update, the prompt below it on
+  row 5; `Reprint(true)` gives the reprint on demand. Its closure, listed
+  for Linux, macOS and Windows (142, 140 and 144 packages), holds no Charm
+  module but `x/ansi`; the same filter over `workspace`'s closure finds 9
+  Charm packages. The control, `-control`, expecting `v2.8.0`'s two
+  updates, exited 1: "the reprint and the region are 1 synchronized
+  updates, want 2".
+
+**Not done here:** the owner's commit of the notes; the disclosure guard;
+the owner's push, CI, the annotated tag `v2.9.0` and CI on it; the smoke
+test from the proxy; issue #14 told; and the close-out. This step stays
+open for them, and the PLAN `in-progress`.
