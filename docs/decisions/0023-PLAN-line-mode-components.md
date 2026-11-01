@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-11-01
 associated-madr: "0023-MADR-line-mode-components.md"
 ---
@@ -3439,3 +3439,28 @@ the agent ran the guard itself. CI run 41329794200 passed: `modules`,
 the owner's push, CI, the annotated tag `v2.9.0` and CI on it; the smoke
 test from the proxy; issue #14 told; and the close-out. This step stays
 open for them, and the PLAN `in-progress`.
+
+**The release, `v2.9.0`:**
+
+* The owner committed the notes (`16349ec`) and pushed `main`, again
+  through the global pre-push guard. Docs run 41332140055 passed; the push
+  changed documents only, so CI did not run for it, and `439ee1b`'s CI had
+  passed on the code it carries.
+* The owner tagged `16349ec` `v2.9.0`, annotated, and pushed the tag. Its
+  CI run, 41332438576, passed: `modules`, `gates`, and `test` on macOS 15,
+  Ubuntu 24.04 and Windows 2025.
+* The proxy serves `v2.9.0` at `16349ec`. The consumer smoke test,
+  `smoke29.py proxy`, in a scratch module outside the repository with
+  `GOWORK` empty, required the tag by `go get`, then ran `go mod tidy`,
+  `go vet` and `go build`; the closure for Linux, macOS and Windows held no
+  Charm module but `x/ansi`. The program: the due reprint, written with
+  `region.Print`, one synchronized update, the prompt below it on row 5;
+  `Reprint(true)` on demand. Its control, `-control`, exited 1: "the
+  reprint and the region are 1 synchronized updates, want 2".
+* Issue #14 told, for the owner to close.
+* **Step 7e complete, 2026-11-01.**
+* **This PLAN is complete, 2026-11-01.** Step 7e's Verification holds: its
+  mutations killed, each failure quoted; the gates passed on macOS, Linux
+  and Windows; `make apicheck` reported 0 incompatible changes; the release
+  smoke test passed from the proxy, its closure clean; the identifier scan
+  found nothing.
