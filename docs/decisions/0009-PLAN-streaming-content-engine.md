@@ -1,6 +1,6 @@
 ---
 status: proposed
-date: 2026-10-07
+date: 2026-11-01
 associated-madr: "0009-MADR-streaming-content-engine.md"
 ---
 # Implement the streaming content engine
@@ -73,6 +73,30 @@ so is Step 6's `Pane`, which imports `workspace`, `frame` and Bubble Tea.
 `stream` joins `TestCoresAreCharmFree` in 0023-PLAN's Step 5, before this
 PLAN's Step 5 runs. This PLAN stays proposed.
 
+*2026-11-01, for
+[0009-MADR-streaming-content-engine.md](0009-MADR-streaming-content-engine.md)
+A6:* the pair re-read against the tree at `114bee8`. The section "Order
+and changes, as revised on 2026-11-01" under Implementation Steps is how
+the steps below now read. *Later on 2026-11-01:* the owner answered Q9 to
+Q12 with the recommendations, and A6 is accepted: `frame` and
+`inputfilter` are cores with adapters, `Interpret`'s row is
+`InterpretRow`, the order is the revised one, and `theme.New` stamps an
+ID. In short:
+
+* **Done elsewhere:** Step 2, and A1.1 but for `Interpret`, by
+  [0020-PLAN-charm-free-cores-glyphs-and-safetext.md](0020-PLAN-charm-free-cores-glyphs-and-safetext.md)
+  Step 4 (`v1.13.0`); A5's split and `stream`'s `Printer`, by
+  [0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
+  Step 5 (`v2.6.0`).
+* **The names are A4's** throughout, with A6 item 4's option names and
+  Q11's for `Interpret`'s row, which collides with `ask.Row`.
+* **The tools are today's:** Go 1.27.2, `scripts/go-precheck.py`,
+  `python3 -m tools.verify`, and the defaults inventory and message
+  catalogue of 0024-MADR.
+* **Facts moved:** `local` is at `workspace/render.go:538-556`;
+  ultraviolet joins input split within 50 ms, which Step A1.3 measures
+  before building its reassembly.
+
 ## Goal
 
 Ship `safetext`, `frame`, `inputfilter`, `stream` and `stream/glamourmd`,
@@ -113,6 +137,14 @@ published root version, in Step 7. Steps 2–6 and A1.1–A1.4 add no module.
 Q6–Q8 of A1 kept `Interpret`, `Writer`, `Upgrader` and `FitTable` at the
 paths above.
 
+*2026-11-01 (MADR A6):* Step 2's row and A1.1's but for `Interpret` are
+done (0020-PLAN Step 4). Step 5's `Buffer` and `Doc.Pull`, and Step 6's
+pane, are in `stream/streamtea` (MADR A5); Step 5 adds
+`stream/streamtest` (MADR A2). Steps 3, 4, A1.2 and A1.3 also write
+`frame/frametea` and `inputfilter/inputfiltertea` (Q10); Step 6 adds
+`theme.Theme.ID` (`theme/`, Q9). Every step adds its defaults' rows to
+`docs/guides/defaults.md`, and its message IDs, where it shows text.
+
 ### Out of scope
 
 * A virtualized transcript of many `Doc`s, watermark pruning, and inline
@@ -152,8 +184,62 @@ paths above.
    owner commits with `git commit --no-edit` and pushes. (2026-10-02: the
    org rules forbid agent commits to `main`, and the owner chose this over
    a `feature/` branch.)
+6. *Added 2026-11-01 (MADR A6):* **The tools.** Each step's checks run as
+   `python3 -m tools.verify gates` with the step's files, on macOS and
+   through `remote linux` and `remote windows`; its mutations through
+   `python3 -m tools.verify mutate`; its planned type names through
+   `python3 -m tools.verify names` before any code; and the identifier
+   scan through `python3 -m tools.verify scan`. They cover rule 3's
+   checks.
+7. *Added 2026-11-01 (MADR A6):* **The conventions written since.** Each
+   step follows AGENTS.md's API conventions: hooks with a `…Func`, opaque
+   options named `With…`, `Without…` or `On…`, enums from `internal/enum`,
+   each default a row of `docs/guides/defaults.md` with its control, each
+   string a user is shown a message ID with an English default, the
+   stability line, and `make apicheck` at 0 incompatible changes. Each
+   step re-reads, at the tree it starts on, the facts it relies on, and
+   records a change as a deviation before any code.
 
 ## Implementation Steps
+
+### Order and changes, as revised on 2026-11-01 (MADR A6)
+
+*Accepted with A6, 2026-11-01; the PLAN waits for the owner's approval to
+execute.* The steps below keep their text; this is how each now reads. The
+order is Q12's answer.
+
+| Order | Step | Now |
+| :--- | :--- | :--- |
+| 1 | 1 | records: A6 accepted and Q9 to Q12 answered (done, 2026-11-01); this PLAN `in-progress`; `docs/README.md`; the `planned` rows of A6 item 4 in `docs/guides/defaults.md`; A6's names in `docs/glossary.md`'s "Names the planned records must not take" |
+| — | 2 | **done** by 0020-PLAN Step 4, `v1.13.0`; its tests are `safetext`'s |
+| 2 | A1.1 | `Interpret`, `InterpretOptions` and `InterpretRow` (Q11), alone; the rest of A1.1 is done (0020-PLAN Step 4) |
+| 3 | 3, A1.2 | `frame`, with A4's names (`FrameMsg`, `NewScheduler`, `Pacer` and `PacerFunc`, `Release`, `Gear`) and A1's types, split into the core `frame`, its pure pacing and, built on it, the goroutine-backed `Scheduler`, the `Coalescer`'s wait, `Writer` and `Upgrader`, and `frame/frametea`, the commands and `FrameMsg`'s delivery (Q10; MADR A6 item 8, as corrected); `frame` joins `TestCoresAreCharmFree` |
+| 4 | 4, A1.3 | `inputfilter` (`NewFilter`, A6's option names) and its A1 stages, and `local`'s extension point at `workspace/render.go:538`, split into the core `inputfilter`, the paste-burst machine over `termkey.Input`, the wheel sum and the motion throttle, and, built on them, the goroutine-backed driver of its timed flushes, and `inputfilter/inputfiltertea`, the `tea.WithFilter` function, `CoalescedWheelMsg` and `Attach` (Q10; MADR A6 item 8, as corrected); `inputfilter` joins `TestCoresAreCharmFree`; ultraviolet's joining of split input and its paste assembly measured first (A6 item 2) |
+| 5 | 5 | `stream`'s `Scanner`, moved out of the `Printer` with every `Printer` test, golden and fuzz target unchanged (A6 item 5); then `Doc` (`NewDoc`, `stream.Option`), `Renderer`, `RendererFunc` and `Plain` on `wrapProse`; `stream/streamtest`; `Buffer` and `Doc.Pull` in `stream/streamtea` |
+| 6 | 6 | `theme.Theme.ID`, stamped by `theme.New` (Q9), then `DocPane` in `stream/streamtea`, with `WithoutFollow` and `PaneKeys`, its caches keyed by the ID |
+| 7 | A1.4 | `RenderView`, the dialect rules, `Highlighter` and `HighlighterFunc`, `FitTable` from `layoutTable`, and `Bounded` with its marker's message ID |
+| 8 | 8 | the example, `docs/guides/streaming-content.md`, `docs/architecture.md`, the release notes in `docs/guides/migrating.md`; the owner tags the root's minor release |
+| 9 | 7 | `stream/glamourmd`, after that tag, as revised below |
+
+* **Step 7, re-read:** its `go.mod` states `go 1.27.2`, the floor
+  ([0016-MADR-go-1-27-2-for-go-2026-6604.md](0016-MADR-go-1-27-2-for-go-2026-6604.md)),
+  and requires the root `github.com/maccavelli/go-tui-lib/v2` at the
+  tagged `v2.x` release; the per-module loop is
+  `scripts/go-precheck.py`'s
+  ([0017-MADR-python-repository-scripts.md](0017-MADR-python-repository-scripts.md));
+  glamour's newest release on 2026-11-01 is `v2.0.1`, which the step
+  checks again. The renderer type and its constructor are A4's
+  (`NewRenderer`, `WithTheme`), and its cache is keyed by width,
+  `theme.Theme.ID` (Q9) and emoji.
+* **Every step's fuzz target** is found by `make fuzz` and CI's fuzz step
+  with no change to either.
+* **Q9** is answered: `theme.Theme.ID`, built in Step 6.
+* *Corrected 2026-11-01 (MADR A6 item 8):* rows 3 and 4 said the cores take
+  time in and give a deadline out, with the timer in `frame/frametea`. Each
+  core now holds its pure logic and a goroutine-backed driver built on it,
+  and the adapters convert. Steps 3, 4, A1.2 and A1.3 keep their tests
+  under `testing/synctest`; each driver's goroutine or timer gains a row
+  of `docs/guides/defaults.md`.
 
 ### Step 1: records
 
@@ -169,6 +255,8 @@ moves to `in-progress` when the owner approves its execution, and
 `docs/README.md` is updated then.
 
 ### Step 2: `safetext`
+
+*Done by 0020-PLAN Step 4, released in `v1.13.0` (MADR A6 item 1).*
 
 * The API of MADR §2: `Policy`, `Text`, `Strict`, `Line`, `Clean`,
   `Filter`, `NewFilter`, `SafeURL`, `URLs`. `glyph.Set` gains `Control`
@@ -369,7 +457,9 @@ to the root `go.mod`; it now creates a nested module.
   are accepted, and Phases 2–5 of
   [0010-PLAN-nested-adapter-modules.md](0010-PLAN-nested-adapter-modules.md)
   are complete: the per-module loop in `scripts/go-precheck.sh`, `make` and
-  CI, the `go.work` check, and the per-module depguard rules.
+  CI, the `go.work` check, and the per-module depguard rules. *Met
+  (MADR A3 item 3); the loop is now `scripts/go-precheck.py`, which the
+  `.sh` shim runs (MADR A6).*
 * **Order** (0010-MADR §3). This step runs last: after Steps 2–6,
   A1.1–A1.4 and 8 have landed and the owner has tagged that root release,
   so that the adapter can require a published root version. If it ran
@@ -393,8 +483,9 @@ to the root `go.mod`; it now creates a nested module.
   A finding there stops the step for the owner.
 * **The module:**
   * `stream/glamourmd/go.mod`: `module
-    github.com/maccavelli/go-tui-lib/stream/glamourmd`, `go 1.27.1`, and
-    `require` of the root at the tagged release and of
+    github.com/maccavelli/go-tui-lib/stream/glamourmd`, ~~`go 1.27.1`~~
+    `go 1.27.2` (*2026-11-01, MADR A6*), and `require` of the root,
+    `github.com/maccavelli/go-tui-lib/v2`, at the tagged release and of
     `charm.land/glamour/v2`, with no `replace`;
   * `go work use ./stream/glamourmd` adds it to `go.work`, in the same
     commit;
@@ -600,9 +691,18 @@ step follows the rules for every step above.
   `signal.Notify` in the new packages.
 * No new package starts a goroutine outside `Scheduler`'s timer callback
   and `inputfilter`'s drain send, and, if A1 landed, `Writer`'s writer and
-  `Upgrader`'s jobs. A test with `synctest` checks each.
+  `Upgrader`'s jobs. A test with `synctest` checks each. *Corrected
+  2026-11-01 (MADR A6 item 8):* these are in the cores `frame` and
+  `inputfilter`, with the flush driver's timer, and none is left after
+  `Close`; the adapters start none.
 * The identifier scan finds nothing.
 * After the owner's push, CI is green on all three operating systems.
+* *Added 2026-11-01 (MADR A6):* `TestCoresAreCharmFree` passes with
+  `stream`, `frame` and `inputfilter`, and fails on a scratch copy that
+  imports Bubble Tea into one of them;
+  `TestDefaultsInventory` passes with every row A6 item 4 lists, none left
+  `planned`; `make apicheck` reports 0 incompatible changes at each
+  release; `python3 -m tools.verify names` reports no clash.
 
 ## Rollout and Rollback
 

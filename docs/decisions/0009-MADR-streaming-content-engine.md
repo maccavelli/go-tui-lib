@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-07
+date: 2026-11-01
 decision-makers: owner
 consulted: 0003-REPORT-agent-tui-ecosystem-research.md (§3 agent TUIs, §5 terminal standards); crush, codex, gemini-cli, goose and aider source; Charm v2 APIs (bubbletea v2.0.10, lipgloss v2.0.6, bubbles v2.2.1, x/ansi v0.11.8); charm.land/glamour/v2 v2.0.1; for amendment A2, 0010-REPORT-nested-modules-and-adapter-sources.md (§2, §9, §10)
 informed: pi-go
@@ -1064,6 +1064,244 @@ D7, which the owner accepted, decides, with its A6 item 2:
    when this record's PLAN exports it as `Scanner` (0023-MADR A6 item 2).
 3. **`stream` gains `Printer`, `Markup` and `Style`,** 0023-MADR D7's,
    beside `Doc`.
+
+### A6 (2026-11-01): what is built since, the facts re-read, and four questions answered
+
+*Status: accepted (2026-11-01),* every question answered with its
+recommendation, as A1 was accepted. Proposed the same day, after the
+owner asked to "assess the 0009
+madr and plan pair. evaluate the current state of the codebase and
+environment. ensure the madr and plan are still accurate, grounded in
+facts, and comprehensive." The decision, option A, stands. This amendment
+records what other records have built of it, corrects the facts that have
+moved, applies the conventions written after it, and answers A3's Q9
+and three questions of its own. Every fact below was re-read at `114bee8` on 2026-11-01.
+
+1. **Built since, by other records.**
+
+   | Of this record | Built by | Released |
+   | :--- | :--- | :--- |
+   | §2 `safetext`, with A1's `Command()` and `StatusLine()`, the fields `Escape`, `KeepSGR` and `LinkSchemes`, and A4's names; `glyph.Set.Control` | [0020-MADR-charm-free-cores-glyphs-and-safetext.md](0020-MADR-charm-free-cores-glyphs-and-safetext.md) D9, which also added `IsClean` and makes `internal/sanitize` wrap it | `v1.13.0` |
+   | A5's split: `stream` a Charm-free core, in `TestCoresAreCharmFree` | [0023-MADR-line-mode-components.md](0023-MADR-line-mode-components.md) D7 | `v2.6.0` |
+   | `stream`'s `Printer`, `Markup` and `Style`, beside §4 | 0023-MADR D7, A6 to A10 | `v2.6.0` to `v2.6.2` |
+   | Option D's scrollback, as a line mode: `inline`, `transcript` | 0023-MADR D3, D9, A14 | `v2.3.0` to `v2.9.0` |
+   | §2's "link service" of 0005 | `termsvc.Linker`, [0024-MADR-opt-in-and-opt-out-coverage.md](0024-MADR-opt-in-and-opt-out-coverage.md) A3 | `v2.8.0` |
+
+   **Not built:** `safetext.Interpret` (A1); `frame` and its A1 types;
+   `inputfilter` and its A1 stages; `stream`'s `Doc`, `Renderer`,
+   `RendererFunc`, `Plain`, `RenderView`, `Highlighter`, `FitTable` and
+   `Bounded`; `stream/streamtea`'s `Buffer`, `Doc.Pull` and `DocPane`
+   (A5); `stream/streamtest` (A2); `workspace`'s mouse extension point
+   (§6); and `stream/glamourmd` (A2).
+2. **The facts, re-read.**
+   * **Bubble Tea, at the tree's `v2.0.10`:** every line §Context cites
+     holds: `tea.go:888` renders after each message; `:764-768` applies the
+     filter; `:606` makes the unbuffered `msgs` channel `Send`
+     (`:1192-1197`) writes to; `renderer.go:13-14` is 60 and 120 fps;
+     `mouse.go:113` is `MouseWheelMsg`, a `Mouse` with no magnitude.
+     `v2.1.0` and `v2.1.1` have been released since. `v2.1.1` keeps each of
+     these (`options.go:140` `WithFilter`, `:149` `WithFPS`, `renderer.go:13-14`,
+     `tea.go:620` the channel), and coalesces no wheel or motion event. The
+     tree is not moved to it here.
+   * **`x/ansi`:** the tree's `v0.11.8`; `v0.11.9` is released.
+   * **glamour:** `charm.land/glamour/v2` `v2.0.1` is still the newest
+     release; the proxy lists `v2.0.0` and `v2.0.1`.
+   * **`local`** has moved again: `workspace/render.go:538-556`, after A3
+     item 1's `:460-478`. It still translates the four `tea` mouse types
+     and drops every other `tea.MouseMsg`, so §6's extension point is still
+     needed.
+   * **The theme's revision** (Q9): `theme.Theme` has none. The workspace's
+     unexported `themeGen` (`workspace/workspace.go:173`) is raised by
+     `SetTheme` (`:472`) and keys its view cache (`render.go:152`).
+   * **The wheel profiles' inputs** exist: `termcap.Caps.Mux`
+     (`termcap/caps.go:25`) and `Caps.Brand` (`:48`).
+   * **Split input is partly joined already.** ultraviolet's
+     `TerminalReader`, which Bubble Tea v2 reads through, holds an
+     incomplete sequence until its `EscTimeout`, 50 ms by default
+     (`terminal_reader.go:27`, `:143-180`), and assembles a bracketed
+     paste's text (`:288-310`). A1's fragment reassembly matters only for a
+     report split by more than that; the X10 repair still stands, since
+     X10 is decoded as it comes (`decoder.go:499-503`, `:1631`). Step A1.3
+     measures both before it builds them.
+   * **The repository's tools,** since this record: the toolchain floor is
+     Go 1.27.2 ([0016-MADR-go-1-27-2-for-go-2026-6604.md](0016-MADR-go-1-27-2-for-go-2026-6604.md));
+     the scripts are Python, `scripts/go-precheck.py` with a shell shim
+     ([0017-MADR-python-repository-scripts.md](0017-MADR-python-repository-scripts.md));
+     a step is checked with `python3 -m tools.verify`
+     ([0018-MADR-python-verification-tools.md](0018-MADR-python-verification-tools.md));
+     `make fuzz` finds every fuzz target itself; and `go.work` lists `.`
+     alone, until the adapter joins it.
+3. **A name collides.** A1's `safetext.Row`, what `Interpret` returns, is
+   `ask.Row`'s name, exported since `v2.3.0` (0023). `python3 -m
+   tools.verify names` over this record's 37 planned type names, with A4's,
+   A5's and A6's, reports "names: safetext.Row: also in ask" and no other; the
+   conformance test would fail on it. Q11 asks for the name.
+4. **The API conventions written since apply** (AGENTS.md, "API
+   conventions"; [0014-MADR-native-integration-api.md](0014-MADR-native-integration-api.md) W0), as they apply to every
+   exported name:
+   * **Hooks** (rule 7): `frame.Pacer` gains `PacerFunc`, as A4 gave
+     `Highlighter` its `HighlighterFunc`; `Renderer` has `RendererFunc`.
+   * **Options** (rule 4): a `Without…` option turns a default off, so
+     §4's `WithInlineHoldback(bool)` and `WithPartialLine(bool)` are
+     `WithoutInlineHoldback()` and `WithoutPartialLine()`; §5's
+     `WithFollow(bool)` is `WithoutFollow()`; §6's `WithWheel(bool)` and
+     `WithMotion(bool)` are `WithoutWheelCoalescing()` and
+     `WithoutMotionThrottle()`; and §4's `WithPolicy` is `WithRules`, as
+     A4 renamed the type. Option types are opaque.
+   * **`stream` has one `Option`.** `Printer`'s `stream.Option`, with its
+     `WithRules` and `WithMethod`, is `Doc`'s too: its unexported method
+     set grows to apply to a `Doc`, and only the package makes one. `make
+     apicheck` confirms the change is compatible in the step that makes it.
+   * **Enums** (rule 5): `Gear`, `Demand` and `BurstAction` take their
+     tokens from `internal/enum`.
+   * **Defaults** (rule 12,
+     [0024-MADR-opt-in-and-opt-out-coverage.md](0024-MADR-opt-in-and-opt-out-coverage.md)
+     D1, D8): each default this record applies, with its control, is a row
+     of `docs/guides/defaults.md`, `planned` until built:
+     * `frame`: 60 fps (`WithFPS`); the adaptive gears' thresholds (each
+       an `AdaptiveOption`); `Adaptive` as the default pacer (Q2; a
+       program passes `Immediate`); the coalescer's maximum wait (Kilo's is 100 ms);
+       `Writer`'s stall time (grok's is 5 s);
+     * `inputfilter`: wheel coalescing and the motion throttle on, at
+       16 ms (`WithoutWheelCoalescing`, `WithoutMotionThrottle`,
+       `WithInterval`); paste bursts off (`WithPasteBurst`), with codex's
+       gaps; typeahead off; the events a notch (`WithWheelProfile`);
+     * `stream`: `RelaxAfter` 2 KiB; inline holdback and the partial line
+       on; `safetext.Text`, never less; `Plain`'s width method; the
+       highlighter's limits; `Bounded`'s limits;
+     * `safetext.Interpret`: its 50,000 rows and 8,192 columns;
+     * `stream/streamtea`: following the tail on (`WithoutFollow`); the
+       pane's keys (`PaneKeys`);
+     * `stream/glamourmd`: four cached renderers; emoji (`WithEmoji`).
+   * **Text a user is shown** comes from the program's catalogue
+     ([0024-MADR](0024-MADR-opt-in-and-opt-out-coverage.md) D9, `msgcat`):
+     `Bounded`'s omitted-lines marker, and any text `DocPane` draws, have
+     message IDs and English defaults, and a `WithCatalog`.
+   * **The environment** (rule 9): `inputfilter`'s Windows timing is read
+     from a `WithGOOS` option, as `termcap`'s is, defaulting to the
+     platform the program was built for.
+5. **The block scanner, as built, is classifiers.** `stream/scan.go` holds
+   line classifiers (`fenceRun`, `closesFence`, `htmlStart`, `htmlEnds`,
+   `definition`, `container` and others); the state §4 keeps, the open
+   fence, the HTML block, the table, the paragraph and its lazy
+   continuation, is the `Printer`'s own fields. Exporting `Scanner`
+   (0023-MADR A6 item 2) moves that state into it, and builds the `Printer`
+   on it, every `Printer` test, golden and fuzz target unchanged.
+6. **Logic is not written twice.** `Plain` wraps with `stream`'s
+   `wrapProse`, which the `Printer` wraps with, and A1's `FitTable` starts
+   from its `layoutTable`, adding the fallbacks A1 names.
+7. **Owner questions.** *Q9, A3's, is asked again here,* with its options
+   re-read: `theme.Theme` cannot be compared, since it holds
+   `theme.Styles` ("invalid operation: theme.Theme{} == theme.Theme{}
+   (struct containing theme.Styles cannot be compared)", compiled in a
+   scratch module against the tree), so A3's option C, a theme compared
+   with the last, would need a deep comparison, and is replaced below.
+
+   * **Q9. What keys a cache to a theme.** Recommended: `theme.New`
+     stamps each theme it builds with an unexported identity, read by a
+     method such as `Theme.ID() uint64`; a changed theme is always a new
+     ID, and a rebuilt equal theme costs one render more. It works with or
+     without a workspace, and `stream`'s core never sees `theme`.
+     Alternatives: the workspace exports its `themeGen` and gives it to
+     panes, which a pane outside a workspace lacks; or `theme` gains a
+     fingerprint of its comparable parts, the costliest, which grows with
+     `Theme`.
+
+   * **Q10. `frame` and `inputfilter`: Bubble Tea packages, or cores with
+     adapters?** §1 makes each a Bubble Tea package. 0020-MADR D2's split
+     rule, which 0023 applied to `stream`, would make each a Charm-free core
+     with a `<pkg>tea` adapter: the pacer, the queue, the gears, the
+     coalescer and `Demand` in `frame`, with the scheduler's `tea.Cmd`, the
+     frame message's delivery, `TickCmd` and `Upgrader`'s command in
+     `frame/frametea`; the paste-burst machine over `termkey.Input` and the
+     wheel sum in `inputfilter`, with the `tea.WithFilter` function and
+     `CoalescedWheelMsg` in `inputfilter/inputfiltertea`.
+     * **Recommended: cores with adapters.** A line-mode host paces a
+       streamed reply and detects a paste on a terminal without bracketed
+       paste with no Bubble Tea, as `lineedit` and `transcript` work; it is
+       the library's direction since 0020; and the adapters call the cores,
+       so nothing is written twice. Bad, because there are two more
+       packages.
+     * **As accepted:** two Bubble Tea packages. Fewer packages; a line-mode
+       host writes its own pacing and paste detection.
+   * **Q11. The name of `Interpret`'s row** (item 3). Recommended:
+     `safetext.InterpretRow`, beside `InterpretOptions`. Alternative:
+     `safetext.StyledRow`.
+   * **Q12. The order of what is left.** Recommended: `Interpret` with
+     Q11's name; `frame`; `inputfilter` and the workspace's extension
+     point; `stream`'s `Scanner` and `Doc`, with `streamtest`;
+     `stream/streamtea`; A1's `stream` additions; the guide and the root
+     release; then the adapter. Alternative: `stream`'s `Doc` and
+     `DocPane` first, the TUI's pane being pi-go's need, with `frame` and
+     `inputfilter` after.
+8. **Answered 2026-11-01** (picked from options): Q9 "theme.New stamps an
+   ID (Recommended)"; Q10 "Both cores + adapters (Recommended)"; Q11
+   "safetext.InterpretRow (Recommended)"; Q12 "Foundations first
+   (Recommended)". So:
+   * **`frame` and `inputfilter` are cores,** each with its `<pkg>tea`
+     adapter, by 0020-MADR D2's rule: a declaration whose signature,
+     fields or methods name a Charm type moves to the adapter, and every
+     effect gets a core form the adapter wraps. ~~The cores take time in
+     and give a deadline out, with no clock and no goroutine, as the line
+     mode's engines do (0023-MADR D2): the scheduler's timer and
+     `Upgrader`'s jobs are `frame/frametea`'s.~~ Each core joins
+     `TestCoresAreCharmFree` in the step that builds it. §1's import
+     table reads so.
+   * ***Corrected 2026-11-01,*** the owner's "yes, correct the records to
+     reflect the optimizations", after the agent set out the trade-off.
+     The struck sentence was the agent's, not Q10's answer: the option
+     chosen moved only the scheduler's `tea.Cmd`, the frame message's
+     delivery, `TickCmd` and `Upgrader`'s command to the adapter.
+     0020-MADR D1's boundary is a package's imports, and a core may start a
+     goroutine. Each core has two layers, the second built on the first:
+     * **Pure,** time in and a decision or deadline out, for a host that
+       drives its own deadline loop, as `lineedit`'s and `transcript`'s
+       hosts do: `frame`'s deadline and frame-rate arithmetic, `Queue`,
+       `Pacer` and `PacerFunc`, `Adaptive`, `Immediate`, the gears, the
+       `Coalescer`'s batching and `Demand`; `inputfilter`'s paste-burst
+       machine over `termkey.Input`, the wheel sum and the motion throttle.
+     * **Driven,** with the standard library's timers and goroutines:
+       `frame`'s `Scheduler`, one `time.Timer` whose `Request` and
+       `RequestIn` are safe for concurrent use, due frames merged into a
+       channel of capacity one, and `Close`; beside it the `Coalescer`'s
+       maximum wait, `Writer`'s stall detection and `Upgrader`'s jobs; and
+       `inputfilter`'s driver, which emits its timed flushes, a wheel sum's
+       residual and a paste burst's idle end, on a channel. A line-mode
+       host selects on the channel beside its input; a stream's producers
+       request frames from their own goroutines.
+     * **The adapters convert, and hold no logic:** `frame/frametea` turns
+       the scheduler's channel into a `tea.Cmd`, delivers `FrameMsg`, and
+       holds `TickCmd` and `Upgrader`'s command;
+       `inputfilter/inputfiltertea` holds the `tea.WithFilter` function,
+       `CoalescedWheelMsg`, and `Attach`, which gives the driver's flushes
+       to the program's `Send`.
+     * **Guards:** no goroutine runs without work (§3); under
+       `testing/synctest`, which Go 1.27.2 has, no goroutine is left after
+       `Close`, and each driver's timing holds; a `FrameMsg` carries the
+       time it fired, `At`, which is the `now` the `Pacer` is given, so the
+       scheduler's clock and the host's agree; and each goroutine or timer
+       a driver starts for the program is a row of
+       `docs/guides/defaults.md`, its controls not building the driver and
+       `Close` (AGENTS.md, API convention 12).
+     * **Why:** producers on many goroutines, as a stream's network
+       readers are, need one merged frame, and a line-mode host gets the
+       scheduler, `Writer`'s stall detection and `Upgrader` with no Bubble
+       Tea; one implementation serves both; and `synctest` makes the timers
+       testable. The cost: a lifecycle to close, a mutex to keep race-free,
+       and a second pattern beside the deadline-out engines.
+   * **`Interpret` returns `[]InterpretRow`.**
+   * **The order** is Q12's recommendation, which the PLAN's revised order
+     follows.
+   * **`theme.Theme` gains `ID`,** stamped by `theme.New`, before the first
+     cache keyed by it; A1's and A2's "theme revision" is that ID. A3's Q9
+     is closed.
+9. **What does not change:** option A; the decision drivers; §2's grammar,
+   as built; §3's scheduler, queue and gears; §4's cut rules, costs and
+   stated differences; §6's filter; A1's additions but for Q11's name; A2's
+   nested module; A4's names; A5's split.
+10. **Versioning.** Each part is additive, released in a minor version of
+   the root, `v2.x`. The adapter requires a published root release, and is
+   tagged `stream/glamourmd/v0.1.0` after it (0010-MADR §3).
 
 ## More Information
 
