@@ -845,6 +845,20 @@ removes anything from it.
     iTerm2, WezTerm and the
     xterm.js family, 3 for Apple Terminal, kitty, Ghostty and Alacritty,
     and 1 under tmux, screen and zellij (report §8.5).
+  * *Amended 2026-11-02, by
+    [0009-PLAN-streaming-content-engine.md](0009-PLAN-streaming-content-engine.md)
+    Step A1.3's measurement, D13 and D14:* Bubble Tea `v2.0.10` joins a
+    report split within its 50 ms escape timeout and no further, decodes
+    X10 by the byte, so ConPTY's re-encoding from column 96 misplaces a
+    click and types its row, and keeps a paste's CR and CRLF; it does none
+    of these stages. Reassembly begins only from an unknown head of three
+    bytes or more, so that a bare Esc never waits: a report split after
+    one or two bytes, and any focus report, is not rejoined. The stages'
+    API is the PLAN's Step A1.3: `Report`, `ParseReport`, the
+    `Reassembler` with a `ReplyMatcher`, `Typeahead`, `NormalizePaste`,
+    `PastedPath`, grok's PowerShell rules as `PasteBurstConfig` fields,
+    and the `Flusher`'s `Capture`, `Replay` and `Quarantine`; and Step
+    4's `BurstAction` is `Action`, every stage's.
 
 **What does not change.**
 

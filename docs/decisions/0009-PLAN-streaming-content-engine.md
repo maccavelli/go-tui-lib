@@ -738,6 +738,142 @@ uses the new names.
   refused; a profile of 3 makes 3 events one notch.
 * **Mutations:** reassembly skipped; X10 repair skipped; late replies
   passed as keys; Esc not flushing; CR left in a paste.
+* *Written 2026-11-02 (D13, D14), for the owner's review before any
+  code:* the step's API. Each stage is pure, time in, used on one
+  goroutine, and has `PasteBurst`'s shape: `Key(in, now) Action`, `Tick(now)
+  (termkey.Input, bool)` and `Due() (time.Time, bool)`. The `Flusher` runs
+  them in this order, each one's output the next one's input:
+  `Reassembler`, the typeahead, paste normalisation, `PasteBurst`.
+
+  ```go
+  // inputfilter: one action for every stage. BurstAction, Step 4's, is
+  // renamed: inputfilter is in no release, so no deprecation is owed.
+  type Action uint8 // Pass, Hold, Release: tokens "pass", "hold", "release"
+
+  // Report is a terminal report the stages decode.
+  type Report struct {
+  	Kind   ReportKind
+  	Button MouseButton
+  	X, Y   int         // cells, from 0
+  	Mod    termkey.Mod
+  }
+  type ReportKind uint8  // MousePress, MouseRelease, MouseMotion, MouseWheel,
+  	// FocusIn, FocusOut: tokens "press", "release", "motion", "wheel",
+  	// "focus-in", "focus-out"
+  type MouseButton uint8 // ButtonNone, ButtonLeft, ButtonMiddle, ButtonRight,
+  	// WheelUp, WheelDown, WheelLeft, WheelRight, ButtonBackward,
+  	// ButtonForward, Button10, Button11: ultraviolet's values, which
+  	// tea.MouseButton has, so the adapter converts value for value
+  func ParseReport(raw string) (Report, bool) // SGR mouse, X10 mouse, focus
+
+  // Reassembler joins a report or a reply split past the reader's 50 ms:
+  // from an unknown head (D14), an InputUnknown that begins a CSI, OSC, DCS
+  // or APC sequence and does not end it, each key after it that is one
+  // byte of the sequence is held, up to 1 KiB, until the sequence ends, a
+  // key that is not its next byte comes, or the window passes. A sequence
+  // joined is a reply the matcher knows, and dropped; or a Report, given
+  // as one InputUnknown with its whole Raw; or neither, and given back as
+  // it came. An X10 report ConPTY re-encoded, an InputUnknown "\x1b[M"
+  // and three runes, one of U+0080 to U+00FF, and the keys it ran into, is
+  // repaired, each rune back to its byte. Anything else ends what is held
+  // first: a bare Esc gives it back at once.
+  type ReassembleConfig struct {
+  	Window  time.Duration // how long a head waits for the rest: 500 ms
+  	Replies ReplyMatcher  // nil: no reply is dropped
+  	NoX10   bool          // leave X10 reports as they came
+  }
+  type ReplyMatcher interface{ IsReply(raw string) bool }
+  type ReplyMatcherFunc func(raw string) bool
+  func NewReassembler(c ReassembleConfig) *Reassembler
+
+  // Typeahead keeps grok's typing from ins: text, Backspace, Shift or
+  // Alt+Enter, and pastes, cut at the first Esc.
+  func Typeahead(ins []termkey.Input) []termkey.Input
+
+  // NormalizePaste makes a paste's CRLF and lone CR an LF.
+  func NormalizePaste(s string) string
+
+  // ClipboardImageRequestMsg is an empty bracketed paste, which Windows
+  // Terminal before 1.25 sends for a clipboard holding only an image.
+  type ClipboardImageRequestMsg struct{}
+
+  // PastedPath reads s as a dropped or pasted path: trimmed, its matching
+  // quotes removed, a file:// URL decoded, and accepted only when it begins
+  // with a path's anchor, "/", "~/", a drive ("C:\" or "C:/") or a UNC
+  // "\\" (grok's starts_with_drop_anchor); backslash escapes are undone
+  // except where goos is "windows", and except in a drive or UNC path;
+  // an unquoted space not escaped refuses it, but in a drive or UNC path.
+  func PastedPath(s, goos string) (string, bool)
+
+  // PasteBurstConfig gains grok's PowerShell rules, each off at its zero:
+  //	FirstGap     time.Duration // how soon a run's second key must follow: Gap
+  //	LinesOnly    bool          // a burst with no character after an Enter is
+  //	                           // given back as its keys, unless path-shaped
+  //	PathMinChars int           // with GOOS "windows", a path-shaped burst of at
+  //	                           // least this many is a paste under LinesOnly
+  //	EnterCtrlJ   bool          // an Enter then a Ctrl+J is one "\n", a paste
+  func PowerShellPasteBurst() PasteBurstConfig // grok's: FirstGap 2 ms, Gap 10 ms,
+  	// MinChars 3, LinesOnly, PathMinChars 8, EnterCtrlJ
+
+  // Wheel gains EventsPerNotch int: 1 at zero or less. Whole notches pass;
+  // the events left over carry into the next in the same direction.
+
+  // The Flusher's new options and methods.
+  func WithoutReassembly() Option
+  func WithReassemblyWindow(d time.Duration) Option // 500 ms; zero or less keeps it
+  func WithReplies(m ReplyMatcher) Option
+  func WithoutX10Repair() Option
+  func WithoutPasteNormalization() Option
+  func WithWheelProfile(eventsPerNotch int) Option // 1
+  func (f *Flusher) Capture()                     // hold keys and pastes until Replay
+  func (f *Flusher) Replay() []termkey.Input       // what Capture held, by Typeahead
+  func (f *Flusher) Quarantine(until time.Time)   // drop all input until then
+
+  // inputfilter/inputfiltertea: the conversions.
+  //   - a uv.UnknownEvent, read through internal/termevent.Decode, becomes
+  //     an InputUnknown; an InputUnknown the Reassembler gave back as it
+  //     came becomes the message it was;
+  //   - a joined Report becomes tea's MouseClickMsg, MouseReleaseMsg,
+  //     MouseMotionMsg, MouseWheelMsg, FocusMsg or BlurMsg;
+  //   - an X10 report tea decoded, a MouseMsg whose X+33 is a UTF-8 lead
+  //     byte, 0xC2 or 0xC3, with the keys after it, is given to the
+  //     Reassembler as the InputUnknown it was, re-encoded from the Mouse;
+  //   - an empty tea.PasteMsg becomes inputfilter.ClipboardImageRequestMsg,
+  //     unless WithoutClipboardImageRequest;
+  //   - Filter gains Capture, Replay, which gives what was held through the
+  //     drains, and Quarantine.
+  func WithoutClipboardImageRequest() inputfilter.Option
+  ```
+
+  *Limits stated, by D14 and the measurement:* a report split after its
+  first one or two bytes reaches the model as `esc` or `alt+[` and keys,
+  and is not rejoined, so that a bare Esc never waits; a focus report,
+  three bytes long, has no unknown head to begin from, and is never
+  rejoined; a probe reply Bubble Tea decodes whole after its deadline,
+  such as a `tea.BackgroundColorMsg`, is a message, not keys, and passes.
+  *Numbers the agent chose, with no source:* the 500 ms window, long
+  against the measured 60 and 200 ms gaps and short against a person's
+  typing; the 1 KiB cap is the probe's (`termcaptea/prober.go:182`).
+* *(D13)* **Tests,** besides those above: every two-way split of an SGR
+  report and of a DA1, OSC 11 and kitty-keyboard reply, past 50 ms,
+  whose head is three bytes or more, reaches the model as one message or
+  none; the X10 cases measured, columns 96, 120, 200 and 223, repaired,
+  in termkey's form and in tea's; a head with nothing after it given back
+  at the window's end; a bare Esc after a head giving it back at once;
+  `Typeahead` on grok's cases (`event_loop.rs:56-124`); `Quarantine`
+  dropping a burst of keys and passing the first key after its deadline;
+  `NormalizePaste`; `PastedPath` on codex's cases
+  (`clipboard_paste.rs:399-560`) with prose, two paths and a URL that is
+  not a file refused; `PowerShellPasteBurst` on grok's cases
+  (`event_loop.rs:3587-3715`): a single-line run given back, a multi-line
+  one a paste, an Enter then Ctrl+J a CRLF, a Windows path of eight; a
+  profile of 3 making 3 events one notch; `Action`'s tokens.
+* *(D13)* **Mutations,** besides those above: the window ignored; a
+  reply matched and still given; a Report's coordinates off by one; a
+  rune of U+0080 to U+00FF not repaired; `Typeahead` not cutting at Esc;
+  `Quarantine` passing input before its deadline; `PastedPath` accepting
+  prose; `LinesOnly` ignored; `EnterCtrlJ` ignored; the wheel's leftover
+  events dropped.
 
 ### Step 5: `Scanner`, `Doc`, `Renderer`, `Plain`, `Buffer` and `stream/streamtest`
 
@@ -1878,3 +2014,101 @@ added.
   untracked files included: clean.
 * **Step 4 complete, 2026-11-02,** for the owner's commit. Step A1.3, the
   input stages, measured first, is next.
+
+### Step A1.3: the input stages, measured first
+
+*2026-11-02.* The owner committed Step 4 (`e6947c6`) and said "committed,
+proceed".
+
+**The measurement,** before any code: a scratch module outside the tree,
+requiring the tree by a `replace` and Bubble Tea `v2.0.10` at the
+root's ultraviolet, wrote each input through an `os.Pipe` to a
+`tea.Program` (`WithInput`, `WithOutput(io.Discard)`,
+`WithoutSignalHandler`, `TERM=xterm-256color`), 100 ms after it started,
+the chunks the gap apart, and quit it 300 ms after the last. Its model
+kept every message but `WindowSizeMsg`, `ColorProfileMsg` and `EnvMsg`.
+The same chunks went through `termkey.Decoder`, with `Flush` between
+them, as a line-mode host does when a gap passes its timeout. What each
+received:
+
+* **An SGR mouse report,** `"\x1b[<0;10;5M"`, a left press at column
+  10, row 5:
+  * whole: tea `MouseClickMsg{X:9 Y:4 left}`; termkey
+    `unknown("\x1b[<0;10;5M")`;
+  * split at every byte and in each of its ten two-way splits, 10 ms
+    apart: tea `MouseClickMsg{X:9 Y:4 left}`, every time;
+  * 60 ms and 200 ms apart, byte by byte or split after the ESC: tea
+    `key(esc) key([) key(<) key(0) key(;) key(1) key(0) key(;) key(5)
+    key(shift+m)`; split after `"\x1b["`: `key(alt+[) key(<) …
+    key(shift+m)`; split after 3 to 10 bytes: `uv.UnknownEvent` holding
+    the head, as `"\x1b[<0;10;5"`, then a key for each byte after it,
+    `key(shift+m)`. termkey gave the same keys, and `unknown(…)` for the
+    same heads, at every gap.
+* **A focus report,** `"\x1b[I"`: whole, tea `FocusMsg`, termkey
+  `unknown("\x1b[I")`; 10 ms apart, `FocusMsg` in every split; 60 ms
+  apart byte by byte, `key(esc) key([) key(shift+i)`, split after the
+  ESC, `FocusMsg` in the one run, a gap near the 50 ms join, and after
+  `"\x1b["`, `key(alt+[) key(shift+i)`; 200 ms apart, keys in every
+  split.
+* **An X10 report,** `"\x1b[M"`, a press, then the column and row each
+  plus 32, row 1:
+  * as the bytes, columns 94, 95, 96, 120, 200 and 223: tea
+    `MouseClickMsg{X:93 Y:0}`, `{X:94 Y:0}`, `{X:95 Y:0}`, `{X:119 Y:0}`,
+    `{X:199 Y:0}` and `{X:222 Y:0}`, each right;
+  * as ConPTY relays it, each byte of 0x80 and over the UTF-8 of its
+    value: columns 94 and 95, whose bytes are under 0x80, right; column
+    96, `"\x1b[M \u0080!"`, tea `MouseClickMsg{X:161 Y:95 left} key(!)`;
+    120, `{X:161 Y:119} key(!)`; 200, `{X:162 Y:135} key(!)`; 223,
+    `{X:162 Y:158} key(!)`: the click misplaced, and the row a typed
+    `!`. termkey: `unknown("\x1b[M \u0080") key(!)`, and so on.
+* **A bracketed paste,** `"\x1b[200~a\r\nb\rc\x1b[201~"`: tea
+  `PasteStartMsg PasteMsg{"a\r\nb\rc"} PasteEndMsg`; termkey
+  `paste("a\r\nb\rc")`. Empty, `"\x1b[200~\x1b[201~"`: tea
+  `PasteStartMsg PasteMsg{""} PasteEndMsg`; termkey `paste("")`.
+
+**What it shows:** Bubble Tea joins a report split within its 50 ms
+escape timeout and no further; it decodes X10 by the byte, so ConPTY's
+re-encoding from column 96 misplaces the click and types its row; and it
+keeps a paste's CR and CRLF, and gives an empty paste as an empty
+`PasteMsg`. termkey, the line-mode path, does the same with its host's
+flush. Bubble Tea already does none of the stages measured, so none is
+dropped; and a report split after its first one or two bytes reaches the
+model as `esc` or `alt+[` and keys, with no unknown event to begin from.
+
+* **Deviation D13, 2026-11-02: the step's API.**
+  * **Found** after the measurement: the step names nine stages and gives
+    `PastedPath`'s signature, `ClipboardImageRequestMsg`, `Capture` and
+    `Quarantine` by name, and `WithWheelProfile`; reassembly and X10
+    repair yield mouse and focus reports, which `termkey.Input` does not
+    carry, the core has no type for, and Bubble Tea does not export a
+    decoder of.
+  * **Resolutions offered:** the step in two, the stages whose shape is
+    plain first, and reassembly, X10 repair, late replies and the
+    typeahead after their API is reviewed (recommended); the whole API
+    written into the records first, with no code; or every choice asked
+    at once, and all built in one step.
+  * **Chosen by the owner,** 2026-11-02: "Write the whole API first". The
+    step's text now carries it, for the owner's review and commit; no
+    code is written until the owner approves it. 0009-MADR A1 §6 is
+    annotated, the glossary reserves the names, and
+    `docs/guides/defaults.md` gains the defaults, `planned`.
+    `python3 -m tools.verify names` over `Action`, `Report`,
+    `ReportKind`, `MouseButton`, `Reassembler`, `ReassembleConfig`,
+    `ReplyMatcher`, `ReplyMatcherFunc` and `ClipboardImageRequestMsg`:
+    clean. Step 4's `BurstAction` is in no tag (`git tag --contains
+    e6947c6` lists none), so its rename to `Action` owes no deprecation.
+* **Deviation D14, 2026-11-02: where reassembly may begin.**
+  * **Found** in the measurement: a report split after its first one or
+    two bytes reaches the model as `esc` or `alt+[` and keys, with no
+    unknown event; to claim it, a stage would hold every Esc, which
+    0009-MADR §6 refuses, "a bare Esc flushes anything a stage holds, so
+    Esc never waits". `termcaptea.Prober.IsReplyFragment`
+    (`prober.go:184-238`) begins from an unknown head too.
+  * **Resolutions offered:** only from an unknown head of three bytes or
+    more, read through `internal/termevent` (recommended); or holding Esc
+    and `alt+[` for a window, against §6.
+  * **Chosen by the owner,** 2026-11-02: "Only from an unknown head
+    (Recommended)". The step's API states the limits it leaves.
+* **Step A1.3's API written, 2026-11-02,** a change to the records alone,
+  for the owner's review and commit; its code waits for the owner's
+  "proceed".
