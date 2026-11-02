@@ -345,12 +345,12 @@ record that is not there.
 
 | Behaviour | Default | Control | Status |
 | :--- | :--- | :--- | :--- |
-| Wheel notches | summed, at most one message every 16 ms | `inputfilter/inputfiltertea.WithoutWheelCoalescing`, `inputfilter/inputfiltertea.WithInterval` | planned (0009-PLAN-streaming-content-engine.md Step 4) |
-| Mouse motion | one sample every 16 ms | `inputfilter/inputfiltertea.WithoutMotionThrottle` | planned (0009-PLAN-streaming-content-engine.md Step 4) |
-| Paste-burst detection | off; when on, codex's 3 characters at most 8 ms apart, flushed after 8 ms idle, 60 ms on Windows | `inputfilter/inputfiltertea.WithPasteBurst`, `inputfilter.PasteBurstConfig` | planned (0009-PLAN-streaming-content-engine.md Step 4) |
-| The flush driver's goroutine | one, while a flush is due, until `Close` | `inputfilter.Flusher.Close` | planned (0009-PLAN-streaming-content-engine.md Step 4) |
-| The filter's drain goroutine | one for each held message, sending through the program's `Send` | `inputfilter/inputfiltertea.Filter.Attach` | planned (0009-PLAN-streaming-content-engine.md Step 4) |
-| Wheel events a notch | 1 | `inputfilter/inputfiltertea.WithWheelProfile` | planned (0009-PLAN-streaming-content-engine.md Step A1.3) |
+| Wheel notches | summed, at most one message every 16 ms | `inputfilter.WithoutWheelCoalescing`, `inputfilter.WithInterval` | built |
+| Mouse motion | one sample every 16 ms | `inputfilter.WithoutMotionThrottle` | built |
+| Paste-burst detection | off; when on, codex's 3 characters at most 8 ms apart, flushed after 8 ms idle, 60 ms on Windows | `inputfilter.WithPasteBurst`, `inputfilter.PasteBurstConfig` | built |
+| The flush driver's goroutine | one, while a flush is due, until `Close` | `inputfilter.Flusher.Close` | built |
+| The filter's goroutine | one from `Attach` to its stop, sending each due flush and each held message's drain through the program's `Send` | `inputfilter/inputfiltertea.Filter.Attach` | built |
+| Wheel events a notch | 1 | `inputfilter.WithWheelProfile` | planned (0009-PLAN-streaming-content-engine.md Step A1.3) |
 | Typeahead | none held, none dropped | `inputfilter.Capture`, `inputfilter.Quarantine` | planned (0009-PLAN-streaming-content-engine.md Step A1.3) |
 
 ## stream/streamtea

@@ -23,6 +23,7 @@ var cores = []string{
 	"glyph",
 	"inline",
 	"inline/inlinetest",
+	"inputfilter",
 	"internal/enum",
 	"internal/lineinput",
 	"internal/sanitize",

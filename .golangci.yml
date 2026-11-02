@@ -114,6 +114,7 @@ linters:
             - "**/glyph/*.go"
             - "**/inline/*.go"
             - "**/inline/inlinetest/*.go"
+            - "**/inputfilter/*.go"
             - "**/internal/enum/*.go"
             - "**/internal/lineinput/*.go"
             - "**/internal/sanitize/*.go"

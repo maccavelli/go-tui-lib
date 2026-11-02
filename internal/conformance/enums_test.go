@@ -17,6 +17,7 @@ import (
 	"github.com/maccavelli/go-tui-lib/v2/fuzzy"
 	"github.com/maccavelli/go-tui-lib/v2/glyph"
 	"github.com/maccavelli/go-tui-lib/v2/inline"
+	"github.com/maccavelli/go-tui-lib/v2/inputfilter"
 	"github.com/maccavelli/go-tui-lib/v2/keymap"
 	"github.com/maccavelli/go-tui-lib/v2/launch"
 	"github.com/maccavelli/go-tui-lib/v2/layout"
@@ -57,6 +58,7 @@ var enums = map[string]func(int64) any{
 	"fuzzy.CaseMode":             as[fuzzy.CaseMode],
 	"fuzzy.Grade":                as[fuzzy.Grade],
 	"glyph.Tier":                 as[glyph.Tier],
+	"inputfilter.BurstAction":    as[inputfilter.BurstAction],
 	"keymap.ConflictKind":        as[keymap.ConflictKind],
 	"keymap.Event":               as[keymap.Event],
 	"keymap.Features":            as[keymap.Features],

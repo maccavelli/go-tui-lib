@@ -534,7 +534,11 @@ func (w *Workspace) mouseEvent(msg tea.MouseMsg) tea.Cmd {
 }
 
 // local translates a mouse event into area's cells, or reports false when
-// the pointer is outside area, such as on a border or a title.
+// the pointer is outside area, such as on a border or a title. Bubble Tea's
+// four mouse messages are rebuilt; any other tea.MouseMsg with a
+// WithMouse(tea.Mouse) tea.Msg method, as inputfiltertea.CoalescedWheelMsg
+// has, is translated by calling it, and one without is dropped
+// (docs/decisions/0009-MADR-streaming-content-engine.md §6).
 func local(msg tea.MouseMsg, area layout.Rect) (tea.Msg, bool) {
 	m := msg.Mouse()
 	if !area.Contains(m.X, m.Y) {
@@ -542,7 +546,7 @@ func local(msg tea.MouseMsg, area layout.Rect) (tea.Msg, bool) {
 	}
 	m.X -= area.X
 	m.Y -= area.Y
-	switch msg.(type) {
+	switch e := msg.(type) {
 	case tea.MouseClickMsg:
 		return tea.MouseClickMsg(m), true
 	case tea.MouseReleaseMsg:
@@ -551,6 +555,8 @@ func local(msg tea.MouseMsg, area layout.Rect) (tea.Msg, bool) {
 		return tea.MouseMotionMsg(m), true
 	case tea.MouseWheelMsg:
 		return tea.MouseWheelMsg(m), true
+	case interface{ WithMouse(tea.Mouse) tea.Msg }:
+		return e.WithMouse(m), true
 	}
 	return nil, false
 }

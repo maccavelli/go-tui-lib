@@ -463,6 +463,18 @@ func (p *PasteBurst) Key(k tea.KeyPressMsg, now time.Time) BurstAction
 func (p *PasteBurst) Tick(now time.Time) (flush string, ok bool)
 ```
 
+*Amended 2026-11-02, by
+[0009-PLAN-streaming-content-engine.md](0009-PLAN-streaming-content-engine.md)
+D10, D10a and D12:* A6 item 8 makes `inputfilter` a core, and the PLAN's
+Step 4 gives its API: the pure `Wheel` over `Scroll`, `Throttle` and
+`PasteBurst` over `termkey.Input`, with `Key` giving a `BurstAction`
+(`Pass`, `Hold`, `Release`) and `Due` its deadline; `Flusher`, the driver
+over the three, whose `Flushes` says only that a flush fell due, taken by
+the caller's `Flush` on its own goroutine, so that a key typed after a
+burst never overtakes it; and the options, `inputfilter`'s, which
+`inputfilter/inputfiltertea`'s `NewFilter` takes. `WithWheelProfile` is
+A1's, built by the PLAN's Step A1.3.
+
 * **Wheel.** Notches are summed, and a change of direction resets the sum,
   as crush does. The first notch passes at once, and later ones at most one
   per interval, carrying the sum.
@@ -476,6 +488,12 @@ func (p *PasteBurst) Tick(now time.Time) (flush string, ok bool)
   * `PasteBurst` uses codex's rules: 3 characters, 8 ms apart at most,
     flushed after 8 ms idle (60 ms on Windows), with Enter inside a burst
     as a newline;
+    *annotated 2026-11-02, by the PLAN's D11:* codex at `4b4a5cf` starts a
+    burst at the second fast character, holding the first
+    (`paste_burst.rs:233-242`), and needs 3 only to take back typed text,
+    which a filter cannot; it also reads an Enter as a newline for 120 ms
+    after a burst (lines 160, 347-351). `PasteBurst` keeps 3, holding the
+    characters before it, and leaves the window out;
   * a burst is delivered as `tea.PasteMsg`, so every pane that handles
     bracketed paste handles it with no change;
   * the first `tea.PasteStartMsg` turns detection off for good, because

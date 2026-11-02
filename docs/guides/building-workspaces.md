@@ -329,7 +329,12 @@ With a mouse mode set:
 - a click focuses the pane under the pointer;
 - the wheel scrolls the pane under the pointer, focused or not;
 - dragging a separator resizes;
-- panes receive their mouse events in their own cells.
+- panes receive their mouse events in their own cells: Bubble Tea's four,
+  and any other `tea.MouseMsg` with a `WithMouse(tea.Mouse) tea.Msg`
+  method, which the workspace calls with the pointer in the pane's cells,
+  as `inputfilter/inputfiltertea`'s `CoalescedWheelMsg` has, so a
+  program's own mouse message reaches its pane too; one without the
+  method is dropped.
 
 `WithoutMouse()` turns all of it off. `WithoutMouseFocus()` keeps a click
 from focusing, and `WithoutMouseResize()` a drag from resizing; each

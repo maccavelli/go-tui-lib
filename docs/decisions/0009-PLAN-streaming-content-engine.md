@@ -624,11 +624,50 @@ uses the new names.
 * **The driver** (`inputfilter.Flusher`), safe for concurrent use: the
   timed flushes, a wheel residual and a burst's idle end, on a
   receive-only channel, with `Close`.
+* *Added 2026-11-02 (D10, D10a):* the core's API, which the bullets above
+  left open, is:
+
+  ```go
+  // inputfilter, pure: time in, no clock; each used on one goroutine
+  type Scroll struct{ X, Y, DX, DY int; Mod termkey.Mod }
+  type Wheel struct{ /* zero value ready: 16 ms */ }
+  func (w *Wheel) Add(s Scroll, now time.Time) (Scroll, bool)
+  func (w *Wheel) Residual() (Scroll, bool)
+  func (w *Wheel) Due() (time.Time, bool)
+  type Throttle struct{ /* zero value ready: 16 ms */ }
+  func (t *Throttle) Allow(now time.Time) bool
+  type PasteBurstConfig struct{ MinChars int; Gap, Idle time.Duration; GOOS string }
+  func NewPasteBurst(c PasteBurstConfig) *PasteBurst
+  func (p *PasteBurst) Key(in termkey.Input, now time.Time) BurstAction // Pass, Hold, Release
+  func (p *PasteBurst) Tick(now time.Time) (termkey.Input, bool)
+  func (p *PasteBurst) Due() (time.Time, bool)
+
+  // inputfilter, the driver: safe for concurrent use
+  func NewFlusher(o ...Option) *Flusher // WithInterval, WithoutWheelCoalescing,
+  	// WithoutMotionThrottle, WithPasteBurst
+  func (f *Flusher) Scroll(s Scroll, now time.Time) (Scroll, bool)
+  func (f *Flusher) Motion(now time.Time) bool
+  func (f *Flusher) Input(in termkey.Input, now time.Time) []termkey.Input
+  func (f *Flusher) Flushes() <-chan time.Time // a flush fell due (D10a)
+  func (f *Flusher) Flush(now time.Time) Flush  // what is due, taken by the caller
+  func (f *Flusher) Close() error
+  type Flush struct{ Inputs []termkey.Input; Scroll Scroll; HasScroll bool }
+
+  // inputfilter/inputfiltertea
+  func NewFilter(o ...inputfilter.Option) *Filter
+  ```
+
+  The options are the core's, and the adapter's `NewFilter` takes them.
+  `Flushes` says only that a flush fell due, and the caller takes it with
+  `Flush` on its own goroutine, so that the stages give up nothing off
+  the event loop. *(D11)* A burst starts at `MinChars`, 3, the
+  characters before it held, and an Enter after a burst's flush is a key.
 * **The adapter** (`inputfilter/inputfiltertea`):
 
   ```go
   func NewFilter(o ...Option) *Filter // WithInterval(16 ms), WithoutWheelCoalescing,
   	// WithoutMotionThrottle, WithPasteBurst(inputfilter.PasteBurstConfig), WithWheelProfile(n)
+  	// D10: ...inputfilter.Option; D12: WithWheelProfile is Step A1.3's
   func (f *Filter) Filter(m tea.Model, msg tea.Msg) tea.Msg // for tea.WithFilter
   func (f *Filter) Attach(send func(tea.Msg)) (stop func()) // the driver's flushes, and the FIFO's drain
 
@@ -687,7 +726,8 @@ uses the new names.
   `ClipboardImageRequestMsg`, a plain struct in the core;
   `PastedPath(s, goos string) (string, bool)`; grok's PowerShell burst
   cases as `PasteBurstConfig` fields; and `WithWheelProfile`'s events a
-  notch, 1 by default.
+  notch, 1 by default. *(D10, D12)* `WithWheelProfile` is an
+  `inputfilter.Option`, which the adapter's `NewFilter` takes.
 * **Tests:** each report split at every byte and in every two-way split
   reaches the model as one message, or none for a swallowed reply, and no
   stray key; a truncated report at the input's end is held, then given as
@@ -1631,3 +1671,210 @@ change(s)".
 * **Step A1.2 complete, 2026-11-02,** for the owner's commit. Step 4,
   `inputfilter`, its driver, `inputfilter/inputfiltertea` and the
   workspace's extension point, is next.
+
+### Step 4: `inputfilter`, its driver, `inputfilter/inputfiltertea`, and the extension point
+
+*2026-11-02.* The owner committed Step A1.2 (`21eeeca`) and said
+"committed, proceed".
+
+**Facts re-read:** at Bubble Tea `v2.0.10`, `tea.MouseMsg` is an
+`fmt.Stringer` with `Mouse() Mouse` (`mouse.go:46-51`), and `tea.Mouse` is
+`X, Y`, `Button` and `Mod`; `paste.go` gives `PasteMsg{Content}`,
+`PasteStartMsg` and `PasteEndMsg`; `tea.WithFilter` takes
+`func(Model, Msg) Msg`, and the event loop runs it on every message it
+receives, a program's `Send` included (`tea.go:760-769`). `local` is at
+`workspace/render.go:538-556`, with the four cases. `keymaptea.FromTea`
+converts a `tea.Key` field for field. `termkey.Input` is `Kind` (`InputKey`,
+`InputPaste`, `InputUnknown`), `Key`, `Text`, `Raw` and `Truncated`.
+codex's `paste_burst.rs`, at `4b4a5cf` (2026-11-01), is read under D11.
+
+* **Deviation D10, 2026-11-02: the core's API.**
+  * **Found** reading the step: it names `PasteBurst` with `Key`, `Tick`
+    and `BurstAction`, and a `Flusher` on a channel with `Close`, and no
+    type for a wheel event or the motion throttle in a core that cannot
+    name `tea.Mouse`, no `BurstAction` values, no deadline a driver can
+    read from `PasteBurst`, and nothing a `Flusher`'s channel carries.
+  * **Resolutions offered:** the whole logic in the core, the pure
+    `Wheel`, `Throttle` and `PasteBurst` and the `Flusher` over them, the
+    adapter converting (recommended); the pure stages alone, the adapter
+    combining them under its lock, against 0020-MADR D2; or the API
+    written into the records first, as a change of its own.
+  * **Chosen by the owner,** 2026-11-02: "Full core + Flusher
+    (Recommended)", with the API the step's text now shows. `python3 -m
+    tools.verify names` over `Scroll`, `Wheel`, `Throttle`, `PasteBurst`,
+    `PasteBurstConfig`, `BurstAction`, `Flusher`, `Flush`, `Option`,
+    `Filter` and `CoalescedWheelMsg`: clean.
+* **Deviation D10a, 2026-11-02: who takes a timed flush.**
+  * **Found** working out D10's `Flusher` before any code: a flush taken
+    on the timer's goroutine and sent on the channel lets a key typed
+    after a burst's idle end, while the paste is in transit through the
+    program's `Send`, reach the model before it; and with no reader, the
+    residual is lost, where 0009-MADR §6 has it join the next wheel event.
+  * **Resolutions offered:** `Flushes() <-chan time.Time` says a flush
+    fell due, of capacity one, and `Flush(now) Flush` takes it on the
+    caller's goroutine (recommended); or as D10 first gave it.
+  * **Chosen by the owner,** 2026-11-02: "Channel says when; caller takes
+    (Recommended)". The step's text shows it.
+* **Deviation D11, 2026-11-02: codex's burst, as it is.**
+  * **Found** in codex's `paste_burst.rs` at `4b4a5cf`: it holds the first
+    fast ASCII character and starts a burst at the second within 8 ms
+    (`BeginBufferFromPending`, lines 233-242); its 3 characters
+    (`PASTE_BURST_MIN_CHARS`, line 159) start one only by retro-capture,
+    taking back text already in the textarea, which a filter cannot do,
+    since the keys have reached the model. It also reads an Enter as a
+    newline for 120 ms after a burst (`PASTE_ENTER_SUPPRESS_WINDOW`, lines
+    160 and 347-351), which 0009-MADR §6 does not name.
+  * **Resolutions offered:** `MinChars` 3, as the MADR says, up to two
+    fast characters held, then given as keys when no third comes
+    (recommended), or 2, as codex; and the Enter window left out
+    (recommended), or added at 120 ms, an Enter after a flush given as a
+    one-line paste.
+  * **Chosen by the owner,** 2026-11-02: "3, as the MADR says
+    (Recommended)" and "Leave it out (Recommended)". 0009-MADR §6 is
+    annotated with codex's facts.
+* **Deviation D12, 2026-11-02: `WithWheelProfile`.**
+  * **Found** reading the step: its adapter lists `WithWheelProfile(n)`,
+    which Step A1.3 builds and tests.
+  * **Chosen by the owner,** 2026-11-02: "A1.3, where its test is
+    (Recommended)". It is struck from this step's list, and A1.3 builds it
+    as an `inputfilter.Option` (D10).
+
+**What changed:**
+
+* `inputfilter/`, a new core: `doc.go`; `wheel.go`, `Scroll`, `Wheel`
+  (`Add`, `Residual`, `Due`, and an `Interval` field, 16 ms at zero or
+  less) and `Throttle` (`Allow`, and `Interval`); `burst.go`,
+  `PasteBurstConfig`, `BurstAction` (`Pass`, `Hold`, `Release`; tokens
+  "pass", "hold", "release") from `internal/enum`, and `PasteBurst`
+  (`NewPasteBurst`, `Key`, `Tick`, `Due`); `flusher.go`, `Option`,
+  `WithInterval`, `WithoutWheelCoalescing`, `WithoutMotionThrottle`,
+  `WithPasteBurst`, `Flush`, and `Flusher` (`NewFlusher`, `Scroll`,
+  `Motion`, `Input`, `Flushes`, `Flush`, `Close`). It imports `termkey`,
+  `internal/enum` and the standard library.
+  * `PasteBurst`, by D11: a character typed, a key press with text,
+    shifted at most, or on Windows with AltGr's Ctrl and Alt, starts or
+    joins a run when it comes within the gap of the last; an Enter or a
+    Tab joins a run or a burst but starts none; at `MinChars` the run is
+    a burst, which takes every such key until it has been idle; a run
+    that ends short is given back as its keys; any other input ends what
+    is held first; a bracketed paste turns detection off for good. The
+    Tab is codex's (`paste_burst.rs:4`, "`KeyCode::Char`,
+    `KeyCode::Enter`, and `KeyCode::Tab`"), which §6's "codex's rules"
+    take in.
+  * The `Flusher` holds one mutex over the three stages. A call after
+    which something falls due starts one goroutine with `WaitGroup.Go`,
+    which waits on a `time.Timer`, sends the deadline on `Flushes`, of
+    capacity one, without blocking, and stops; `Close` stops it at once
+    and closes `Flushes`. With D10a, nothing leaves the stages but by a
+    call.
+* `inputfilter/inputfiltertea/`, the adapter: `Filter`, `NewFilter`, its
+  `Filter` method, `Attach`, and `CoalescedWheelMsg` with `Mouse`,
+  `String`, `WithMouse` and `WheelDelta`; `ExampleFilter`.
+  * A wheel sum of one notch reaches the model as the
+    `tea.MouseWheelMsg` it was, and of more as a `CoalescedWheelMsg`, so
+    that a pane that reads only Bubble Tea's wheel still scrolls; the
+    agent's reading of §6's "many wheel notches as one message".
+  * Keys, releases and pastes go through `Flusher.Input` only while the
+    `Filter` is attached, since a held character needs `Attach` to be
+    given back; the conversions are `keymaptea.FromTea` and `ToTea`,
+    which carry all six of `tea.Key`'s fields (`key.go:302-343`).
+  * Bubble Tea gives a bracketed paste as `PasteStartMsg`, `PasteMsg`
+    and `PasteEndMsg`; the `PasteMsg` is the `termkey.InputPaste` that
+    turns detection off, so the step's "after a `tea.PasteStartMsg`" is
+    held by the sequence, and its mutation by "a bracketed paste leaving
+    detection on".
+  * `Attach`'s one goroutine, from `Attach` to its `stop`, sends the
+    drains and the flushes through the program's `Send`; `stop` closes
+    the `Flusher`. It is for the program's end: a filter returns one
+    message, and a send from `stop` would deadlock a `stop` called from
+    `Update`, so what the `Filter` holds at `stop` ends with the program,
+    and after it every message passes as it comes. A second `Attach`
+    panics, a programmer's error. The first `stop` written gave back what
+    the Flusher held with the next message; `TestFilterAttach` found the
+    message after it held with no drain to release it, and the agent
+    changed it to this before any mutation ran.
+  * A message the burst is not given, such as a wheel event, passes a
+    run or burst the Flusher still holds, which has not yet been given;
+    the order the `Filter` keeps is that of what it gives, its held
+    messages before any after them.
+* `workspace/render.go`: `local` gains the case, a `tea.MouseMsg` with
+  `WithMouse(tea.Mouse) tea.Msg` translated by calling it; its comment
+  says so, and `docs/guides/building-workspaces.md`'s mouse list.
+* `internal/conformance`: `inputfilter` joins `cores`, and
+  `inputfilter.BurstAction` the `enums` table. `.golangci.yml`:
+  `"**/inputfilter/*.go"` joins `charmfree` (D5).
+* `docs/architecture.md`: the graph's two lines, the two packages' rows,
+  the cores' list and the tree. `docs/guides/defaults.md`: the step's
+  five rows `built`.
+
+**Tests:** `TestWheelSum`, 100 notches within 16 ms, the first at once
+and 99 as the residual; `TestWheelInterval` (3 intervals);
+`TestWheelReverses`; `TestThrottle` (2); `TestPasteBurst`, 20 cases:
+codex's, a 3-character burst, Enter and Tab inside, a burst ended by an
+arrow, Windows' longer idle, typing 50 ms apart passing through, and
+the rest of D11's rules; `TestPasteBurstDue`; `ExamplePasteBurst`;
+inside `testing/synctest.Test`, `TestFlusherResidual`,
+`TestFlusherBurst`, a key after the idle end following the paste
+(D10a), `TestFlusherUnread`, `TestFlusherOptions` and
+`TestFlusherClose`; in `inputfiltertea`, inside `synctest`, over a stand-in
+event loop whose `Send` blocks, so that a `send` on the calling
+goroutine would deadlock the bubble, `TestFilterBurst`,
+`TestFilterBracketed`, `TestFilterOrder`, `TestFilterWheel`,
+`TestFilterPasses` and `TestFilterAttach`; `TestCoalescedWheelMsg`; and
+`TestMouseExtensionPoint` in `workspace`. All pass under `-race`, three
+times over.
+
+* Test faults of the agent's, fixed: `TestFlusherResidual` and
+  `TestFlusherBurst` waited for a flush with `synctest.Wait`, which does
+  not move the clock, short of its deadline, and now sleep to it; and
+  `TestPasteBurst` lacked a character after a burst's idle end, so that
+  a `Key` that did not first expire what is due would have survived; the
+  case was added before the mutations ran.
+
+**Mutations,** `python3 -m tools.verify mutate`, on the final code:
+
+| Mutation | Its failure |
+| :--- | :--- |
+| 4.1 the direction reset removed | `TestWheelReverses`: "down, down, up held {… DY:1 …}; want DY -1" |
+| 4.2 every motion sample passed | `TestThrottle`: "interval 0s: passed at [0s 1ms 2ms …]" |
+| 4.3 the FIFO bypassed by new input | `TestFilterOrder`: "before the drains the model got \"paste(abc) wheel(wheeldown)\"; want the paste alone" |
+| 4.4 `local` ignoring `WithMouse` | `TestMouseExtensionPoint`: "logs got []; want one coalesced wheel at (3,2) with 7 notches" |
+| 4.5 a bracketed paste leaving detection on | `TestPasteBurst`: "a bracketed paste turns detection off: \"[x]\"; want \"[x] a b c\"" |
+| 4.6 `Close` not stopping the goroutine | `TestFlusherClose`: "Close waited 1h0m0s for the deadline; want it stopped at once" |
+| 4.7 the first notch not passing at once | `TestWheelSum`: "Due = -2562047h47m16.854775808s, true; want 16 ms after the first" |
+| 4.8 the residual not taken by `Flush` | `TestFlusherResidual`: "passed 1, flushed {… HasScroll:false}; want 1, then 99" |
+| 4.9 an Enter inside a burst not kept | `TestPasteBurst`: "Enter inside a burst: \"[abc] enter d\"; want \"[abc\\nd]\"" |
+| 4.10 an arrow not ending a burst first | `TestPasteBurst`: "a burst ended by an arrow: \"up\"; want \"[abc] up\"" |
+| 4.11 Windows' idle ignored | `TestPasteBurst`: "Windows' longer idle: \"[abc] d\"; want \"[abcd]\"" |
+| 4.12 a run not given back as keys | `TestPasteBurst`: "two held, given back as keys: \"\"; want \"a b\"" |
+| 4.13 a character after the idle end joining the burst | `TestPasteBurst`: "a character after the idle end starts again: \"[abcx]\"; want \"[abc] x\"" |
+| 4.14 the drain not asked for again | `TestFilterOrder`: "the drains gave \"key(up)\"; want the arrow, then the wheel" |
+| 4.15 the core importing Bubble Tea | `TestCoresAreCharmFree`: "inputfilter (GOOS=linux) links charm.land/bubbletea/v2: inputfilter → charm.land/bubbletea/v2" |
+| 4.16 `MinChars` ignored | `TestPasteBurst`: "MinChars, Gap and Idle set: \"a b\"; want \"[ab]\"" |
+
+`mutate: 16 killed, 0 survived, 0 errors`. The PLAN named six; its "a
+`PasteStartMsg` leaving detection on" is 4.5, as above, and its "`Close`
+not waiting" is 4.6, which `synctest` can observe, as Step 3's 3.7 found.
+The rest hold D10, D10a and D11.
+
+**The API,** `make apicheck`: "against v2.9.0, 0 incompatible
+change(s)"; the packages `inputfilter` and `inputfilter/inputfiltertea`
+added.
+
+**Gates,** with the step's files:
+
+| Host | `gates` |
+| :--- | :--- |
+| macOS | 22 passed, 0 failed, 0 skipped in 654 s |
+| `remote linux` | 21 passed, 0 failed, 1 skipped (`gofmt`) in 1553 s |
+| `remote windows` | 21 passed, 0 failed, 1 skipped (`gofmt`) in 2679 s |
+
+* The pre-add check found one finding in the agent's code, errcheck on
+  `_ = fl.f.Close()`, which this repository's `check-blank` refuses; it
+  is the repository's reasoned `//nolint:errcheck`, as
+  `stream/printer.go:119-120` has, since a `Flusher`'s `Close` always
+  returns nil. Then the pre-add check of the thirteen Go files, the
+  documents' checks, `internal/conformance` and the identifier scan,
+  untracked files included: clean.
+* **Step 4 complete, 2026-11-02,** for the owner's commit. Step A1.3, the
+  input stages, measured first, is next.
