@@ -2,6 +2,8 @@
 // (docs/decisions/0009-MADR-streaming-content-engine.md §3, A6 item 8): Wait
 // is a command that waits for the Scheduler's next frame and returns it as
 // a frame.DueMsg, and Forward pushes every frame to the program's Send.
+// TickCmd ticks an animation at its frame.Demand, CoalesceCmd delivers a
+// frame.Coalescer's deadline, and WaitUpgrade an Upgrader's next result.
 //
 // A program re-arms Wait on each frame:
 //
@@ -16,6 +18,7 @@ package frametea
 
 import (
 	"sync"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -60,5 +63,36 @@ func Forward(s *frame.Scheduler, send func(tea.Msg)) (stop func()) {
 	return func() {
 		once.Do(func() { close(done) })
 		wg.Wait()
+	}
+}
+
+// TickCmd is a command that ticks once, after t's interval for d, as a
+// frame.TickMsg; for frame.None it is nil, so that a program with nothing
+// animating arms no timer. A program re-arms it on each TickMsg, with the
+// demand of what it drew.
+func TickCmd(d frame.Demand, t frame.Ticks) tea.Cmd {
+	iv := t.Interval(d)
+	if iv == 0 {
+		return nil
+	}
+	return tea.Tick(iv, func(at time.Time) tea.Msg { return frame.TickMsg{At: at, Demand: d} })
+}
+
+// CoalesceCmd is a command that returns a frame.FlushMsg at due, the
+// deadline a Coalescer's Push gave, on which the program calls Flush.
+func CoalesceCmd(due time.Time) tea.Cmd {
+	return tea.Tick(time.Until(due), func(time.Time) tea.Msg { return frame.FlushMsg{At: due} })
+}
+
+// WaitUpgrade is a command that waits for u's next result, and returns it
+// as a frame.UpgradeMsg; once u is closed, it returns nil. A program
+// re-arms it on each result.
+func WaitUpgrade[K comparable, R any](u *frame.Upgrader[K, R]) tea.Cmd {
+	return func() tea.Msg {
+		m, ok := <-u.Results()
+		if !ok {
+			return nil
+		}
+		return m
 	}
 }

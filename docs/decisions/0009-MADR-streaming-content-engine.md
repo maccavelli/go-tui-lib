@@ -720,6 +720,12 @@ removes anything from it.
     `TickCmd(None)` returns nil, so an idle program wakes for nothing. A
     view that paints an animation reports which animations it painted, and
     a tick redraws only when one of those changes on that tick.
+    *Added 2026-11-02, by
+    [0009-PLAN-streaming-content-engine.md](0009-PLAN-streaming-content-engine.md)
+    D7:* a tick's message is `frame.TickMsg{At, Demand}`, and the
+    message of a `Coalescer`'s deadline `frame.FlushMsg{At}`, on which a
+    program calls `Flush`; both are `frame`'s, and `frame/frametea`'s
+    `TickCmd` and `CoalesceCmd` return them.
   * **`Writer`** wraps the output the caller passes to `tea.WithOutput`
     (report §8.17). It keeps `queued` and `written` counters and allows one
     frame in flight, so draws during a stalled terminal collapse into one.
@@ -1420,6 +1426,18 @@ one question. Every fact was re-read on 2026-11-01.
     it to one pending buffer, written whole when the first completes: many
     draws become one write, and no byte is lost, as A1's test says. A
     write's error is returned by the next `Write` and by `Close`.
+    *Amended 2026-11-02, by
+    [0009-PLAN-streaming-content-engine.md](0009-PLAN-streaming-content-engine.md)
+    D9:* an `io.Writer` under `tea.WithOutput` is not transparent. Bubble
+    Tea `v2.0.10` finds the terminal only as a `term.File`
+    (`tty_unix.go:30`, `tty_windows.go:36`), for the window size, the
+    resize listener, Windows' virtual-terminal mode and the colour
+    profile, and restores the terminal straight after its last flush
+    (`tty.go:33-49`). So `frame.Output` forwards `Fd` and `Read` to what
+    it wraps, and is a `term.File`; and a `Write` waits for its own bytes
+    up to `WithWriteWait` (100 ms), so that on a terminal that keeps up
+    Bubble Tea's last bytes land before the restore, and only a slower
+    write lets the program go on.
 11. **Defaults the research gives:** `Demand`'s `Slow` ticks every 83 ms
     and `Fast` at the scheduler's frame rate (grok's `TickDemand`); the
     `Coalescer`'s maximum wait is 100 ms (Kilo); `Writer` reports a stall

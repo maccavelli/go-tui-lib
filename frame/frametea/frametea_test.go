@@ -1,6 +1,8 @@
 package frametea_test
 
 import (
+	"context"
+	"slices"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -105,6 +107,76 @@ func TestForward(t *testing.T) {
 		_ = s.Close()
 		if got.len() != 1 {
 			t.Fatalf("Forward sent %d frames; want 1", got.len())
+		}
+	})
+}
+
+// TestTickCmd: None arms no timer, a nil command; Slow and Fast tick once,
+// after Ticks' interval, as a frame.TickMsg with the demand and the time it
+// fired (docs/decisions/0009-MADR-streaming-content-engine.md A1 §3).
+func TestTickCmd(t *testing.T) {
+	if cmd := frametea.TickCmd(frame.None, frame.Ticks{}); cmd != nil {
+		t.Fatal("TickCmd(None) is a command; want nil")
+	}
+	for _, c := range []struct {
+		d    frame.Demand
+		t    frame.Ticks
+		want time.Duration
+	}{
+		{frame.Slow, frame.Ticks{}, 83 * time.Millisecond},
+		{frame.Fast, frame.Ticks{}, time.Second / 60},
+		{frame.Slow, frame.Ticks{Slow: time.Second}, time.Second},
+	} {
+		synctest.Test(t, func(t *testing.T) {
+			start := time.Now()
+			m, ok := frametea.TickCmd(c.d, c.t)().(frame.TickMsg)
+			if !ok || m.Demand != c.d || m.At.Sub(start) != c.want || time.Since(start) != c.want {
+				t.Fatalf("TickCmd(%v) gave %#v after %v; want its tick after %v", c.d, m, time.Since(start), c.want)
+			}
+		})
+	}
+}
+
+// TestCoalesceCmd: the command returns a frame.FlushMsg at the deadline a
+// Coalescer's Push gave, and at once for one passed.
+func TestCoalesceCmd(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var applied [][]int
+		c := frame.NewCoalescer(func(b []int) { applied = append(applied, slices.Clone(b)) }, nil, 0)
+		start := time.Now()
+		due, ok := c.Push(1, start)
+		c.Push(2, start)
+		if !ok {
+			t.Fatal("the first Push gave no deadline")
+		}
+		m, isFlush := frametea.CoalesceCmd(due)().(frame.FlushMsg)
+		if !isFlush || !m.At.Equal(due) || time.Since(start) != 100*time.Millisecond {
+			t.Fatalf("CoalesceCmd gave %#v after %v; want the deadline after 100ms", m, time.Since(start))
+		}
+		c.Flush()
+		if len(applied) != 1 || !slices.Equal(applied[0], []int{1, 2}) {
+			t.Fatalf("the flush at the deadline applied %v; want [[1 2]]", applied)
+		}
+		before := time.Now()
+		if _, ok := frametea.CoalesceCmd(start)().(frame.FlushMsg); !ok || time.Since(before) != 0 {
+			t.Fatal("a passed deadline did not flush at once")
+		}
+	})
+}
+
+// TestWaitUpgrade: the command returns the Upgrader's next result as a
+// frame.UpgradeMsg, and nil once it is closed.
+func TestWaitUpgrade(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		u := frame.NewUpgrader[string, int]()
+		u.Submit("k", 3, func(context.Context) int { return 9 })
+		m, ok := frametea.WaitUpgrade(u)().(frame.UpgradeMsg[string, int])
+		if !ok || m.Key != "k" || m.Gen != 3 || m.Result != 9 {
+			t.Fatalf("WaitUpgrade gave %#v; want {k 3 9}", m)
+		}
+		_ = u.Close()
+		if m := frametea.WaitUpgrade(u)(); m != nil {
+			t.Fatalf("WaitUpgrade after Close gave %#v; want nil", m)
 		}
 	})
 }

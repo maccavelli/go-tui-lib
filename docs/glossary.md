@@ -169,11 +169,11 @@ exports. Its amendment of 2026-10-25 (A5.2) renamed A2's `Input`, what a
 provider is asked, to `Search`, since `termkey.Input` is exported in
 `v2.0.0`.
 
-0009's amendments of 2026-11-01 (A6 to A8, and its PLAN's D1) reserve
-these, which its PLAN builds: in `frame`, `DueMsg`, `Queue`, `Snapshot`,
-`Pacer`, `PacerFunc`, `Release`, `Gear`, `AdaptiveOption`, `Scheduler`,
-`Coalescer`, `Demand`, `Ticks`, `Output`, `OutputOption`, `OutputEvent`,
-`Upgrader` and `UpgradeMsg`; in `inputfilter`, `PasteBurst`,
+0009's amendments of 2026-11-01 (A6 to A8, and its PLAN's D1 and D7)
+reserve these, which its PLAN builds: in `frame`, `DueMsg`, `Queue`,
+`Snapshot`, `Pacer`, `PacerFunc`, `Release`, `Gear`, `AdaptiveOption`,
+`Scheduler`, `Coalescer`, `FlushMsg`, `Demand`, `Ticks`, `TickMsg`,
+`Output`, `OutputOption`, `OutputEvent`, `Upgrader` and `UpgradeMsg`; in `inputfilter`, `PasteBurst`,
 `PasteBurstConfig`, `BurstAction`, `Flusher` and
 `ClipboardImageRequestMsg`; in `inputfilter/inputfiltertea`, `Filter` and
 `CoalescedWheelMsg`; in `stream`, `InterpretOptions`, `InterpretRow`,

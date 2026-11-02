@@ -564,14 +564,31 @@ uses the new names.
   fps int) tea.Cmd`~~ `TickCmd(d frame.Demand, t frame.Ticks) tea.Cmd`, nil
   for `None`; `WaitUpgrade(u) tea.Cmd`; and `CoalesceCmd(due time.Time)
   tea.Cmd`, the tick for a `Coalescer`'s deadline.
+  *Added 2026-11-02 (D7):* `TickCmd`'s message is
+  `frame.TickMsg{At time.Time; Demand Demand}`, and `CoalesceCmd`'s
+  `frame.FlushMsg{At time.Time}`, on which a program calls `Flush`; both
+  are the core's, beside `DueMsg`.
 * **`Output`** writes on its own goroutine; while a write is in flight it
   appends later writes to one pending buffer, written whole after, and
   drops nothing (A7 item 10). `Write` returns `len(p)` and the error of an
   earlier write, if any. A write in flight longer than the stall time
   sends `Stalled` once, and `Resumed` when it completes.
+  *Amended 2026-11-02 (D9):* `Output` has `Fd() uintptr` and
+  `Read(p []byte) (int, error)`, forwarded to what it wraps when that has
+  them, so that it is a `term.File` and Bubble Tea still finds the
+  terminal; and `Write` waits for its own bytes to be written up to
+  `WithWriteWait(d)` (100 ms), returning sooner when they are, so that on
+  a terminal that keeps up Bubble Tea's last write lands before it
+  restores the terminal. Only a write slower than the wait lets the
+  program go on, its later draws merging.
 * **`Upgrader`:** a newer `Submit` for a key cancels the older job's
   context; a result whose generation is older than the newest submitted
   for its key is dropped; `Close` cancels every job and waits.
+  *Read 2026-11-02 (D8):* "the newest submitted" is the key's job while it
+  runs. A `Submit` whose generation is lower than the running job's is
+  ignored; an equal or higher one cancels and replaces it; a result is
+  delivered only while its job is still the key's; and the key is
+  forgotten when its job ends.
 * **Tests,** inside `synctest.Test`: a barrier between deltas is applied
   after the earlier and before the later, for every interleaving of a
   generated sequence; the maximum wait applies a batch when no frame
@@ -1418,3 +1435,199 @@ change(s)".
   clean.
 * **Step 3 complete, 2026-11-02,** for the owner's commit. Step A1.2,
   `Coalescer`, `Demand`, `Output` and `Upgrader`, is next.
+
+### Step A1.2: `Coalescer`, `Demand`, `Output` and `Upgrader`
+
+*2026-11-02.* The owner committed Step 3 (`600348d`) and said "committed,
+proceed".
+
+**Facts re-read:** 0003-REPORT §8.17 gives grok's `TickDemand{None, Slow
+(83 ms), Fast}`, grok's stall "after 5 s with no progress", and Kilo's
+"100 ms timer" (`0003-REPORT-agent-tui-ecosystem-research.md:1983-2000`);
+Bubble Tea `v2.0.10`'s `cursed_renderer.go:643` builds an
+`uv.NewTerminalRenderer`, and ultraviolet's `terminal_renderer.go:111-117`,
+at the version the root requires, says it writes "the minimal necessary
+escape sequences to transition the terminal to the new buffer state".
+Each holds. `python3 -m tools.verify names` over the step's ten type
+names, D7's two among them: clean.
+
+* **Deviation D7, 2026-11-02: the messages of `TickCmd` and
+  `CoalesceCmd`.**
+  * **Found** reading the step: it gives `frametea.TickCmd(d, t)` and
+    `CoalesceCmd(due)`, each a `tea.Cmd`, and names no message for either;
+    a command returns one, and the program switches on its type.
+  * **Resolutions offered:** `frame.TickMsg{At, Demand}` and
+    `frame.FlushMsg{At}` in the core, beside `DueMsg`, since they name no
+    Charm type (0020-MADR D2) (recommended); the same two in `frametea`,
+    against D2, which a line-mode host could not use; or `DueMsg` for
+    both, with which a program cannot tell which command to re-arm.
+  * **Chosen by the owner,** 2026-11-02: "Two messages in frame
+    (Recommended)". The step's text, the glossary's reserved names and
+    0009-MADR A1 §3 are annotated. No file is added.
+* **Deviation D8, 2026-11-02: how long `Upgrader` remembers a key's
+  newest generation.**
+  * **Found** reading the step: "a result whose generation is older than
+    the newest submitted for its key is dropped" does not say how long
+    the newest is kept.
+  * **Resolutions offered:** while a job for the key runs, the key
+    forgotten when it ends, memory bounded by the jobs in flight
+    (recommended); forever, an entry for every key ever submitted; or
+    the first with an exported `Forget(key)`, which nothing asks for.
+  * **Chosen by the owner,** 2026-11-02: "While a job for the key runs
+    (Recommended)". The step's text is annotated; the MADR's "a stale one
+    is dropped" holds as written.
+* **Deviation D9, 2026-11-02: `Output` under `tea.WithOutput`.**
+  * **Found** reading Bubble Tea `v2.0.10` before writing `Output`:
+    * Bubble Tea finds the terminal only as `p.output.(term.File)`
+      (`tty_unix.go:30`, `tty_windows.go:36`), x/term `v0.2.2`'s
+      `io.ReadWriteCloser` with `Fd() uintptr` (`terminal.go:9-12`). It
+      takes from it the window size (`tea.go:1051-1059`,
+      `tty.go:109-126`), the resize listener (`tea.go:696`), Windows'
+      virtual-terminal mode (`tty_windows.go:36-48`), and through
+      colorprofile `v0.4.3` the colour profile (`env.go:34-36`). An
+      `Output` that is an `io.Writer` alone gives a program a 0 by 0
+      window, no resize, no colour, and no virtual-terminal mode on
+      Windows.
+    * Bubble Tea restores the terminal straight after its last flush
+      (`tty.go:33-49`). An `Output` whose `Write` returns before its bytes
+      are written lets that restore come first: on Windows the last
+      sequences then reach a console whose virtual-terminal mode is off,
+      and print as text.
+    * 0009-MADR A1 §3 and A7 item 10 take an `io.Writer` under
+      `tea.WithOutput` to be transparent; they are wrong about it. Nothing
+      in the tree is affected: `Output` was unbuilt.
+  * **Resolutions offered:** `Output` forwards `Fd` and `Read`, and
+    `Write` waits for its own bytes up to a bound, `WithWriteWait`, 100 ms
+    (recommended); forward `Fd` and `Read` and return at once, leaving the
+    Windows defect, close to a workaround; or document `Output` for
+    line-mode hosts alone, which drops A1's purpose for Bubble Tea.
+  * **Chosen by the owner,** 2026-11-02: "File methods + bounded wait
+    (Recommended)". The step's text and 0009-MADR A7 item 10 are
+    annotated; `docs/guides/defaults.md` gains two rows, the wait and
+    `Output`'s goroutine, which convention 12 needs and Step 1 did not
+    list. 100 ms is the agent's choice, not a researched number: it is
+    the coalescer's wait, long against a write to a terminal that keeps
+    up and short against the 5 s stall. No file is added.
+
+**What changed:**
+
+* `frame/coalescer.go`: `Coalescer[T]`, `NewCoalescer`, whose nil
+  `apply` panics, a programmer's error, whose nil `mergeable` merges
+  every item, and whose `maxWait` keeps 100 ms at zero or less; `Push(v,
+  now) (due, ok)`, a deadline when a delta starts a batch, and a barrier
+  applying the batch, then itself alone; `Flush`, reusing the batch's
+  slice; and `FlushMsg` (D7).
+* `frame/demand.go`: `Demand` (`None`, `Slow`, `Fast`; tokens "none",
+  "slow", "fast") from `internal/enum`; `Combine`, the greatest;
+  `Ticks`, whose zero or negative field keeps 83 ms or a 60th of a
+  second, and `Interval`, 0 for `None` and for a demand with no token;
+  and `TickMsg` (D7).
+* `frame/output.go`: `Output`, `NewOutput`, `OutputOption`,
+  `WithStallAfter` (5 s), `WithWriteWait` (100 ms, D9), `OutputEvent`
+  (`Stalled`, `Resumed`; tokens "stalled", "resumed"), `Events`, `Fd`,
+  `Read`, `Close` and `ErrClosed`.
+  * One goroutine, started by `WaitGroup.Go` when a write is queued and
+    none is in flight, writes the pending buffer, again while more is
+    pending, and stops; two buffers are swapped, so the steady state
+    allocates nothing for the bytes.
+  * A `Write` copies its bytes into the pending buffer and waits on that
+    buffer's `done` channel or the write wait. Once a wait has run out,
+    later `Write`s return at once until a write completes, so that a
+    stalled terminal holds the program for one wait, not one a draw; this
+    is how D9's "only a slower write lets the program go on" behaves
+    across draws, and is the agent's.
+  * A short write is `io.ErrShortWrite`. The first failed write's error
+    is every later `Write`'s, with 0, and `Close`'s.
+  * The stall timer is a `time.AfterFunc` started with each write, which
+    sends `Stalled` only while that write, by its number, is in flight;
+    `Resumed` follows when it completes. `Events` holds one event: an
+    event still unread when its opposite comes is taken back, so a
+    program that reads late reads the current state, and a send never
+    blocks.
+* `frame/upgrader.go`: `Upgrader[K, R]`, `NewUpgrader`, `Submit`,
+  `Results` (unbuffered), `Close`, and `UpgradeMsg`. Each job is a
+  goroutine started by `WaitGroup.Go`, with a context of its own; a job
+  replaced, or the `Upgrader` closed, has its context cancelled and its
+  result dropped, and a key is forgotten when its job ends (D8). A job
+  replaced at the moment its result is read may still deliver it, and
+  its `Gen` says which it is; the documentation says so.
+* `frame/frametea/frametea.go`: `TickCmd`, nil for `None`, otherwise a
+  `tea.Tick` returning `frame.TickMsg`; `CoalesceCmd`, a `tea.Tick` to
+  the deadline returning `frame.FlushMsg`; and `WaitUpgrade`, generic,
+  nil once the `Upgrader` is closed.
+* `frame/doc.go`: the package comment names the new types.
+* `internal/conformance/enums_test.go`: `frame.Demand` and
+  `frame.OutputEvent` join `enums`.
+* `docs/guides/defaults.md`: the step's four rows and D9's two `built`.
+  `docs/architecture.md`: the graph's line, the two packages' rows and
+  the tree.
+
+**Tests:** `TestCoalescerModel`, every one of the 3,279 scripts of 1 to 7
+steps over a delta, a barrier and a frame against a model of the batches
+and the deadlines; `TestCoalescerWait` (3 cases) and `TestCoalescerNil`;
+`ExampleCoalescer`; `TestCombine` (4) and `TestTicks` (8);
+`TestOutputKeepsUp`, `TestOutputStalled`, `TestOutputWithdraws`,
+`TestOutputErrors` (2 writers) and `TestOutputFile`;
+`TestUpgraderReplaces`, `TestUpgraderStale`, `TestUpgraderGenerations`
+and `TestUpgraderClose`; and in `frametea`, `TestTickCmd` (4),
+`TestCoalesceCmd` and `TestWaitUpgrade`. Every driver's test runs inside
+`testing/synctest.Test`; all pass under `-race`, three times over.
+
+* Three test faults of the agent's, fixed before any mutation ran:
+  `TestOutputKeepsUp` looked for no event after `Close`, when a closed
+  channel gives the zero value, `Stalled`; `TestUpgraderGenerations`
+  submitted a lower generation the moment the higher one's result was
+  read, before that job had ended and its key was forgotten, which D8
+  ignores, as it should; and `TestOutputErrors`'s writer failed every
+  write, so that a mutation making the error not sticky would have
+  survived, and now fails only its first.
+
+**Mutations,** `python3 -m tools.verify mutate`, on the final code:
+
+| Mutation | Its failure |
+| :--- | :--- |
+| A1.2.1 the barrier not flushing first | `TestCoalescerModel`: "\"db\" applied [[{1 true}] [{0 false}]]; want [[{0 false}] [{1 true}]]" |
+| A1.2.2 `TickCmd(None)` a command | `TestTickCmd`: "TickCmd(None) is a command; want nil" |
+| A1.2.3 `Output` dropping the pending buffer | `TestOutputStalled`: "writes [\"first\"]; want the first, then the rest as one" |
+| A1.2.4 `Output` writing a second time while one is in flight | `TestOutputStalled`: "no event; want stalled", then the bubble's deadlock |
+| A1.2.5 `Upgrader` keeping a stale result | `TestUpgraderStale`: "the replaced job returned: result {Key:a Gen:1 Result:stale}" |
+| A1.2.6 `Upgrader` not cancelling the replaced job | `TestUpgraderReplaces`: "0 jobs cancelled; want the replaced one" |
+| A1.2.7 `Write` returning before its bytes are written | `TestOutputStalled`: "Write(\"first\") took 0s; want 100ms" |
+| A1.2.8 later `Write`s waiting while the terminal is slow | `TestOutputStalled`: "Write(\"b\") took 100ms; want 0s" |
+| A1.2.9 `Fd` not forwarded | `TestOutputFile`: "Fd = 43; want the file's, 42" |
+| A1.2.10 an unread event not withdrawn | `TestOutputWithdraws`: "a stall over before it was read: event stalled" |
+| A1.2.11 a write's error not sticky | `TestOutputErrors`: "the next Write = 1, \<nil\>; want 0, terminal gone" |
+| A1.2.12 `WithStallAfter` ignored | `TestOutputWithdraws`: "0 events waiting at the stall; want Stalled" |
+| A1.2.13 a lower generation replacing the running job | `TestUpgraderGenerations`: "result {Key:a Gen:3 Result:three}; want {a 5 five}" |
+| A1.2.14 a key not forgotten when its job ends | `TestUpgraderGenerations`: "no result; want {a 3 again}" |
+| A1.2.15 `Close` not cancelling the jobs | `TestUpgraderClose`: "panic: deadlock: all goroutines in bubble are blocked" |
+| A1.2.16 the default wait ignored | `TestCoalescerWait`: "maxWait 0s: Push gave 0s, true; want a deadline 100ms on" |
+| A1.2.17 a deadline for every delta | `TestCoalescerModel`: "\"dd\" gave deadlines at steps [0 1]; want [0]" |
+| A1.2.18 `Combine` the last, not the greatest | `TestCombine`: "Combine([none fast slow]) = slow; want fast" |
+| A1.2.19 `Slow`'s default lost | `TestTicks`: "slow: Interval(slow) = 0s; want 83ms" |
+
+`mutate: 19 killed, 0 survived, 0 errors`. The PLAN named six, A1.2.1
+to A1.2.6; the rest hold D8, D9 and the defaults. A1.2.7 was first
+written as `if true`, which left `slow` unused: the mutant did not
+compile, and its "kill" was a build failure. It was replaced by
+`if slow || true`, killed as above.
+
+**The API,** apidiff at the `Makefile`'s pin against `v2.9.0`: the
+packages `frame` and `frame/frametea` added, as in Step 3, with the
+names above; `make apicheck`: "against v2.9.0, 0 incompatible
+change(s)".
+
+**Gates,** with the step's files:
+
+| Host | `gates` |
+| :--- | :--- |
+| macOS | 22 passed, 0 failed, 0 skipped in 808 s |
+| `remote linux` | 21 passed, 0 failed, 1 skipped (`gofmt`) in 1451 s |
+| `remote windows` | 21 passed, 0 failed, 1 skipped (`gofmt`) in 2623 s |
+
+* The pre-add check of the twelve Go files, the documents' checks,
+  `internal/conformance` and the identifier scan, untracked files
+  included: clean.
+* **Step A1.2 complete, 2026-11-02,** for the owner's commit. Step 4,
+  `inputfilter`, its driver, `inputfilter/inputfiltertea` and the
+  workspace's extension point, is next.
