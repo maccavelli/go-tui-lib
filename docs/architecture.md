@@ -37,6 +37,8 @@ below).
  lineedit/lineedittea  the composer in a pane → lineedit, inline, workspace, keymap/keymaptea, termkey; bubbletea
  stream        a streamed reply's Markdown, line by line → safetext, internal/enum; x/ansi
  transcript    the conversation, reprinted on a resize → stream, msgcat, safetext; x/ansi
+ frame         a frame's pacing, and the scheduler → internal/enum; standard library
+ frame/frametea  frames in tea            → frame; bubbletea
  inline        live rows below the scrollback → termcap, termkey, internal/enum, internal/sanitize; x/ansi
  inline/inlinetest  a terminal screen for tests → inline; x/ansi
  palette       the command palette        → workspace, command, command/commandtea, keymap, fuzzy, layout, pick, when, internal/enum, internal/sanitize; bubbletea, bubbles/textinput, lipgloss, x/ansi
@@ -90,6 +92,8 @@ below).
 | `lineedit` | `Composer`, from `NewComposer` with `WithPrompt`, `WithContinue`, `WithHeader`, `WithHistory`, `WithCompleter`, `WithKeymap`, `WithLimit`, `WithPaste`, `WithExternalEditor`, `WithClearScreen`, `WithMethod`, `WithGlyphs`, `WithRegion` and `WithRules`: the line a user types as an I/O-free engine (`Resize`, `HandleInput`, `Timeout`, `HandleTimeout`, `Cancel`, `NextEvent`, `View`, `Text`, `SetText`), laid out in whole words, its keys commands in the program's keymap, `ComposerEvent` and `ComposerEventKind`; `History`, x/term's, and `MemHistory`; `Completer`, `CompleterFunc`; `PasteMode`; `DefaultRules`, the command IDs `CharLeftID` to `ExternalID` and `ComposerScope` ([0023-MADR](decisions/0023-MADR-line-mode-components.md) D6, A3, A5) |
 | `lineedit/lineedittea` | `ComposerPane`, from `NewComposerPane(ws)` with `WithID` and `WithComposer`: the same `Composer` in a workspace pane; `Composer`; `EventMsg`; `DefaultID` |
 | `stream` | `Printer`, from `NewPrinter` with `WithMarkup`, `WithWidth`, `WithMethod`, `WithRules` and `WithoutTableLayout`: a streamed reply's Markdown printed line by line, each line once it is stable (a paragraph's line held one line, a table until it ends, a fence's lines as they complete), cleaned, styled with every marker kept, and wrapped at whole words (`Write`, `Flush`, `SetWidth`, `Source`, `Idle`, and `At`, its source drawn again at another width); `Markup`, the `Style` of each part, and `DefaultMarkup`, gobble's; `Style`, a set of SGR attributes, with `Apply`; `Writer`, from `NewWriter`, an `io.WriteCloser` and `io.StringWriter` over a `Printer`, writing each stable line to its destination, `Close` writing the rest and leaving the destination open, its first error sticky, `ErrClosed` after `Close`, and `WithCRLF` for CR LF line ends ([0009-MADR](decisions/0009-MADR-streaming-content-engine.md) A8); `Interpret`, captured terminal output, such as a tool's, replayed into `InterpretRow`s, each styled and plain, CR, BS, tabs, cursor moves and erases applied and every other sequence dropped, bounded by `InterpretOptions` ([0009-MADR](decisions/0009-MADR-streaming-content-engine.md) A1, A7 Q13). Its block scanner is unexported until 0009's `Doc` is built on it ([0023-MADR](decisions/0023-MADR-line-mode-components.md) D7, A3, A6, A7, A8) |
+| `frame` | `Queue[T]`, items released in order (`Push`, `Len`, `Snapshot`, `Drain`), and `Snapshot`; `Pacer`, `PacerFunc` and `Release`; `Gear` (`Smooth`, `CatchUp`); `Adaptive`, codex's two gears, with `WithCatchUpDepth`, `WithCatchUpAge`, `WithSmoothDepth`, `WithSmoothAge`, `WithHold`, `WithSevereDepth` and `WithSevereAge`; `Immediate`; `Scheduler`, from `NewScheduler` with `WithFPS`, whose `Request` and `RequestIn` merge into one frame on `Frames`, a goroutine only while a frame is due, and `Close`; `DueMsg` ([0009-MADR](decisions/0009-MADR-streaming-content-engine.md) §3, A6, A7) |
+| `frame/frametea` | `Wait`, a command for the next frame, re-armed on each `DueMsg`; `Forward`, every frame pushed to the program's `Send` until its `stop` or the scheduler's `Close` |
 | `transcript` | `Transcript`, from `NewTranscript` with `WithMaxBytes`, `WithMaxRows`, `WithSettle`, `WithMethod`, `WithoutScrollbackClear`, `WithSynchronized`, `WithRules`, `WithCatalog` and `WithNoticeStyle`: what a line-mode CLI has shown, as pieces (`AddText`, `AddDrawn`, `AddReply`), bounded in bytes, oldest first, and printed again at the new width once a resize settles and the host is idle (`Resize`, `Timeout`, `HandleTimeout`): `SGR 0`, then one synchronized update of `CSI 2 J`, `CSI 3 J`, home and the newest pieces back to the row limit, after `MsgEarlierOutput` when it cut, its line breaks CR LF; `Messages` ([0023-MADR](decisions/0023-MADR-line-mode-components.md) D9, D13, A8) |
 | `internal/enum` | `Names`, an enum's tokens, on `uint8` or `int`, and `Bits`, a bit set's, on `uint8` or `uint16`, for an enum's `String`, `MarshalText` and `UnmarshalText`; `Name`, `Marshal` and `Unmarshal` over a bare table |
 | `internal/teamsg` | `Cmd`, the `tea.Cmd` that delivers one message |
@@ -112,7 +116,7 @@ below).
 | `tuitest` | `Golden` across {colour, no colour} × {UTF-8, ASCII} × widths; `Case.Profile` and `Case.Glyphs`; `Fits`; `Text` for a single file; `Annotate` |
 
 - **`layout` has no Charm import,** so its solver can serve any front end.
-- **The Charm-free cores** are `ask`, `command`, `fuzzy`, `glyph`,
+- **The Charm-free cores** are `ask`, `command`, `frame`, `fuzzy`, `glyph`,
   `inline`, `inline/inlinetest`, `internal/enum`, `internal/lineinput`,
   `internal/sanitize`, `keymap`, `layout`, `lineedit`, `msgcat`, `pick`,
   `safetext`, `stream`, `termcap`, `termkey`, `termsvc`, `transcript` and `when`: none links a Charm
@@ -266,6 +270,8 @@ pick/ lineedit/             the line mode's picker and composer
 lineedit/lineedittea/       the composer in a workspace pane
 stream/ transcript/         a streamed reply's Markdown, and the
                             conversation printed again on a resize
+frame/ frame/frametea/      a frame's pacing and scheduler, and its
+                            Bubble Tea commands
 termcap/termcaptea/         the probe's Bubble Tea host
 termcap/termcaptest/        fake terminals for tests
 termsvc/termsvctea/         termsvc's Bubble Tea commands

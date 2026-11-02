@@ -328,12 +328,12 @@ record that is not there.
 
 | Behaviour | Default | Control | Status |
 | :--- | :--- | :--- | :--- |
-| A frame's rate | 60 a second, clamped to 1 to 120, as Bubble Tea's | `frame.WithFPS` | planned (0009-PLAN-streaming-content-engine.md Step 3) |
-| When the adaptive pacer catches up | at 8 items queued, or the oldest 120 ms old | `frame.WithCatchUpDepth`, `frame.WithCatchUpAge` | planned (0009-PLAN-streaming-content-engine.md Step 3) |
-| When it eases back | once at most 2 items and 40 ms have held for 250 ms | `frame.WithSmoothDepth`, `frame.WithSmoothAge`, `frame.WithHold` | planned (0009-PLAN-streaming-content-engine.md Step 3) |
-| Catching up again within that hold | only at 64 items, or 300 ms | `frame.WithSevereDepth`, `frame.WithSevereAge` | planned (0009-PLAN-streaming-content-engine.md Step 3) |
-| The scheduler's goroutine | one, while a frame is due, from `NewScheduler` to `Close` | `frame.Scheduler.Close` | planned (0009-PLAN-streaming-content-engine.md Step 3) |
-| Push delivery's goroutine | one for each `Forward`, until its stop or the scheduler's `Close` | `frame/frametea.Forward` | planned (0009-PLAN-streaming-content-engine.md Step 3) |
+| A frame's rate | 60 a second, clamped to 1 to 120, as Bubble Tea's | `frame.WithFPS` | built |
+| When the adaptive pacer catches up | at 8 items queued, or the oldest 120 ms old | `frame.WithCatchUpDepth`, `frame.WithCatchUpAge` | built |
+| When it eases back | once at most 2 items and 40 ms have held for 250 ms | `frame.WithSmoothDepth`, `frame.WithSmoothAge`, `frame.WithHold` | built |
+| Catching up again within that hold | only at 64 items, or 300 ms | `frame.WithSevereDepth`, `frame.WithSevereAge` | built |
+| The scheduler's goroutine | one, while a frame is due, from `NewScheduler` to `Close` | `frame.Scheduler.Close` | built |
+| Push delivery's goroutine | one for each `Forward`, until its stop or the scheduler's `Close` | `frame/frametea.Forward` | built |
 | A coalescer's wait when no frame comes | 100 ms | `frame.NewCoalescer` | planned (0009-PLAN-streaming-content-engine.md Step A1.2) |
 | Animation ticks | 83 ms for a slow animation, one frame at 60 fps for a fast one, none when nothing animates | `frame.Ticks` | planned (0009-PLAN-streaming-content-engine.md Step A1.2) |
 | A stalled terminal | reported once after 5 s with no write completing | `frame.WithStallAfter` | planned (0009-PLAN-streaming-content-engine.md Step A1.2) |

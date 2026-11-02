@@ -157,9 +157,9 @@ test has passed from the proxy.
 | — | 2 | `safetext/`, `glyph/` | done by 0020-PLAN Step 4 |
 | 2 | A1.1 | `stream/` | `Interpret`, `InterpretOptions`, `InterpretRow` (Q13) |
 | 2a | A8.1 | `stream/` | `stream.Writer`, a plain streaming writer (MADR A8; *waits for the owner's approval*) |
-| 3 | 3 | `frame/`, `frame/frametea/`, `internal/conformance/` | the pacing core, the scheduler, and their adapter |
+| 3 | 3 | `frame/`, `frame/frametea/`, `internal/conformance/`, *`.golangci.yml` (D5)* | the pacing core, the scheduler, and their adapter |
 | 4 | A1.2 | `frame/`, `frame/frametea/` | `Coalescer`, `Demand`, ~~`Writer`~~ `Output` (Q14), `Upgrader` |
-| 5 | 4 | `inputfilter/`, `inputfilter/inputfiltertea/`, `internal/conformance/`, `workspace/render.go` | the wheel, motion and paste-burst cores, their driver, the filter, and `local`'s extension point |
+| 5 | 4 | `inputfilter/`, `inputfilter/inputfiltertea/`, `internal/conformance/`, `workspace/render.go`, *`.golangci.yml` (D5)* | the wheel, motion and paste-burst cores, their driver, the filter, and `local`'s extension point |
 | 6 | A1.3 | `inputfilter/`, `inputfilter/inputfiltertea/` | A1's input stages, measured first |
 | 7 | 5 | `stream/`, `stream/streamtest/` | `Scanner` out of the `Printer`; `Doc`, `Renderer`, `Plain`, `Buffer`, `Doc.Pull`; `CheckRenderer` |
 | 8 | 6 | `theme/`, `stream/streamtea/` | `Theme.ID`; `DocPane` |
@@ -422,7 +422,7 @@ type is `stream.Writer` (Q14).
 * **The pure layer** (`frame`), used on one goroutine, time passed in:
 
   ```go
-  type FrameMsg struct {
+  type DueMsg struct {
   	At  time.Time // when the frame fell due
   	Seq uint64    // one more for each frame delivered
   }
@@ -461,7 +461,7 @@ type is `stream.Writer` (Q14).
   func NewScheduler(o ...Option) *Scheduler // WithFPS(n): 60; clamped to 1..120
   func (s *Scheduler) Request()                  // as soon as the cap allows
   func (s *Scheduler) RequestIn(d time.Duration) // the earliest deadline wins
-  func (s *Scheduler) Frames() <-chan FrameMsg   // capacity one: requests merge
+  func (s *Scheduler) Frames() <-chan DueMsg   // capacity one: requests merge
   func (s *Scheduler) Close() error              // closes Frames; idempotent
   ```
 
@@ -471,11 +471,11 @@ type is `stream.Writer` (Q14).
 * **The adapter** (`frame/frametea`):
 
   ```go
-  func Wait(s *frame.Scheduler) tea.Cmd                           // one FrameMsg; nil once closed
+  func Wait(s *frame.Scheduler) tea.Cmd                           // one DueMsg; nil once closed
   func Forward(s *frame.Scheduler, send func(tea.Msg)) (stop func()) // push delivery, §3's WithSend
   ```
 
-  A program re-arms `Wait` on each `FrameMsg`:
+  A program re-arms `Wait` on each `DueMsg`:
   `return m, tea.Batch(m.pane.Update(msg), frametea.Wait(m.frames))`.
   *Added 2026-11-01 (D2):* `Forward` starts one goroutine, which reads
   `Frames` and calls `send`, started by `WaitGroup.Go` and ended by its
@@ -483,7 +483,7 @@ type is `stream.Writer` (Q14).
   idempotent.
 * **Tests,** inside `synctest.Test`:
   * 1,000 `Request`s from 10 goroutines within one frame deliver one
-    `FrameMsg`;
+    `DueMsg`;
   * frames come no closer than 1/fps, at 60 and 120 fps; `WithFPS(500)`
     is 120 and `WithFPS(0)` is 60;
   * `RequestIn(50ms)` alone delivers at 50 ms, and with a `Request` after
@@ -803,7 +803,7 @@ Four parts, each passing its tests before the next.
   ```
 
   It follows the tail until scrolled up, and again at the bottom; it pulls
-  from its `Buffer` on each `frame.FrameMsg` with its pacer, `Adaptive` by
+  from its `Buffer` on each `frame.DueMsg` with its pacer, `Adaptive` by
   default; it scrolls by a `tea.MouseWheelMsg`, and by any mouse message
   with `WheelDelta() (dx, dy int)`; it reads `w.Theme()` and
   `w.WidthMethod()` at each draw, and keeps its lines by width, method and
@@ -1288,3 +1288,133 @@ A1.1's five; `make apicheck`: "against v2.9.0, 0 incompatible change(s)".
   identifier scan: clean.
 * **Step A8.1 complete, 2026-11-01,** for the owner's commit. Step 3,
   `frame`, is next.
+
+### Step 3: `frame`, its scheduler, and `frame/frametea`
+
+*2026-11-01.* The owner committed Step A8.1 (`ae933d6`) and said
+"committed proceed".
+
+**Facts re-read:** Bubble Tea's frame-rate bounds, 60 and 120
+(`renderer.go:13-14` at `v2.0.10`); a `tea.Cmd` is `func() tea.Msg`;
+`testing/synctest` gives `Test`, `Wait` and `Sleep`, and `Test` fails when
+the bubble's goroutines deadlock at its end; `internal/enum`'s `Names`
+gives an enum's `String`, `MarshalText` and `UnmarshalText`
+(`inline/reflow.go`), and `internal/conformance/enums_test.go`'s `enums`
+table lists each one; a core is listed in `cores`
+(`internal/conformance/charmfree_test.go`) and in the depguard rule
+`charmfree` (`.golangci.yml:107-131`), "Keep the two lists the same".
+
+* **Deviation D5, 2026-11-01: the depguard rule.**
+  * **Found** reading `.golangci.yml`: a core is listed in `charmfree` as
+    well as in `cores`, so that a direct Bubble Tea import fails at lint;
+    the step's scope named `internal/conformance/` and not `.golangci.yml`,
+    and Step 4's the same.
+  * **Resolutions offered:** add `"**/frame/*.go"` here and
+    `"**/inputfilter/*.go"` in Step 4 (recommended); or leave lint to the
+    conformance test alone, the two lists differing, a workaround.
+  * **Chosen by the owner,** 2026-11-01: "Add it, Steps 3 and 4
+    (Recommended)". `.golangci.yml` is added to both steps' scope rows.
+* **Deviation D6, 2026-11-02: the frame message's name.**
+  * **Found** by the pre-add check, on the agent's code: revive's
+    `exported` rule refused `frame.FrameMsg`, "type name will be used as
+    frame.FrameMsg by other packages, and that stutters; consider calling
+    this Msg", the name 0009-MADR A4 gave, "a message type is named for
+    what it carries". No exported type of the repository stutters, and
+    none carries a revive exception.
+  * **Resolutions offered:** `frame.DueMsg`, a frame that fell due, as
+    `termcap.CapsMsg` names what it carries (recommended); keep `FrameMsg`
+    with the repository's first `nolint:revive`; or revive's `frame.Msg`,
+    which A4 refused. `python3 -m tools.verify names` over `DueMsg`, `Msg`
+    and `TickMsg`: clean.
+  * **Chosen by the owner,** 2026-11-02: "frame.DueMsg (Recommended)". The
+    code, `docs/architecture.md`, the glossary's reserved names and this
+    PLAN's steps say `DueMsg`; 0009-MADR A4's row is annotated, so that
+    where the MADR says `FrameMsg`, it reads `DueMsg`. No file is added.
+
+**What changed:**
+
+* `frame/`, a new core: `doc.go`; `gear.go`, `Gear` (`Smooth`,
+  `CatchUp`; tokens "smooth" and "catch-up") from `internal/enum`;
+  `queue.go`, `Queue[T]`, a ring buffer whose zero value is empty, with
+  `Push`, `Len`, `Snapshot` and `Drain`, an `iter.Seq[T]` that asks its
+  `Pacer` once and leaves what an early stop does not take; `pacer.go`,
+  `Pacer`, `PacerFunc`, `Release`, `Immediate`, and `Adaptive` with its
+  seven options, each keeping its default at zero or less;
+  `scheduler.go`, `DueMsg`, `Scheduler`, `NewScheduler`, `WithFPS`,
+  `Request`, `RequestIn`, `Frames` and `Close`.
+* The `Scheduler` holds one mutex. A request after which a frame falls
+  due starts one goroutine with `WaitGroup.Go`; it waits on a
+  `time.Timer`, is woken through a channel of capacity one when the
+  deadline moves earlier, sends the frame without blocking, a frame
+  waiting unread serving the request, and stops. `Close` closes `stop`,
+  waits for the goroutine, and closes `Frames`.
+* `frame/frametea/`, the adapter: `Wait` and `Forward` (D2), and
+  `ExampleWait`, a program that re-arms `Wait` on each frame.
+* `internal/conformance`: `frame` joins `cores`, and `frame.Gear` the
+  `enums` table. `.golangci.yml`: `"**/frame/*.go"` joins `charmfree`
+  (D5).
+* `docs/architecture.md`: the package graph, the table's two rows, the
+  cores' list and the tree. `docs/guides/defaults.md`: the six `frame`
+  rows of Step 3 `built`. `docs/glossary.md`: `DueMsg` (D6).
+
+**Tests:** `TestSchedulerMerges`, `TestSchedulerRate` (6 cases),
+`TestRequestIn` (5), `TestSchedulerSeq`, `TestSchedulerUnread` and
+`TestSchedulerClose`, each inside `testing/synctest.Test`; `TestAdaptive`
+(10 tables of codex's transitions), `TestAdaptiveOptions`, `TestImmediate`
+and `TestGear`; `TestQueue`, `TestQueueWraps` and `TestQueueAllocs`, a
+frame of 64 items allocating at most twice, nothing an item;
+`ExampleAdaptive`; and in `frametea`, `TestWait` and `TestForward`. All
+pass under `-race`.
+
+* Two test faults of the agent's, fixed: `TestSchedulerSeq` wanted
+  2 s / 60 for the second frame where two intervals of a 60th are
+  33.333332 ms; and two mutations first survived (below), so two tests
+  were made to hold what they claimed.
+
+**Mutations,** `python3 -m tools.verify mutate`, on the final code:
+
+| Mutation | Its failure |
+| :--- | :--- |
+| 3.1 `Frames` unbuffered | `TestSchedulerMerges`: "no frame came" |
+| 3.2 `Frames` of capacity 2 | `TestSchedulerUnread`: "the request made while the first waited: a frame came, {… Seq:2}" |
+| 3.3 the frame-rate cap skipped | `TestSchedulerMerges`: "within the frame's interval: a frame came, {… Seq:2}" |
+| 3.4 the exit hold ignored | `TestAdaptive`: "step 1 (at 10ms, depth 2, oldest 30ms): {Take:1 Gear:smooth}; want take 2 in catch-up" |
+| 3.5 the severe bypass ignored | `TestAdaptive`: "step 5 (at 500ms, depth 64, oldest 0s): {Take:1 Gear:smooth}; want take 64 in catch-up" |
+| 3.6 `Drain` from the tail | `TestQueue`: "Drain of 5 gave [19 19 19 19 19]; want 0 to 4" |
+| 3.7 `Close` not stopping the goroutine | `TestSchedulerClose`: "Close waited 1h0m0s for the pending frame's deadline; want it stopped at once" |
+| 3.8 `Seq` not raised | `TestSchedulerSeq`: "frame 1 is {… Seq:1}; want Seq 2 at 16.666666ms" |
+| 3.9 a later deadline winning | `TestRequestIn`: "no frame came" |
+| 3.10 a deadline moved earlier not woken | `TestRequestIn`: "no frame came" |
+| 3.11 `Forward`'s stop not ending it | `TestForward`: "panic: deadlock: all goroutines in bubble are blocked" |
+| 3.12 `Wait` after `Close` giving a frame | `TestWait`: "Wait after Close gave frame.DueMsg{…}; want nil" |
+| 3.13 the core importing Bubble Tea | `TestCoresAreCharmFree`: "frame (GOOS=linux) links charm.land/bubbletea/v2: frame → charm.land/bubbletea/v2" |
+
+`mutate: 13 killed, 0 survived`. The PLAN named seven; 3.9 to 3.13 were
+added for the earliest deadline, the adapter and the core's closure.
+3.7 and 3.10 first survived: under `synctest`, a bubble whose goroutines
+all block advances its clock, so the hour's timer fired and `Close`
+returned late, not never; and the second request reached the goroutine
+before it first read the deadline. `TestSchedulerClose` now wants `Close`
+to take no time, and `TestRequestIn` lets the goroutine block on the
+first deadline before moving it. 3.7 is named for what it changes; the
+PLAN's "`Close` not waiting for the goroutine" leaves it nothing to wait
+for under `synctest`, and was replaced.
+
+**The API,** apidiff at the `Makefile`'s pin against `v2.9.0`: two
+packages added, `frame` and `frame/frametea`, beside Steps A1.1 and
+A8.1's additions; `make apicheck`: "against v2.9.0, 0 incompatible
+change(s)".
+
+**Gates,** with the step's files:
+
+| Host | `gates` |
+| :--- | :--- |
+| macOS | 22 passed, 0 failed, 0 skipped in 801 s |
+| `remote linux` | 21 passed, 0 failed, 1 skipped (`gofmt`) in 1331 s |
+| `remote windows` | 21 passed, 0 failed, 1 skipped (`gofmt`) in 2609 s |
+
+* The pre-add check of the twelve Go files, `make modernize`, the
+  documents' checks, `internal/conformance` and the identifier scan:
+  clean.
+* **Step 3 complete, 2026-11-02,** for the owner's commit. Step A1.2,
+  `Coalescer`, `Demand`, `Output` and `Upgrader`, is next.

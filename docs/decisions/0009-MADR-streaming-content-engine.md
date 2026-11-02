@@ -1024,7 +1024,7 @@ with a type the library exports or another record plans
 | `frame.Plan` | `frame.Release` | `layout.Plan` |
 | `Plan.Mode` | `Release.Gear` | `command.Mode` |
 | `frame.New` | `frame.NewScheduler` | `New` builds only the type named after its package |
-| `frame.Msg` | `frame.FrameMsg` | a message type is named for what it carries |
+| `frame.Msg` | ~~`frame.FrameMsg`~~ `frame.DueMsg` (*2026-11-02, [0009-PLAN-streaming-content-engine.md](0009-PLAN-streaming-content-engine.md) D6: `FrameMsg` stutters, which revive's `exported` rule refuses; where this record says `FrameMsg`, read `DueMsg`*) | a message type is named for what it carries |
 | `inputfilter.New` | `inputfilter.NewFilter` | as `frame.New` |
 | `stream.New` | `stream.NewDoc` | as `frame.New` |
 | `stream.Pane` | `stream.DocPane` | `layout.Pane` and `workspace.Pane` |

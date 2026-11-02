@@ -18,6 +18,7 @@ import (
 var cores = []string{
 	"ask",
 	"command",
+	"frame",
 	"fuzzy",
 	"glyph",
 	"inline",

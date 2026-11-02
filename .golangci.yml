@@ -109,6 +109,7 @@ linters:
           files:
             - "**/ask/*.go"
             - "**/command/*.go"
+            - "**/frame/*.go"
             - "**/fuzzy/*.go"
             - "**/glyph/*.go"
             - "**/inline/*.go"

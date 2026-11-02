@@ -170,7 +170,7 @@ provider is asked, to `Search`, since `termkey.Input` is exported in
 `v2.0.0`.
 
 0009's amendments of 2026-11-01 (A6 to A8, and its PLAN's D1) reserve
-these, which its PLAN builds: in `frame`, `FrameMsg`, `Queue`, `Snapshot`,
+these, which its PLAN builds: in `frame`, `DueMsg`, `Queue`, `Snapshot`,
 `Pacer`, `PacerFunc`, `Release`, `Gear`, `AdaptiveOption`, `Scheduler`,
 `Coalescer`, `Demand`, `Ticks`, `Output`, `OutputOption`, `OutputEvent`,
 `Upgrader` and `UpgradeMsg`; in `inputfilter`, `PasteBurst`,

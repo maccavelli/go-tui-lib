@@ -13,6 +13,7 @@ import (
 
 	"github.com/maccavelli/go-tui-lib/v2/ask"
 	"github.com/maccavelli/go-tui-lib/v2/command"
+	"github.com/maccavelli/go-tui-lib/v2/frame"
 	"github.com/maccavelli/go-tui-lib/v2/fuzzy"
 	"github.com/maccavelli/go-tui-lib/v2/glyph"
 	"github.com/maccavelli/go-tui-lib/v2/inline"
@@ -50,6 +51,7 @@ var enums = map[string]func(int64) any{
 	"command.SourceKind":         as[command.SourceKind],
 	"command.Surface":            as[command.Surface],
 	"command.Verdict":            as[command.Verdict],
+	"frame.Gear":                 as[frame.Gear],
 	"fuzzy.CaseMode":             as[fuzzy.CaseMode],
 	"fuzzy.Grade":                as[fuzzy.Grade],
 	"glyph.Tier":                 as[glyph.Tier],
