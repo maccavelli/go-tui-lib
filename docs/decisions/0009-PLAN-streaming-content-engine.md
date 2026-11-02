@@ -338,8 +338,10 @@ test has passed from the proxy.
   ```
 
 * **Behaviour,** as A1 sets it: a grid of cells, each advanced by its
-  width under `Method`, a wide cluster taking two and a half-overwritten
-  one blanked; SGR in its `;` and `:` forms kept, and written once per
+  width under `Method`, ~~a wide cluster taking two and a half-overwritten
+  one blanked~~ *(corrected 2026-11-01, D3)* a cluster taking every cell
+  its width measures, and one written over in any cell blanked whole; SGR
+  in its `;` and `:` forms kept, and written once per
   change of style; CR to column 0, overwriting; BS one cell back; HT to the
   next multiple of 8; `CSI K` and `J` with 0, 1 and 2, and `A`, `B`, `C`,
   `D` and `G`, each with a default of 1; every other sequence, OSC among
@@ -1040,3 +1042,144 @@ and said "committed, approved to proceed".
   the first Windows run was stopped for the rerun above.
 * **Step 1 complete, 2026-11-01,** for the owner's commit. Step A1.1 is
   next; Step A8.1, after it, waits for the owner's approval.
+
+### Step A1.1: `Interpret`, in `stream` (Q13)
+
+*2026-11-01.* The owner committed Step 1 (`8626c9f`) and said
+"committed, approved for A8.1 and proceed to A1.1". Step A8.1 is approved;
+it runs after this step.
+
+**Facts re-read:**
+
+* `stream` imports `safetext`, `glyph` (through it), `internal/enum` and
+  `x/ansi` (`go list -deps`); `Interpret` adds no import.
+* `x/ansi`'s `Method.DecodeSequenceInString(data, state, p)` splits text
+  into grapheme clusters with their widths; its zero state is
+  `NormalState`, and with a nil `Parser` it stores no parameter. Its
+  parser, given a `Parser`, misreads 32 or more parameter separators
+  (`internal/sanitize/separators.go`, 0023-MADR A10). So `Interpret` reads
+  a sequence's parameters itself, at most 32 for an SGR, as `safetext`'s
+  `KeepSGR` keeps, and gives `x/ansi` text alone.
+* `safetext` writes invalid UTF-8 as one U+FFFD for each maximal subpart
+  (`safetext/utf8.go`, unexported; `safetext`'s narrow rule keeps it in
+  that package). `Interpret` cleans each run of printable bytes with
+  `safetext.Clean` under the zero `Rules`, the strictest, which writes
+  invalid UTF-8 so and removes format characters too; no logic is written
+  twice. A run ends at an ASCII control byte, which no maximal subpart
+  spans.
+* `safetext`'s grammar for C1 code points, U+009B a CSI, U+009D an OSC,
+  U+0090, U+0098, U+009E and U+009F strings, U+009C an ST, holds for
+  `Interpret` too, so the two read a sequence alike.
+
+* **Deviation D3, 2026-11-01: a cluster wider than two cells.**
+  * **Found** by `FuzzInterpret`'s second 5-minute run, after 112 s, on
+    the agent's own code: the input "ౙ్ౙ్ౙ00", 6 columns, `ansi.WcWidth`,
+    gave "row 0 is 7 cells, over 6: "ౙ్ౙ్ౙ  00"". Under `ansi.WcWidth`,
+    `x/ansi` gives a cluster the sum of its runes' widths: in a scratch
+    module, `DecodeSequenceInString` measured the Telugu conjunct "ౙ్ౙ్ౙ"
+    at 3 cells and the family "👨‍👩‍👧" at 6, and under `ansi.GraphemeWidth`
+    at 1 and 2. The step's text said "a wide cluster taking two", and the
+    code placed only one continuation cell, padding the rest with blanks.
+  * **Resolutions offered:** a cluster takes every cell it measures
+    (recommended); clamp a cluster to 2 cells, which makes the row's
+    measured width disagree with its cells, a workaround; or split such a
+    cluster into runes, which breaks the cluster model.
+  * **Chosen by the owner,** 2026-11-01: "Any width, as measured
+    (Recommended)". The step's behaviour is corrected above. The fuzz
+    input is kept as a seed, `testdata/fuzz/FuzzInterpret/06a722286caffb19`,
+    added to the step's files; table rows cover clusters of 3 and 6 cells.
+
+**What changed:**
+
+* `stream/interpret.go`: `Interpret`, `InterpretOptions`, `InterpretRow`,
+  `DefaultInterpretRows` and `DefaultInterpretCols`. It reads its input as
+  `safetext`'s grammar does, ESC and the C1 code points opening sequences,
+  and keeps SGR (its own `;` and `:` parser, at most 32 groups of at most
+  8 parts), CR, BS, HT, LF, and CSI A, B, C, D, G, K and J. Every other
+  sequence and control is dropped; an OSC, DCS, SOS, PM or APC string over
+  `safetext.DefaultMaxString` bytes is abandoned there. Text runs are
+  cleaned by `safetext.Clean` under the zero `Rules`, then split into
+  clusters by `Method.DecodeSequenceInString` with a nil `Parser`. A style
+  is a comparable value, written as one canonical SGR at each change. Past
+  twice `MaxRows`, the grid keeps its newest `MaxRows` rows, so dropping
+  old rows costs one copy a `MaxRows` rows; the result is the newest
+  `MaxRows`, without trailing empty rows.
+* `stream/doc.go`: a paragraph on `Interpret`. `docs/architecture.md`:
+  `stream`'s row. `docs/guides/defaults.md`: `Interpret`'s bounds `built`.
+* Found by lint and fixed before the gates: gocyclo, `sgr`'s complexity
+  44 over 40, so the set-and-clear attributes became the table
+  `attrCodes`; gosec G115 on `uint8(g[1])`, so `underlines` is a lookup;
+  staticcheck ST1018 on a test literal holding U+200B and U+202E as
+  characters, so the test's format and combining characters are escapes.
+* Found by the table, after D3's fix and before the commit: the agent's
+  `clearCluster` read its loop bound from the cluster's first cell, which
+  the first pass had blanked, so it cleared one cell alone and left the
+  rest as continuations; the row "writing in a 3-cell cluster blanks it
+  whole" failed: "" yx"; want [" y x"]". The bound is read once; mutation
+  A1.1.10 holds it.
+
+**Tests,** in `stream/interpret_test.go`:
+
+* `TestInterpret`, 39 rows: text, LF, CR, BS, HT, each erase, each move,
+  each dropped sequence and control, C1, invalid UTF-8, format characters,
+  wide and combining clusters, clusters of 3 and 6 cells under
+  `ansi.WcWidth` and of 2 under `ansi.GraphemeWidth` (D3), both caps.
+* `TestInterpretSGR`, 16 rows: the `;` and `:` forms of 38, 48 and 58,
+  4:n, a change of style mid-row, the reset, the C1 CSI, a 33-parameter
+  SGR and an index past 255, each dropped.
+* `TestInterpretString`, `TestInterpretDefaults` and
+  `TestInterpretDeterministic`.
+* `FuzzInterpret`: rows within `MaxRows`; no row wider than `MaxCols`
+  under the method; `Styled` holds SGR and nothing else; `Plain` is
+  `ansi.Strip(Styled)` and clean under `safetext.Line()`; two calls equal.
+  Three seeds, and D3's input.
+
+**Mutations,** `python3 -m tools.verify mutate`, on the final code:
+
+| Mutation | Its failure |
+| :--- | :--- |
+| A1.1.1 one column a rune | `Interpret("世x\r\x1b[Cy") = ["世y"]; want [" yx"]` |
+| A1.1.2 CR not returning to column 0 | `Interpret("abcdef\rXY") = ["abcdefXY"]; want ["XYcdef"]` |
+| A1.1.3 HT to a multiple of 4 | `Interpret("a\tb\tc") = ["a   b   c"]; want ["a       b       c"]` |
+| A1.1.4 an OSC kept as text | `Interpret("a\x1b]0;title\ab") = ["a0;titleb"]; want ["ab"]` |
+| A1.1.5 `MaxRows` ignored | `Interpret("1\n2\n3\n4") = ["1" "2" "3" "4"]; want ["3" "4"]` |
+| A1.1.6 the `:` form of SGR not read | `Interpret("\x1b[38:2::255:0:10mr") = [{"r" "r"}]; want one row "\x1b[0;38;2;255;0;10mr\x1b[m"` |
+| A1.1.7 C1 code points read as text | `Interpret("\u009b1mx") = [{"x" "x"}]; want one row "\x1b[0;1mx\x1b[m"` |
+| A1.1.8 a cluster written over left standing | `Interpret("世x\r\x1b[Cy") = ["世yx"]; want [" yx"]` |
+| A1.1.9 one continuation cell only (D3) | `Interpret("ౙ్ౙ్ౙ00") = ["ౙ్ౙ్ౙ 00"]; want ["ౙ్ౙ్ౙ00"]` |
+| A1.1.10 `clearCluster`'s bound read each pass (D3) | `Interpret("ౙ్ౙ్ౙx\r\x1b[Cy") = [" yx"]; want [" y x"]` |
+
+`mutate: 10 killed, 0 survived, 0 errors`. The PLAN named six; A1.1.7 to
+A1.1.10 were added for the C1 grammar, the cluster written over, and D3.
+A1.1.4 is killed by `TestInterpret`, not by `FuzzInterpret` as the step
+expected: the fuzz target's properties hold for an OSC's body read as
+text.
+
+**Fuzzing,** `FuzzInterpret`, 5 minutes each: on the code before the lint
+fixes, 26,051,152 executions, no failure; after them, D3's failure at
+112 s; after D3's fix, 35,539,438 executions, no failure.
+
+**Benchmark,** `BenchmarkInterpret`, 1 MB of a test run's coloured output
+with CR progress bars, five runs: 34.0 to 39.2 ms, 26.8 to 30.8 MB/s,
+55,062,862 to 55,063,244 B and 290,099 to 290,100 allocations an
+operation. `BenchmarkReplyRender`, beside it: 22,575 to 26,630 ns, 32,792
+B, 200 allocations. The MADR sets no budget for `Interpret`.
+
+**The API,** apidiff at the `Makefile`'s pin against `v2.9.0`: five
+additions, `stream.DefaultInterpretCols`, `DefaultInterpretRows`,
+`Interpret`, `InterpretOptions` and `InterpretRow`, and nothing else;
+`make apicheck`: "against v2.9.0, 0 incompatible change(s)".
+
+**Gates,** with the step's files:
+
+| Host | `gates` |
+| :--- | :--- |
+| macOS | 22 passed, 0 failed, 0 skipped in 1347 s |
+| `remote linux` | 21 passed, 0 failed, 1 skipped (`gofmt`) in 1232 s |
+| `remote windows` | 21 passed, 0 failed, 1 skipped (`gofmt`) in 2578 s |
+
+* The pre-add check of the three Go files, `make modernize`, the
+  documents' checks and the identifier scan: clean.
+* **Step A1.1 complete, 2026-11-01,** for the owner's commit, with
+  `stream/testdata/fuzz/FuzzInterpret/06a722286caffb19`, a new file. Step
+  A8.1, approved, is next.

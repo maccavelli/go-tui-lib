@@ -1,0 +1,5 @@
+go test fuzz v1
+[]byte("ౙ్ౙ్ౙ00")
+byte('i')
+byte('9')
+bool(false)

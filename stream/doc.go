@@ -19,6 +19,12 @@
 // text is underlined, and a reference link only once its definition has
 // been printed.
 //
+// Interpret replays captured terminal output, such as a tool's, into the
+// rows a terminal would show, each styled and plain: a progress bar
+// rewritten by CR ends as its last state, colour stays, and every
+// sequence but SGR, the cursor moves and the erases is dropped
+// (docs/decisions/0009-MADR-streaming-content-engine.md A1, A7 Q13).
+//
 // The package links no Charm module but x/ansi.
 //
 // Stability: stable. Exported names change only through the deprecation
