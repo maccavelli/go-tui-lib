@@ -36,6 +36,12 @@ func WithWidth(n int) Option { return optionFunc(func(p *Printer) { p.width = n 
 // ansi.GraphemeWidth after.
 func WithMethod(m ansi.Method) Option { return optionFunc(func(p *Printer) { p.method = m }) }
 
+// WithCRLF ends each printed line, and each row of a wrapped one, with CR
+// LF in place of LF, for a terminal in raw mode written without an
+// inline.Region; a Writer's output too
+// (docs/decisions/0009-MADR-streaming-content-engine.md A8).
+func WithCRLF() Option { return optionFunc(func(p *Printer) { p.crlf = true }) }
+
 // WithRules sets how the reply is cleaned: by r, and then by safetext's
 // Text rules, the floor, so that no rules clean less than Text does
 // (docs/decisions/0024-MADR-opt-in-and-opt-out-coverage.md D2).

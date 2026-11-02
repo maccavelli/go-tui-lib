@@ -1464,9 +1464,14 @@ handle over the whole engine and a pipeline of stages.
      `WithMarkup`, `WithWidth`, `WithMethod`, `WithRules`,
      `WithoutTableLayout`, and one more, `WithCRLF()`, which ends each line
      with CR LF, for a terminal in raw mode written without an
-     `inline.Region`; the `Printer` honours it too. With no option, the
+     `inline.Region`; the `Printer` honours it too. ~~With no option, the
      output is the input cleaned by `safetext.Text`, unstyled and
-     unwrapped: plain.
+     unwrapped: plain.~~ *Corrected 2026-11-01, by
+     [0009-PLAN-streaming-content-engine.md](0009-PLAN-streaming-content-engine.md)
+     D4:* with no option, the `Writer` has the `Printer`'s defaults: the
+     input cleaned by `safetext.Text`, unstyled and unwrapped, a table laid
+     out in aligned columns; with `WithoutTableLayout` too, the cleaned
+     input byte for byte.
    * **Each `Write`** gives its bytes to the `Printer`, and writes what is
      now stable to `dst` in one `dst.Write`. The output is the same for any
      split of the input, the `Printer`'s own property.

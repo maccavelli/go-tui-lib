@@ -319,7 +319,8 @@ record that is not there.
 | An unclosed emphasis, backtick run, strikethrough or link at a partial line's end | held back until it closes or the line ends | `stream.WithoutInlineHoldback` | planned (0009-PLAN-streaming-content-engine.md Step 5) |
 | The partial last line | shown, when no complete line is queued | `stream.WithoutPartialLine` | planned (0009-PLAN-streaming-content-engine.md Step 5) |
 | `Interpret`'s bounds | 50,000 rows, the oldest dropped past them; 8,192 columns a row | `stream.InterpretOptions`, `stream.DefaultInterpretRows`, `stream.DefaultInterpretCols` | built |
-| A line's end, from a `Printer` or a `Writer` | LF | `stream.WithCRLF` | planned (0009-PLAN-streaming-content-engine.md Step A8.1) |
+| A line's end, from a `Printer` or a `Writer` | LF | `stream.WithCRLF` | built |
+| A `Writer`'s destination at `Close` | left open: it is the program's | `stream.Writer.Close` | decided (0009-MADR-streaming-content-engine.md A8) |
 | Code shown plain | over 512 KiB, 10,000 lines or 4 KiB in one line | the options Step A1.4 names | planned (0009-PLAN-streaming-content-engine.md Step A1.4) |
 | Live tool output that `Bounded` keeps | its head and tail past a byte limit, each line capped | the options Step A1.4 names | planned (0009-PLAN-streaming-content-engine.md Step A1.4) |
 

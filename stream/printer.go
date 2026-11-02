@@ -27,6 +27,7 @@ type Printer struct {
 	width  int
 	rules  safetext.Rules
 	asIs   bool // a table's rows printed as they came, by WithoutTableLayout
+	crlf   bool // lines end with CR LF, by WithCRLF
 
 	clean   cleaned             // the sanitizers' output, read after each write
 	san     *safetext.Sanitizer // the rules', writing into base
@@ -90,7 +91,7 @@ func (p *Printer) Source() string { return p.source.String() }
 // so on a resize (docs/decisions/0023-MADR-line-mode-components.md A8 item
 // 2, A9 item 2).
 func (p *Printer) At(width int) string {
-	q := &Printer{markup: p.markup, method: p.method, width: width, rules: p.rules, asIs: p.asIs, defs: map[string]bool{}}
+	q := &Printer{markup: p.markup, method: p.method, width: width, rules: p.rules, asIs: p.asIs, crlf: p.crlf, defs: map[string]bool{}}
 	q.clean.b.WriteString(p.Source()) // cleaned already, by the rules and then the floor
 	q.end()
 	return q.drain()
@@ -159,10 +160,17 @@ func (p *Printer) drain() string {
 	return s
 }
 
-// emit writes one printed line.
+// emit writes one printed line, its rows and its end as WithCRLF says.
+// The cleaned text holds no CR, so no line end is written twice.
 func (p *Printer) emit(s string, nl bool) {
+	if p.crlf {
+		s = strings.ReplaceAll(s, "\n", "\r\n")
+	}
 	p.out.WriteString(s)
-	if nl {
+	switch {
+	case nl && p.crlf:
+		p.out.WriteString("\r\n")
+	case nl:
 		p.out.WriteByte('\n')
 	}
 }

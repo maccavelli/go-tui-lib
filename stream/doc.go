@@ -19,6 +19,12 @@
 // text is underlined, and a reference link only once its definition has
 // been printed.
 //
+// A Writer is an io.WriteCloser over a Printer, so the standard library's
+// composition reaches a reply: io.Copy from its body, io.MultiWriter to a
+// terminal and a log. Each line is written to its destination once it is
+// stable, and Close writes the rest and leaves the destination open
+// (docs/decisions/0009-MADR-streaming-content-engine.md A8).
+//
 // Interpret replays captured terminal output, such as a tool's, into the
 // rows a terminal would show, each styled and plain: a progress bar
 // rewritten by CR ends as its last state, colour stays, and every

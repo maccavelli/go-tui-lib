@@ -385,6 +385,12 @@ width.
   line printed already stays as it was. `WithoutTableLayout` prints a
   table's rows as they came.
 - **Cleaning** is by `WithRules`, never below `safetext.Text()`.
+- **Plain output, with no region.** `stream.NewWriter(dst, o...)` is an
+  `io.WriteCloser` over a `Printer`: `io.Copy(w, resp.Body)` writes each
+  line to `dst` once it is stable, and `w.Close()` writes the rest and
+  leaves `dst` open. Its options are the `Printer`'s; `WithCRLF` ends each
+  line with CR LF, for a terminal in raw mode written without a region. A
+  failed write to `dst` is returned by every later `Write` and `Close`.
 
 ## Print the conversation again on a resize
 

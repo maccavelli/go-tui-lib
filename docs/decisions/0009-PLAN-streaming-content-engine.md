@@ -385,7 +385,11 @@ type is `stream.Writer` (Q14).
     and a plain reader, gives the `Printer`'s `Write` and `Flush` output
     byte for byte, at widths 0, 60 and 100, with and without
     `DefaultMarkup`;
-  * with no option, the output is the input cleaned by `safetext.Text`;
+  * ~~with no option, the output is the input cleaned by `safetext.Text`;~~
+    *(corrected 2026-11-01, D4)* with no option, the output is a
+    `Printer`'s with no option, a table laid out; with
+    `WithoutTableLayout`, the input cleaned by `safetext.Text`, byte for
+    byte;
   * `WriteString` equals `Write`;
   * `WithCRLF`: every line ends with CR LF and no LF stands alone, from the
     `Writer` and from the `Printer`;
@@ -1183,3 +1187,104 @@ additions, `stream.DefaultInterpretCols`, `DefaultInterpretRows`,
 * **Step A1.1 complete, 2026-11-01,** for the owner's commit, with
   `stream/testdata/fuzz/FuzzInterpret/06a722286caffb19`, a new file. Step
   A8.1, approved, is next.
+
+### Step A8.1: `stream.Writer`, a plain streaming writer (0009-MADR A8)
+
+*2026-11-01.* The owner committed Step A1.1 (`fa54b2e`) and said
+"committed, proceed".
+
+**Facts re-read:** the `Printer`'s API is `NewPrinter(o ...Option)`,
+`Write(chunk string) string`, `Flush() string`, `At`, `Idle`, `SetWidth`
+and `Source` (`stream/printer.go`); every printed line leaves it through
+`emit`, which ends it with `\n` (`printer.go:163-168`); a prose line
+wrapped at a width holds `\n` between its rows; the cleaned text holds no
+`\r`, since `safetext.Text` drops a lone CR and makes CR LF one LF; `At`
+builds a second `Printer` from this one's options (`printer.go:93`);
+`stream.Option` is `interface{ apply(*Printer) }`, so the `Writer` passes
+its options to its `Printer` and the interface does not change;
+`safetext.ErrClosed` is "safetext: write after Close", the precedent for
+`stream.ErrClosed`.
+
+* **Deviation D4, 2026-11-01: the `Writer`'s defaults.**
+  * **Found** reading the `Printer`'s options: 0009-MADR A8 item 2 says a
+    `Writer` with no option gives "the input cleaned by `safetext.Text`,
+    unstyled and unwrapped: plain", and this step's tests said the same;
+    but a `Printer` lays a table out by default, and gives the cleaned
+    input byte for byte only with `WithoutTableLayout` too
+    (`stream/doc.go`; `options.go`, `WithoutTableLayout`).
+  * **Resolutions offered:** the `Printer`'s defaults, the sentence
+    corrected (recommended); a `Writer` that applies `WithoutTableLayout`
+    first, with its own defaults row and a way back; or a second
+    constructor for byte-for-byte output.
+  * **Chosen by the owner,** 2026-11-01: "The Printer's defaults
+    (Recommended)". A8 item 2 and this step's test are corrected; no row
+    and no file are added.
+
+**What changed:**
+
+* `stream/writer.go`: `Writer`, `NewWriter`, `Write`, `WriteString`,
+  `Close` and `ErrClosed` ("stream: write after Close"). Each write passes
+  its input to the `Printer` and writes what is stable in one
+  `io.WriteString`; a short write with no error is `io.ErrShortWrite`; the
+  first error is kept and returned from then on.
+* `stream/options.go`: `WithCRLF()`. `stream/printer.go`: the `crlf`
+  field; `emit` writes a line's rows and its end with CR LF under it; `At`
+  keeps it. `stream.Option` is unchanged: the `Writer` passes its options
+  to its `Printer`.
+* `stream/doc.go`: a paragraph on the `Writer`. `docs/guides/line-mode.md`,
+  "Stream a reply": plain output with no region. `docs/architecture.md`:
+  `stream`'s row. `docs/guides/defaults.md`: the line-end row `built`, and
+  a `decided` row, the destination left open at `Close` (A8 item 5).
+
+**Tests,** in `stream/writer_test.go`: `TestWriterCopy`, `io.Copy` of
+`testdata/reply.txt` through `iotest.OneByteReader`, `iotest.HalfReader`
+and a whole reader, at widths 0, 60 and 100, with and without
+`DefaultMarkup`, equal to the `Printer`'s output byte for byte;
+`TestWriterDefaults` (D4); `TestWriterString`; `TestCRLF`, for a
+`Printer`, a `Writer` and `Printer.At`; `TestWriterError`;
+`TestWriterShortWrite`; `TestWriterClose`; `FuzzWriter`, random splits of
+any input equal to the `Printer`'s output for the whole; `ExampleWriter`;
+`BenchmarkWriter`. Every existing `stream` test passes unchanged,
+`TestReplyBudget` among them.
+
+**Mutations,** `python3 -m tools.verify mutate`:
+
+| Mutation | Its failure |
+| :--- | :--- |
+| A8.1.1 `Write`'s stable lines not written | `TestWriterCopy`: "one byte, width 0, styled false: the Writer's output differs from the Printer's" |
+| A8.1.2 `Close` not flushing | the same |
+| A8.1.3 the error not sticky | `TestWriterError`: "a write after the failure = 5, full; want 0 and the same error" |
+| A8.1.4 `Close` closing the destination | `TestWriterClose`: "Close closed the destination 1 times" |
+| A8.1.5 `WithCRLF` ignored | `TestCRLF`: "Printer: … want every line ending CR LF, and no lone CR or LF" |
+| A8.1.6 a `Write` after `Close` accepted | `TestWriterClose`: "Write after Close = 1, <nil>; want 0, ErrClosed" |
+| A8.1.7 a wrapped line's rows left LF | `TestCRLF`: "Printer: "A paragraph long\nenough to be wrapped\nat twenty columns.\r\n…"" |
+| A8.1.8 a short write not reported | `TestWriterShortWrite`: "a short write = <nil>; want io.ErrShortWrite" |
+| A8.1.9 `At` not keeping `WithCRLF` | `TestCRLF`: "Printer.At: … want every line ending CR LF" |
+
+`mutate: 9 killed, 0 survived, 0 errors`. The step named six; A8.1.7 to
+A8.1.9 were added for the wrapped rows, the short write and `At`.
+
+**Fuzzing,** `FuzzWriter`, 5 minutes: 5,779,391 executions, no failure.
+
+**Benchmark,** five runs: `BenchmarkWriter` 22.2 to 30.6 µs, 30,232 B and
+216 allocations an operation; `BenchmarkReplyRender`, beside it, 20.6 to
+24.2 µs, 32,792 B and 200 allocations.
+
+**The API,** apidiff at the `Makefile`'s pin against `v2.9.0`: this step
+adds `stream.ErrClosed`, `NewWriter`, `WithCRLF` and `Writer`, beside Step
+A1.1's five; `make apicheck`: "against v2.9.0, 0 incompatible change(s)".
+`TestNoTypeNameMeansTwoThings`, `TestCoresAreCharmFree` and
+`TestNarrowClosures` pass.
+
+**Gates,** with the step's files:
+
+| Host | `gates` |
+| :--- | :--- |
+| macOS | 22 passed, 0 failed, 0 skipped in 956 s |
+| `remote linux` | 21 passed, 0 failed, 1 skipped (`gofmt`) in 1341 s |
+| `remote windows` | 21 passed, 0 failed, 1 skipped (`gofmt`) in 2615 s |
+
+* The pre-add check of the five Go files, the documents' checks and the
+  identifier scan: clean.
+* **Step A8.1 complete, 2026-11-01,** for the owner's commit. Step 3,
+  `frame`, is next.
