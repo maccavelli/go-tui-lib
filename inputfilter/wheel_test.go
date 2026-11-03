@@ -98,6 +98,61 @@ func TestWheelReverses(t *testing.T) {
 	}
 }
 
+// TestWheelProfile: with 3 events a notch, 3 events are one notch, the
+// events over carry into the next, a change of direction drops them, and
+// Residual gives whole notches only (docs/decisions/0009-MADR-streaming-content-engine.md
+// A1 §6).
+func TestWheelProfile(t *testing.T) {
+	w := inputfilter.Wheel{EventsPerNotch: 3}
+	var passed []int
+	for i := range 7 {
+		if s, ok := w.Add(down(0, 0), t0.Add(time.Duration(i)*time.Second)); ok {
+			passed = append(passed, s.DY)
+		}
+	}
+	if len(passed) != 2 || passed[0] != 1 || passed[1] != 1 {
+		t.Fatalf("7 events a second apart passed %v; want two notches", passed)
+	}
+	if _, ok := w.Residual(); ok {
+		t.Fatal("one event over gave a Residual; want none")
+	}
+	if _, ok := w.Due(); ok {
+		t.Fatal("one event over is due; want nothing due")
+	}
+	carry := inputfilter.Wheel{EventsPerNotch: 3}
+	notches := 0
+	for _, at := range []time.Duration{0, 1, 2, 3, 4, 5, 6, 100, 200} {
+		if s, ok := carry.Add(down(0, 0), t0.Add(at*time.Millisecond)); ok {
+			notches += s.DY
+		}
+	}
+	if notches != 3 {
+		t.Fatalf("9 events, 4 of them held within an interval: %d notches; want 3, the 2 over carried", notches)
+	}
+	w.Add(down(0, 0), t0.Add(10*time.Second))
+	w.Add(up(0, 0), t0.Add(11*time.Second))
+	w.Add(up(0, 0), t0.Add(12*time.Second))
+	if s, ok := w.Add(up(0, 0), t0.Add(13*time.Second)); !ok || s.DY != -1 {
+		t.Fatalf("after a reversal, three up gave %+v, %v; want one notch up, the downs dropped", s, ok)
+	}
+	f := inputfilter.NewFlusher(inputfilter.WithWheelProfile(3), inputfilter.WithoutWheelCoalescing())
+	defer f.Close()
+	if s, ok := f.Scroll(down(0, 0), t0); !ok || s.DY != 1 {
+		t.Fatal("WithoutWheelCoalescing with a profile: want each event as it came")
+	}
+	g := inputfilter.NewFlusher(inputfilter.WithWheelProfile(3))
+	defer g.Close()
+	n := 0
+	for i := range 6 {
+		if s, ok := g.Scroll(down(0, 0), t0.Add(time.Duration(i)*time.Second)); ok {
+			n += s.DY
+		}
+	}
+	if n != 2 {
+		t.Fatalf("WithWheelProfile(3): 6 events gave %d notches; want 2", n)
+	}
+}
+
 // TestThrottle: one sample an interval passes, 16 ms by default.
 func TestThrottle(t *testing.T) {
 	for _, c := range []struct {

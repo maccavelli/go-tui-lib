@@ -350,14 +350,14 @@ record that is not there.
 | Paste-burst detection | off; when on, codex's 3 characters at most 8 ms apart, flushed after 8 ms idle, 60 ms on Windows | `inputfilter.WithPasteBurst`, `inputfilter.PasteBurstConfig` | built |
 | The flush driver's goroutine | one, while a flush is due, until `Close` | `inputfilter.Flusher.Close` | built |
 | The filter's goroutine | one from `Attach` to its stop, sending each due flush and each held message's drain through the program's `Send` | `inputfilter/inputfiltertea.Filter.Attach` | built |
-| Wheel events a notch | 1 | `inputfilter.WithWheelProfile` | planned (0009-PLAN-streaming-content-engine.md Step A1.3) |
-| Typeahead | none held, none dropped | `inputfilter.Flusher.Capture`, `inputfilter.Flusher.Quarantine` | planned (0009-PLAN-streaming-content-engine.md Step A1.3) |
-| A report or reply split past the reader's 50 ms | rejoined from an unknown head of three bytes or more, which waits up to 500 ms for the rest | `inputfilter.WithoutReassembly`, `inputfilter.WithReassemblyWindow` | planned (0009-PLAN-streaming-content-engine.md Step A1.3) |
-| An X10 report ConPTY re-encoded | repaired | `inputfilter.WithoutX10Repair` | planned (0009-PLAN-streaming-content-engine.md Step A1.3) |
-| A probe reply rejoined after its deadline | given back as it came, unless a matcher knows it | `inputfilter.WithReplies` | planned (0009-PLAN-streaming-content-engine.md Step A1.3) |
-| A paste's CR and CRLF | made LF | `inputfilter.WithoutPasteNormalization` | planned (0009-PLAN-streaming-content-engine.md Step A1.3) |
-| An empty bracketed paste | a `ClipboardImageRequestMsg` | `inputfilter/inputfiltertea.WithoutClipboardImageRequest` | planned (0009-PLAN-streaming-content-engine.md Step A1.3) |
-| grok's PowerShell burst rules | off | `inputfilter.PasteBurstConfig`, `inputfilter.PowerShellPasteBurst` | planned (0009-PLAN-streaming-content-engine.md Step A1.3) |
+| Wheel events a notch | 1 | `inputfilter.WithWheelProfile` | built |
+| Typeahead | none held, none dropped | `inputfilter.Flusher.Capture`, `inputfilter.Flusher.Quarantine` | built |
+| A report or reply split past the reader's 50 ms | rejoined from an unknown head of three bytes or more, which waits up to 500 ms for the rest | `inputfilter.WithoutReassembly`, `inputfilter.WithReassemblyWindow` | built |
+| An X10 report ConPTY re-encoded | repaired | `inputfilter.WithoutX10Repair` | built |
+| A probe reply rejoined after its deadline | given back as it came, unless a matcher knows it | `inputfilter.WithReplies` | built |
+| A paste's CR and CRLF | made LF | `inputfilter.WithoutPasteNormalization` | built |
+| An empty bracketed paste | a `ClipboardImageRequestMsg` | `inputfilter.WithoutClipboardImageRequest` | built |
+| grok's PowerShell burst rules | off | `inputfilter.PasteBurstConfig`, `inputfilter.PowerShellPasteBurst` | built |
 
 ## stream/streamtea
 

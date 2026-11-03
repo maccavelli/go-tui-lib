@@ -142,6 +142,55 @@ func TestPasteBurst(t *testing.T) {
 	}
 }
 
+// TestPowerShellPasteBurst: grok's cases (grok
+// xai-grok-pager/src/app/event_loop.rs:3587-3715): a single-line run is
+// given back as its keys; a run with a character after an Enter is a
+// paste; an Enter then a Ctrl+J is one line break, and a paste; a dropped
+// Windows path of 8 or more is a paste, and of 7 is not; and the second
+// key must come within 2 ms.
+func TestPowerShellPasteBurst(t *testing.T) {
+	win := inputfilter.PowerShellPasteBurst()
+	win.GOOS = "windows"
+	ctrlJ := termkey.Input{Kind: termkey.InputKey, Key: termkey.KeyEvent{Code: 'j', Mod: termkey.ModCtrl}}
+	typed := func(s string) []step {
+		var out []step
+		for i, r := range s {
+			out = append(out, in(time.Duration(i)*ms, char(string(r))))
+		}
+		return append(out, tick(time.Second))
+	}
+	for _, c := range []struct {
+		name  string
+		steps []step
+		want  string
+	}{
+		{"a single line given back", typed("abcd"), "a b c d"},
+		{"a character after an Enter", []step{
+			in(0, char("a")), in(ms, char("b")), in(2*ms, key(termkey.KeyEnter, 0)), in(3*ms, char("c")), tick(time.Second),
+		}, `[ab\nc]`},
+		{"an Enter alone at the end", []step{
+			in(0, char("a")), in(ms, char("b")), in(2*ms, key(termkey.KeyEnter, 0)), tick(time.Second),
+		}, "a b enter"},
+		{"Enter then Ctrl+J", []step{
+			in(0, char("a")), in(ms, key(termkey.KeyEnter, 0)), in(2*ms, ctrlJ), tick(time.Second),
+		}, `[a\n]`},
+		{"a Windows path of 8", typed(`C:\x.png`), `[C:\x.png]`},
+		{"a Windows path of 7", typed(`C:\x.pn`), `C : \ x . p n`},
+		{"the second key past 2 ms", []step{
+			in(0, char("a")), in(3*ms, char("b")), in(4*ms, key(termkey.KeyEnter, 0)), in(5*ms, char("c")), tick(time.Second),
+		}, `a [b\nc]`},
+	} {
+		got := show(feed(inputfilter.NewPasteBurst(win), c.steps...))
+		if got != c.want {
+			t.Errorf("%s: %q; want %q", c.name, got, c.want)
+		}
+	}
+	first := inputfilter.PasteBurstConfig{GOOS: "linux", FirstGap: 2 * ms}
+	if got := show(feed(inputfilter.NewPasteBurst(first), in(0, char("a")), in(3*ms, char("b")), in(4*ms, char("c")), in(5*ms, char("d")), tick(time.Second))); got != "a [bcd]" {
+		t.Errorf("FirstGap alone: %q; want the first given back and the rest a paste", got)
+	}
+}
+
 // A line-mode host on a terminal that does not bracket pastes: three
 // characters a millisecond apart are a burst, given as one paste once it
 // has been idle; a key typed alone is given back after the gap.

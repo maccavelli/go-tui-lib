@@ -174,8 +174,9 @@ and D13) reserve these, which its PLAN builds: in `frame`, `DueMsg`, `Queue`,
 `Snapshot`, `Pacer`, `PacerFunc`, `Release`, `Gear`, `AdaptiveOption`,
 `Scheduler`, `Coalescer`, `FlushMsg`, `Demand`, `Ticks`, `TickMsg`,
 `Output`, `OutputOption`, `OutputEvent`, `Upgrader` and `UpgradeMsg`; in `inputfilter`, `Scroll`, `Wheel`,
-`Throttle`, `PasteBurst`, `PasteBurstConfig`, `BurstAction` (to be
-`Action`, D13), `Flusher`, `Flush`, `Report`, `ReportKind`,
+`Throttle`, `PasteBurst`, `PasteBurstConfig`, `Action` (Step 4's
+`BurstAction`, renamed by D13 before any release), `Flusher`, `Flush`,
+`Report`, `ReportKind`,
 `MouseButton`, `Reassembler`, `ReassembleConfig`, `ReplyMatcher`,
 `ReplyMatcherFunc` and `ClipboardImageRequestMsg`; in `inputfilter/inputfiltertea`, `Filter` and
 `CoalescedWheelMsg`; in `stream`, `InterpretOptions`, `InterpretRow`,

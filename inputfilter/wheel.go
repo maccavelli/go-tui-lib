@@ -30,10 +30,31 @@ type Wheel struct {
 	// Interval is the least time between two events passed: 16 ms when it
 	// is zero or less.
 	Interval time.Duration
+	// EventsPerNotch is how many events a terminal sends for one notch,
+	// which 0005's Caps tell (docs/decisions/0009-MADR-streaming-content-engine.md
+	// A1 §6): 1 when it is zero or less. Whole notches pass; the events
+	// left over carry into the next in the same direction.
+	EventsPerNotch int
 
-	sum  Scroll
-	held bool      // sum holds notches not yet passed
+	sum  Scroll    // the events held, not yet notches passed
 	last time.Time // when the last event passed
+}
+
+// per is how many events make a notch.
+func (w *Wheel) per() int { return max(w.EventsPerNotch, 1) }
+
+// take gives the whole notches the sum holds, and leaves the events over
+// in it.
+func (w *Wheel) take() (Scroll, bool) {
+	n := w.per()
+	out := w.sum
+	out.DX, out.DY = w.sum.DX/n, w.sum.DY/n
+	if out.DX == 0 && out.DY == 0 {
+		return Scroll{}, false
+	}
+	w.sum.DX -= out.DX * n
+	w.sum.DY -= out.DY * n
+	return out, true
 }
 
 // interval is the Wheel's interval.
@@ -48,36 +69,32 @@ func (w *Wheel) interval() time.Duration {
 // true; or false while the interval since the last one has not passed,
 // the sum held.
 func (w *Wheel) Add(s Scroll, now time.Time) (Scroll, bool) {
-	if w.held && (opposite(w.sum.DX, s.DX) || opposite(w.sum.DY, s.DY)) {
-		w.sum, w.held = Scroll{}, false
+	if opposite(w.sum.DX, s.DX) || opposite(w.sum.DY, s.DY) {
+		w.sum = Scroll{}
 	}
 	w.sum = Scroll{X: s.X, Y: s.Y, DX: w.sum.DX + s.DX, DY: w.sum.DY + s.DY, Mod: s.Mod}
 	if !w.last.IsZero() && now.Sub(w.last) < w.interval() {
-		w.held = true
 		return Scroll{}, false
 	}
-	out := w.sum
-	w.sum, w.held, w.last = Scroll{}, false, now
-	return out, true
+	out, ok := w.take()
+	if ok {
+		w.last = now
+	}
+	return out, ok
 }
 
 // opposite reports whether a and b point opposite ways.
 func opposite(a, b int) bool { return a < 0 && b > 0 || a > 0 && b < 0 }
 
-// Residual takes the sum held, and reports whether there was one.
-func (w *Wheel) Residual() (Scroll, bool) {
-	if !w.held {
-		return Scroll{}, false
-	}
-	out := w.sum
-	w.sum, w.held = Scroll{}, false
-	return out, true
-}
+// Residual takes the whole notches held, and reports whether there were
+// any.
+func (w *Wheel) Residual() (Scroll, bool) { return w.take() }
 
-// Due is when the sum held may pass, an interval after the last event
-// passed, and false when none is held.
+// Due is when the notches held may pass, an interval after the last event
+// passed, and false when no whole notch is held.
 func (w *Wheel) Due() (time.Time, bool) {
-	if !w.held {
+	n := w.per()
+	if w.sum.DX/n == 0 && w.sum.DY/n == 0 {
 		return time.Time{}, false
 	}
 	return w.last.Add(w.interval()), true

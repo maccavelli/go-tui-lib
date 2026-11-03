@@ -845,6 +845,13 @@ uses the new names.
   func WithoutClipboardImageRequest() inputfilter.Option
   ```
 
+  *Corrected 2026-11-02 (D15):* ~~`inputfiltertea.WithoutClipboardImageRequest`~~
+  is `inputfilter.WithoutClipboardImageRequest() Option`, the core's, with
+  `func (f *Flusher) ClipboardImageRequest(in termkey.Input) bool`, which
+  reports whether an input the Flusher gave is the request: an empty
+  bracketed paste, unless the option built it. The adapter turns such a
+  paste into `ClipboardImageRequestMsg`; a line-mode host asks the same.
+
   *Limits stated, by D14 and the measurement:* a report split after its
   first one or two bytes reaches the model as `esc` or `alt+[` and keys,
   and is not rejoined, so that a bare Esc never waits; a focus report,
@@ -2112,3 +2119,163 @@ model as `esc` or `alt+[` and keys, with no unknown event to begin from.
 * **Step A1.3's API written, 2026-11-02,** a change to the records alone,
   for the owner's review and commit; its code waits for the owner's
   "proceed".
+
+*2026-11-02.* The owner committed the API and said "committed, proceed".
+
+* **Deviation D15, 2026-11-02: the clipboard request's control.**
+  * **Found** working the API through before any code: it gives
+    `inputfiltertea.WithoutClipboardImageRequest() inputfilter.Option`,
+    which the adapter cannot make, since `inputfilter.Option` is opaque,
+    an interface whose method only `inputfilter`'s functions satisfy
+    (AGENTS.md, API convention 4; `inputfilter/flusher.go`); and the
+    Flusher's `termkey.Input` cannot mark a paste as the request, so the
+    adapter could not learn the setting from it either.
+  * **Resolutions offered:** the option the core's, with a `Flusher`
+    method, `ClipboardImageRequest(in termkey.Input) bool`, that the
+    adapter and a line-mode host ask (recommended); the adapter's own
+    options, with a `Core` wrapper for the core's, changing Step 4's
+    `NewFilter`; or no control, the conversion listed as a floor.
+  * **Chosen by the owner,** 2026-11-02: "Core option + core test
+    (Recommended)". The step's text and the defaults row are corrected.
+
+**What changed,** to the API the owner committed (`ed80a46`), with D15:
+
+* `inputfilter/action.go`: `Action`, Step 4's `BurstAction` renamed, in
+  no release; `burst.go`'s `PasteBurst` returns it.
+* `inputfilter/report.go`: `Report`, `ReportKind`, `MouseButton` and
+  `ParseReport`, SGR, X10 and focus, the button's bits read as
+  ultraviolet's `parseMouseButton` reads them; SGR numbers over 65,536,
+  a `+` sign or an empty part refused.
+* `inputfilter/reassemble.go`: `ReplyMatcher`, `ReplyMatcherFunc`,
+  `ReassembleConfig` and `Reassembler`. Details the API left, the
+  agent's:
+  * a head is an `InputUnknown` of three bytes or more: a CSI whose
+    bytes after `ESC [` are all parameters or intermediates, 0x20 to
+    0x3f, or an OSC, DCS or APC with no BEL or `ESC \`; a key is the
+    sequence's next byte when it types one printable byte, or in a
+    string sequence is Ctrl+G, BEL, or a `\` after an ESC the head ended
+    with. A string reply split before its ST's ESC is not rejoined,
+    since that ESC arrives as a bare Esc, which gives back what is held;
+  * an X10 head's pieces must come in one read: the keys it ran into
+    within 5 ms, the agent's number, so that a click at a wide
+    terminal's column 162 or 163 with a key typed after it is not
+    "repaired". Only a column ConPTY re-encoded is repaired; a row of 96
+    or more leaves a lone byte that is no rune, which is not;
+  * a held input's `Raw` is copied, since termkey's may share its
+    buffer.
+* `inputfilter/typeahead.go`: `Typeahead`. `inputfilter/paste.go`:
+  `ClipboardImageRequestMsg`, `NormalizePaste` and `PastedPath`, which
+  takes codex's quoting, `file://` decoding and drive and UNC forms, and
+  grok's anchor; a `file://` URL naming another host is refused.
+* `burst.go`: grok's four `PasteBurstConfig` fields and
+  `PowerShellPasteBurst`, `Idle` 10 ms beside the API's values, grok's
+  continue timeout (`event_loop.rs:3440`). A run now keeps the inputs it
+  took, so that `LinesOnly` can give one back as its keys.
+* `wheel.go`: `EventsPerNotch`; the sum holds events, and whole notches
+  pass.
+* `flusher.go`: the options `WithWheelProfile`, `WithoutReassembly`,
+  `WithReassemblyWindow`, `WithReplies`, `WithoutX10Repair`,
+  `WithoutPasteNormalization` and `WithoutClipboardImageRequest` (D15);
+  the methods `Capture`, `Replay`, `Quarantine` and
+  `ClipboardImageRequest` (D15). `Input` and `Flush` run the stages in the
+  API's order. `Capture` holds at most 4,096 inputs, the agent's bound on
+  untrusted input; `Quarantine` drops what the stages hold, and the
+  wheel's sum, and its deadline holds for `Scroll` and `Motion` too.
+* `inputfilter/inputfiltertea/inputfiltertea.go`:
+  * a `uv.UnknownEvent` is read through `internal/termevent.Decode`, so
+    the adapter imports no ultraviolet, as `termcaptea` does;
+  * the message each unknown head and each suspect X10 click came as is
+    kept, at most 64, and given back when its input comes back as it
+    went;
+  * a suspect X10 click is re-encoded with x/ansi's `EncodeMouseButton`;
+  * pastes reach the stages attached or not, so that normalisation and
+    the clipboard request need no `Attach`; keys and unknown heads only
+    while attached, as Step 4;
+  * `Capture`, `Replay`, whose messages go through the drains, and
+    `Quarantine`, which drops keys, pastes, mouse and focus messages, and
+    held input, and passes the rest.
+* `internal/conformance`: `inputfilter.Action`, `MouseButton` and
+  `ReportKind` in `enums`. `docs/architecture.md`, `docs/glossary.md`,
+  `inputfilter/doc.go`: the names. `docs/guides/defaults.md`: the eight
+  rows of Step A1.3 `built`.
+
+**Tests:** `TestParseReport`, 27 reports; `TestReassembleSplits`, every
+two-way split of an SGR report, a DA1, a kitty keyboard and an OSC 11
+reply, through `termkey.Decoder` with a flush between, 60 ms apart;
+`TestReassembleX10`, columns 95, 96, 120, 200 and 223 as ConPTY relays
+them, in one read and 6 ms apart; `TestReassembleEnds`; `TestNormalizePaste`;
+`TestPastedPath`, 20 cases; `TestTypeahead`; `TestPowerShellPasteBurst`, 8;
+`TestWheelProfile`; `TestFlusherStages`, `TestFlusherWindow`,
+`TestFlusherCapture`, `TestFlusherQuarantine` and
+`TestClipboardImageRequest`; in the adapter, `TestFilterSplitReport`,
+`TestFilterX10`, the four clicks the measurement found misread,
+`TestFilterPastes`, `TestFilterCapture`, `TestFilterQuarantine`, and
+`TestReportAgreesWithTea`, which runs a `tea.Program` over a pipe and
+holds `ParseReport`, made a message, to the message Bubble Tea's own
+reader gives for each of 26 reports. All pass under `-race`, three times
+over.
+
+* Test faults of the agent's, fixed: `TestReassembleX10` gave an X10
+  report's pieces 60 ms apart, when they come in one read;
+  `TestFlusherWindow` waited with `synctest.Wait`, which does not move
+  the clock, Step 4's fault again; `TestFlusherCapture` wanted a newline
+  where `show` writes `\n`. And two mutations first survived: the wheel's
+  leftover events were never left over in `TestWheelProfile`, which gained
+  a case that leaves two; and the X10 window in `next` was dead code,
+  since `Key` gives back an expired head first, so the clause was
+  removed and the mutation moved to the wait itself.
+
+**Mutations,** `python3 -m tools.verify mutate`, on the final code:
+
+| Mutation | Its failure |
+| :--- | :--- |
+| A1.3.1 reassembly skipped | `TestReassembleSplits`: "an SGR report split \"\\x1b[<\"\|\"0;10;5M\": u(\"\\x1b[<\") 0 ; 1 0 ; 5 shift+m; want u(\"\\x1b[<0;10;5M\")" |
+| A1.3.2 X10 repair skipped | `TestReassembleX10`: "column 96: u(\"\\x1b[M \\u0080\") !; want one report" |
+| A1.3.3 late replies passed as keys | `TestReassembleSplits`: "a DA1 reply split \"\\x1b[?\"\|\"62;22c\": u(\"\\x1b[?\") 6 2 ; 2 2 c; want" none |
+| A1.3.4 Esc not flushing | `TestReassembleEnds`: "esc after a head: esc u(\"\\x1b[<0;1\"); want the head, then it" |
+| A1.3.5 CR left in a paste | `TestFlusherStages`: "a paste:" the CR kept |
+| A1.3.6 the window ignored | `TestReassembleEnds`: "Due 500ms; want 80ms" |
+| A1.3.7 a whole reply matched and still given | `TestReassembleEnds`: "a whole reply the matcher knows: u(\"\\x1b[?62;22c\"); want it dropped" |
+| A1.3.8 a Report's column off by one | `TestReportAgreesWithTea`: "tea gave tea.MouseClickMsg{X:9, Y:4, …}; ours is tea.MouseClickMsg{X:10, Y:4, …}" |
+| A1.3.9 a rune of U+0080 to U+00FF not repaired | `TestReassembleX10`: "column 96: u(\"\\x1b[M \\u0080\") !; want one report" |
+| A1.3.10 `Typeahead` not cutting at Esc | `TestTypeahead`: "Typeahead gave \"h i backspace shift+enter alt+enter [p] A z [q]\"" |
+| A1.3.11 `Quarantine` passing input before its deadline | `TestFlusherQuarantine`: "a paste before the deadline passed" |
+| A1.3.12 `PastedPath` accepting prose | `TestPastedPath`: "PastedPath(\"hello\", linux) = \"hello\", true; want \"\", false" |
+| A1.3.13 `LinesOnly` ignored | `TestPowerShellPasteBurst`: "a single line given back: \"[abcd]\"; want \"a b c d\"" |
+| A1.3.14 `EnterCtrlJ` ignored | `TestPowerShellPasteBurst`: "Enter then Ctrl+J: \"a enter ctrl+j\"; want \"[a\\\\n]\"" |
+| A1.3.15 the wheel's leftover events dropped | `TestWheelProfile`: "9 events, 4 of them held within an interval: 2 notches; want 3, the 2 over carried" |
+| A1.3.16 `WithoutClipboardImageRequest` ignored | `TestClipboardImageRequest`: "WithoutClipboardImageRequest still reports the request" |
+| A1.3.17 the X10 one-read window ignored | `TestReassembleX10`: "column 96, its key 6 ms after: u(\"\\x1b[M \\x80!\"); want it as it came, not one read" |
+| A1.3.18 the adapter not suspecting an X10 click | `TestFilterX10`: "column 96: the model got […MouseClickMsg{X:161, Y:95…}, KeyPressMsg{Text:\"!\"…}]" |
+| A1.3.19 a head given back as nothing | `TestFilterSplitReport`: "after the window the model got []uv.Event(nil); want the head" |
+| A1.3.20 `Capture` not holding | `TestFlusherCapture`: "during Capture: h u(\"\\x1b[<0;1;1M\") up …" |
+| A1.3.21 `FirstGap` ignored | `TestPowerShellPasteBurst`: "the second key past 2 ms: \"[ab\\\\nc]\"; want \"a [b\\\\nc]\"" |
+
+`mutate: 21 killed, 0 survived, 0 errors`: the PLAN's five, D13's ten,
+and six for D15, the X10 window and the adapter's conversions.
+
+**The API,** `make apicheck`: "against v2.9.0, 0 incompatible
+change(s)"; `inputfilter` and `inputfilter/inputfiltertea` are in no tag.
+
+**Gates,** with the step's files:
+
+| Host | `gates` |
+| :--- | :--- |
+| macOS | 22 passed, 0 failed, 0 skipped in 527 s |
+| `remote linux` | 21 passed, 0 failed, 1 skipped (`gofmt`) in 1093 s |
+| `remote windows` | 21 passed, 0 failed, 1 skipped (`gofmt`) in 2665 s |
+
+* The pre-add check's first run found eight findings, all in the
+  agent's code, each fixed: `"windows"` three times (goconst), now
+  `goosWindows`; `len(rest) > 0` for `rest != ""` (gocritic); two
+  conversions of a rune checked to be U+00FF or under to a byte (gosec
+  G115), each given the repository's reasoned `//nolint:gosec`; an
+  untagged switch (staticcheck QF1002); `ansi.MouseButton(m.Button)`,
+  which is already x/ansi's type (unconvert); and `messages`' `out`,
+  nil at every call (unparam), dropped. The 21 mutations were run again
+  on the fixed code: 21 killed. Then the pre-add check of the nineteen
+  Go files, the documents' checks, `internal/conformance` and the
+  identifier scan, untracked files included: clean.
+* **Step A1.3 complete, 2026-11-02,** for the owner's commit. Step 5,
+  `Scanner`, `Doc`, `Renderer`, `Plain`, `Buffer` and
+  `stream/streamtest`, is next.
