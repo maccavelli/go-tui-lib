@@ -34,6 +34,7 @@ var cores = []string{
 	"pick",
 	"safetext",
 	"stream",
+	"stream/streamtest",
 	"termcap",
 	"termkey",
 	"termsvc",

@@ -1,5 +1,6 @@
 // Package stream prints a streamed reply's Markdown in a line-mode CLI's
-// scrollback, styled and wrapped, each line once
+// scrollback, styled and wrapped, each line once, or draws it a stable
+// prefix at a time
 // (docs/decisions/0023-MADR-line-mode-components.md D7, D8, A3, A6, A7;
 // docs/decisions/0009-MADR-streaming-content-engine.md A5).
 //
@@ -19,6 +20,15 @@
 // text is underlined, and a reference link only once its definition has
 // been printed.
 //
+// A Doc draws a streamed document for a screen that is redrawn, a stable
+// prefix at a time (docs/decisions/0009-MADR-streaming-content-engine.md
+// §4): a Scanner reads each complete line once, a blank line where nothing
+// stays open is a cut, the source before a cut is a segment a Renderer
+// renders once a width, and only the tail is rendered each frame. Plain is
+// the Renderer that styles nothing. A Buffer takes a stream's chunks from
+// any goroutine, and Doc.Pull drains it on the one that owns the Doc,
+// paced by a frame.Pacer.
+//
 // A Writer is an io.WriteCloser over a Printer, so the standard library's
 // composition reaches a reply: io.Copy from its body, io.MultiWriter to a
 // terminal and a log. Each line is written to its destination once it is
@@ -31,7 +41,7 @@
 // sequence but SGR, the cursor moves and the erases is dropped
 // (docs/decisions/0009-MADR-streaming-content-engine.md A1, A7 Q13).
 //
-// The package links no Charm module but x/ansi.
+// The package links no Charm module but x/ansi, and frame, a core.
 //
 // Stability: stable. Exported names change only through the deprecation
 // policy in AGENTS.md, "API conventions".

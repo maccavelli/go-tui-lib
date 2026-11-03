@@ -125,6 +125,7 @@ linters:
             - "**/pick/*.go"
             - "**/safetext/*.go"
             - "**/stream/*.go"
+            - "**/stream/streamtest/*.go"
             - "**/termcap/*.go"
             - "**/termkey/*.go"
             - "**/termsvc/*.go"

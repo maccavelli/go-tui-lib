@@ -927,6 +927,12 @@ Four parts, each passing its tests before the next.
    `stream.Option` gains a second unexported method so that one option
    applies to a `Printer` and a `Doc` (A6 item 4, A7 item 6); an option
    that means nothing to one of them is documented as ignored by it.
+   *Added 2026-11-03 (D16):* each segment's render input carries the
+   reference and footnote definitions committed so far, after a blank
+   line, so that a reference resolves wherever its definition is; a
+   committed definition drops the cache, and the segments render once
+   more. `Plain` prints no definition line, so that its frames and its
+   one-shot render agree.
 3. **`Buffer` and `Doc.Pull`,** in `stream` (A7 item 9):
 
    ```go
@@ -2279,3 +2285,187 @@ change(s)"; `inputfilter` and `inputfilter/inputfiltertea` are in no tag.
 * **Step A1.3 complete, 2026-11-02,** for the owner's commit. Step 5,
   `Scanner`, `Doc`, `Renderer`, `Plain`, `Buffer` and
   `stream/streamtest`, is next.
+
+### Step 5: `Scanner`, `Doc`, `Renderer`, `Plain`, `Buffer` and `stream/streamtest`
+
+*2026-11-03.* The owner committed Step A1.3 (`8f9d052`) and said
+"committed, proceed".
+
+* **Deviation D16, 2026-11-03: a definition in another segment.**
+  * **Found** reading 0009-MADR §4 against the `Renderer` before any
+    code: "When a committed segment holds one, every cached segment is
+    dropped and rendered again once", but a `Renderer` is
+    `Render(src, width)`, a function of the segment it is given, so a
+    segment rendered again alone cannot see a definition in another, and
+    the rule renders again to the same frame. crush, which §4 follows,
+    holds a link-reference definition open, so that no cut falls after it
+    (0003-REPORT §3.1).
+  * **Resolutions offered:** each segment's input carries the definitions
+    committed so far, `Plain` printing none (recommended); §4's text as it
+    is, the rule recorded as without effect; or no cut after a definition,
+    as crush, which breaks §4's cost bound.
+  * **Chosen by the owner,** 2026-11-03: "Append definitions to each
+    input (Recommended)". The step's text and 0009-MADR §4 are annotated.
+
+**What changed,** in the step's four parts, each passing its tests before
+the next:
+
+1. `stream/scanner.go`: `Scanner`, `Scan`, `Block` and `BlockKind`, from
+   `internal/enum`, sixteen kinds (tokens "blank", "paragraph",
+   "continuation", "heading", "setext", "break", "fence", "code",
+   "fence-end", "indented", "html", "list", "quote", "table",
+   "table-row", "definition"), one for each branch the `Printer` took.
+   The `Printer`'s `fence`, `html`, `paragraph` and `lazy` moved into it;
+   its held line and table rows, what it prints, stay its own. `line` now
+   switches on the `Block`. Every `Printer` test passed unchanged, its
+   goldens byte for byte, `TestReplyBudget` within its 257 allocations,
+   and `FuzzPrinter` ran 5 minutes, 9,140,231 executions, clean.
+   * `Block`'s fields are the agent's, as the step left them: `Cut`, a cut
+     falls before this line, told on the first line after the blank ones,
+     since only that line decides it, where the step's sketch says "before
+     the next line"; `Split`, a relaxed cut may fall before this line;
+     `Fence`, a fence line's opening line; `Label`, a definition's label.
+     The open list item is its marker's kind, a bullet's character or an
+     ordered marker's delimiter, the columns before it and those its
+     content begins at (CommonMark §5.2, one to four spaces after the
+     marker).
+2. `stream/renderer.go`: `Renderer`, `RendererFunc` and `Plain`, the
+   `Printer`'s drawing with the zero `Markup`, no definition printed
+   (D16). `stream/document.go`: `Doc`, `NewDoc`, `Append`, `Write`,
+   `Finish`, `Reset`, `Render`, `Version`, `Finished` and `Source`.
+   `stream/options.go`: `Option` gained `applyDoc`, each option a pair of
+   functions, a nil one ignored and so documented; `WithRelaxAfter`,
+   `WithoutInlineHoldback` and `WithoutPartialLine`. The agent's readings:
+   * a segment runs from the last cut to the next, its blank lines with it;
+     a fence a relaxed cut splits is closed by its run and opened again by
+     its opening line; each input carries the committed definitions after
+     a blank line (D16), but the tail's inside a fence or an HTML block,
+     where they would be text;
+   * the frame cache is the last `(width, Version)`, the segments' renders
+     are kept for the two widths last used, and their join is kept with
+     them, so that a frame copies its prefix once; a `Render` returns a
+     string, so a frame is one copy of the document, as A1.4's
+     `RenderView` will not be;
+   * the holdback reads emphasis and strong runs of `*` and `_` as
+     CommonMark's flanking rule does in short, a run opening only before a
+     character not a space and closing only after one, `_` inside a word
+     neither; `~~` exactly; a run of backticks until a run of as many; and
+     a link once its `](` has come, not before; inside a fence the
+     partial line is code, and shown whole;
+   * `Append` after `Finish` does nothing, and `Write` returns `ErrClosed`;
+     `Version` only rises, `Reset` included.
+3. `stream/buffer.go`: `Buffer`, `NewBuffer`, `Write`, `Close` and
+   `Doc.Pull`. `stream` now imports `frame`, a core (A7 item 9). The
+   `Buffer` holds the partial line until no complete line is queued, and
+   gives it to the `Doc` then, which is what hides it while lines are
+   queued; the `Doc` first kept a flag of its own for that too, which the
+   mutations found could never be seen, and it was removed. A `nil`
+   `Pacer` is `frame.Immediate()`.
+4. `stream/streamtest/`: `CheckRenderer`, forty documents from fixed
+   seeds, of every block kind the `Doc` cuts by, each at 40 and 80
+   columns, whole, byte by byte and in random chunks of 1 to 32 bytes:
+   chunking invariance, the stated differences only, with relaxed cuts
+   off, a frame and the whole source's render the same but for their
+   blank lines, and `Finish` exactness; reported by `t.Errorf`. Its
+   generator is unexported.
+* `internal/conformance`: `stream.BlockKind` in `enums`;
+  `stream/streamtest`, Charm-free, in `cores`, and `.golangci.yml`'s
+  `charmfree`, by D5's rule. `docs/architecture.md`: the graph, the two
+  packages' rows, the cores' list and the tree; `docs/guides/defaults.md`:
+  the step's three rows `built`; `stream/doc.go`, `stream/scan.go`: the
+  package comment and the scanner's.
+
+**Tests:** `TestScanner`, 30 documents of the step's cases;
+`TestScannerFields`; `TestDocCuts`, 8; `TestDocHoldback`, 14;
+`TestDocFinish`; `TestDocClean`, a sequence in each of three chunks and
+none in a frame or the source; `TestDocRenderError`; `TestPlain`;
+`FuzzDoc`, whose 5 minutes ran 14,821,507 executions clean;
+`ExampleDoc`; inside the package, `TestRelaxedCuts`, a paragraph, a
+quote, a fence, an ordered list, a table and an HTML block;
+`TestDefinitions`; `TestCost`, 200 KB of paragraphs, of one paragraph, of
+one fence, of one list and of one table, in 20-byte chunks; and
+`TestWidthBack`; `TestBufferWriters`, `TestBufferFrames`,
+`TestBufferClose` and `TestPullQueued`; in `streamtest`, `TestPlain`,
+`Plain` at both width methods, `TestStatedDifferences`, a Renderer that
+renders each block as itself, `TestCheckRendererCatches` and
+`TestDocument`. All pass under `-race`.
+
+* Test faults of the agent's, fixed: `TestDocCuts` and
+  `TestDocRenderError` ended their sources on a partial line, after
+  which no cut is decided, as §4 has it; `TestPlain` wanted a table
+  without its outer pipes, which `layoutTable` draws; and `TestCost`'s
+  table, re-rendered whole each frame as the stated exception, took
+  6.7 s, so it renders a frame each 4 KB.
+* **The benchmark,** 200 KB in 20-byte chunks at 80 columns, a frame
+  after each, on the agent's macOS host: `BenchmarkDoc` 0.82 s, 1.13 GB
+  and 519,010 allocations; `BenchmarkWholeRender`, the source so far
+  rendered whole by `Plain` at each chunk, 41.5 s, 13.4 GB and
+  137,405,289. The first `BenchmarkDoc`, which joined every segment each
+  frame, was 1.09 s and 1.18 GB; the join is kept since.
+
+**Mutations,** `python3 -m tools.verify mutate`, on the final code:
+
+| Mutation | Its failure |
+| :--- | :--- |
+| 5.1 a cut inside a fence | `TestDocCuts`: "a fence's blank: \"[```\\nx]\\n\\n[y\\n```]\\n\\n[z]\"" |
+| 5.2 the list's next-line check skipped | `TestDocCuts`: "a loose list: \"[- a]\\n\\n[- b]\\n\\n[c]\"" |
+| 5.3 a reference definition keeping the cache | `TestDefinitions`: "the first segment rendered 0 times after the definition; want once" |
+| 5.4 `Finish` keeping the segmented render | `TestDocFinish`: "after Finish: \"[a]\\n\\n[b\\n\\nc]\" …; want \"[a\\n\\nb\\n\\nc **open]\"" |
+| 5.5 the relaxed cut never taken | `TestRelaxedCuts`: "a paragraph: 0 segments; want the paragraph split" |
+| 5.6 a relaxed cut inside a table | `TestRelaxedCuts`: "a table: segments [\"a \| b\\n--- \| ---\\n01 \| x\\n\" …]; want the table whole" |
+| 5.7 a list's relaxed cut losing its number | `TestRelaxedCuts`: "an ordered list: segment 1 \"item\\n5. item…\": want it to begin with its item's number" |
+| 5.8 `Append` skipping the sanitizer | `TestDocClean`: "a frame \"a \\x1b[31mred\" or the source … holds ESC" |
+| 5.9 `CheckRenderer` missing a cut-dependent Renderer | `TestCheckRendererCatches`: "CheckRenderer reported nothing for a Renderer that depends on where the source was cut" |
+| 5.10a the `Scanner` forgetting the lazy continuation | `TestScanner`: "a lazy continuation: list paragraph; want list continuation" |
+| 5.10b the `Printer`'s `Scanner` forgetting the paragraph's continuation | `TestParagraphContinues`: "\"Foo\\n    bar\\n===\\n\"; want \"Foo\\n\\x1b[1m    bar\\x1b[0m\\n\\x1b[1m===\\x1b[0m\\n\"" |
+| 5.11 the holdback skipped | `TestDocHoldback`: "strong, open: \"Hello **wor\"; want \"Hello \"" |
+| 5.12 the partial line given while lines are queued | `TestPullQueued`: "after Pull 0 the frame is \"a\\npart\" …; want \"a\"" |
+| 5.13 `Pull` not finishing a closed `Buffer` | `TestBufferClose`: "after the last Pull: finished false …; want finished" |
+| 5.14 a line asking for no frame | `TestBufferFrames`: "a completed line asked for no frame" |
+| 5.15 one width cached | `TestWidthBack`: "a segment rendered 5 times over two widths; want at most 2" |
+| 5.16 the definitions not carried | `TestDefinitions`: "segment inputs [\"see [x]\\n\\n\" …]; want each to carry the definition" |
+| 5.17 a failed segment's text lost | `TestDocRenderError`: "\"[good]\\n\\n[end]\"; want the failed segment as Plain draws it" |
+| 5.18 `Plain` printing definitions | `TestPlain`: "Plain(\"see [x]\\n\\n[x]: https://e.x\\n\", 0) = \"see [x]\\n\\n[x]: https://e.x\\n\"" |
+| 5.19 a fence split not opened again | `TestRelaxedCuts`: "a fence: segment 1 \"x = 03\\n…\": want it to open the fence with its info string and close it" |
+
+`mutate: 20 killed, 0 survived, 0 errors`. The step named ten. Its last,
+"the `Printer` built on a `Scanner` that forgets the lazy continuation
+(`TestParagraphContinues`)", names a test of a paragraph's continuation,
+an indented line, not the lazy continuation of a list item; it first
+survived, and is 5.10b, with 5.10a for the lazy one. 5.12 first targeted
+the `Doc`'s own flag, and survived, since the flag could not be seen;
+the flag was removed and the mutation moved to the `Buffer`. 5.13 was
+first written as the `Finish` call removed, which left `closed` unused:
+the mutant did not compile, and it was rewritten.
+
+**The API,** `make apicheck`: "against v2.9.0, 0 incompatible
+change(s)": the unexported method `Option` gained is compatible, as A6
+item 4 expected; `stream` adds 38 names since `v2.9.0`, Steps A1.1's and
+A8.1's among them, and `stream/streamtest` is new.
+
+**Gates,** with the step's files:
+
+| Host | `gates` |
+| :--- | :--- |
+| macOS | 22 passed, 0 failed, 0 skipped in 626 s (the second run; the first failed `modernize`) |
+| `remote linux` | 21 passed, 0 failed, 1 skipped (`gofmt`) in 1260 s |
+| `remote windows` | 21 passed, 0 failed, 1 skipped (`gofmt`) in 2673 s |
+
+* The pre-add check's first run found four findings in the agent's code,
+  each fixed: a parameter named `close` twice (revive
+  redefines-builtin-id), now `closer`; `render` beside `Render` (revive
+  confusing-naming), now `draw`; and the holdback's untagged switch
+  (staticcheck QF1002). The first macOS `gates` then failed `modernize`,
+  which the pre-add check does not run and the agent had not run
+  itself, as earlier steps did: `go fix` wanted `strings.SplitSeq` for
+  three loops over `strings.Split`, in `streamtest.go`,
+  `streamtest_test.go` and `scanner_test.go`, the agent's; the remote
+  runs, started on the same code, were stopped. `go fix ./stream/...`
+  applied them, changing those three files alone, and `make modernize`
+  was clean on the three platforms. The 20 mutations were run again on
+  the fixed code: 20 killed. The pre-add check of the eighteen Go files,
+  before `go fix`, and the `gates`' `release-check`, the pre-add check
+  of every file, after it; the documents' checks, `internal/conformance`
+  and the identifier scan, untracked files included: clean.
+* **Step 5 complete, 2026-11-03,** for the owner's commit. Step 6,
+  `theme.Theme.ID` and `DocPane`, is next.

@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
+
 	"github.com/maccavelli/go-tui-lib/v2/stream"
 )
 
@@ -38,6 +40,48 @@ func BenchmarkReplyRender(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		replyRender(reply)
+	}
+}
+
+// paragraphs is about 200 KB of prose in paragraphs of five lines.
+func paragraphs() string {
+	var b strings.Builder
+	for i := 0; b.Len() < 200<<10; i++ {
+		b.WriteString("A line of a paragraph in a streamed reply, wrapped by Plain.\n")
+		if i%5 == 4 {
+			b.WriteString("\n")
+		}
+	}
+	return b.String()
+}
+
+// BenchmarkDoc: 200 KB in 20-byte chunks through a Doc with Plain at 80
+// columns, a frame after each: each segment rendered once, and the tail
+// each frame (docs/decisions/0009-PLAN-streaming-content-engine.md Step
+// 5).
+func BenchmarkDoc(b *testing.B) {
+	src := paragraphs()
+	b.ReportAllocs()
+	for b.Loop() {
+		d := stream.NewDoc(stream.Plain(ansi.WcWidth))
+		for i := 0; i < len(src); i += 20 {
+			d.Append(src[i:min(i+20, len(src))])
+			d.Render(80)
+		}
+	}
+}
+
+// BenchmarkWholeRender: the same 200 KB, the whole source so far rendered
+// by Plain at each chunk, as a renderer with no stable prefix does: what
+// BenchmarkDoc is measured against.
+func BenchmarkWholeRender(b *testing.B) {
+	src := paragraphs()
+	plain := stream.Plain(ansi.WcWidth)
+	b.ReportAllocs()
+	for b.Loop() {
+		for i := 0; i < len(src); i += 20 {
+			plain.Render(src[:min(i+20, len(src))], 80) //nolint:errcheck // Plain never fails
+		}
 	}
 }
 

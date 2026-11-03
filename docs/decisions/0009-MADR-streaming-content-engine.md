@@ -394,6 +394,13 @@ func (b *Buffer) Close() error                // end of stream; Pull then calls 
   (`[x]: url`), or a footnote definition (`[^x]:`), can change how earlier
   text renders. When a committed segment holds one, every cached segment is
   dropped and rendered again once. That is still a function of the content.
+  *Amended 2026-11-03, by
+  [0009-PLAN-streaming-content-engine.md](0009-PLAN-streaming-content-engine.md)
+  D16:* a `Renderer` renders the segment it is given, so a segment
+  rendered again alone cannot see a definition in another. Each
+  segment's render input carries the definitions committed so far,
+  after a blank line, which a Markdown renderer renders as nothing; and
+  `Plain`, which is not one, prints no definition line.
 * **`Finish` makes the frame exact.** After `Finish`, `Render(width)` is
   `Renderer.Render(Source(), width)`, byte for byte, rendered once and
   cached.

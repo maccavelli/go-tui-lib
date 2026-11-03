@@ -315,9 +315,9 @@ record that is not there.
 | A paragraph's line | held until the next line comes, or the reply ends | `stream.Printer.Flush` | decided (0023-MADR-line-mode-components.md A3, Q10) |
 | A table | held until a blank line or another block ends it | `stream.Printer.Flush` | decided (0023-MADR-line-mode-components.md D7, A6) |
 | A link | its text in the `Link` style and its destination in the `URL` style, no OSC 8 | `stream.Markup` | decided (0023-MADR-line-mode-components.md A6) |
-| A long run with no blank line | cut after 2 KiB, at the next line where its block may be split | `stream.WithRelaxAfter` | planned (0009-PLAN-streaming-content-engine.md Step 5) |
-| An unclosed emphasis, backtick run, strikethrough or link at a partial line's end | held back until it closes or the line ends | `stream.WithoutInlineHoldback` | planned (0009-PLAN-streaming-content-engine.md Step 5) |
-| The partial last line | shown, when no complete line is queued | `stream.WithoutPartialLine` | planned (0009-PLAN-streaming-content-engine.md Step 5) |
+| A long run with no blank line | cut after 2 KiB, at the next line where its block may be split | `stream.WithRelaxAfter` | built |
+| An unclosed emphasis, backtick run, strikethrough or link at a partial line's end | held back until it closes or the line ends | `stream.WithoutInlineHoldback` | built |
+| The partial last line | shown, when no complete line is queued | `stream.WithoutPartialLine` | built |
 | `Interpret`'s bounds | 50,000 rows, the oldest dropped past them; 8,192 columns a row | `stream.InterpretOptions`, `stream.DefaultInterpretRows`, `stream.DefaultInterpretCols` | built |
 | A line's end, from a `Printer` or a `Writer` | LF | `stream.WithCRLF` | built |
 | A `Writer`'s destination at `Close` | left open: it is the program's | `stream.Writer.Close` | decided (0009-MADR-streaming-content-engine.md A8) |

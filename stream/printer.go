@@ -28,6 +28,7 @@ type Printer struct {
 	rules  safetext.Rules
 	asIs   bool // a table's rows printed as they came, by WithoutTableLayout
 	crlf   bool // lines end with CR LF, by WithCRLF
+	noDefs bool // a definition prints nothing, as Plain draws
 
 	clean   cleaned             // the sanitizers' output, read after each write
 	san     *safetext.Sanitizer // the rules', writing into base
@@ -35,15 +36,12 @@ type Printer struct {
 	source  strings.Builder     // the cleaned source so far
 	partial string              // the incomplete last line
 
-	held      string   // a paragraph's line, until the next line
-	holding   bool     // held is a line
-	table     []string // a table's rows, until it ends
-	tableNL   bool     // the table's last row has its line break
-	fence     string   // the open fence's marker run, or ""
-	html      int      // the open HTML block's kind, 1 to 7, or 0
-	paragraph bool     // the last line was a paragraph's
-	lazy      bool     // the last line was a list item's or a quote's text, which a paragraph's line continues
-	defs      map[string]bool
+	scan    Scanner  // the block state, line to line
+	held    string   // a paragraph's line, until the next line
+	holding bool     // held is a line
+	table   []string // a table's rows, until it ends
+	tableNL bool     // the table's last row has its line break
+	defs    map[string]bool
 
 	out strings.Builder
 }
@@ -133,7 +131,7 @@ func (p *Printer) end() {
 	}
 	p.endHeld()
 	p.endTable()
-	p.fence, p.html, p.paragraph, p.lazy = "", 0, false, false
+	p.scan = Scanner{}
 }
 
 // take reads what the sanitizers wrote, and prints each line it
@@ -176,97 +174,46 @@ func (p *Printer) emit(s string, nl bool) {
 }
 
 // line takes one complete source line, nl false for a last line with no
-// line break.
+// line break, as its Scanner tells its block.
 func (p *Printer) line(l string, nl bool) {
-	if p.fence != "" {
-		if closesFence(l, p.fence) {
-			p.fence = ""
-			p.emit(p.fenceLine(l, ""), nl)
-			return
-		}
-		p.emit(l, nl)
-		return
-	}
-	if p.html > 0 {
-		end := htmlEnds(p.html, l)
-		if end && p.html >= 6 {
-			p.html = 0 // the blank line is the block's end, and is printed as one
-		} else {
-			if end {
-				p.html = 0
-			}
-			p.emit(l, nl)
-			return
-		}
-	}
-	if len(p.table) > 0 {
-		if !blank(l) && !startsBlock(l) {
-			p.table, p.tableNL = append(p.table, l), nl
-			return
-		}
+	b := p.scan.Scan(l)
+	if len(p.table) > 0 && b.Kind != BlockTableRow {
 		p.endTable()
 	}
-	if p.holding {
-		h := p.held
+	if p.holding && b.Kind != BlockSetext && b.Kind != BlockTable {
+		p.endHeld()
+	}
+	switch b.Kind {
+	case BlockTableRow:
+		p.table, p.tableNL = append(p.table, l), nl
+	case BlockSetext:
 		p.holding = false
-		switch {
-		case setextUnderline(l):
-			p.emit(p.markup.Heading.Apply(h), true)
-			p.emit(p.markup.Heading.Apply(l), nl)
-			p.paragraph = false
-			return
-		case tableStart(h, l):
-			p.table, p.tableNL = []string{h, l}, nl
-			p.paragraph = false
-			return
-		}
-		p.emit(p.prose(h), true)
-	}
-	p.block(l, nl)
-}
-
-// block takes a line with nothing held before it.
-func (p *Printer) block(l string, nl bool) {
-	cont, lazy := p.paragraph, p.lazy
-	p.paragraph, p.lazy = false, false
-	if lazy && !blank(l) && !startsBlock(l) && !indentedCode(l) {
-		p.lazy = true // a lazy continuation, never a setext heading's text (CommonMark §4.3)
-		p.emit(p.prose(l), nl)
-		return
-	}
-	switch {
-	case blank(l):
-		p.emit(l, nl)
-	case fenceRun(l) != "":
-		p.fence = fenceRun(l)
-		p.emit(p.fenceLine(l, p.fence), nl)
-	case indentedCode(l) && !cont:
-		p.emit(l, nl)
-	case atxHeading(l):
+		p.emit(p.markup.Heading.Apply(p.held), true)
 		p.emit(p.markup.Heading.Apply(l), nl)
-	case thematicBreak(l):
-		p.emit(l, nl)
-	case htmlStart(l, cont) > 0:
-		k := htmlStart(l, cont)
-		if !htmlEnds(k, l) || k >= 6 {
-			p.html = k
-		}
-		p.emit(l, nl)
-	case container(l):
-		p.lazy = !blank(strings.TrimLeft(containerText(l), ">"))
+	case BlockTable:
+		p.holding = false
+		p.table, p.tableNL = []string{p.held, l}, nl
+	case BlockFence:
+		p.emit(p.fenceLine(l, fenceRun(l)), nl)
+	case BlockFenceEnd:
+		p.emit(p.fenceLine(l, ""), nl)
+	case BlockHeading:
+		p.emit(p.markup.Heading.Apply(l), nl)
+	case BlockList, BlockQuote, BlockContinuation:
 		p.emit(p.prose(l), nl)
-	default:
-		if lbl, ok := definition(l); ok && !cont {
-			p.defs[lbl] = true
+	case BlockDefinition:
+		p.defs[b.Label] = true
+		if !p.noDefs {
 			p.emit(p.definitionLine(l), nl)
-			return
 		}
-		p.paragraph = true
+	case BlockParagraph:
 		if !nl {
 			p.emit(p.prose(l), false) // the reply's last line: nothing can follow it
 			return
 		}
 		p.held, p.holding = l, true
+	default: // blank, code, indented code, a break, HTML
+		p.emit(l, nl)
 	}
 }
 

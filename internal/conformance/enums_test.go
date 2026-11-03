@@ -75,6 +75,7 @@ var enums = map[string]func(int64) any{
 	"layout.Span":                as[layout.Span],
 	"palette.Grouping":           as[palette.Grouping],
 	"pick.ChooserEventKind":      as[pick.ChooserEventKind],
+	"stream.BlockKind":           as[stream.BlockKind],
 	"stream.Style":               as[stream.Style],
 	"termcap.Brand":              as[termcap.Brand],
 	"termcap.ColorProfile":       as[termcap.ColorProfile],

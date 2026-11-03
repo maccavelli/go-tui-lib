@@ -6,9 +6,9 @@ import "strings"
 // reads a line's start, to the depth the Printer needs: it tells a fence's
 // opening and closing lines, indented code, ATX headings, setext
 // underlines, thematic breaks, list items, block quotes, HTML blocks,
-// reference definitions and table rows from a paragraph's lines. It is
-// unexported until 0009's Doc is built on it
-// (docs/decisions/0023-MADR-line-mode-components.md A6 item 2).
+// reference definitions and table rows from a paragraph's lines. Scanner
+// keeps the state between lines (docs/decisions/0023-MADR-line-mode-components.md
+// A6 item 2; docs/decisions/0009-PLAN-streaming-content-engine.md Step 5).
 
 // indentOf is the columns of s's leading spaces and tabs, a tab to the
 // next multiple of 4, and the bytes they take.
