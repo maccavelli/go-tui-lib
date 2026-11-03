@@ -73,3 +73,63 @@ new gate was seen failing on planted input, the workflows pass actionlint and
 the contract check, and a docs-only push (Docs 41109199104) and a mixed push
 (CI 41103202698, Docs 41103202654) routed as decided.
 
+### A1 (2026-11-03): a contract-check case that sees no problem says why
+
+*Status: proposed (2026-11-03),* from the owner's choice "Record, propose
+0018 fix (Recommended)" in [0009-PLAN-streaming-content-engine.md](0009-PLAN-streaming-content-engine.md) Step 6, deviation D18, and their answer
+the same day, "0022, as 0018 A6 says (Recommended)": [0018-MADR-python-verification-tools.md](0018-MADR-python-verification-tools.md) A6 item 2 puts
+a fix to `scripts/check_ci_filters_test.py` or the script it tests here.
+To be implemented by [0022-PLAN-align-docs-ci-and-disclosure-gates.md](0022-PLAN-align-docs-ci-and-disclosure-gates.md) Phase 4.
+
+**Found.**
+
+1. **A case fails now and then on the Windows host, and only there.**
+   `script-test-check_ci_filters` failed one case in [0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md) Step 7d (D30),
+   its case not named then; passed ten runs of 0018-PLAN Step 11, which
+   made a failure name its case; then failed in 0009-PLAN Step 6's run
+   of every gate, "FAIL the recipe drops the guide check: want
+   ['readers: make docs-check does not run --check-guide, the reader in
+   scripts/go-examples.py'], got []", and, rerun alone on the same tree,
+   passed twice and failed a third time, "FAIL a pattern with no file:
+   want ["tracked: CI ignores 'nothing/**/*.md', which matches no tracked
+   file"], got []". It passes on macOS and Linux.
+2. **What the failures share:** a case broke its copy, and the checker's
+   run gave no problem. The copy was broken: `Tree.edit` asserts that its
+   text occurs, and a miss would read "the case stopped".
+3. **Why the cause is not known:** the test's `run` keeps the lines that
+   start "check-ci-filters: " and do not end "problem(s)", and nothing
+   else. `check_ci_filters.py` prints every error it handles on such a
+   line, so `[]` is either a run that found nothing in a broken copy, or
+   a run that ended before its summary, such as an exception it does not
+   catch, whose traceback and exit status `run` drops. The case of D30
+   and both of D18 could be either.
+
+**Considered.**
+
+* **A. The test tells the two apart.** `run` keeps the exit status and
+  the whole output, and refuses a run the checker did not complete: one
+  with no "check-ci-filters: N problem(s)" line, or whose status does not
+  agree with N. The case then stops with the status and the output's
+  last lines, and the gate is run on the Windows host until it fails
+  again, so that the cause is seen before anything is fixed.
+* **B. A case that gets nothing runs again.** It would hide the fault,
+  whichever it is: a workaround.
+* **C. The gate skips the Windows host.** The same, for one host.
+
+**Decided (proposed):** "A", because the next failure then names its
+cause, and B and C remove the evidence.
+
+1. **`run` refuses an incomplete run,** and its message gives, on one
+   line, the exit status and the last 10 lines of the output, joined, so
+   that `case`, which prints the last line of a traceback, prints them in
+   the case's FAIL line, and the run goes on to the next case, as
+   AGENTS.md, "Scripts", requires.
+2. **The flake is then looked into:** the gate runs alone on the Windows
+   host until a run fails or twenty have passed, and what the failure
+   names is recorded.
+3. **The cause and its fix are the owner's to choose:** they are recorded
+   with their evidence and offered as a deviation of Phase 4, and no fix
+   is made before one is picked.
+4. **What is not changed:** the contract the checker holds, the
+   workflows, CI's and Docs' commands, and every other gate.
+

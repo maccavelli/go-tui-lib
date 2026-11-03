@@ -2650,6 +2650,15 @@ change(s)"; with compatible changes listed, `theme` adds
   * **Chosen by the owner,** 2026-11-03: "Record, propose 0018 fix
     (Recommended)". The amendment is written after this step's commit, as
     its own. No file is added to this step's scope.
+  * *Corrected 2026-11-03,* after the step's commit (`4413f94`): the
+    agent named the wrong record. 0018-MADR A6 item 2 puts a fix to
+    `scripts/check_ci_filters_test.py` or the script it tests in an
+    amendment to
+    [0022-MADR-align-docs-ci-and-disclosure-gates.md](0022-MADR-align-docs-ci-and-disclosure-gates.md).
+    Asked again, the owner chose "0022, as 0018 A6 says (Recommended)".
+    ~~an amendment to 0018-MADR~~ 0022-MADR A1 and
+    [0022-PLAN-align-docs-ci-and-disclosure-gates.md](0022-PLAN-align-docs-ci-and-disclosure-gates.md)
+    Phase 4 are proposed.
 * **Step 6 complete, 2026-11-03,** for the owner's commit. Step A1.4,
   `RenderView`, the dialect, `Highlighter`, `FitTable` and `Bounded`, is
   next.

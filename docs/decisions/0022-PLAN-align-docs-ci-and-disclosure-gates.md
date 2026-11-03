@@ -1,6 +1,6 @@
 ---
-status: complete
-date: 2026-10-30
+status: in-progress
+date: 2026-11-03
 associated-madr: "0022-MADR-align-docs-ci-and-disclosure-gates.md"
 ---
 # Implement aligned docs-only CI and disclosure gates
@@ -40,6 +40,37 @@ Boundary: Preserve full CI for command fixtures and all nonlisted paths. The use
 2. Run `make check-records markdownlint docs-check disclosure-check`; `python3 scripts/go-examples.py --check-guide`; actionlint; scratch plants for a missing index row, broken link, MD018, real home path, divergent filters and a command fixture wrongly ignored. Capture status before filtering output. Check this pair and edited documents for real-machine identifiers. Read each edited file in full and verify links.
 3. After explicit authorization to push in that same turn, observe a docs-only push and a non-doc or mixed push. Tag, schedule and dispatch routing is not waited for: GitHub evaluates no path filter for a tag push, `schedule` and `workflow_dispatch` carry none, and the contract check of phase 2, step 2 fails if a trigger is lost or a `paths` filter is added. Record run IDs, conclusions and which workflow started. Mark this PLAN complete only after the criteria below hold; otherwise record the outstanding observation. Commit at the end of each approved phase under repository rules. *Amended 2026-10-25: the wait for the next tag or scheduled run is removed, as acp-go-sdk2's 0037-PLAN-align-docs-ci-and-disclosure-gates.md did in its step 3.*
 
+### Phase 4 (A1): a case that sees no problem says why
+
+*Added 2026-11-03, for MADR amendment A1, from [0009-PLAN-streaming-content-engine.md](0009-PLAN-streaming-content-engine.md) Step 6's deviation
+D18; proposed.*
+
+1. **`scripts/check_ci_filters_test.py`:** `run` keeps the checker's exit
+   status and its whole output, and raises when the run is not one the
+   checker completed: no "check-ci-filters: N problem(s)" line, or an
+   exit status other than 0 with N 0 and 1 with N above it. Its message
+   gives, on one line, the status and the output's last 10 lines, joined,
+   since `case` prints a traceback's last line alone; so `case` prints
+   "FAIL <case>: the case stopped: …" with them, and goes on.
+2. **Seen failing,** each on a scratch copy of the repository, never the
+   tree: the checker made to raise an uncaught exception before its
+   summary, and made to exit 0 while printing a problem; each makes the
+   harness print the case's FAIL line with the status and the output, and
+   exit 1. The clean tree still gives "check_ci_filters_test: 42 passed,
+   0 failed".
+3. **Mutations:** the summary check dropped; the status check dropped.
+4. **The flake** (A1 item 2): `remote windows -- --only
+   script-test-check_ci_filters`, from the tree, until a run fails or
+   twenty have passed. What the failure says, or "twenty passed", goes in
+   this phase's record and in a dated note under 0009-PLAN Step 6's D18.
+5. **The cause** (A1 item 3): recorded with its evidence and offered to
+   the owner as a deviation of this phase, with resolutions that leave the
+   tree correct; nothing is fixed before the owner picks one.
+6. **Checks:** the script's tests on macOS, the Linux host and the
+   Windows host; `python3 scripts/check_ci_filters.py`; `make markdownlint
+   check-records docs-check disclosure-check`; the identifier scan. The
+   owner commits the phase.
+
 ## Verification
 
 * Both workflows pass pinned Markdownlint, numbered-record/index and relative-link validation, and portable tracked-text disclosure scanning.
@@ -47,6 +78,7 @@ Boundary: Preserve full CI for command fixtures and all nonlisted paths. The use
 * A docs-only push starts Docs but not full CI; a non-doc or mixed push starts full CI. Tags, schedules and dispatch retain existing behavior, shown by the contract check and the workflows' structure, not by waiting for a run.
 * Scratch plants fail their intended gates; filter or gate drift fails the parity test.
 * Before an authorized push, the local pre-push guard checks outgoing commits. Its private deny list is never copied into CI.
+* *Added 2026-11-03 (A1):* a case of the contract check's test whose checker run did not complete fails with the run's exit status and output, and the Windows flake's cause is recorded.
 
 ## Rollout and Rollback
 
