@@ -363,9 +363,9 @@ record that is not there.
 
 | Behaviour | Default | Control | Status |
 | :--- | :--- | :--- | :--- |
-| Following the tail | on, until the user scrolls up; again at the bottom | `stream/streamtea.WithoutFollow` | planned (0009-PLAN-streaming-content-engine.md Step 6) |
-| The pane's keys | up, down, pgup, pgdown, home and end, in the "kind:docpane" scope | `stream/streamtea.DefaultRules` | planned (0009-PLAN-streaming-content-engine.md Step 6) |
-| How queued lines are released | the adaptive pacer | `stream/streamtea.WithPacer` | planned (0009-PLAN-streaming-content-engine.md Step 6) |
+| Following the tail | on, until the user scrolls up; again at the bottom | `stream/streamtea.WithoutFollow` | built |
+| The pane's keys | up, down, pgup, pgdown, home and end, in the "kind:docpane" scope | `stream/streamtea.DefaultRules` | built |
+| How queued lines are released | the adaptive pacer | `stream/streamtea.WithPacer` | built |
 
 ## transcript
 

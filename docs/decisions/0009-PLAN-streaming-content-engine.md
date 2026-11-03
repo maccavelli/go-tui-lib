@@ -942,6 +942,9 @@ Four parts, each passing its tests before the next.
    func (d *Doc) Pull(b *Buffer, p frame.Pacer, now time.Time) bool // true while more is queued
    ```
 
+   *Amended 2026-11-03 (D17, in Step 6):* while lines stay queued, `Pull`
+   also asks `b`'s Scheduler for the next frame.
+
 4. **`stream/streamtest`** (A2): `CheckRenderer(t testing.TB, r
    stream.Renderer, o ...stream.Option)`, built on `stream`'s exported API
    alone, streaming generated documents in random chunks and reporting
@@ -1016,6 +1019,11 @@ Four parts, each passing its tests before the next.
   theme ID, an ID of 0 never reused; its scroll marks come from the
   theme's glyphs; `Changed` is true only after a new `Version`, size,
   scroll or key.
+  *Added 2026-11-03 (D17):* `Doc.Pull` asks its `Buffer`'s Scheduler for
+  the next frame while lines stay queued, so that the pane, which has no
+  scheduler, drains its queue a frame at a time. Step 5's `Pull` gains
+  it here, with a test, and the mutation "`Pull` not asking for the next
+  frame".
 * **Tests:** `ID`: two `New`s differ, a copy keeps its ID, a literal is 0,
   concurrent `New`s under `-race` are unique. `DocPane`, in a real
   workspace with `workspace.DefaultRules()` and `DefaultRules()` in its
@@ -2469,3 +2477,179 @@ A8.1's among them, and `stream/streamtest` is new.
   and the identifier scan, untracked files included: clean.
 * **Step 5 complete, 2026-11-03,** for the owner's commit. Step 6,
   `theme.Theme.ID` and `DocPane`, is next.
+
+### Step 6: `theme.Theme.ID` and `DocPane`
+
+*2026-11-03.* The owner committed Step 5 (`a9fcfaf`) and said
+"committed, proceed".
+
+* **Deviation D17, 2026-11-03: the next frame while lines stay queued.**
+  * **Found** reading the step against Step 5's code, before any of its
+    own: `Doc.Pull` reports that lines are still queued "so that the
+    caller asks for another frame" (`stream/buffer.go:97-115`), and the
+    step gives `DocPane` no scheduler to ask. `Buffer.Write` asks for a
+    frame only when a line completes, and `Close` asks once, so in the
+    adaptive pacer's Smooth gear, one line a frame, the rest wait for the
+    next write, and after `Close` for ever. In a scratch module against
+    the tree, five lines written and closed, then pulled on each frame
+    with `frame.Adaptive()`: one frame came, then none in 5 s; the source
+    stayed "a\n", and the `Doc` never finished.
+  * **Resolutions offered:** `Pull` asks the `Buffer`'s own Scheduler for
+    the next frame while lines stay queued, which a line-mode host gets
+    too (recommended); or `streamtea.WithScheduler`, the pane asking when
+    `Pull` reports true: one more option, and a scheduler that may not be
+    the `Buffer`'s. Doing nothing leaves a stream's last lines unshown.
+  * **Chosen by the owner,** 2026-11-03: "Pull asks itself
+    (Recommended)". Step 5's `Pull` changes in this step; the step's
+    text, Step 5's item 3 and 0009-MADR A7 item 9 are annotated.
+
+**What changed,** in the step's three parts, each passing its tests before
+the next:
+
+1. `theme/theme.go`: `Theme.ID`, read from an unexported field that `New`
+   stamps from a `sync/atomic` counter, the first ID 1; `Theme`'s and
+   `ID`'s documentation say that a copy keeps its ID, that a changed theme
+   is built with `New`, and that a literal's ID is 0, which a cache never
+   serves from.
+2. `stream/buffer.go` (D17): `Pull` asks `b`'s Scheduler for the next
+   frame while lines stay queued, and its documentation says so.
+3. `stream/streamtea`, new: `DocPane`, `NewDocPane`, `Update`, `View`,
+   `Changed`, `Title`, `KeyContexts` and `ConsumesCommand`; `Option`,
+   `WithTitle`, `WithoutFollow`, `WithBuffer` and `WithPacer`; the six
+   command IDs, `DocPaneScope` and `DefaultRules`, built as `palette`'s
+   are. The agent's readings, where the step leaves the shape open:
+   * **The marks** have a column of their own, the pane's last, whenever
+     the pane is two cells wide or more, so that a row keeps its wrap as
+     the document outgrows the pane: the theme's `ScrollUp` on the first
+     row while rows are above, its `ScrollDown` on the last while rows are
+     below, the latter on a pane one row high, each in the theme's `Muted`
+     style, their shapes carrying the meaning.
+   * **What the theme keys.** A row wider than its column, which a
+     renderer may draw (a long word, a table, a code line), is cut with
+     the workspace's width method and ends with the theme's `Ellipsis`, as
+     `glyph.Set` says the field is for. So the rows the pane keeps depend
+     on the theme, and the step's key by theme ID, its literal theme never
+     served, and its two mutations can be seen; drawn only at each `View`,
+     the marks alone would not have made the key observable.
+   * **The width method** fits each row, cut and padded, so a row is
+     exactly its column under the workspace's method, whatever the `Doc`
+     measured with.
+   * **Scrolling:** a wheel notch is a row, as `palette`'s picker scrolls;
+     a page is the pane's height; home and end are the first and the last
+     page. `WithoutFollow` starts at the document's start and never
+     follows, end included.
+   * **`Changed`** compares what the last `View` drew with now: the `Doc`'s
+     `Version`, the size from `SizeMsg`, the first row and following. A
+     scroll that moves nothing, such as down at the end, an unbound key
+     and a frame with no `Buffer` leave it false.
+   * **`Title`** is empty without `WithTitle`. The workspace then draws an
+     empty title, not the pane's ID, since `workspace/render.go:290` takes
+     a `Titled` pane's title as it is, where `commands.go:343` and
+     `palette/panes.go:56` fall back on an empty one: a difference in the
+     workspace before this step, recorded and not changed here.
+
+**Tests:** `TestID` and `TestIDConcurrent`, 800 `New`s on 8 goroutines
+under `-race`, every ID different and none 0; `TestPullAsksNextFrame`;
+and in `streamtea`, in a real workspace whose keymap is
+`workspace.DefaultRules()` and `DefaultRules()`: `TestFollow`, following,
+staying put when scrolled up as the document grows, following again at
+the end, and `WithoutFollow`; `TestChanged`, false after an unrelated
+message, a scroll down at the end, an unbound key and a frame with no
+`Buffer`, true after a new version, a scroll and a size, false after each
+draw; `TestPull`, a frame pulling one line by the adaptive pacer and both
+by `Immediate`, then draining a closed `Buffer` to `Finish` on the frames
+`Pull` asks for; `TestWheel`, a `tea.MouseWheelMsg` and an
+`inputfiltertea.CoalescedWheelMsg` of four notches, both through the
+workspace; `TestCommands`, each default key and a user's `k` bound to
+`stream.scroll.up`, `ConsumesCommand` and `KeyContexts`; `TestTitle`;
+`TestTheme`, the Unicode and ASCII ellipses, and two literal themes, ID 0
+both, each drawing its own; `TestMethod`, an emoji with a skin tone padded
+again when the terminal reports mode 2027; and `TestGolden`, the pane in a
+bordered workspace by `Plain` across the matrix at 30 and 60 columns:
+mid-stream with a partial line held before an unclosed `**`, inside a
+growing table, finished, and scrolled up with both marks. The 32 goldens
+were read before this record. All pass under `-race`.
+
+* Test faults of the agent's, fixed: the first documents were paragraphs,
+  which `Plain` draws a blank row apart, so the tests draw lines with an
+  echoing renderer; `TestTheme` wanted "..." for the ASCII set's
+  ellipsis, which is "~"; and `TestWheel`'s first notch came before any
+  frame was drawn, when the workspace has no region for the mouse to hit,
+  so the harness draws after building, as a program does.
+* **The benchmark,** `BenchmarkView`, 24 rows of 80 columns once the rows
+  are kept, five runs each on the agent's macOS host: at 100 rows a
+  median of 2,484 ns, at 10,000 rows 2,738 ns, 1.10×, within the step's
+  2×; 6,064 bytes and 7 allocations a `View` at both.
+
+**Mutations,** `python3 -m tools.verify mutate`, on the final code:
+
+| Mutation | Its failure |
+| :--- | :--- |
+| 6.1 `Changed` always true | `TestChanged`: "after an unrelated message: Changed true; want false" |
+| 6.2 following ignoring the user's scroll | `TestFollow`: "scrolled up a row: [\"line 8 … ^\" \"line 9\" \"line 10\"]" |
+| 6.3 the cache keyed without the theme ID | `TestTheme`: "a new theme, the ASCII one: \"xxxxxxxx…\"" |
+| 6.4 an ID of 0 served from the cache | `TestTheme`: "a literal theme with Ellipsis \"?\": \"xxxxxxxx!\"" |
+| 6.5 `ConsumesCommand` false for a scroll command | `TestCommands`: "after up: … want lines 16 to 19" and "ConsumesCommand(stream.scroll.up) false" |
+| 6.6 the marks not from the glyphs | `TestGolden`: "scrolled color.utf8.30: line 2 differs", the four UTF-8 cases |
+| 6.7 `Pull` not asking for the next frame (D17) | `TestPullAsksNextFrame`: "no frame in 5 s after 1: source \"a\\n\", not finished" |
+| 6.8 `New` stamping one ID | `TestID`: "two News: IDs 1 and 1; want two different, neither 0" |
+| 6.9 the rows fitted without the workspace's method | `TestMethod`: "under 1: … want 7 spaces of padding and the marks' column" |
+| 6.10 a mouse message's `WheelDelta` ignored | `TestWheel`: "four notches up, coalesced: [\"line 7 … ^\" …]" |
+| 6.11 a frame not pulling the `Buffer` | `TestPull`: "the adaptive pacer: after one frame the source is \"\"; want \"a\\n\"" |
+| 6.12 a scroll at the end changing the view | `TestChanged`: "after a scroll down at the end: Changed true; want false" |
+
+`mutate: 12 killed, 0 survived, 0 errors`. The step named six; the
+others are D17's and the agent's readings'. Each was killed by its named
+test's assertion, none by a build failure.
+
+**The API,** `make apicheck`: "against v2.9.0, 0 incompatible
+change(s)"; with compatible changes listed, `theme` adds
+`Theme.ID` alone, as the step says, and `stream/streamtea` is new.
+`stream/streamtea` is not a core: it imports `workspace` and Bubble Tea.
+
+**Gates,** with the step's files:
+
+| Host | `gates` |
+| :--- | :--- |
+| macOS | 22 passed, 0 failed, 0 skipped in 717 s |
+| `remote linux` | 21 passed, 0 failed, 1 skipped (`gofmt`) in 1233 s |
+| `remote windows` | 20 passed, 1 failed (`script-test-check_ci_filters`, D18), 1 skipped (`gofmt`) in 2809 s |
+
+* The pre-add check of the eleven Go files and `make modernize` were clean
+  at their first run, as were `internal/conformance`, the documents'
+  checks, after this record too, and the identifier scan, untracked files
+  included.
+
+* **Deviation D18, 2026-11-03: D30's Windows failure, again, named.**
+  * **Found** in the Windows run of every gate:
+    `script-test-check_ci_filters`, "check_ci_filters_test: 41 passed, 1
+    failed", the case quoted, as 0018-PLAN Step 11 made it: "FAIL the
+    recipe drops the guide check: want ['readers: make docs-check does
+    not run --check-guide, the reader in scripts/go-examples.py'], got
+    []". It is
+    [0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
+    D30's failure, whose case was not known then.
+  * **Rerun alone** through `remote windows`, from the same tree: passed,
+    passed, then failed another case, "FAIL a pattern with no file: want
+    ["tracked: CI ignores 'nothing/**/*.md', which matches no tracked
+    file"], got []", each run 120 to 134 s. It passes on macOS and
+    Linux.
+  * **What is known:** in both cases the case's own edit of its copy
+    landed, since `Tree.edit` asserts its count and a miss reads "the case
+    stopped"; so `check_ci_filters.py`, run on a broken copy, printed no
+    problem line, and the test's `run` keeps only those lines, not the
+    exit status or the rest of the output that would say why. This step
+    changed no script, workflow or `Makefile`.
+  * **Resolutions offered:** record it here, close the step, and propose
+    an amendment to
+    [0018-MADR-python-verification-tools.md](0018-MADR-python-verification-tools.md)
+    whose step makes the test report the checker's exit status and output
+    when no problem line comes, then finds the cause (recommended); or
+    chase it on the host now, with no bound on the time, and in `scripts/`,
+    outside this PLAN.
+  * **Chosen by the owner,** 2026-11-03: "Record, propose 0018 fix
+    (Recommended)". The amendment is written after this step's commit, as
+    its own. No file is added to this step's scope.
+* **Step 6 complete, 2026-11-03,** for the owner's commit. Step A1.4,
+  `RenderView`, the dialect, `Highlighter`, `FitTable` and `Bounded`, is
+  next.

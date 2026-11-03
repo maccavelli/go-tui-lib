@@ -28,6 +28,7 @@ package theme
 
 import (
 	"image/color"
+	"sync/atomic"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/colorprofile"
@@ -245,13 +246,30 @@ func (s *BorderStyle) UnmarshalText(t []byte) error {
 
 // Theme is everything a package needs to render: the profile and background
 // it was built for, the glyphs, the palette and the built styles.
+//
+// Its fields are exported, but a changed theme is built with New: a copy
+// keeps the ID of the theme it was copied from, so a cache keyed by the ID
+// would serve a changed copy what it drew for the original.
 type Theme struct {
 	Profile    colorprofile.Profile
 	Background Background
 	Glyphs     glyph.Set
 	Palette    Palette
 	Styles     Styles
+
+	id uint64 // New's stamp; 0 in a Theme built as a literal
 }
+
+// ids is the last ID New stamped.
+var ids atomic.Uint64
+
+// ID is the theme's identity, for a cache keyed by the theme
+// (docs/decisions/0009-MADR-streaming-content-engine.md A6 Q9, A7 item 4):
+// each New stamps a new one, unique in the process. A copy keeps it, even
+// when its fields are changed after. A Theme built as a literal has ID 0,
+// which a cache never serves from, so it always draws right, at the cost
+// of its cache.
+func (t Theme) ID() uint64 { return t.id }
 
 // Option changes how New builds a theme.
 type Option func(*options)
@@ -278,7 +296,8 @@ func WithPaletteFor(bg Background, p Palette) Option {
 	}
 }
 
-// New builds a theme for profile p, background bg and glyph set g.
+// New builds a theme for profile p, background bg and glyph set g, with a
+// new ID.
 func New(p colorprofile.Profile, bg Background, g glyph.Set, opts ...Option) Theme {
 	var o options
 	for _, opt := range opts {
@@ -291,7 +310,7 @@ func New(p colorprofile.Profile, bg Background, g glyph.Set, opts ...Option) The
 	if bp, ok := o.byBG[bg]; ok {
 		pal = bp
 	}
-	return Theme{Profile: p, Background: bg, Glyphs: g, Palette: pal, Styles: build(p, bg, pal)}
+	return Theme{Profile: p, Background: bg, Glyphs: g, Palette: pal, Styles: build(p, bg, pal), id: ids.Add(1)}
 }
 
 // resolve is the colour c stands for on background bg and profile p: a

@@ -97,8 +97,10 @@ func (b *Buffer) take(p frame.Pacer, now time.Time) (lines []string, partial str
 // Pull appends what b's queue releases to d by p at now, Immediate's
 // whole queue when p is nil, and the partial line once no complete one is
 // queued, which a frame then shows; once b is closed and empty, it calls
-// Finish. It reports whether lines are still queued, so that the caller
-// asks for another frame.
+// Finish. While lines are still queued, it asks b's Scheduler for the next
+// frame, so the queue drains a frame at a time, and reports true
+// (docs/decisions/0009-PLAN-streaming-content-engine.md D17); a caller of
+// a Buffer with no Scheduler asks for that frame itself.
 func (d *Doc) Pull(b *Buffer, p frame.Pacer, now time.Time) bool {
 	if p == nil {
 		p = frame.Immediate()
@@ -110,6 +112,9 @@ func (d *Doc) Pull(b *Buffer, p frame.Pacer, now time.Time) bool {
 	d.Append(partial)
 	if closed && !more {
 		d.Finish()
+	}
+	if more && b.s != nil {
+		b.s.Request()
 	}
 	return more
 }

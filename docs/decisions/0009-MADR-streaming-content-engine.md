@@ -1455,6 +1455,11 @@ one question. Every fact was re-read on 2026-11-01.
    time.Time)` are `stream`'s, which then imports `frame`, a core. A
    line-mode host feeds a `Doc` from a network goroutine through them too.
    `stream/streamtea` holds `DocPane` and its keys alone.
+   *Amended 2026-11-03, by
+   [0009-PLAN-streaming-content-engine.md](0009-PLAN-streaming-content-engine.md)
+   D17:* while lines stay queued, `Pull` asks `b`'s Scheduler for the
+   next frame, so that a host or a pane with no scheduler of its own
+   drains the queue a frame at a time; its result still reports it.
 10. **`Writer` never drops a write.** grok's drawer skips a frame while
     the terminal is busy (0003-REPORT §8.17). A1's `Writer` is an
     `io.Writer` under `tea.WithOutput`, and Bubble Tea v2's renderer

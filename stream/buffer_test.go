@@ -85,6 +85,33 @@ func TestBufferClose(t *testing.T) {
 	}
 }
 
+// TestPullAsksNextFrame: a host that pulls on each frame and asks for
+// none itself still drains a closed stream a line a frame, and finishes
+// (docs/decisions/0009-PLAN-streaming-content-engine.md D17).
+func TestPullAsksNextFrame(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		s := frame.NewScheduler()
+		defer s.Close()
+		b := stream.NewBuffer(s)
+		d := stream.NewDoc(echo)
+		b.Write([]byte("a\nb\nc\nd\ne\n"))
+		b.Close()
+		frames := 0
+		for !d.Finished() {
+			select {
+			case m := <-s.Frames():
+				frames++
+				d.Pull(b, one, m.At)
+			case <-time.After(5 * time.Second):
+				t.Fatalf("no frame in 5 s after %d: source %q, not finished", frames, d.Source())
+			}
+		}
+		if frames != 5 || d.Source() != "a\nb\nc\nd\ne\n" {
+			t.Errorf("finished after %d frames with %q; want 5 frames, a to e", frames, d.Source())
+		}
+	})
+}
+
 // one is a Pacer that releases one line a frame.
 var one = frame.PacerFunc(func(frame.Snapshot, time.Time) frame.Release { return frame.Release{Take: 1} })
 
