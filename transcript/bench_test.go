@@ -80,6 +80,33 @@ func TestReprintBudget(t *testing.T) {
 	}
 }
 
+// transcriptHeap is the most heap benchTranscript's 4 MiB of kept replies
+// may hold (docs/decisions/0025-MADR-charm-free-stream-allocations.md
+// D3).
+const transcriptHeap = 20 << 20
+
+// TestTranscriptHeap: the benchmark's transcript, 4 MiB of kept replies,
+// holds at most transcriptHeap of heap once built: no kept reply keeps a
+// sanitizer.
+func TestTranscriptHeap(t *testing.T) {
+	if testing.Short() {
+		t.Skip("builds 4 MiB of replies")
+	}
+	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(1))
+	var before, after runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&before)
+	tr := benchTranscript(t)
+	runtime.GC()
+	runtime.ReadMemStats(&after)
+	runtime.KeepAlive(tr)
+	held := int64(after.HeapAlloc) - int64(before.HeapAlloc)
+	t.Logf("the 4 MiB transcript holds %d bytes of heap", held)
+	if held > transcriptHeap {
+		t.Errorf("the 4 MiB transcript holds %d bytes of heap; want at most %d", held, transcriptHeap)
+	}
+}
+
 // perRun is f's allocations and bytes allocated a call, over runs calls
 // after one to warm it, counted as testing.AllocsPerRun counts them.
 func perRun(runs int, f func()) (allocs, bytes float64) {

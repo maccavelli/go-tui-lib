@@ -130,6 +130,9 @@ func (d *Doc) Finish() {
 	d.san.Close()  //nolint:errcheck // as Append: cleaned's Write never fails
 	d.base.Close() //nolint:errcheck // as Append: cleaned's Write never fails
 	d.take()
+	// A finished Doc keeps no sanitizer; Reset makes a new pair
+	// (docs/decisions/0025-MADR-charm-free-stream-allocations.md D3).
+	d.san, d.base = nil, nil
 	d.finished = true
 	d.version++
 }

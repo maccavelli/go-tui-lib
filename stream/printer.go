@@ -79,11 +79,13 @@ func NewPrinter(o ...Option) *Printer {
 	if p.highlighter != nil {
 		p.hl = &highlight{h: p.highlighter, lim: p.lim}
 	}
-	p.open()
 	return p
 }
 
-// open starts the sanitizers afresh.
+// open starts the sanitizers afresh, at the first Write after NewPrinter
+// or a Flush: a Printer holds none until it is written, and a finished
+// reply none at all (docs/decisions/0025-MADR-charm-free-stream-allocations.md
+// D3).
 func (p *Printer) open() {
 	p.base = safetext.NewSanitizer(&p.clean, floor)
 	p.san = safetext.NewSanitizer(p.base, p.rules)
@@ -150,6 +152,9 @@ func (p *Printer) Idle() bool {
 // Write takes the next chunk of the reply, and gives what is now stable,
 // as whole lines.
 func (p *Printer) Write(chunk string) string {
+	if p.san == nil {
+		p.open()
+	}
 	p.san.Write([]byte(chunk)) //nolint:errcheck // it fails only as cleaned's Write does, which never fails
 	p.take()
 	return p.drain()
@@ -160,10 +165,12 @@ func (p *Printer) Write(chunk string) string {
 // afresh, at a line's start with no block open; the source and the
 // definitions printed are kept.
 func (p *Printer) Flush() string {
-	p.san.Close()  //nolint:errcheck // as Write: cleaned's Write never fails
-	p.base.Close() //nolint:errcheck // as Write: cleaned's Write never fails
+	if p.san != nil {
+		p.san.Close()  //nolint:errcheck // as Write: cleaned's Write never fails
+		p.base.Close() //nolint:errcheck // as Write: cleaned's Write never fails
+		p.san, p.base = nil, nil
+	}
 	p.end()
-	p.open()
 	return p.drain()
 }
 

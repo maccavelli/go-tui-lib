@@ -2,6 +2,7 @@ package stream_test
 
 import (
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -129,5 +130,62 @@ func TestReplyBudget(t *testing.T) {
 	reply := readReply(t)
 	if n := testing.AllocsPerRun(20, func() { replyRender(reply) }); n > replyAllocs {
 		t.Errorf("a streamed reply: %.0f allocations; want at most %d", n, replyAllocs)
+	}
+}
+
+// heldHeap is the heap each of n objects build makes holds once built:
+// HeapAlloc after a collection, before and after building them, kept
+// alive past the second read
+// (docs/decisions/0025-PLAN-charm-free-stream-allocations.md rule 12).
+func heldHeap(n int, build func() any) float64 {
+	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(1))
+	kept := make([]any, n)
+	var before, after runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&before)
+	for i := range kept {
+		kept[i] = build()
+	}
+	runtime.GC()
+	runtime.ReadMemStats(&after)
+	runtime.KeepAlive(kept)
+	return (float64(after.HeapAlloc) - float64(before.HeapAlloc)) / float64(n)
+}
+
+// TestHeldHeap: what a Printer or a Doc holds once its work is done, each
+// of 2,000: a kept reply, written and flushed, as a transcript keeps it;
+// a Printer never written; a finished Doc, drawn once. None keeps a
+// sanitizer (docs/decisions/0025-MADR-charm-free-stream-allocations.md
+// D3).
+func TestHeldHeap(t *testing.T) {
+	reply := string(readReply(t))
+	printer := func() *stream.Printer {
+		return stream.NewPrinter(stream.WithMarkup(stream.DefaultMarkup()), stream.WithWidth(100))
+	}
+	for _, c := range []struct {
+		name  string
+		limit float64
+		build func() any
+	}{
+		{"a kept reply", 5120, func() any {
+			p := printer()
+			p.Write(reply)
+			p.Flush()
+			return p
+		}},
+		{"a Printer never written", 3072, func() any { return printer() }},
+		{"a finished Doc", 6144, func() any {
+			d := stream.NewDoc(stream.Plain(ansi.WcWidth))
+			d.Append(reply)
+			d.Finish()
+			d.Render(80)
+			return d
+		}},
+	} {
+		got := heldHeap(2000, c.build)
+		t.Logf("%s holds %.0f bytes of heap", c.name, got)
+		if got > c.limit {
+			t.Errorf("%s holds %.0f bytes of heap; want at most %.0f", c.name, got, c.limit)
+		}
 	}
 }

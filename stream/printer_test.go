@@ -513,6 +513,25 @@ func TestPrinted(t *testing.T) {
 	}
 }
 
+// TestFlushUnwritten: Flush of a Printer never written gives "" and does
+// not panic, though the Printer has no sanitizer yet; a Write after it
+// prints as a new Printer's would
+// (docs/decisions/0025-MADR-charm-free-stream-allocations.md D3).
+func TestFlushUnwritten(t *testing.T) {
+	p := NewPrinter(WithWidth(20))
+	got, panicked := func() (out string, panicked bool) {
+		defer func() { panicked = recover() != nil }()
+		return p.Flush(), false
+	}()
+	if panicked || got != "" {
+		t.Fatalf("Flush of a Printer never written: %q, panicked %v; want \"\" and no panic", got, panicked)
+	}
+	in := "one two three four five\n\nsix\n"
+	if got, want := p.Write(in)+p.Flush(), print([]string{in}, WithWidth(20)); got != want {
+		t.Fatalf("a Write after it: %q; want a new Printer's %q", got, want)
+	}
+}
+
 // TestSource: Source is the cleaned source, across a Flush; Idle is true
 // only at a line's start with nothing held.
 func TestSource(t *testing.T) {

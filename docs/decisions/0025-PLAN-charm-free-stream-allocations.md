@@ -447,3 +447,73 @@ two rows. Records only. **Step 1 complete, 2026-11-04.**
   (gofmt, golangci-lint for each GOOS, go vet, go test, go mod tidy,
   govulncheck); the documents' checks and the identifier scan clean.
 * **Step 2 complete, 2026-11-04.**
+
+### Step 3: D3, no sanitizer kept by a finished reply
+
+*2026-11-04.* The owner committed Step 2 (`8ef3ff3`) and said "committed,
+proceed".
+
+**Facts re-read** at `8ef3ff3`, by the same script as at `a8ff40f`: every
+line cited in `stream/printer.go`, `stream/document.go`, `transcript/`
+and `safetext/` is where it was; only `stream/bench_test.go`'s moved, by
+Step 2's additions.
+
+**What changed:**
+
+* `stream/printer.go`: `NewPrinter` calls no `open`; `Write` calls `open`
+  when `p.san` is nil; `Flush` closes and drops the pair when it has one,
+  and calls no `open`. `open`'s documentation says when it runs.
+* `stream/document.go`: `Finish` drops its pair after closing it.
+* `stream/bench_test.go`: `heldHeap`, by D1, and `TestHeldHeap`, which
+  logs each case's heap.
+* `transcript/bench_test.go`: `transcriptHeap`, 20 MiB, and
+  `TestTranscriptHeap`, skipped under `-short`.
+* `stream/printer_test.go`: `TestFlushUnwritten`.
+
+**Measured** (`go test -v`):
+
+| Budget | Ceiling | At this step | At `8ef3ff3` |
+| :--- | ---: | ---: | ---: |
+| a kept reply's heap | 5,120 | 4,124 | 9,500 |
+| a `Printer` never written | 3,072 | 2,095 | 7,471 |
+| a finished `Doc` | 6,144 | 4,975 | 12,655 |
+| the 4 MiB transcript | 20,971,520 | 19,046,608 | 43,528,896 |
+
+Under `-race`: 4,124, 2,095, 4,975 and 19,047,936. `TestReplyBudget` and
+`TestReprintBudget` pass, under `-race` too.
+
+**Mutations** (`python3 -m tools.verify mutate`): 6 killed, 0 survived,
+0 errors, each by an assertion:
+
+* 3.1 `NewPrinter` calls `open`: `bench_test.go:188: a Printer never
+  written holds 7471 bytes of heap; want at most 3072`.
+* 3.2 `Flush` calls `open` after dropping the pair: `bench_test.go:188: a
+  kept reply holds 9500 bytes of heap; want at most 5120`; and in
+  `transcript`, `bench_test.go:106: the 4 MiB transcript holds 43527392
+  bytes of heap; want at most 20971520`.
+* 3.3 `Flush` keeps the closed pair: `printer_test.go:549: Source =
+  "one\ntw"`.
+* 3.4 `Finish` keeps its pair: `bench_test.go:188: a finished Doc holds
+  12655 bytes of heap; want at most 6144`.
+* 3.5 `Flush` with no nil check: `printer_test.go:527: Flush of a Printer
+  never written: "", panicked true; want "" and no panic`.
+
+**The budgets' second failure** (rule 10): this step's three test files on
+a scratch export of `8ef3ff3`: `TestHeldHeap` fails each case, "a kept
+reply holds 9500 bytes of heap; want at most 5120", "a Printer never
+written holds 7471 … want at most 3072", "a finished Doc holds 12655 …
+want at most 6144"; `TestTranscriptHeap`, "the 4 MiB transcript holds
+43528896 bytes of heap; want at most 20971520". `TestFlushUnwritten`
+passes there, as it must: that code opens at `NewPrinter`.
+
+**Gates:**
+
+* `make pre-add-check` on the five Go files: clean.
+* `python3 -m tools.verify gates` on macOS: 22 passed, 0 failed, 0
+  skipped in 855 s.
+* `remote linux`: 21 passed, 0 failed, 1 skipped (`gofmt`, which a
+  remote run is given no files for) in 1,198 s. `remote windows`: the
+  same, in 2,881 s.
+* The documents' checks and the identifier scan: clean.
+
+**Step 3 complete, 2026-11-04.**
