@@ -43,11 +43,10 @@ type Printer struct {
 	heldAt  int          // the held paragraph line's
 	tableAt int          // the held table's first line's
 
-	clean   cleaned             // the sanitizers' output, read after each write
 	san     *safetext.Sanitizer // the rules', writing into base
-	base    *safetext.Sanitizer // the floor's, writing into clean
+	base    *safetext.Sanitizer // the floor's, writing into source
 	source  strings.Builder     // the cleaned source so far
-	partial string              // the incomplete last line
+	partial string              // the incomplete last line, a view of source's end
 
 	scan    Scanner  // the block state, line to line
 	held    string   // a paragraph's line, until the next line
@@ -59,9 +58,11 @@ type Printer struct {
 	out strings.Builder
 }
 
-// cleaned is where the sanitizers write: the floor's sanitizer writes
+// cleaned is where a Doc's sanitizers write: the floor's sanitizer writes
 // here, and the rules' sanitizer into the floor's. Its Write never fails,
-// as a strings.Builder's does not.
+// as a strings.Builder's does not. A Printer's floor writes into its
+// Source itself (docs/decisions/0025-MADR-charm-free-stream-allocations.md
+// D2).
 type cleaned struct{ b strings.Builder }
 
 func (c *cleaned) Write(p []byte) (int, error) { return c.b.Write(p) }
@@ -87,7 +88,7 @@ func NewPrinter(o ...Option) *Printer {
 // reply none at all (docs/decisions/0025-MADR-charm-free-stream-allocations.md
 // D3).
 func (p *Printer) open() {
-	p.base = safetext.NewSanitizer(&p.clean, floor)
+	p.base = safetext.NewSanitizer(&p.source, floor)
 	p.san = safetext.NewSanitizer(p.base, p.rules)
 }
 
@@ -137,7 +138,7 @@ func (p *Printer) draw(src string, width int) string {
 	if p.hl != nil {
 		q.hl = &highlight{h: p.hl.h, lim: p.hl.lim}
 	}
-	q.clean.b.WriteString(src) // cleaned already, by the rules and then the floor
+	q.source.WriteString(src) // cleaned already, by the rules and then the floor
 	q.end()
 	return q.drain()
 }
@@ -146,7 +147,7 @@ func (p *Printer) draw(src string, width int) string {
 // ends a line, and no line, table or part of one waits. A transcript's
 // reprint no longer needs it (Printed).
 func (p *Printer) Idle() bool {
-	return p.partial == "" && !p.holding && len(p.table) == 0 && p.clean.b.Len() == 0
+	return p.partial == "" && !p.holding && len(p.table) == 0
 }
 
 // Write takes the next chunk of the reply, and gives what is now stable,
@@ -155,7 +156,7 @@ func (p *Printer) Write(chunk string) string {
 	if p.san == nil {
 		p.open()
 	}
-	p.san.Write([]byte(chunk)) //nolint:errcheck // it fails only as cleaned's Write does, which never fails
+	p.san.Write([]byte(chunk)) //nolint:errcheck // it fails only as the Source's Write does, which never fails
 	p.take()
 	return p.drain()
 }
@@ -166,8 +167,8 @@ func (p *Printer) Write(chunk string) string {
 // definitions printed are kept.
 func (p *Printer) Flush() string {
 	if p.san != nil {
-		p.san.Close()  //nolint:errcheck // as Write: cleaned's Write never fails
-		p.base.Close() //nolint:errcheck // as Write: cleaned's Write never fails
+		p.san.Close()  //nolint:errcheck // as Write: the Source's Write never fails
+		p.base.Close() //nolint:errcheck // as Write: the Source's Write never fails
 		p.san, p.base = nil, nil
 	}
 	p.end()
@@ -194,24 +195,22 @@ func (p *Printer) end() {
 	}
 }
 
-// take reads what the sanitizers wrote, and prints each line it
-// completes.
+// take prints each line the Source completes after p.at, the partial
+// line's start, reading it where the sanitizers wrote it; the partial line
+// is the Source's end, not a copy of it, so no chunk copies it again
+// (docs/decisions/0025-MADR-charm-free-stream-allocations.md D2).
 func (p *Printer) take() {
-	s := p.clean.b.String()
-	p.clean.b.Reset()
-	p.source.WriteString(s)
-	s = p.partial + s
+	src := p.source.String()
 	for {
-		i := strings.IndexByte(s, '\n')
+		i := strings.IndexByte(src[p.at:], '\n')
 		if i < 0 {
 			break
 		}
 		p.lineAt = p.at
-		p.line(s[:i], true)
+		p.line(src[p.at:p.at+i], true)
 		p.at += i + 1
-		s = s[i+1:]
 	}
-	p.partial = s
+	p.partial = src[p.at:]
 }
 
 func (p *Printer) drain() string {

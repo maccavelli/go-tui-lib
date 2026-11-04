@@ -167,7 +167,7 @@ func TestHeldHeap(t *testing.T) {
 		limit float64
 		build func() any
 	}{
-		{"a kept reply", 5120, func() any {
+		{"a kept reply", 3584, func() any {
 			p := printer()
 			p.Write(reply)
 			p.Flush()
@@ -187,5 +187,67 @@ func TestHeldHeap(t *testing.T) {
 		if got > c.limit {
 			t.Errorf("%s holds %.0f bytes of heap; want at most %.0f", c.name, got, c.limit)
 		}
+	}
+}
+
+// perRun is f's allocations and bytes allocated a call, over runs calls
+// after one to warm it, as transcript's perRun counts them.
+func perRun(runs int, f func()) (allocs, bytes float64) {
+	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(1))
+	f()
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	for range runs {
+		f()
+	}
+	runtime.ReadMemStats(&after)
+	return float64(after.Mallocs-before.Mallocs) / float64(runs), float64(after.TotalAlloc-before.TotalAlloc) / float64(runs)
+}
+
+// TestChunkBudget: the benchmark reply in 8-byte chunks allocates at most
+// 176 times and 25,600 bytes, or 192 and 27,648 in a race build: no chunk
+// copies the partial line again
+// (docs/decisions/0025-MADR-charm-free-stream-allocations.md D2).
+func TestChunkBudget(t *testing.T) {
+	reply := string(readReply(t))
+	maxAllocs, maxBytes := 176.0, 25600.0
+	if raceBuild {
+		maxAllocs, maxBytes = 192, 27648
+	}
+	allocs, bytes := perRun(20, func() { chunked(reply, 8) })
+	t.Logf("the reply in 8-byte chunks: %.0f allocations, %.0f bytes", allocs, bytes)
+	if allocs > maxAllocs || bytes > maxBytes {
+		t.Errorf("the reply in 8-byte chunks: %.0f allocations and %.0f bytes; want at most %.0f and %.0f", allocs, bytes, maxAllocs, maxBytes)
+	}
+}
+
+// TestLongLineBudget: a 4,060-byte line in 4-byte chunks allocates at most
+// 144 times and 69,632 bytes, or 144 and 77,824 in a race build, in
+// proportion to its length and not its square
+// (docs/decisions/0025-MADR-charm-free-stream-allocations.md D2).
+func TestLongLineBudget(t *testing.T) {
+	maxAllocs, maxBytes := 144.0, 69632.0
+	if raceBuild {
+		maxBytes = 77824
+	}
+	allocs, bytes := perRun(20, func() { chunked(longLine, 4) })
+	t.Logf("the long line in 4-byte chunks: %.0f allocations, %.0f bytes", allocs, bytes)
+	if allocs > maxAllocs || bytes > maxBytes {
+		t.Errorf("the long line in 4-byte chunks: %.0f allocations and %.0f bytes; want at most %.0f and %.0f", allocs, bytes, maxAllocs, maxBytes)
+	}
+}
+
+// TestPlainAllocs: Plain draws a short document with at most 22
+// allocations, and its view with at most 29: a draw's input is written
+// into the Printer's Source once, not copied there again
+// (docs/decisions/0025-MADR-charm-free-stream-allocations.md D2).
+func TestPlainAllocs(t *testing.T) {
+	src := "A first paragraph, long enough to wrap at forty columns.\n\nThen a **second** one.\n"
+	p := stream.Plain(ansi.WcWidth)
+	render := testing.AllocsPerRun(200, func() { _, _ = p.Render(src, 40) })
+	view := testing.AllocsPerRun(200, func() { _, _ = p.(stream.ViewRenderer).RenderView(src, 40) })
+	t.Logf("Plain: Render %.0f, RenderView %.0f allocations", render, view)
+	if render > 22 || view > 29 {
+		t.Errorf("Plain: Render %.0f and RenderView %.0f allocations; want at most 22 and 29", render, view)
 	}
 }

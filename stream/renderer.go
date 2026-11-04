@@ -42,7 +42,7 @@ func (r plain) Render(src string, width int) (string, error) { return r.drawWith
 // not nil.
 func (r plain) drawWith(src string, width int, h *highlight) string {
 	q := &Printer{method: r.method, width: width, noDefs: true, fit: true, defs: map[string]bool{}, hl: h}
-	q.clean.b.WriteString(src)
+	q.source.WriteString(src)
 	q.end()
 	return q.drain()
 }

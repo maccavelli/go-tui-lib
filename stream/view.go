@@ -270,7 +270,7 @@ func (r plain) RenderView(src string, width int) (RenderView, error) {
 func (r plain) viewWith(src string, width int, h *highlight) RenderView {
 	q := &Printer{method: r.method, width: width, noDefs: true, fit: true, defs: map[string]bool{}, hl: h}
 	q.view = newViewBuilder(src)
-	q.clean.b.WriteString(src)
+	q.source.WriteString(src)
 	q.end()
 	out := q.drain()
 	v := q.view.v

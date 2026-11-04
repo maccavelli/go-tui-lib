@@ -83,7 +83,7 @@ func TestReprintBudget(t *testing.T) {
 // transcriptHeap is the most heap benchTranscript's 4 MiB of kept replies
 // may hold (docs/decisions/0025-MADR-charm-free-stream-allocations.md
 // D3).
-const transcriptHeap = 20 << 20
+const transcriptHeap = 16 << 20
 
 // TestTranscriptHeap: the benchmark's transcript, 4 MiB of kept replies,
 // holds at most transcriptHeap of heap once built: no kept reply keeps a

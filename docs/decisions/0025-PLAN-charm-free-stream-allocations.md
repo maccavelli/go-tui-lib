@@ -50,7 +50,7 @@ deviation.
 | 1 | `docs/decisions/0025-*`, `docs/README.md` | the MADR accepted, this PLAN `in-progress` |
 | 2 | `stream/bench_test.go` | two benchmarks~~, and the helpers the budgets use~~ (D1: each helper with its first use) |
 | 3 | `stream/printer.go`, `stream/document.go`, `stream/bench_test.go`, `stream/printer_test.go`, `transcript/bench_test.go` | D3: no sanitizer kept by a finished reply; its budgets |
-| 4 | `stream/printer.go`, `stream/renderer.go`, `stream/view.go`, `stream/bench_test.go`, `transcript/bench_test.go` | D2: the chunk path; its budgets |
+| 4 | `stream/printer.go`, `stream/renderer.go`, `stream/view.go`, `stream/bench_test.go`, `transcript/bench_test.go`; by D3, `stream/build_race_test.go`, `stream/build_norace_test.go` | D2: the chunk path; its budgets |
 | 5 | `stream/document.go`, `stream/document_test.go`, `stream/bench_test.go` | D1: `Doc.RenderParts`; its tests, budget, benchmark and example |
 | 6 | `docs/guides/streaming-content.md`, `docs/guides/migrating.md`, `README.md`, this PLAN, the MADR, `docs/README.md` | the guide, the release, the close-out |
 
@@ -229,6 +229,11 @@ numbers are measured in the tree, before and after.
       allocations and 65,536 bytes (127 and 59,960; 2,158 and
       2,271,196);~~ *Re-set by D2:* at most 144 allocations and 69,632
       bytes (128 and 64,056; 2,159 and 2,275,294 at Step 3's tree);
+      *by deviation D3,* both with a second ceiling for a race build,
+      `TestChunkBudget` at most 192 allocations and 27,648 bytes,
+      `TestLongLineBudget` at most 144 and 77,824, chosen by `raceBuild`,
+      a constant of `stream/build_race_test.go` (`//go:build race`) and
+      `stream/build_norace_test.go`;
     * `TestPlainAllocs`: `Plain`'s `Render` and `RenderView` of
       "A first paragraph, long enough to wrap at forty columns.\n\nThen a
       **second** one.\n" at 40, at most 22 and 29 allocations (22 and 29;
@@ -517,3 +522,112 @@ passes there, as it must: that code opens at `NewPrinter`.
 * The documents' checks and the identifier scan: clean.
 
 **Step 3 complete, 2026-11-04.**
+
+### Step 4: D2, the chunk path
+
+*2026-11-04.* The owner committed Step 3 (`8f22f83`) and said "committed,
+proceed".
+
+**Facts re-read** at `8f22f83`: as the table says, at lines moved by
+Step 3's additions (the Printer's `clean` field `:46`, `open`'s floor
+`:90`, `draw`'s `:140`, `Idle` `:149`, `take` `:199-215` with the join at
+`:203`); `stream/renderer.go:45` and `stream/view.go:273` unchanged.
+
+* **Deviation D3, 2026-11-04: the race build allocates more.**
+  * **Found,** running the step's budgets under `-race`, which CI runs:
+    `TestChunkBudget` 182 allocations and 25,184 bytes against 176 and
+    25,600; `TestLongLineBudget` 134 and 72,640 against 144 and 69,632.
+    Without `-race`, 167 and 23,792, and 128 and 64,056. The race
+    readings repeated exactly over three runs. A profile of
+    `BenchmarkReplyChunks` under each build put the 15 allocations more
+    in the race build in `strings.Builder` (`WriteByte`, `WriteString`,
+    `Write`), `bytes.Buffer` (`grow`, `growSlice`, `String`) and
+    `Style.Apply`'s `stream/style.go:76`, none a site of this step's: the
+    race build compiles with other inlining and escape decisions. Before
+    the change, under `-race`: 413 and 36,336, and 2,165 and 2,292,000.
+    The heap budgets, `TestPlainAllocs`, `TestReplyBudget` and
+    `TestReprintBudget` pass under `-race`.
+  * **Resolutions offered:** a ceiling for each build, chosen by a
+    constant a `//go:build race` file sets (recommended); or one ceiling
+    for both, set from the race build. Skipping the budgets under
+    `-race` was not offered: it is a workaround. Rule 10 forbids raising
+    a ceiling to pass, so the plain build's stand.
+  * **Chosen by the owner,** 2026-11-04: "A ceiling for each build".
+    `stream/build_race_test.go` and `stream/build_norace_test.go` added
+    to the step; Step 4 annotated above. No decision changes, so the
+    MADR is not amended.
+
+**What changed:**
+
+* `stream/printer.go`: `open` makes the floor's sanitizer write into
+  `&p.source`; `take` scans the Source from `p.at` and sets `p.partial`
+  to `src[p.at:]`; `draw` writes its input into `q.source`; the `clean`
+  field goes, with `Idle`'s term; `base`'s and `partial`'s field comments,
+  `cleaned`'s documentation (now `Doc`'s) and the `nolint` comments say
+  so.
+* `stream/renderer.go`, `stream/view.go`: `q.source.WriteString(src)`.
+* `stream/bench_test.go`: `perRun`, by D1; `TestChunkBudget`,
+  `TestLongLineBudget` and `TestPlainAllocs`; `TestHeldHeap`'s kept reply
+  at 3,584 bytes.
+* `stream/build_race_test.go`, `stream/build_norace_test.go`: `raceBuild`,
+  by D3.
+* `transcript/bench_test.go`: `transcriptHeap` at 16 MiB.
+
+**Measured** (`go test -v`; under `-race` where it differs):
+
+| Budget | Ceiling | At this step | Under `-race` (its ceiling) | At `8f22f83` |
+| :--- | ---: | ---: | ---: | ---: |
+| `TestChunkBudget`, allocations and bytes | 176, 25,600 | 167, 23,792 | 182, 25,184 (192, 27,648) | 398, 34,016 |
+| `TestLongLineBudget` | 144, 69,632 | 128, 64,056 | 134, 72,640 (144, 77,824) | 2,159, 2,275,283 |
+| `TestPlainAllocs`, `Render` and `RenderView` | 22, 29 | 22, 29 | 22, 29 | 23, 30 |
+| `TestHeldHeap`, a kept reply | 3,584 | 3,081 | 3,100 | 4,124 |
+| `TestTranscriptHeap` | 16,777,216 | 14,384,656 | 14,384,624 | 19,046,624 |
+
+`TestHeldHeap`'s other cases are Step 3's, 2,095 and 4,975.
+`TestReplyBudget` and `TestReprintBudget` pass, under `-race` too.
+
+**Mutations:** 4 killed, 0 survived, 0 errors, each by an assertion; and
+4.1 twice more, in both builds, against both chunk budgets:
+
+* 4.1 `p.partial = strings.Clone(src[p.at:])`: `bench_test.go:226: the
+  long line in 4-byte chunks: 1143 allocations and 2263138 bytes; want at
+  most 144 and 69632`. Against both budgets, plain: "the reply in 8-byte
+  chunks: 282 allocations and 32097 bytes; want at most 176 and 25600",
+  and the long line's as above; under `-race`: "297 allocations and
+  33632 bytes; want at most 192 and 27648" and "1149 allocations and
+  2271734 bytes; want at most 144 and 77824".
+* 4.2 `drawWith` writes `strings.Clone(src)`: `bench_test.go:240: Plain:
+  Render 23 and RenderView 29 allocations; want at most 22 and 29`.
+* 4.3 each line printed with its line break: `TestStyleCases`,
+  `printer_test.go:92: heading: "## Title\n" gives
+  "\x1b[1m## Title\n\x1b[0m\n"; want "\x1b[1m## Title\x1b[0m\n"`, and its
+  other cases.
+* 4.4 the partial line lost: `TestStyleCases`, `printer_test.go:92: no
+  trailing newline: "# T" gives ""; want "\x1b[1m# T\x1b[0m"`.
+
+**The budgets' second failure** (rule 10): this step's `stream` and
+`transcript` test files on a scratch export of `8f22f83`: every new or
+tightened budget fails, at the "At `8f22f83`" column's values, each
+"want at most" the ceiling above; and under `-race`, with the two build
+files, `TestChunkBudget` "413 allocations and 36336 bytes; want at most
+192 and 27648" and `TestLongLineBudget` "2165 allocations and 2292002
+bytes; want at most 144 and 77824".
+
+**Fuzz,** 5 minutes each, no failure, no file added to the tree:
+`FuzzPrinter` 19,579,827 runs, `FuzzWriter` 8,854,534, `FuzzDoc`
+7,884,402, `FuzzTranscript` 9,418,264.
+
+**Gates:**
+
+* `make pre-add-check` on the seven Go files: clean.
+* `python3 -m tools.verify gates` on macOS: 22 passed, 0 failed, 0
+  skipped in 838 s; `release-check` clean over 514 files, `apicheck`
+  among it.
+* `remote linux`: 21 passed, 0 failed, 1 skipped (`gofmt`) in 1,280 s.
+* `remote windows`: the first run ended `remote: windows: exit=255` after
+  its `vuln` gate, every gate before it passed (`race`, `shuffle` and
+  `lc-all-c` among them), the ssh session lost; run again whole: 21
+  passed, 0 failed, 1 skipped in 2,916 s.
+* The documents' checks and the identifier scan: clean.
+
+**Step 4 complete, 2026-11-04.**
