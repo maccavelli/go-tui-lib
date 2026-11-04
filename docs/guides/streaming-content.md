@@ -39,6 +39,14 @@ fmt.Printf("%q\n", d.Render(40))
   the text before it is rendered once a width and kept, and only the tail
   after the last cut is rendered each frame. A tail that goes 2 KiB with
   no cut is cut where its block can be split (`WithRelaxAfter`).
+- **A frame need not be copied.** `Render`'s frame is one new string each
+  version, the kept part copied into it with the tail. A host that draws
+  the frame's last rows itself, in a pane or an inline region, takes the
+  two parts with `RenderParts(width)`: the committed part, and the tail,
+  neither copied; `Render` is the two joined by a blank line. Since
+  `v2.12.0`
+  ([0025-MADR-charm-free-stream-allocations.md](../decisions/0025-MADR-charm-free-stream-allocations.md)
+  D1).
 - **The partial last line shows,** up to an emphasis, a strikethrough, a
   code span or a link it opens and has not closed: `Then a **sec` shows
   as far as `Then a`. `WithoutInlineHoldback` shows it whole, `WithoutPartialLine`
@@ -48,6 +56,21 @@ fmt.Printf("%q\n", d.Render(40))
 - **The `Renderer` is yours.** `NewDoc(nil)` draws with `Plain`, which
   wraps prose and lays tables out and styles nothing; a program passes
   its own, such as the planned glamour adapter's.
+
+<!-- from: stream/document_test.go#parts -->
+
+```go
+d := stream.NewDoc(stream.Plain(ansi.WcWidth))
+d.Append("A first paragraph.\n\nThen a second, whose first line is whole,\nand whose next is still stream")
+prefix, tail := d.RenderParts(40)
+fmt.Printf("%q\n%q\n", prefix, tail)
+```
+
+The prefix is `"A first paragraph."`, committed once the second
+paragraph's first line came, and the tail the second paragraph, wrapped at
+40. The prefix is drawn anew, not only grown, when a reference definition
+is committed, at a width the `Doc` no longer caches (it keeps two), and
+after `SetRevision` or `Reset`; after `Finish`, it is the whole frame.
 
 A `Doc` is used on one goroutine. A reply that comes from a network
 reader's goroutine goes through a `Buffer`: its `Write` is safe from any

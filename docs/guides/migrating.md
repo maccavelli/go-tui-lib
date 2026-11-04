@@ -7,6 +7,42 @@ needs a major version, at a new module path
 ([AGENTS.md, API conventions](../../AGENTS.md#api-conventions), rule 1).
 Up to `v0.12.0`, a deprecated name was removed in the next minor release.
 
+## Migrating to `v2.12.0`
+
+`v2.12.0` is a minor release: fewer copies and less heap in `stream`'s
+Charm-free paths, and one method added
+([0025-MADR-charm-free-stream-allocations.md](../decisions/0025-MADR-charm-free-stream-allocations.md),
+[0025-PLAN-charm-free-stream-allocations.md](../decisions/0025-PLAN-charm-free-stream-allocations.md)).
+Nothing is removed or retyped: `make apicheck` against `v2.11.0` reports 0
+incompatible changes. Every output is the same, byte for byte. A program
+on `v2.11.0` needs no change:
+
+```bash
+go get github.com/maccavelli/go-tui-lib/v2@v2.12.0
+```
+
+### Added
+
+- **`Doc.RenderParts(width int) (prefix, tail string)`:** `Render`'s frame
+  in its two parts, the committed part and the tail, neither copied;
+  `Render` is the two joined by one blank line. Cached as `Render` is: a
+  second call at one width and version allocates nothing. Drawing each
+  frame of a 200 KB document streamed in 20-byte chunks by `RenderParts`
+  allocates 37.6 MB in all, by `Render` 1.12 GB.
+
+### Changed, with the same output
+
+- **A `Printer` copies the partial line no more at each chunk,** nor a
+  draw's input twice. A 4,060-byte line in 4-byte chunks allocates 64,056
+  bytes, 2,280,668 under `v2.11.0`; a streamed reply in 8-byte chunks 167
+  times and 23,792 bytes, 400 and 39,392 before. The `Writer`, the
+  reprint and `Plain` gain with it.
+- **A finished reply or document keeps no sanitizer.** A `Printer` makes
+  its sanitizers at its first `Write`, and drops them at `Flush`; a `Doc`
+  drops its own at `Finish`. A kept reply holds about 3.1 KB of heap,
+  9.5 KB under `v2.11.0`, and a 4 MiB transcript of the benchmark reply
+  14.4 MB, 43.6 MB before.
+
 ## Migrating to `v2.11.0`
 
 `v2.11.0` is a minor release, for issue #15. It adds one method,

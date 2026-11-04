@@ -349,8 +349,9 @@ numbers are measured in the tree, before and after.
     pass, and its closure for Linux, macOS and Windows holds no Charm
     module but `x/ansi`;
   * its control against `v2.11.0` from the proxy, the requirement held
-    there with no `go mod tidy`: the build fails, `RenderParts`
-    undefined.
+    there ~~with no `go mod tidy`~~ (*by deviation D5:* after `go mod
+    tidy`, the requirement checked to be `v2.11.0` still): the build
+    fails, `RenderParts` undefined.
 * The MADR's status and this PLAN's `complete`; `docs/README.md`.
 
 ## Verification
@@ -734,3 +735,60 @@ to the tree.
 * The documents' checks and the identifier scan: clean.
 
 **Step 5 complete, 2026-11-04.**
+
+### Step 6: the guide, the release and the close-out
+
+*2026-11-04.* The owner committed Step 5 (`7818042`) and said "committed
+proceed".
+
+**Measured in the tree** at `7818042`, `-count 3`, the release's numbers:
+`BenchmarkReplyRender` 24,840 B/op and 174 allocs/op;
+`BenchmarkReplyChunks` 23,792 and 167; `BenchmarkLongLine` 64,056 and
+128; `BenchmarkWriter` 21,336 and 162; `BenchmarkDoc` 1,123,324,403 to
+1,123,327,573 and 507,659 to 507,688; `BenchmarkDocParts` 37,568,684 to
+37,568,883 and 497,392 to 497,394; `BenchmarkReprint` 6,230,561 to
+6,230,585 and 44,168. Heap: a kept reply 3,100 bytes, a Printer never
+written 2,095, a finished `Doc` 4,975, the 4 MiB transcript 14,383,296.
+The MADR's "All three" column, within its stated repeat.
+
+**What changed:**
+
+* `docs/guides/streaming-content.md`, "Feed a Doc": the bullet "A frame
+  need not be copied", and after the list the `parts` excerpt with what
+  it prints and when the prefix is drawn anew. The guide's excerpts
+  checked: 20, the new one among them.
+* `docs/guides/migrating.md`: "Migrating to `v2.12.0`", its numbers the
+  tree's above.
+* `README.md`: the current release `v2.12.0`, and a sentence in
+  "Streaming content".
+
+* **Deviation D5, 2026-11-04: the control needs `go.sum`.**
+  * **Found,** rehearsing the smoke test (`smoke212.py local`, a scratch
+    module outside the repository, the tree by a replace): the control
+    against `v2.11.0` with no `go mod tidy` failed for another reason,
+    `parts/main.go:13:2: missing go.sum entry for module providing
+    package github.com/charmbracelet/x/ansi`, which the script refused as
+    a pass. The rule against tidy was from `v2.10.0`'s control
+    (0009-PLAN Step 8), whose program imported packages `v2.9.0` did not
+    have, so tidy moved its requirement; here every package
+    `./parts` imports is in `v2.11.0`.
+  * **Resolutions offered:** `go mod tidy`, the requirement then checked
+    to be `v2.11.0` (recommended); or no tidy, the missing `go.sum` line
+    got by hand at the version `v2.11.0` selects.
+  * **Chosen by the owner,** 2026-11-04: "Tidy, the requirement checked".
+    Step 6 annotated above.
+
+**The smoke test, rehearsed** (`smoke212.py local`): `go mod tidy`, `go
+vet` and `go build` exit 0; `./parts`' closure for Linux, macOS and
+Windows is the module, the root, `x/ansi`, `displaywidth`, `uax29`,
+`go-colorful` and `go-runewidth`, no Charm module but `x/ansi`; "smoke:
+PASS parts, 1224 frames by RenderParts, the reply through a Printer and a
+Writer". Its control against `v2.11.0` from the proxy, after `go mod
+tidy`, requires `v2.11.0` still, and fails as it must:
+`parts/main.go:46:21: d.RenderParts undefined (type *stream.Doc has no
+field or method RenderParts)`.
+
+**Not done here:** the owner's commit; the disclosure guard; the owner's
+push, CI and Docs on it; the annotated tag `v2.12.0` and CI on it; the
+smoke test from the proxy, `smoke212.py proxy`; and the close-out. This
+step stays open for them, and the PLAN `in-progress`.
