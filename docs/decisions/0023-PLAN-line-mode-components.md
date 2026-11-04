@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-11-04
 associated-madr: "0023-MADR-line-mode-components.md"
 ---
@@ -3652,7 +3652,52 @@ held at `v2.10.0` after `go mod tidy`, and fails as it must: "smoke: FAIL
 mid, 117 words shown, 108 once each wanted", the nine words of the held
 line shown twice.
 
-**Not done here:** the owner's commit; the disclosure guard; the owner's
+~~**Not done here:** the owner's commit; the disclosure guard; the owner's
 push, CI and Docs on it, the annotated tag `v2.11.0` and CI on it; the
 smoke test from the proxy, `smoke211.py proxy`; issue #15 told; and the
-close-out. This step stays open for them, and the PLAN `in-progress`.
+close-out. This step stays open for them, and the PLAN `in-progress`.~~
+Done, below.
+
+**The release, `v2.11.0`:**
+
+* **The push.** The owner committed the step (`7830b0b`) and pushed
+  `main`, `56d2a6e` and `7830b0b`. The push was made before the agent ran
+  the disclosure guard; run afterwards over `cc4c4a5..7830b0b`, it exited
+  0 with nothing to report. CI run 41847897882 passed: `modules`, `gates`,
+  and `test` on macOS 15, Ubuntu 24.04 and Windows 2025. Docs run
+  41847897801 passed.
+* **The tag.** The owner tagged `7830b0b` `v2.11.0`, annotated, and pushed
+  it. Its CI run, 41851728371, passed `modules`, `gates`, and `test` on
+  Ubuntu 24.04 and Windows 2025 at its first attempt.
+* **Deviation D34, 2026-11-04: the tag's macOS job found no runner.**
+  * **Found:** `test (., macos-15)` was cancelled at attempts 1 to 5,
+    each after 15 minutes queued, with no step run: "The job was not
+    acquired by Runner of type hosted even after multiple attempts", and
+    GitHub's notice of capacity limits on macOS arm64 runners. The same
+    commit's macOS job had passed on `main` (41847897882). Not the code's.
+  * **Resolutions offered,** after attempt 2: re-run the job each hour
+    until a runner takes it (recommended), or re-run it at once. The step
+    closes only when it passes.
+  * **Chosen by the owner,** 2026-11-04: "Re-run now" (attempt 3); after
+    attempt 3, "try a re-run every 30 minutes, starting one now". A scratch
+    script re-ran only the failed job, at 15:47, 16:19 and 16:49 UTC.
+  * **The outcome:** attempt 6 was taken by a runner at 16:59 UTC and
+    passed at 17:07. Run 41851728371 passed, every job.
+* **The smoke test from the proxy** (`smoke211.py proxy`, a scratch module
+  outside the repository, `GOWORK` empty): `go get
+  github.com/maccavelli/go-tui-lib/v2@v2.11.0`, `go mod tidy`, `go vet` and
+  `go build` exit 0; `./mid`'s closure for Linux, macOS and Windows is the
+  module, the root, `x/ansi`, `displaywidth`, `uax29`, `go-colorful` and
+  `go-runewidth`, no Charm module but `x/ansi`; "smoke: PASS mid, the
+  reprint mid-paragraph, each of 108 words once".
+* **The control,** the same program against `v2.10.0` from the proxy, the
+  requirement still `v2.10.0` after `go mod tidy`: it builds, and fails,
+  exit 1, "smoke: FAIL mid, 117 words shown, 108 once each wanted", the
+  held line's nine words shown twice.
+* Issue #15 told, for the owner to close.
+* **Step 7f complete, 2026-11-04.**
+* **This PLAN is complete, 2026-11-04.** Step 7f's Verification holds: its
+  mutations killed, each failure quoted; the gates passed on macOS, Linux
+  and Windows; `make apicheck` reported 0 incompatible changes; the release
+  smoke test passed from the proxy, its closure clean, and its control
+  failed against `v2.10.0`; the identifier scan found nothing.
