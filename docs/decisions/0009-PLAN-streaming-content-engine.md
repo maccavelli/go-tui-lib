@@ -3176,9 +3176,42 @@ the identifier scan: clean.
 | `remote linux` | 21 passed, 0 failed, 1 skipped (`gofmt`) in 1297 s |
 | `remote windows` | 21 passed, 0 failed, 1 skipped (`gofmt`) in 2724 s |
 
-**Not done yet, and the release:** the owner's commit of the above; the
+~~**Not done yet, and the release:** the owner's commit of the above; the
 disclosure guard over the outgoing commits; the owner's push of `main`,
 and CI and Docs green on it; the owner's tag, `v2.10.0` as the agent
 proposes or whichever the owner names, and CI green on the tag; and the
 smoke test from the proxy, `smoke210.py proxy`. The step stays open for
-them, and the PLAN `in-progress`.
+them, and the PLAN `in-progress`.~~ Done, below.
+
+**The release, `v2.10.0`,** under 0023-PLAN's rule 4:
+
+* **The API,** `make apicheck` against `v2.9.0`: 0 incompatible changes.
+  The notes are "Migrating to `v2.10.0`" in `docs/guides/migrating.md`.
+* **The push.** The owner committed the step (`72b2a95`) and pushed
+  `main`, `4f02461`, `e0cdaa9` and `72b2a95`. The push was made before
+  the agent ran the disclosure guard; run afterwards over
+  `b25f461..72b2a95`, it exited 0 with nothing to report. CI run
+  41765341197 passed: `modules`, `gates`, and `test` on macOS 15, Ubuntu
+  24.04 and Windows 2025. Docs run 41765341170 passed.
+* **The tag.** The owner tagged `72b2a95` `v2.10.0`, annotated, and
+  pushed it. The tag's CI run, 41769461956, passed every job.
+* **The smoke test from the proxy** (`smoke210.py proxy`, a scratch
+  module outside the repository, `GOWORK` empty): `go get
+  github.com/maccavelli/go-tui-lib/v2@v2.10.0`, `go mod tidy`, `go vet`
+  and `go build` exit 0; `./line`'s closure for Linux, macOS and Windows
+  is the module, the root, `x/ansi`, `displaywidth`, `uax29`,
+  `go-colorful` and `go-runewidth`, no Charm module but `x/ansi`, and it
+  ran 7 frames, "smoke: PASS line"; `./tui`'s four rows were lines 8 to 11
+  of twelve, "smoke: PASS tui".
+* **The control,** the same programs against `v2.9.0` from the proxy:
+  `go build ./...` exit 1, "no required module provides package
+  github.com/maccavelli/go-tui-lib/v2/frame", the requirement still
+  `v2.9.0`. Its first run, as rehearsed, ran `go mod tidy` before the
+  build, which now moved the requirement to `v2.10.0`, the newest version
+  with the packages, so the programs built and the control reported a
+  failure of its own: the agent's fault, since a control that a later
+  release satisfies proves nothing. It now builds with no tidy and checks
+  that the requirement stayed `v2.9.0`.
+* **Step 8 complete, 2026-11-04.** Step 7, `stream/glamourmd`, which runs
+  after this tag (0010-MADR §3), is next; the PLAN stays `in-progress` for
+  it.
