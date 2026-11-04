@@ -72,7 +72,10 @@ type Doc struct {
 	version   uint64
 	finished  bool
 
-	frame       string
+	frame       string // Render's: the parts joined, once joined is set
+	partPrefix  string // the committed segments' renders at frameW, joined
+	partTail    string // the tail's render at frameW
+	joined      bool
 	frameW      int
 	frameV      uint64
 	framed      bool
@@ -240,8 +243,46 @@ func (d *Doc) Render(width int) string {
 	if d.finished {
 		return d.whole(width)
 	}
+	d.parts(width)
+	if !d.joined {
+		switch {
+		case d.partTail == "":
+			d.frame = d.partPrefix
+		case d.partPrefix == "":
+			d.frame = d.partTail
+		default:
+			d.frame = d.partPrefix + "\n\n" + d.partTail
+		}
+		d.joined = true
+	}
+	return d.frame
+}
+
+// RenderParts is Render's frame in its two parts, not joined: prefix, the
+// committed segments' renders, and tail, the tail's. Render(width) is
+// prefix and tail joined by one blank line, either alone when the other
+// is "". After Finish, prefix is the whole frame and tail is "". Like
+// Render, it is cached by width and version; a second call at the same
+// width and version allocates nothing. Neither part is copied for the
+// call, so a host that draws only the frame's last rows pays for those
+// alone, where Render's frame is a new string of the whole document each
+// version. The prefix is drawn anew, not only grown, when a reference
+// definition is committed, at a width the cache has dropped, and after
+// SetRevision or Reset
+// (docs/decisions/0025-MADR-charm-free-stream-allocations.md D1).
+func (d *Doc) RenderParts(width int) (prefix, tail string) {
+	if d.finished {
+		return d.whole(width), ""
+	}
+	d.parts(width)
+	return d.partPrefix, d.partTail
+}
+
+// parts draws the frame's two parts at width, unless they are drawn at
+// this width and version already.
+func (d *Doc) parts(width int) {
 	if d.framed && d.frameW == width && d.frameV == d.version {
-		return d.frame
+		return
 	}
 	c := d.widthCache(width)
 	src := d.source.String()
@@ -259,17 +300,8 @@ func (d *Doc) Render(width int) string {
 	if t := d.tail(src); t != "" {
 		tail = trimBlank(d.draw(t, width, base, true))
 	}
-	prefix := c.joined.String()
-	switch {
-	case tail == "":
-		d.frame = prefix
-	case prefix == "":
-		d.frame = tail
-	default:
-		d.frame = prefix + "\n\n" + tail
-	}
-	d.frameW, d.frameV, d.framed = width, d.version, true
-	return d.frame
+	d.partPrefix, d.partTail = c.joined.String(), tail
+	d.frameW, d.frameV, d.framed, d.joined = width, d.version, true, false
 }
 
 // join appends part to b after one blank line, and nothing for an empty

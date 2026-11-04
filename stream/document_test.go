@@ -233,6 +233,7 @@ func ExampleDoc() {
 	d.Finish()
 	fmt.Printf("%q\n", d.Render(40))
 	// guide:end
+
 	// Output:
 	// "A first para"
 	// "A first paragraph.\n\nThen a "
@@ -258,4 +259,89 @@ func TestPlain(t *testing.T) {
 			t.Errorf("Plain(%q, %d) = %q, %v; want %q", c.src, c.width, got, err, c.want)
 		}
 	}
+}
+
+// joinParts is Render's frame from RenderParts' two parts.
+func joinParts(prefix, tail string) string {
+	switch {
+	case tail == "":
+		return prefix
+	case prefix == "":
+		return tail
+	}
+	return prefix + "\n\n" + tail
+}
+
+// TestRenderParts: over three documents, in chunks of 1, 7 and 64 bytes,
+// SetRevision(7) at the 51st chunk: after each chunk, at each of widths
+// 40, 80 and 120, in an order that turns with the chunk, so that three
+// widths are asked at one version, one more than a Doc caches, Render is
+// RenderParts joined, and both are what a twin Doc given the same chunks
+// and drawn only at that width gives; a second RenderParts allocates
+// nothing. After Finish, RenderParts is (Render, "")
+// (docs/decisions/0025-MADR-charm-free-stream-allocations.md D1). The
+// second document's 120 lines of one paragraph pass RelaxAfter's 2 KiB,
+// so that a relaxed cut commits a segment before any blank line.
+func TestRenderParts(t *testing.T) {
+	docs := []string{
+		paragraphs()[:12<<10],
+		strings.Repeat("a line of a long paragraph\n", 120) + "\nnext\n",
+		"intro\n\n```go\nx := 1\n\ny := 2\n```\n\n| a | b |\n| - | - |\n| 1 | 2 |\n\nsee [x]\n\n[x]: https://e.example\n\nafter [x]\n",
+	}
+	widths := []int{40, 80, 120}
+	for di, doc := range docs {
+		for _, size := range []int{1, 7, 64} {
+			d := stream.NewDoc(stream.Plain(ansi.WcWidth))
+			twins := map[int]*stream.Doc{}
+			for _, w := range widths {
+				twins[w] = stream.NewDoc(stream.Plain(ansi.WcWidth))
+			}
+			for k, i := 0, 0; i < len(doc); k, i = k+1, i+size {
+				chunk := doc[i:min(i+size, len(doc))]
+				d.Append(chunk)
+				for _, tw := range twins {
+					tw.Append(chunk)
+				}
+				if k == 50 {
+					d.SetRevision(7)
+				}
+				for j := range widths {
+					w := widths[(k+j)%len(widths)]
+					prefix, tail := d.RenderParts(w)
+					joined := joinParts(prefix, tail)
+					if r := d.Render(w); r != joined {
+						t.Fatalf("doc %d, size %d, at %d, width %d: Render %q; RenderParts joined %q", di, size, i, w, r, joined)
+					}
+					if want := twins[w].Render(w); joined != want {
+						t.Fatalf("doc %d, size %d, at %d, width %d: RenderParts joined %q; a twin's frame %q", di, size, i, w, joined, want)
+					}
+					if n := testing.AllocsPerRun(3, func() { d.RenderParts(w) }); n != 0 {
+						t.Fatalf("doc %d, size %d, at %d, width %d: a second RenderParts allocates %v times", di, size, i, w, n)
+					}
+				}
+			}
+			d.Finish()
+			for _, w := range widths {
+				if prefix, tail := d.RenderParts(w); tail != "" || prefix != d.Render(w) {
+					t.Fatalf("doc %d, size %d, finished, width %d: RenderParts %q, %q; want (Render, \"\")", di, size, w, prefix, tail)
+				}
+			}
+		}
+	}
+}
+
+// A host that draws the frame itself takes its two parts: the committed
+// part, drawn once and kept, and the tail, drawn each frame; neither is
+// copied to make a frame.
+func ExampleDoc_RenderParts() {
+	// guide:parts
+	d := stream.NewDoc(stream.Plain(ansi.WcWidth))
+	d.Append("A first paragraph.\n\nThen a second, whose first line is whole,\nand whose next is still stream")
+	prefix, tail := d.RenderParts(40)
+	fmt.Printf("%q\n%q\n", prefix, tail)
+	// guide:end
+
+	// Output:
+	// "A first paragraph."
+	// "Then a second, whose first line is\nwhole,\nand whose next is still stream"
 }

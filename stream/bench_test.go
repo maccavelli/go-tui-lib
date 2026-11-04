@@ -251,3 +251,35 @@ func TestPlainAllocs(t *testing.T) {
 		t.Errorf("Plain: Render %.0f and RenderView %.0f allocations; want at most 22 and 29", render, view)
 	}
 }
+
+// docParts streams paragraphs() in 20-byte chunks into a Doc, drawing each
+// frame by RenderParts at 80 columns, as BenchmarkDoc draws it by Render.
+func docParts(src string) {
+	d := stream.NewDoc(stream.Plain(ansi.WcWidth))
+	for i := 0; i < len(src); i += 20 {
+		d.Append(src[i:min(i+20, len(src))])
+		d.RenderParts(80)
+	}
+}
+
+// BenchmarkDocParts: BenchmarkDoc's document, each frame by RenderParts
+// (docs/decisions/0025-MADR-charm-free-stream-allocations.md D1).
+func BenchmarkDocParts(b *testing.B) {
+	src := paragraphs()
+	b.ReportAllocs()
+	for b.Loop() {
+		docParts(src)
+	}
+}
+
+// TestRenderPartsBudget: BenchmarkDocParts' work allocates at most 40 MiB:
+// no frame copies the committed prefix, which Render's frame does, about
+// 1.1 GB for the same document (0025-MADR D1).
+func TestRenderPartsBudget(t *testing.T) {
+	src := paragraphs()
+	_, bytes := perRun(2, func() { docParts(src) })
+	t.Logf("the document by RenderParts: %.0f bytes", bytes)
+	if bytes > 40<<20 {
+		t.Errorf("the document by RenderParts: %.0f bytes; want at most %d", bytes, 40<<20)
+	}
+}

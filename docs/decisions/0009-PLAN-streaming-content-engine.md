@@ -3215,3 +3215,11 @@ them, and the PLAN `in-progress`.~~ Done, below.
 * **Step 8 complete, 2026-11-04.** Step 7, `stream/glamourmd`, which runs
   after this tag (0010-MADR §3), is next; the PLAN stays `in-progress` for
   it.
+
+*Noted 2026-11-04, by
+[0025-PLAN-charm-free-stream-allocations.md](0025-PLAN-charm-free-stream-allocations.md)
+deviation D4:* this step's region `doc` in `stream/document_test.go` put
+`// guide:end` directly above `ExampleDoc`'s `// Output:`. One comment
+group, it made Go compile the example and check no output, from `72b2a95`
+until 0025-PLAN Step 5, which puts a blank line between them. Its output,
+once run, was what the example states.

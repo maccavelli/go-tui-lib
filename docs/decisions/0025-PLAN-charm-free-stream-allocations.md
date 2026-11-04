@@ -303,7 +303,9 @@ numbers are measured in the tree, before and after.
   * `ExampleDoc_RenderParts`, a guide region `parts`: a paragraph and a
     blank line appended, then a second paragraph still streaming; the
     two parts printed with `%q`. Its output is read before it is
-    committed.
+    committed. *By deviation D4,* a blank line between its
+    `// guide:end` and its `// Output:`, and `ExampleDoc`'s, so that each
+    is run.
   * Every existing `Doc`, `DocPane` and guide test passes unchanged.
 * **Mutations:**
   * 5.1 `RenderParts` returns `(d.Render(width), "")`: `TestRenderPartsBudget`.
@@ -631,3 +633,104 @@ bytes; want at most 144 and 77824".
 * The documents' checks and the identifier scan: clean.
 
 **Step 4 complete, 2026-11-04.**
+
+### Step 5: D1, `Doc.RenderParts`
+
+*2026-11-04.* The owner committed Step 4 (`a63eec5`) and said "committed,
+proceed".
+
+**Facts re-read** at `a63eec5`: `Render` at `stream/document.go:239`, the
+cache's `:246`, the join at `:269`, the frame kept at `:271`, the
+definition reset at `:319`, two widths at `:309`, the method `tail` at
+`:339`: as the table says, 3 lines down by Step 3's comment in `Finish`.
+
+* **Deviation D4, 2026-11-04: `ExampleDoc` was never run.**
+  * **Found,** writing `ExampleDoc_RenderParts`: it was not run, and
+    `go test -list Example ./stream/` listed only `ExamplePrinter` and
+    `ExampleWriter`, at `a63eec5` too. Go checks an example's output only
+    when its last comment group begins `Output:`; `// guide:end` directly
+    above `// Output:` makes them one group, and the example is compiled
+    and not run. A scan of the 28 examples: `ExampleDoc`
+    (`stream/document_test.go:226`) and the new example alone; the five
+    others not collected have no output comment, compile-only by design
+    (`ExampleWait`, `ExampleFilter`, `ExampleRun`, `ExampleProber`,
+    `ExampleWorkspace_program`; `ExampleFilter` had none before
+    `72b2a95` either). `ExampleDoc` was run from `a9fcfaf`, which added
+    it, until `72b2a95`, 0009-PLAN Step 8, which put its guide region
+    around it. On a scratch export, a blank line between the two lines
+    made it run, and it passed.
+  * **Resolutions offered:** both examples fixed in this step, with a note
+    in 0009-PLAN (recommended); or the new one alone, `ExampleDoc` left
+    for an amendment of 0009.
+  * **Chosen by the owner,** 2026-11-04: "Fix both in Step 5". A dated
+    note is added to
+    [0009-PLAN-streaming-content-engine.md](0009-PLAN-streaming-content-engine.md)'s
+    Step 8 record. No decision changes.
+
+**What changed:**
+
+* `stream/document.go`: `partPrefix`, `partTail` and `joined` beside
+  `frame`; `parts(width)`, today's `Render` body to the tail's render,
+  keeping the parts; `Render` joining them once a version;
+  `RenderParts(width) (prefix, tail string)`, documented as MADR D1.
+* `stream/document_test.go`: `joinParts`, `TestRenderParts`,
+  `ExampleDoc_RenderParts` (region `parts`), and D4's blank line in
+  `ExampleDoc`.
+* `stream/bench_test.go`: `docParts`, `BenchmarkDocParts` and
+  `TestRenderPartsBudget`.
+
+**The API:** `make apicheck` against `v2.11.0`: 0 incompatible changes.
+`go doc ./stream Doc` lists `func (d *Doc) RenderParts(width int)
+(prefix, tail string)`, which `v2.11.0`'s `stream/document.go` does not
+name; it is the step's one exported addition, and Steps 3 and 4 added
+none.
+
+**Measured:** `TestRenderPartsBudget`, 37,568,624 bytes, at most
+41,943,040; under `-race`, 37,963,024, within the same ceiling, so this
+budget needs no race ceiling. `TestRenderParts` passes in 12 s, 40 s under
+`-race`. `ExampleDoc_RenderParts` prints `"A first paragraph."` and
+`"Then a second, whose first line is\nwhole,\nand whose next is still
+stream"`, read from its run against a placeholder before it was written.
+`go test -list Example ./stream/` now lists `ExampleDoc` and
+`ExampleDoc_RenderParts`. Every earlier budget passes, under `-race` too.
+
+**Mutations:** 6 killed, 0 survived, 0 errors, each by an assertion:
+
+* 5.1 `RenderParts` returns `(d.Render(width), "")`: `bench_test.go:283:
+  the document by RenderParts: 1123317624 bytes; want at most 41943040`,
+  the budget's second failure by rule 10 as planned.
+* 5.2 the parts kept across widths: `document_test.go:316: doc 0, size 1,
+  at 40, width 40: RenderParts joined "A line of a paragraph in a
+  streamed reply"; a twin's frame "A line of a paragraph in a
+  streamed\nreply"`.
+* 5.3 `joined` left set: `document_test.go:313: doc 0, size 1, at 1,
+  width 80: Render "A"; RenderParts joined "A "`.
+* 5.4 the finished frame as the tail: `document_test.go:326: doc 0, size
+  1, finished, width 40: RenderParts "", "A line of a paragraph …"; want
+  (Render, "")`.
+* 5.5 the parts drawn again at one version: `document_test.go:319: doc 0,
+  size 1, at 0, width 40: a second RenderParts allocates 11 times`.
+* 5.6, by D4, `holdback` returning the partial line whole: `--- FAIL:
+  ExampleDoc`, its got and want printed: the example runs.
+
+**Fuzz:** `FuzzDoc`, 5 minutes, 8,355,794 runs, no failure, no file added
+to the tree.
+
+**Gates:**
+
+* `make pre-add-check` on the three Go files: clean, the examples gate
+  among it.
+* `python3 -m tools.verify gates` on macOS: 22 passed, 0 failed, 0
+  skipped in 962 s.
+* `remote linux`: 21 passed, 0 failed, 1 skipped (`gofmt`) in 1,509 s.
+* `remote windows`: 20 passed, 1 failed, 1 skipped in 2,880 s. The one
+  failed was `markdownlint`, `exit=2` in 1 s: Node.js v26.13.0 threw
+  `SyntaxError: Unexpected number` loading markdownlint-cli2's own
+  modules (`compileSourceTextModule`), before any file was read; the step
+  changes no Markdown, and macOS and Linux passed it. Run again alone
+  through `remote windows -- --only markdownlint`: 1 passed, `Summary: 0
+  issues in 0 files`. Every other gate passed in the full run, `race`,
+  `shuffle`, `lc-all-c` and the examples gate among them.
+* The documents' checks and the identifier scan: clean.
+
+**Step 5 complete, 2026-11-04.**
