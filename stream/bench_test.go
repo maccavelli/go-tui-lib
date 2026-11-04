@@ -43,6 +43,41 @@ func BenchmarkReplyRender(b *testing.B) {
 	}
 }
 
+// chunked streams src through a Printer with DefaultMarkup at 100
+// columns, in chunks of size bytes, and flushes it.
+func chunked(src string, size int) string {
+	p := stream.NewPrinter(stream.WithMarkup(stream.DefaultMarkup()), stream.WithWidth(100))
+	var out strings.Builder
+	for i := 0; i < len(src); i += size {
+		out.WriteString(p.Write(src[i:min(i+size, len(src))]))
+	}
+	out.WriteString(p.Flush())
+	return out.String()
+}
+
+// BenchmarkReplyChunks: the benchmark reply in 8-byte chunks, as a model's
+// small deltas come (docs/decisions/0025-MADR-charm-free-stream-allocations.md).
+func BenchmarkReplyChunks(b *testing.B) {
+	reply := string(readReply(b))
+	b.ReportAllocs()
+	for b.Loop() {
+		chunked(reply, 8)
+	}
+}
+
+// longLine is one paragraph line of 4,060 bytes and its line break.
+var longLine = strings.Repeat("a word or two of a long line ", 140) + "\n"
+
+// BenchmarkLongLine: one long paragraph line in 4-byte chunks, a partial
+// line until its break comes
+// (docs/decisions/0025-MADR-charm-free-stream-allocations.md, Finding 2).
+func BenchmarkLongLine(b *testing.B) {
+	b.ReportAllocs()
+	for b.Loop() {
+		chunked(longLine, 4)
+	}
+}
+
 // paragraphs is about 200 KB of prose in paragraphs of five lines.
 func paragraphs() string {
 	var b strings.Builder

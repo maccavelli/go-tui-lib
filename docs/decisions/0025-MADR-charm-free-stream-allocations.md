@@ -156,6 +156,15 @@ rows show.
 | Heap a finished `Doc` holds, bytes | 12,646 | 12,648 | 12,648 | 4,966 | 4,966 |
 | Heap a `Printer` never written holds, bytes | 7,462 | 7,462 | 7,462 | 2,081 | 2,086 |
 
+* **The two rows of small chunks, in the tree** (*noted 2026-11-04,*
+  [0025-PLAN-charm-free-stream-allocations.md](0025-PLAN-charm-free-stream-allocations.md)
+  deviation D2): the probe these rows were taken with discarded the
+  Printer's output; the tree's benchmarks collect it, as
+  `BenchmarkReplyRender` does, which adds 2,592 bytes and 4 allocations
+  to the reply, and 4,096 bytes and 1 allocation to the line. In the tree the reply in 8-byte chunks measures 39,392 B and
+  400 allocs at `a8ff40f`'s code, 34,016 and 398 with D3, and 23,792 and
+  167 with all three; the 4,060-byte line 2,280,668 and 2,161, 2,275,294
+  and 2,159, and 64,056 and 128. No decision changes.
 * **Times,** the median of five, indicative under the load above: the
   4,060-byte line 427 µs at `a8ff40f`, 127 µs with all three;
   `BenchmarkDoc`'s document 189 ms by `Render` at `a8ff40f`, 50 ms by

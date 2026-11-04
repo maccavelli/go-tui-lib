@@ -48,7 +48,7 @@ deviation.
 | Step | Paths | What |
 | :--- | :--- | :--- |
 | 1 | `docs/decisions/0025-*`, `docs/README.md` | the MADR accepted, this PLAN `in-progress` |
-| 2 | `stream/bench_test.go` | two benchmarks, and the helpers the budgets use |
+| 2 | `stream/bench_test.go` | two benchmarks~~, and the helpers the budgets use~~ (D1: each helper with its first use) |
 | 3 | `stream/printer.go`, `stream/document.go`, `stream/bench_test.go`, `stream/printer_test.go`, `transcript/bench_test.go` | D3: no sanitizer kept by a finished reply; its budgets |
 | 4 | `stream/printer.go`, `stream/renderer.go`, `stream/view.go`, `stream/bench_test.go`, `transcript/bench_test.go` | D2: the chunk path; its budgets |
 | 5 | `stream/document.go`, `stream/document_test.go`, `stream/bench_test.go` | D1: `Doc.RenderParts`; its tests, budget, benchmark and example |
@@ -80,7 +80,7 @@ changes, and its failure read.
 | 3.2 `Flush` opens again | heap of a kept reply | 8,475 bytes; budgets 5,120, then 3,584 |
 | 3.3 `Flush` keeps the closed pair | `TestSource` | killed: `printer_test.go:530: Source = "one\ntw"` |
 | 3.4 `Finish` keeps its pair | heap of a finished `Doc` | 12,646 bytes; budget 6,144 |
-| 4.1 the partial line cloned at each chunk | `BenchmarkLongLine`'s work | 2,258,984 bytes and 1,142 allocations; budgets 65,536 and 144 |
+| 4.1 the partial line cloned at each chunk | `BenchmarkLongLine`'s work | 2,258,984 bytes and 1,142 allocations; budgets 65,536 and 144 (69,632 and 144 by D2) |
 | 4.2 `drawWith` clones its input | `Plain`'s allocations | `Render` 23, `RenderView` 29; budgets 22 and 29 |
 | 4.3 each line printed with its line break | `TestStyleCases` | killed at `printer_test.go:92` ("heading"); `TestAnySplit` alone let it survive |
 | 4.4 the partial line lost | `TestStyleCases` | killed: `no trailing newline: "# T" gives ""` |
@@ -150,10 +150,11 @@ numbers are measured in the tree, before and after.
   * `BenchmarkLongLine`: one paragraph line,
     `strings.Repeat("a word or two of a long line ", 140)` and a line
     break (4,061 bytes), through the same `Printer` in 4-byte chunks.
-  * `perRun(runs int, f func()) (allocs, bytes float64)`, as
-    `transcript/bench_test.go:85` has it, for the budgets' bytes.
-  * `heldHeap(n int, build func() any) float64`, the heap `n` built
-    objects hold, each, by rule 12.
+  * ~~`perRun(runs int, f func()) (allocs, bytes float64)`, as
+    `transcript/bench_test.go:85` has it, for the budgets' bytes.~~
+    *Moved to Step 4 by deviation D1, 2026-11-04.*
+  * ~~`heldHeap(n int, build func() any) float64`, the heap `n` built
+    objects hold, each, by rule 12.~~ *Moved to Step 3 by deviation D1.*
 * **Recorded in the execution record:** each benchmark's B/op and
   allocs/op at the step's tree, `-count 5`, with the MADR's table
   beside them; a difference of more than 1 % in bytes or allocations is
@@ -170,6 +171,9 @@ numbers are measured in the tree, before and after.
   * `stream/document.go`: `Finish` sets `d.san` and `d.base` to nil
     after closing them.
 * **Tests:**
+  * *Added by deviation D1:* `stream/bench_test.go`'s
+    `heldHeap(n int, build func() any) float64`, the heap `n` built
+    objects hold, each, by rule 12.
   * `stream/bench_test.go`, `TestHeldHeap`, three cases by `heldHeap`
     over 2,000 objects:
     * a kept reply, gobble's reply written and flushed: at most 5,120
@@ -209,14 +213,22 @@ numbers are measured in the tree, before and after.
     `q.source.WriteString(src)`.
   * `Write` keeps `p.san.Write([]byte(chunk))`.
 * **Tests:**
+  * *Added by deviation D1:* `stream/bench_test.go`'s
+    `perRun(runs int, f func()) (allocs, bytes float64)`, as
+    `transcript/bench_test.go:85` has it, for the budgets' bytes.
   * `stream/bench_test.go`:
     * `TestHeldHeap`'s kept reply tightened to at most 3,584 bytes
       (3,110 in the prototype; 4,137 at Step 3's tree);
-    * `TestChunkBudget`: `BenchmarkReplyChunks`' work at most 176
+    * ~~`TestChunkBudget`: `BenchmarkReplyChunks`' work at most 176
       allocations and 23,552 bytes (163 and 21,200; 394 and 31,424 at
-      Step 3's tree);
-    * `TestLongLineBudget`: `BenchmarkLongLine`'s work at most 144
-      allocations and 65,536 bytes (127 and 59,960; 2,158 and 2,271,196);
+      Step 3's tree);~~ *Re-set by deviation D2, 2026-11-04:* at most 176
+      allocations and 25,600 bytes (167 and 23,792 with all three changes;
+      398 and 34,016 at Step 3's tree), the in-tree benchmark, which keeps
+      the output;
+    * ~~`TestLongLineBudget`: `BenchmarkLongLine`'s work at most 144
+      allocations and 65,536 bytes (127 and 59,960; 2,158 and
+      2,271,196);~~ *Re-set by D2:* at most 144 allocations and 69,632
+      bytes (128 and 64,056; 2,159 and 2,275,294 at Step 3's tree);
     * `TestPlainAllocs`: `Plain`'s `Render` and `RenderView` of
       "A first paragraph, long enough to wrap at forty columns.\n\nThen a
       **second** one.\n" at 40, at most 22 and 29 allocations (22 and 29;
@@ -372,3 +384,66 @@ numbers are measured in the tree, before and after.
 (`4e1a51f`) and said "accept the madr, approved to proceed". The MADR is
 `accepted`, with those words; this PLAN `in-progress`; `docs/README.md`'s
 two rows. Records only. **Step 1 complete, 2026-11-04.**
+
+### Step 2: the measurements in the tree
+
+* **Deviation D1, 2026-11-04: the helpers had no caller.**
+  * **Found,** at the pre-add check of Step 2 as written:
+    `make pre-add-check FILES="stream/bench_test.go"` exited 2,
+    `stream/bench_test.go:83:6: func perRun is unused (unused)` and
+    `:98:6: func heldHeap is unused (unused)`, under each GOOS.
+    `.golangci.yml` enables `unused` with `run.tests: true`; the helpers'
+    first callers are Step 3's `TestHeldHeap` and Step 4's budgets.
+  * **Resolutions offered:** each helper added with its first use,
+    `heldHeap` in Step 3 and `perRun` in Step 4 (recommended); or Step 2
+    merged into Step 3. A `nolint` was not offered: it is a workaround.
+  * **Chosen by the owner,** 2026-11-04: "Add each helper with its first
+    use". Steps 2 to 4 annotated above; no decision changes, so the MADR
+    is not amended.
+
+* **Deviation D2, 2026-11-04: the in-tree benchmarks keep the output.**
+  * **Found,** measuring Step 2's benchmarks in the tree, `-count 5`:
+    `BenchmarkReplyChunks` 39,392 B/op and 400 allocs/op, against the
+    MADR's 36,800 and 396, +7.0 % in bytes, past this step's 1 %.
+    `BenchmarkLongLine` 2,280,668 and 2,161 against 2,276,572 and 2,160,
+    within it. On fresh scratch copies with this step's
+    `stream/bench_test.go`, the cause: `chunked` collects the Printer's
+    output in a builder, as `replyRender` does, where the MADR's probe
+    discarded it: +2,592 bytes and +4 allocations to the reply, +4,096
+    bytes and +1 allocation to the line, before and after the changes
+    alike. With all three changes the in-tree benchmarks measure
+    23,792 and 167, and 64,056 and 128, so Step 4's `TestChunkBudget`,
+    23,552 bytes, would fail, and `TestLongLineBudget`'s 65,536 would
+    hold by 2.3 %. With D3 alone, Step 3's tree: 34,016 and 398, and
+    2,275,294 and 2,159.
+  * **Resolutions offered:** keep the output, the in-tree numbers the
+    baseline, Step 4's ceilings re-set from them (recommended); or
+    discard the output, as the probe did, the ceilings as written.
+  * **Chosen by the owner,** 2026-11-04: "Keep the output; re-set the
+    ceilings". Step 4 annotated above; the MADR's table gains a dated
+    note.
+* **What Step 2 adds:** `stream/bench_test.go`: `chunked(src string,
+  size int) string`, a `Printer` with `DefaultMarkup` at 100 columns fed
+  `src` in chunks of `size` bytes, its output collected, then flushed;
+  `BenchmarkReplyChunks`, the benchmark reply in 8-byte chunks;
+  `longLine`, 4,060 bytes of one paragraph line and its line break; and
+  `BenchmarkLongLine`, `longLine` in 4-byte chunks. No library code
+  changes.
+* **The baseline in the tree,** at `08f35fe` with this step, `-count 5`,
+  each run's bytes and allocations:
+
+  | Benchmark | B/op | allocs/op |
+  | :--- | ---: | ---: |
+  | `BenchmarkReplyRender` | 33,160 | 205 |
+  | `BenchmarkReplyChunks` | 39,392 | 400 |
+  | `BenchmarkLongLine` | 2,280,668 to 2,280,676 | 2,161 |
+  | `BenchmarkWriter` | 30,600 | 221 |
+  | `BenchmarkDoc` | 1,125,833,370 to 1,125,834,077 | 518,568 to 518,575 |
+  | `BenchmarkReprint` | 6,550,587 to 6,550,598 | 44,480 |
+
+  `BenchmarkReplyRender`, `BenchmarkWriter`, `BenchmarkDoc` and
+  `BenchmarkReprint` are the MADR's, within 0.01 %.
+* **Checks:** `make pre-add-check FILES="stream/bench_test.go"`: clean
+  (gofmt, golangci-lint for each GOOS, go vet, go test, go mod tidy,
+  govulncheck); the documents' checks and the identifier scan clean.
+* **Step 2 complete, 2026-11-04.**

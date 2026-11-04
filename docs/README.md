@@ -65,7 +65,7 @@ it was when they were written
 | 0024 | PLAN | [Implement API rule 12, its floors, the message catalogue and the defaults inventory, and close the command-and-control gaps](decisions/0024-PLAN-command-and-control-opt-outs.md) | complete (`v2.2.0`) |
 | 0024 | PLAN | [Close the terminal, text and convention gaps, and adopt the message catalogue](decisions/0024-PLAN-terminal-text-and-convention-opt-outs.md) | complete (`v2.7.0` and `v2.8.0`) |
 | 0025 | MADR | [Draw a Doc's frame without copying its prefix, stream a Printer's chunks without copying the line again, and keep no sanitizer in a finished reply](decisions/0025-MADR-charm-free-stream-allocations.md) | accepted |
-| 0025 | PLAN | [Implement a Doc's frame without the prefix copied, a Printer's chunks without the line copied again, and no sanitizer kept by a finished reply](decisions/0025-PLAN-charm-free-stream-allocations.md) | in-progress (Step 1 complete; Step 2 next) |
+| 0025 | PLAN | [Implement a Doc's frame without the prefix copied, a Printer's chunks without the line copied again, and no sanitizer kept by a finished reply](decisions/0025-PLAN-charm-free-stream-allocations.md) | in-progress (Step 2 complete; Step 3 next) |
 
 ## I want to…
 
