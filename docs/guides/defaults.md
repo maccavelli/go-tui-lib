@@ -384,7 +384,8 @@ record that is not there.
 | The reprint as one synchronized update | mode 2026 set and reset | `transcript.WithSynchronized` | built |
 | How `AddText`'s text and the notice are cleaned | `safetext.Text`, never less | `transcript.WithRules` | built |
 | The notice when a reprint left output out | "(earlier output is not shown again)", unstyled | `transcript.WithCatalog`, `transcript.Messages`, `transcript.WithNoticeStyle` | built |
-| When a reprint is made | once the last resize has settled and the host says its output is idle, or when the host asks | `transcript.Transcript.HandleTimeout`, `transcript.Transcript.Reprint` | decided (0023-MADR-line-mode-components.md D9, A8) |
+| When a reprint is made | once the last resize has settled and the host says its output is idle, or when the host asks; the host's own output, at a line's start, once Step 7f is built (0023-MADR A15) | `transcript.Transcript.HandleTimeout`, `transcript.Transcript.Reprint` | decided (0023-MADR-line-mode-components.md D9, A8) |
+| How a kept reply is drawn | what its Printer has printed, a held line left for the Printer to print | `stream.Printer.Printed` | planned (0023-PLAN-line-mode-components.md Step 7f) |
 
 ## inline and inline/inlinetest
 

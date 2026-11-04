@@ -2181,6 +2181,83 @@ facts".
       `inlinetest`, `transcript`, `lineedit`, `lineedittea`, `pick`, `ask`
       and `asktea` passes unchanged.
 
+### A15 (2026-11-04): a reprint while a reply holds a line (issue #15)
+
+*Status: proposed (2026-11-04),* for issue #15, filed for gobble-cli's
+`0035-PLAN-pin-current-sibling-releases-and-remove-gobble-copies.md` P18a
+(its deviation 19), from the owner's choice of the issue's option A on
+2026-11-03, "draft it after the release, option A", after `v2.10.0`'s
+release. To be implemented by [0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md) Step 7f.
+
+1. **The issue's account holds at `cc4c4a5`.** A reprint waits for every
+   kept reply's Printer to be idle: `HandleTimeout(now, idle)` and
+   `Reprint(idle)` give "" while `idle` is false
+   (`transcript/transcript.go:165`, `:184`), and the package documentation
+   (`transcript/doc.go:17`), `ExampleTranscript` and the line-mode guide's
+   recipe pass the reply's `Idle()`. A kept reply is drawn by `Printer.At`
+   (`transcript/transcript.go:127`), which draws its whole Source, a held
+   line among it, so a reprint while a line is held would show that line,
+   and the next `Write` would print it again (item 6 of A14). A Printer
+   holds a paragraph's line until the next line comes (A3 item 13, Q10),
+   so through a long paragraph it is never idle, and the reprint waits for
+   the paragraph's end.
+2. **What a Printer has printed is final, and now known.** A printed line
+   is never printed or styled again (D7). Since [0009-PLAN-streaming-content-engine.md](0009-PLAN-streaming-content-engine.md) Step A1.4 the Printer
+   keeps each line's source offset: the partial line's start, the held
+   paragraph line's, and the held table's first line's (`at`, `heldAt` and
+   `tableAt`, `stream/printer.go`). The Source up to the first of them
+   that is held is exactly what it has printed.
+3. **The decision: `func (p *Printer) Printed(width int) string`,** the
+   issue's item 1: the Source as far as it has been printed, drawn afresh
+   at width as `At` draws the whole, the held paragraph line, a held table
+   and the partial line left out. It changes nothing in the receiver.
+   While the Printer is `Idle`, `Printed` is `At`. What the receiver prints
+   after it, at the width `SetWidth` gives, continues it, with no line
+   twice and none lost.
+4. **The Transcript draws a kept reply by `Printed`,** in place of `At`:
+   the issue's option A, the owner's. A reprint then needs no reply idle:
+   the `idle` of `HandleTimeout` and `Reprint` is the host's own output
+   alone, at a line's start. A host that writes each reply's lines as its
+   Printer gives them, through `Region.Print`, is at one whenever it calls.
+   Neither signature changes.
+   * A host that passes `reply.Idle()`, as the recipe does, sees no change:
+     whenever that is true, `Printed` is `At`, so its reprints are
+     `v2.10.0`'s.
+   * A host that passes its own state reprints mid-paragraph; the held
+     line follows the reprint when the Printer gives it, at the new width.
+5. **The prototype,** on a scratch export of `cc4c4a5`, `Printed` as item 3
+   and a property test over `transcript/testdata/reply.txt` and three
+   documents, among them a setext heading, a table that a paragraph ends,
+   a list, a fence, a definition and a last line with no line break, in
+   chunks of 1, 3, 7, 16 and 64 bytes. At each of 1,895 points between
+   Writes, `Printed(40)` and everything the Printer gave after it at width
+   40, its `Flush` included, were the whole reply printed at 40, byte for
+   byte; at the 53 points where the Printer was `Idle`, `Printed(40)` was
+   `At(40)`. The control, `At` in place of `Printed`, failed at the first
+   point, "HHello …": the partial line drawn, then printed again.
+6. **The documentation** (the issue's item 3): `Idle`'s and `At`'s say a
+   reprint uses `Printed`, and why; `transcript`'s package documentation,
+   `HandleTimeout`'s, `Reprint`'s and `AddReply`'s, and the line-mode
+   guide's recipe, that `idle` is the host's own output and the reply's is
+   no longer needed; and `ExampleTranscript`'s host passes its own.
+7. **Considered and left:**
+   * **The issue's option B, `transcript.WithHeldReplies()`,** opting in:
+     an option whose default withholds only reprints that item 5 shows
+     right, and a row more among the defaults.
+   * **Releasing a held line early,** which the issue does not ask: it
+     would draw a setext heading's text or a table's header as prose.
+   * **The Transcript drawing the held line itself,** and the Printer not
+     printing it after: it changes what `Write` prints, which the issue
+     does not ask either.
+8. **Defaults.** `transcript`'s row "When a reprint is made" says the host's
+   `idle` is its own output; a row is added, "How a kept reply is drawn",
+   its control `stream.Printer.Printed`, `planned` until the step builds
+   it.
+9. **The release.** `Printed` is an addition, so the next minor, `v2.11.0`,
+   or whichever the owner names; `make apicheck` stays at 0 incompatible
+   changes. A reprint's bytes change only for a host that passes `idle`
+   true while a reply holds a line, whose reprint `v2.10.0` held back.
+
 ## More Information
 
 * Issues of this repository: #7, #8, #9 and #10, each with gobble's

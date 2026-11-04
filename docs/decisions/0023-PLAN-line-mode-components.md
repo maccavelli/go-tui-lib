@@ -1,6 +1,6 @@
 ---
-status: complete
-date: 2026-11-01
+status: in-progress
+date: 2026-11-04
 associated-madr: "0023-MADR-line-mode-components.md"
 ---
 # Implement the line-mode question, picker, composer and transcript
@@ -739,6 +739,65 @@ exported name is added, `Transcript.Reprint`.
     by `region.Print` in one update, and a control that expects
     `v2.8.0`'s two;
   * issue #14 told, for the owner to close.
+
+### Step 7f: a reprint while a reply holds a line (issue #15)
+
+*Added 2026-11-04, for 0023-MADR A15; proposed.* One exported name is
+added, `stream.Printer.Printed`.
+
+* **Facts re-read** at the tree the step starts on, each a deviation if
+  changed: `stream/printer.go`'s `At`, `Idle`, and where `at`, `heldAt`
+  and `tableAt` are set; `transcript/transcript.go`'s `piece.at`,
+  `HandleTimeout` and `Reprint`; the recipe in `transcript/doc.go`,
+  `transcript/example_test.go` and `docs/guides/line-mode.md`.
+* **Code:**
+  1. `stream/printer.go`: `Printed(width int) string`, as A15 item 3;
+     `At`'s and `Idle`'s documentation, as item 6.
+  2. `transcript/transcript.go`: `piece.at` draws a reply by `Printed`;
+     `HandleTimeout`'s, `Reprint`'s and `AddReply`'s documentation, as A15
+     items 4 and 6.
+  3. `transcript/doc.go`: the same.
+  4. `transcript/example_test.go`: the host's `idle` passes its own state,
+     at a line's start since it writes whole lines; the example's output
+     is unchanged.
+* **Tests:**
+  * `stream/printer_test.go`, `TestPrinted`: A15 item 5's property, over
+    the same documents and chunk sizes; `Printed` is `At` whenever `Idle`;
+    `Printed` changes nothing, the receiver's next `Write` giving the same
+    with the call and without.
+  * `stream`'s `FuzzPrinter` gains the property at its split points.
+  * `transcript/host_test.go`, `TestHostReprintMidParagraph`: a resize
+    settles while a long paragraph streams; `HandleTimeout(now, true)`
+    gives the reprint at once; after the paragraph ends, the
+    `inlinetest.Screen` shows each word once, at the new width.
+  * `transcript/transcript_test.go`: with a reply holding a line, the
+    reprint without that line; with the reply idle, the bytes `v2.10.0`
+    gives.
+  * The budgets hold: `TestReplyBudget`, 257 allocations
+    (`stream/bench_test.go`), and `TestReprintBudget`, 49,696 allocations
+    and 7,274,618 bytes (`transcript/bench_test.go`).
+  * Every existing test, golden and example passes unchanged.
+  * `FuzzPrinter` and `transcript`'s fuzz target run 5 minutes each.
+* **Mutations,** each killing a named test:
+  * `Printed` ignoring a held paragraph line: `TestPrinted`;
+  * ignoring a held table: `TestPrinted`;
+  * `Printed` changing the receiver: `TestPrinted`;
+  * the Transcript drawing a reply by `At`: `TestHostReprintMidParagraph`.
+* **Docs:** `docs/guides/line-mode.md`, "Print the conversation again on a
+  resize": the host's `idle` is its own output, and a reprint may come
+  mid-paragraph; `docs/guides/defaults.md`'s two rows (A15 item 8).
+* **Gates:** `python3 -m tools.verify gates` on macOS, and through `remote
+  linux` and `remote windows`; `make apicheck` 0 incompatible changes, one
+  addition; the identifier scan.
+* **The release,** `v2.11.0`, under rule 4, or whichever the owner names
+  (A15 item 9):
+  * notes in `docs/guides/migrating.md`, "Migrating to `v2.11.0`":
+    `Printed`; the Transcript drawing kept replies by it; a host's `idle`;
+  * `README.md`'s current release;
+  * a smoke test from the proxy against the tag: a resize settled
+    mid-paragraph, reprinted at once, each word once on the screen, and a
+    control that fails against `v2.10.0`;
+  * issue #15 told, for the owner to close.
 
 ## Verification
 
