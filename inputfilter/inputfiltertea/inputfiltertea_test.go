@@ -274,8 +274,10 @@ func TestCoalescedWheelMsg(t *testing.T) {
 // terminal that does not bracket pastes, once the Filter is attached to
 // the program's Send.
 func ExampleFilter() {
+	// guide:filter
 	f := inputfiltertea.NewFilter(inputfilter.WithPasteBurst(inputfilter.PasteBurstConfig{}))
 	p := tea.NewProgram(nil, tea.WithFilter(f.Filter))
-	stop := f.Attach(p.Send)
+	stop := f.Attach(p.Send) // the timed flushes and the drains reach the program through its Send
 	defer stop()
+	// guide:end
 }

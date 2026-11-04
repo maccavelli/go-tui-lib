@@ -1295,6 +1295,9 @@ Four parts, each passing its tests before the next.
   `frame` and no Bubble Tea, whose closure for Linux, macOS and Windows
   holds no Charm module but `x/ansi` for the cores, with a control that
   fails against the release before.
+  *Added 2026-11-03 (D21):* the step fixes `DocPane`'s last row under a
+  finished `Doc`, which its rehearsal found: `stream/streamtea/pane.go`
+  and its test join the step's files.
 
 ### Step 7: `stream/glamourmd`, a nested module
 
@@ -3081,3 +3084,101 @@ D19's alone.
   identifier scan, untracked files included: clean.
 * **Step A1.4 complete, 2026-11-03,** for the owner's commit. Step 8, the
   examples, the guide and the root's release, is next.
+
+### Step 8: the examples, the guide, and the root's release
+
+*2026-11-03.* The owner committed Step A1.4 (`e0cdaa9`) and said
+"committed proceed".
+
+**The examples,** each with its `// guide:` region:
+
+* `ExampleDoc` (`stream/document_test.go`, region `doc`) and
+  `ExampleFilter` (`inputfilter/inputfiltertea/inputfiltertea_test.go`,
+  region `filter`), as they were, with their regions;
+* `ExampleScheduler` (`frame/example_test.go`, region `scheduler`), new: a
+  line-mode host's loop with no Bubble Tea, a reply written into a
+  `Buffer` from a goroutine, each frame pulled with `frame.Adaptive`;
+* `ExampleDocPane` (`stream/streamtea/example_test.go`, region
+  `docpane`), new: a model whose `Update` gives the workspace each
+  message and re-arms `frametea.Wait` on each `frame.DueMsg`, the one
+  line, and an answer streamed from a goroutine through a `Buffer` into a
+  `DocPane`; the example runs Wait and gives its message to `Update` as
+  Bubble Tea's loop does. Each passed three runs; the first build failed
+  on the agent's function `stream`, the package's name, now `answer`.
+
+**The guide,** `docs/guides/streaming-content.md`: feeding a `Doc` from
+the event loop or from goroutines; the `Scheduler`, and why `Wait` is
+re-armed; choosing a pacer; showing a `Doc` in a pane, its commands and
+keys; the filter, `Attach` and paste bursts; what the stream cannot send,
+and trusted links through `termsvc.Linker`; what may differ before
+`Finish`; `RenderView`; highlighting; tables; `Interpret` and `Bounded`;
+the line mode's use of the cores; and the defaults. Its four excerpts are
+the regions, as `scripts/go-examples.py --check-guide` reads them:
+"examples: 19 excerpt(s) checked", clean. markdownlint's first run found a
+code span ending in a space, the agent's, reworded.
+
+**The rows:** `docs/README.md`'s "I want to…", six rows into the guide,
+and the 0009 PLAN's status, which read "in-progress (Step 1)" since Step
+1, now Step 8's; `README.md`'s feature list and its "I want to…" row;
+`docs/architecture.md`'s guides line; and "Migrating to `v2.10.0`" in
+`docs/guides/migrating.md`, the release's notes, as the releases before
+it, `v2.10.0` the name the agent proposes for the owner's tag. It names
+the two changes a `v2.9.0` program can see: `theme.Theme`'s unexported
+field, so an unnamed-field literal no longer compiles, and the workspace
+passing on another package's mouse message that has `WithMouse` (Step
+4).
+
+**The smoke test, rehearsed** before the tag
+(`scratchpad`'s `smoke210.py local`, the tree by a `replace`, in a scratch
+module outside the repository, `GOWORK` empty): `./line`, a reply paced by
+`frame` into a `Doc` with no Bubble Tea, 7 frames; its closure for Linux,
+macOS and Windows the module itself, the root, `x/ansi`, `displaywidth`,
+`uax29`, `go-colorful` and `go-runewidth`: no Charm module but `x/ansi`.
+`./tui`, a document streamed through a `Buffer` into a `DocPane` of four
+rows. The control, the same programs against `v2.9.0` from the proxy:
+`go mod tidy` and `go build` exit 1, "module …@latest found (v2.9.0), but
+does not contain package github.com/maccavelli/go-tui-lib/v2/frame".
+
+* **Deviation D21, 2026-11-03: a finished `Doc`'s last row in a pane.**
+  * **Found** in the rehearsal: the four-row pane drew lines 9 to 11 of
+    twelve and an empty row, where it drew the last four while the
+    document streamed. `Doc.Render` after `Finish` is the renderer's
+    output byte for byte, which ends with a line break, and `DocPane`'s
+    `rows()` split it at each, so the break began an empty last row; the
+    text moved up a row when the stream ended. It is Step 6's, committed
+    (`4413f94`).
+  * **Resolutions offered:** fix it in this step, with a test and a
+    mutation (recommended); or release `v2.10.0` with it recorded, and fix
+    it in a `v2.10.1` step.
+  * **Chosen by the owner,** 2026-11-03: "Fix it in Step 8
+    (Recommended)". `rows()` drops the one line break that ends the frame
+    before it splits, so a document's own blank lines stay rows. The
+    step's text is annotated; its files gain `stream/streamtea/pane.go`
+    and `pane_test.go`.
+  * **Test:** `TestFinishedTail`, the last four lines on the pane's four
+    rows while the document streams and after `Finish`. **Mutation:** 8.1,
+    the break kept: `TestFinishedTail`, "finished: [\"line 10 … ^\"
+    \"line 11\" \"line 12\" \"\"]; while streaming [\"line 9 … ^\" …]; want
+    lines 9 to 12 both". `mutate: 1 killed`. The rehearsal again: the pane
+    drew lines 8 to 11, and the smoke test passed.
+
+**Checks:** the pre-add check of the five Go files; `make lint` ("0
+issues", three systems) and `make vuln` ("No vulnerabilities found"), as
+`docs/guides/releasing.md` asks before a release;
+`scripts/check_ci_filters.py`, "0 problem(s)"; the documents' checks and
+the identifier scan: clean.
+
+**Gates,** with the step's files:
+
+| Host | `gates` |
+| :--- | :--- |
+| macOS | 22 passed, 0 failed, 0 skipped in 1076 s |
+| `remote linux` | 21 passed, 0 failed, 1 skipped (`gofmt`) in 1297 s |
+| `remote windows` | 21 passed, 0 failed, 1 skipped (`gofmt`) in 2724 s |
+
+**Not done yet, and the release:** the owner's commit of the above; the
+disclosure guard over the outgoing commits; the owner's push of `main`,
+and CI and Docs green on it; the owner's tag, `v2.10.0` as the agent
+proposes or whichever the owner names, and CI green on the tag; and the
+smoke test from the proxy, `smoke210.py proxy`. The step stays open for
+them, and the PLAN `in-progress`.

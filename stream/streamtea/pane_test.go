@@ -414,6 +414,23 @@ func TestTheme(t *testing.T) {
 	})
 }
 
+// TestFinishedTail: once its Doc is finished, a following pane still shows
+// the document's last line on its last row, as it did while it streamed:
+// the line break that ends a finished frame begins no row
+// (docs/decisions/0009-PLAN-streaming-content-engine.md D21).
+func TestFinishedTail(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := stream.NewDoc(nil)
+		d.Append(numbered(12))
+		g := newProg(t, 20, 4, d, asciiTheme, keys(t))
+		before := g.shown()
+		d.Finish()
+		if got := g.shown(); !equal(got, window(9, 12, true, false)) || !equal(got, before) {
+			t.Fatalf("finished: %q; while streaming %q; want lines 9 to 12 both", got, before)
+		}
+	})
+}
+
 // TestRevision: the pane gives its Doc its theme's ID as the revision, so
 // a committed segment is drawn again under a new theme, not under the same
 // one, and under a literal theme at each draw

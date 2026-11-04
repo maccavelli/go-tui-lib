@@ -224,6 +224,7 @@ func FuzzDoc(f *testing.F) {
 // a segment, rendered once, while the second grows in the tail; after
 // Finish, the frame is the Renderer's of the whole reply.
 func ExampleDoc() {
+	// guide:doc
 	d := stream.NewDoc(stream.Plain(ansi.WcWidth))
 	for _, chunk := range []string{"A first para", "graph.\n\nThen a **sec", "ond** one."} {
 		d.Append(chunk)
@@ -231,6 +232,7 @@ func ExampleDoc() {
 	}
 	d.Finish()
 	fmt.Printf("%q\n", d.Render(40))
+	// guide:end
 	// Output:
 	// "A first para"
 	// "A first paragraph.\n\nThen a "

@@ -321,8 +321,9 @@ docs/
   reports/                  REPORT records
   guides/                   how-to guides: workspaces, terminal
                             capabilities, commands, the command palette,
-                            keymaps, the line mode, releasing, migrating,
-                            the defaults and their controls
+                            keymaps, the line mode, streaming content,
+                            releasing, migrating, the defaults and their
+                            controls
 ```
 
 ## Dependencies

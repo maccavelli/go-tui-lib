@@ -27,7 +27,7 @@ it was when they were written
 | 0008 | MADR | [Find and run anything from one command palette, built on an in-repository fuzzy matcher and asynchronous, scoped providers](decisions/0008-MADR-command-palette.md) | accepted; A1 accepted; A2 recorded; A3 accepted; A4 accepted (item 2 by A5.3); A5 accepted; A6 accepted; built: `fuzzy` in `v1.13.0`, `palette` in `v2.1.0` |
 | 0008 | PLAN | [Implement the command palette and the fuzzy matcher](decisions/0008-PLAN-command-palette.md) | complete |
 | 0009 | MADR | [Stream agent output through a stable-prefix Markdown engine, a frame scheduler, an input filter and a safe-text sanitizer](decisions/0009-MADR-streaming-content-engine.md) | accepted; A1–A3 accepted; A4 recorded; A5 accepted (by 0023-MADR D7); A6 accepted, Q9 to Q12 answered; A7 accepted, Q13 answered; A8 accepted, Q14 answered |
-| 0009 | PLAN | [Implement the streaming content engine](decisions/0009-PLAN-streaming-content-engine.md) | in-progress (Step 1) |
+| 0009 | PLAN | [Implement the streaming content engine](decisions/0009-PLAN-streaming-content-engine.md) | in-progress (Step 8, the root's release; Step 7 after it) |
 | 0010 | MADR | [Ship the Cobra, Kong and glamour adapters as nested Go modules, released apart from the root and developed through a committed go.work, with every gate run per module and without the workspace](decisions/0010-MADR-nested-adapter-modules.md) | accepted; A1–A3 accepted; the command adapters superseded by 0012 |
 | 0010 | PLAN | [Implement the multi-module repository: go.work, per-module gates, and the release procedure](decisions/0010-PLAN-nested-adapter-modules.md) | complete |
 | 0010 | REPORT | [Nested modules, a committed go.work, and the adapters' upstream sources](reports/0010-REPORT-nested-modules-and-adapter-sources.md) | — |
@@ -138,7 +138,13 @@ it was when they were written
 | test a line-mode component on a fake screen | [guides/line-mode.md](guides/line-mode.md#test-on-a-screen) |
 | know why the line-mode components are built this way | [0023-MADR](decisions/0023-MADR-line-mode-components.md) |
 | know why the command palette and fuzzy matcher are built this way | [0008-MADR](decisions/0008-MADR-command-palette.md) |
-| see how streamed Markdown, frames and untrusted text will be handled | [0009-MADR](decisions/0009-MADR-streaming-content-engine.md) |
+| see how streamed Markdown, frames and untrusted text are handled, and why | [0009-MADR](decisions/0009-MADR-streaming-content-engine.md) |
+| show a reply in a pane as it streams in from another goroutine, following its tail | [guides/streaming-content.md](guides/streaming-content.md#show-a-doc-in-a-pane) |
+| feed a streamed Markdown document, and know what a frame shows before it ends | [guides/streaming-content.md](guides/streaming-content.md#feed-a-doc), [guides/streaming-content.md](guides/streaming-content.md#what-may-differ-before-finish) |
+| pace frames asked for from many goroutines, in Bubble Tea or a line-mode loop | [guides/streaming-content.md](guides/streaming-content.md#pace-frames-with-the-scheduler), [guides/streaming-content.md](guides/streaming-content.md#choose-a-pacer) |
+| sum the wheel, thin motion and detect paste bursts before they queue | [guides/streaming-content.md](guides/streaming-content.md#filter-input-noise) |
+| copy a code block, hit-test a link or select text while a reply streams | [guides/streaming-content.md](guides/streaming-content.md#copy-links-and-selection) |
+| highlight code, fit a table to a width, or show a tool's output bounded | [guides/streaming-content.md](guides/streaming-content.md#highlight-code), [guides/streaming-content.md](guides/streaming-content.md#tables), [guides/streaming-content.md](guides/streaming-content.md#tool-output) |
 | know why terminal capabilities are detected this way | [0005-MADR](decisions/0005-MADR-terminal-capabilities-and-services.md) |
 | learn what the terminal supports, over SSH and inside tmux | [guides/terminal-capabilities.md](guides/terminal-capabilities.md) |
 | quit without leaving mode 2031 set | [guides/terminal-capabilities.md](guides/terminal-capabilities.md#quit-through-the-prober) |

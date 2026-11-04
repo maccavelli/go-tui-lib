@@ -7,6 +7,58 @@ needs a major version, at a new module path
 ([AGENTS.md, API conventions](../../AGENTS.md#api-conventions), rule 1).
 Up to `v0.12.0`, a deprecated name was removed in the next minor release.
 
+## Migrating to `v2.10.0`
+
+`v2.10.0` is a minor release: the streaming content engine
+([0009-MADR-streaming-content-engine.md](../decisions/0009-MADR-streaming-content-engine.md),
+[0009-PLAN-streaming-content-engine.md](../decisions/0009-PLAN-streaming-content-engine.md)).
+It adds packages and names, and changes two things, below. Nothing is
+removed or retyped: `make apicheck` against `v2.9.0` reports 0
+incompatible changes. A program on `v2.9.0` needs no change, unless it
+builds a `theme.Theme` from a literal whose fields are not named:
+
+```bash
+go get github.com/maccavelli/go-tui-lib/v2@v2.10.0
+```
+
+### Added
+
+- **`frame` and `frame/frametea`:** the `Scheduler`, which merges
+  requests for a frame from any goroutine; the `Queue` and its pacers,
+  `Adaptive` and `Immediate`; `Coalescer`, `Demand` and `Ticks`; `Output`,
+  which reports a stalled terminal; `Upgrader`, renders off the event
+  loop; and `Wait`, `Forward`, `TickCmd`, `CoalesceCmd` and `WaitUpgrade`
+  for a Bubble Tea program.
+- **`inputfilter` and `inputfilter/inputfiltertea`:** the wheel summed,
+  motion thinned, paste bursts detected, split reports joined, X10
+  reports repaired, pastes normalised, and typeahead captured or
+  quarantined; `Filter`, for `tea.WithFilter`, and `CoalescedWheelMsg`.
+- **`stream`:** `Doc`, `NewDoc`, `Renderer`, `RendererFunc`, `Plain`,
+  `Scanner`, `Block` and `BlockKind`; `Buffer` and `Doc.Pull`; `View`,
+  `RenderView` and its side-tables, `ViewRenderer`; `Highlighter`,
+  `HighlighterFunc` and `Doc.SetRevision`; `FitTable` and `TableOptions`;
+  `Bounded`, `Messages` and `MsgOmitted`; `Interpret`; `Writer`; and their
+  options. The `Printer`'s output is as before.
+- **`stream/streamtest`:** `CheckRenderer`, which holds a renderer to the
+  `Doc`'s contract.
+- **`stream/streamtea`:** `DocPane`, its options, commands and keys.
+- **`theme.Theme.ID`,** an identity `theme.New` stamps, for a cache keyed
+  by the theme.
+
+### Changed
+
+- **`theme.Theme` holds its ID in an unexported field,** so a literal
+  `theme.Theme{p, bg, g, pal, st}` whose fields are not named no longer
+  compiles. Name the fields, or build the theme with `theme.New`, which
+  gives it an ID; a literal's is 0, and a cache never keeps what it drew.
+- **A workspace passes on a mouse message of another package,** in the
+  cells of the pane under the pointer, when it has `WithMouse(tea.Mouse)
+  tea.Msg`, as `inputfiltertea.CoalescedWheelMsg` has; under `v2.9.0` it
+  was dropped.
+
+[The streaming guide](streaming-content.md) shows the new packages
+together.
+
 ## Migrating to `v2.9.0`
 
 `v2.9.0` is a minor release, for issue #14. It adds one method,

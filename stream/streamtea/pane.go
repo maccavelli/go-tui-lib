@@ -176,7 +176,9 @@ func (p *DocPane) rows(width int) []string {
 	}
 	cw := column(width)
 	var out []string
-	if src := p.d.Render(cw); src != "" {
+	// A finished Doc's frame is its Renderer's, which ends with a line
+	// break: that ends the last row and begins none (0009-PLAN D21).
+	if src := strings.TrimSuffix(p.d.Render(cw), "\n"); src != "" {
 		for l := range strings.SplitSeq(src, "\n") {
 			out = append(out, fit(l, cw, key.method, t.Glyphs.Ellipsis))
 		}

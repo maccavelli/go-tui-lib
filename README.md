@@ -156,6 +156,17 @@ pattern, used by every program that needs it.
   synchronized update, and `Reprint` reprints on demand.
   [The line-mode guide](docs/guides/line-mode.md) shows the loop that
   drives every line-mode component.
+- **Streaming content, since `v2.10.0`.** `stream`'s `Doc` draws a
+  streamed Markdown document a stable prefix at a time, rendering each
+  part once a width and only the tail each frame, by your renderer or
+  `Plain`; a `Buffer` takes the stream from any goroutine, and `frame`'s
+  `Scheduler` and pacers release it a frame at a time. `Doc.View` gives
+  each frame's links, code blocks and tables while it streams; `Bounded`
+  and `Interpret` hold a tool's output. `stream/streamtea`'s `DocPane`
+  shows a `Doc` in a workspace pane, and `inputfilter` sums the wheel,
+  thins motion and detects paste bursts before they queue. The cores link
+  no Charm module but `x/ansi`.
+  [The streaming guide](docs/guides/streaming-content.md) shows each.
 - **The stack is Charm v2:** `charm.land/bubbletea/v2`,
   `charm.land/lipgloss/v2` and `charm.land/bubbles/v2`, with
   `github.com/charmbracelet/colorprofile` and
@@ -185,6 +196,7 @@ repository as it is now.
 | find and run anything from a command palette, or complete `@` and `/` in an editor | [the command palette guide](docs/guides/command-palette.md) |
 | start the TUI from my CLI with `--tui`, and fall back when it cannot run | [Start the TUI from your CLI](docs/guides/commands.md#start-the-tui-from-your-cli) |
 | ask, pick, edit a line and stream a reply in a line-mode CLI, without Bubble Tea | [the line-mode guide](docs/guides/line-mode.md) |
+| show a reply in a pane as it streams, paced, and filter the input that comes meanwhile | [the streaming guide](docs/guides/streaming-content.md) |
 | know which Charm version to use, and what may be imported | [AGENTS.md, Dependencies](AGENTS.md#dependencies) |
 | know the rules every TUI package follows | [AGENTS.md, TUI conventions](AGENTS.md#tui-conventions) |
 | refuse or change a default the library applies | [the defaults guide](docs/guides/defaults.md) |
