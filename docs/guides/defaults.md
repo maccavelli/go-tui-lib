@@ -321,13 +321,13 @@ record that is not there.
 | `Interpret`'s bounds | 50,000 rows, the oldest dropped past them; 8,192 columns a row | `stream.InterpretOptions`, `stream.DefaultInterpretRows`, `stream.DefaultInterpretCols` | built |
 | A line's end, from a `Printer` or a `Writer` | LF | `stream.WithCRLF` | built |
 | A `Writer`'s destination at `Close` | left open: it is the program's | `stream.Writer.Close` | decided (0009-MADR-streaming-content-engine.md A8) |
-| Code highlighting | none | `stream.WithHighlighter`, `stream.HighlighterFunc` | planned (0009-PLAN-streaming-content-engine.md Step A1.4) |
-| Code shown plain | over 512 KiB, 10,000 lines or 4 KiB in one line | `stream.WithHighlightLimits` | planned (0009-PLAN-streaming-content-engine.md Step A1.4) |
-| A partial line's unclosed math, `\(` or `$$` | shown | `stream.WithMath` | planned (0009-PLAN-streaming-content-engine.md Step A1.4) |
-| A table wider than the width | key/value records, then stacked records, then its source | `stream.WithoutTableLayout`, `stream.FitTable` | planned (0009-PLAN-streaming-content-engine.md Step A1.4) |
-| Live tool output that `Bounded` keeps | all of it to 64 KiB, then its first 20 and last 20 lines, each line cut at 4 KiB | `stream.WithMaxBytes`, `stream.WithHeadLines`, `stream.WithTailLines`, `stream.WithMaxLineBytes` | planned (0009-PLAN-streaming-content-engine.md Step A1.4) |
-| How `Bounded` cleans | `safetext.Text`, never less than `safetext.StatusLine` | `stream.WithRules`, given to `stream.NewBounded` | planned (0009-PLAN-streaming-content-engine.md Step A1.4) |
-| `Bounded`'s omitted line and its Ellipsis | English; `glyph.Unicode` | `stream.WithCatalog`, `stream.Messages`, `stream.WithGlyphs` | planned (0009-PLAN-streaming-content-engine.md Step A1.4) |
+| Code highlighting | none | `stream.WithHighlighter`, `stream.HighlighterFunc` | built |
+| Code shown plain | over 512 KiB, 10,000 lines or 4 KiB in one line | `stream.WithHighlightLimits` | built |
+| A partial line's unclosed math, `\(` or `$$` | shown | `stream.WithMath` | built |
+| A table wider than the width, in `Plain` (a `Printer`'s is never wrapped) | key/value records, then stacked records, then its source | `stream.WithoutTableLayout`, `stream.FitTable` | built |
+| Live tool output that `Bounded` keeps | all of it to 64 KiB, then its first 20 and last 20 lines, each line cut at 4 KiB | `stream.WithMaxBytes`, `stream.WithHeadLines`, `stream.WithTailLines`, `stream.WithMaxLineBytes` | built |
+| How `Bounded` cleans | `safetext.Text`, never less than `safetext.StatusLine` | `stream.WithRules`, given to `stream.NewBounded` | built |
+| `Bounded`'s omitted line and its Ellipsis | English; `glyph.Unicode` | `stream.WithCatalog`, `stream.Messages`, `stream.WithGlyphs` | built |
 
 ## frame and frame/frametea
 

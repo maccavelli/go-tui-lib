@@ -50,6 +50,9 @@ type Doc struct {
 	rules                 safetext.Rules
 	relaxAfter            int
 	noHoldback, noPartial bool
+	math                  bool        // the holdback holds math too, by WithMath
+	highlighter           Highlighter // WithHighlighter's, used when the Renderer is Plain
+	lim                   limits      // WithHighlightLimits'
 
 	clean     cleaned
 	san, base *safetext.Sanitizer
@@ -74,12 +77,19 @@ type Doc struct {
 	frameV      uint64
 	framed      bool
 	finalWidths []int
+
+	code      codeCache // the tail's highlighted lines
+	codeWidth int       // the width they were drawn at
+	rev       uint64    // SetRevision's
+
+	views      map[int]*viewCache // the committed segments' views, by width
+	viewWidths []int              // the widths whose views are kept, the latest last
 }
 
 // NewDoc is a Doc that renders with r, Plain by the Doc's method when r is
 // nil.
 func NewDoc(r Renderer, o ...Option) *Doc {
-	d := &Doc{rules: safetext.Text(), relaxAfter: defaultRelaxAfter}
+	d := &Doc{rules: safetext.Text(), relaxAfter: defaultRelaxAfter, lim: defaultLimits()}
 	for _, opt := range o {
 		opt.applyDoc(d)
 	}
@@ -137,6 +147,26 @@ func (d *Doc) Reset() {
 	d.widths, d.cache = nil, map[int]*widthCache{}
 	d.final, d.finalWidths = map[int]string{}, nil
 	d.finished, d.framed = false, false
+	d.code.reset()
+	d.views, d.viewWidths = map[int]*viewCache{}, nil
+	d.version++
+}
+
+// SetRevision is the revision of what the Renderer and the Highlighter draw
+// with, such as a theme.Theme's ID, which stream does not import
+// (docs/decisions/0009-PLAN-streaming-content-engine.md D19): a different
+// one drops every cache, the segments', the frame's and the highlighted
+// lines, so the next frame is drawn anew, and raises Version.
+func (d *Doc) SetRevision(rev uint64) {
+	if rev == d.rev {
+		return
+	}
+	d.rev = rev
+	d.widths, d.cache = nil, map[int]*widthCache{}
+	d.final, d.finalWidths = map[int]string{}, nil
+	d.framed = false
+	d.code.reset()
+	d.views, d.viewWidths = map[int]*viewCache{}, nil
 	d.version++
 }
 
@@ -214,11 +244,17 @@ func (d *Doc) Render(width int) string {
 	src := d.source.String()
 	for ; c.outs < len(d.segs); c.outs++ {
 		sg := d.segs[c.outs]
-		join(&c.joined, trimBlank(d.draw(d.input(sg.open, src[sg.start:sg.end], sg.close, true), width)))
+		join(&c.joined, trimBlank(d.draw(d.input(sg.open, src[sg.start:sg.end], sg.close, true), width, inputBase(sg.start, sg.open), false)))
 	}
+	if width != d.codeWidth {
+		d.code.reset()
+		d.codeWidth = width
+	}
+	base := inputBase(d.tailStart, d.tailOpen)
+	d.code.keep(base)
 	var tail string
 	if t := d.tail(src); t != "" {
-		tail = trimBlank(d.draw(t, width))
+		tail = trimBlank(d.draw(t, width, base, true))
 	}
 	prefix := c.joined.String()
 	switch {
@@ -255,7 +291,7 @@ func (d *Doc) whole(width int) string {
 		delete(d.final, d.finalWidths[0])
 		d.finalWidths = d.finalWidths[1:]
 	}
-	s := d.draw(d.source.String(), width)
+	s := d.draw(d.source.String(), width, 0, false)
 	d.final[width] = s
 	d.finalWidths = append(d.finalWidths, width)
 	return s
@@ -301,7 +337,7 @@ func (d *Doc) tail(src string) string {
 	body := src[d.tailStart:d.done]
 	if partial := src[d.done:]; partial != "" && !d.noPartial {
 		if !d.noHoldback && d.scan.fence == "" {
-			partial = holdback(partial)
+			partial = holdback(partial, d.math)
 		}
 		body += partial
 	}
@@ -342,9 +378,29 @@ func (d *Doc) input(open, body, closer string, withDefs bool) string {
 	return b.String()
 }
 
+// inputBase is the document offset of a render input's start, for the
+// input of a segment or a tail that begins at start, inside the fence open
+// opens when it is not "": its opening line, given again, is before start.
+func inputBase(start int, open string) int {
+	if open == "" {
+		return start
+	}
+	return start - len(open) - 1
+}
+
 // draw is the Renderer's render of src at width, or, when it fails, src
-// drawn by Plain: no text is lost.
-func (d *Doc) draw(src string, width int) string {
+// drawn by Plain: no text is lost. With a Highlighter and Plain, src's
+// fences are highlighted, a block past a limit plain whole; base is src's
+// offset in the document, and keep keeps the lines highlighted, as the
+// tail's are.
+func (d *Doc) draw(src string, width, base int, keep bool) string {
+	if p, ok := d.r.(plain); ok && d.highlighter != nil {
+		h := &highlight{h: d.highlighter, lim: d.lim, plain: overLimits(src, base, d.lim), base: base}
+		if keep {
+			h.cache = &d.code
+		}
+		return p.drawWith(src, width, h)
+	}
 	out, err := d.r.Render(src, width)
 	if err != nil {
 		out, _ = Plain(d.method).Render(src, width) //nolint:errcheck // Plain never fails

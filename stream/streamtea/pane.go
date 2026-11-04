@@ -20,7 +20,9 @@ import (
 // It draws the Doc's rows at the pane's width, less one column on the
 // right, where the theme's ScrollUp and ScrollDown glyphs mark that rows
 // continue above or below. A row wider than its column is cut, measured
-// with the workspace's width method, and ends with the theme's Ellipsis.
+// with the workspace's width method, and ends with the theme's Ellipsis. It
+// gives the Doc its theme's ID as its revision, so a Renderer or a
+// Highlighter that draws with the theme draws again when it changes.
 type DocPane struct {
 	w             *workspace.Workspace
 	d             *stream.Doc
@@ -30,7 +32,13 @@ type DocPane struct {
 	follow        bool // the last rows are shown, however many come
 	cache         rows
 	drawn         drawn
+	literal       uint64 // the last revision given for a theme of ID 0
 }
+
+// literalRevs is the revisions a DocPane gives its Doc under a theme of ID
+// 0, one each draw, from where no theme's ID reaches: theme.New counts from
+// 1.
+const literalRevs = 1 << 63
 
 // rowsKey is what a pane's rows were made under.
 type rowsKey struct {
@@ -161,6 +169,7 @@ func (p *DocPane) rows(width int) []string {
 		return nil
 	}
 	t := p.w.Theme()
+	p.revise(t.ID())
 	key := rowsKey{version: p.d.Version(), width: width, method: p.w.WidthMethod(), theme: t.ID()}
 	if key.theme != 0 && p.cache.key == key {
 		return p.cache.rows
@@ -176,6 +185,20 @@ func (p *DocPane) rows(width int) []string {
 	return out
 }
 
+// revise gives the Doc its revision, the theme's ID, so that a Renderer or
+// a Highlighter that draws with the theme is drawn again when it changes;
+// under a theme of ID 0, a new revision each time, so that a literal theme
+// draws right at the cost of every cache
+// (docs/decisions/0009-MADR-streaming-content-engine.md A7 item 4;
+// docs/decisions/0009-PLAN-streaming-content-engine.md D19).
+func (p *DocPane) revise(id uint64) {
+	if id == 0 {
+		p.literal++
+		id = literalRevs | p.literal
+	}
+	p.d.SetRevision(id)
+}
+
 // fit is s cut to cells cells measured with m, ending with tail when it is
 // cut, and padded to them.
 func fit(s string, cells int, m ansi.Method, tail string) string {
@@ -185,11 +208,11 @@ func fit(s string, cells int, m ansi.Method, tail string) string {
 
 // View is the rows shown at the pane's size, with their marks.
 func (p *DocPane) View(width, height int) string {
+	all := p.rows(width) // first, since a new revision raises the Doc's Version
 	p.drawn = drawn{ok: true, version: p.d.Version(), width: width, height: height, top: p.top, follow: p.follow}
 	if width <= 0 || height <= 0 {
 		return ""
 	}
-	all := p.rows(width)
 	top := p.first(len(all), height)
 	shown := all[top:min(top+height, len(all))]
 	if column(width) == width || len(shown) == 0 {

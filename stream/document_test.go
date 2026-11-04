@@ -75,6 +75,56 @@ func TestDocHoldback(t *testing.T) {
 	}
 }
 
+// TestDocMath: WithMath holds an unclosed \( or $$ in the partial line,
+// until it closes or Finish; without it, they show
+// (docs/decisions/0009-MADR-streaming-content-engine.md A1 §4).
+func TestDocMath(t *testing.T) {
+	for _, c := range []struct {
+		name, src, want string
+		math            bool
+	}{
+		{`an open \(`, `the area \(a^2`, "the area ", true},
+		{`a closed \(`, `the area \(a^2\) is`, `the area \(a^2\) is`, true},
+		{"an open $$", "so $$x + y", "so ", true},
+		{"a closed $$", "so $$x$$ then", "so $$x$$ then", true},
+		{"an escaped bracket stays", `a \[b`, `a \[b`, true},
+		{`without math, \( shows`, `the area \(a^2`, `the area \(a^2`, false},
+		{"without math, $$ shows", "so $$x + y", "so $$x + y", false},
+	} {
+		var o []stream.Option
+		if c.math {
+			o = append(o, stream.WithMath())
+		}
+		d := stream.NewDoc(echo, o...)
+		d.Append(c.src)
+		if got := d.Render(80); got != c.want {
+			t.Errorf("%s: %q; want %q", c.name, got, c.want)
+		}
+		d.Finish()
+		if got := d.Render(80); got != c.src {
+			t.Errorf("%s, after Finish: %q; want the whole line", c.name, got)
+		}
+	}
+}
+
+// TestDialect: the model-output dialect, as grok renders it: only ~~
+// strikes, so ~**10%** is a tilde and strong text, and ~~x~~ is struck
+// (docs/decisions/0009-MADR-streaming-content-engine.md A1 §4).
+func TestDialect(t *testing.T) {
+	m := stream.DefaultMarkup()
+	struck := m.Strike.Apply("~~x~~")
+	for _, c := range []struct{ src, want string }{
+		{"~~x~~\n", struck + "\n"},
+		{"~**10%**\n", "~" + m.Strong.Apply("**10%**") + "\n"},
+		{"~x~\n", "~x~\n"},
+	} {
+		p := stream.NewPrinter(stream.WithMarkup(m))
+		if got := p.Write(c.src) + p.Flush(); got != c.want {
+			t.Errorf("%q: %q; want %q", c.src, got, c.want)
+		}
+	}
+}
+
 // TestDocFinish: after Finish, a frame is the Renderer's of the whole
 // source, byte for byte; Finished says so, Version rose, Append does
 // nothing and Write returns ErrClosed; Reset empties it.
@@ -155,6 +205,12 @@ func FuzzDoc(f *testing.F) {
 		parts.Append(rest)
 		if a, b := whole.Render(30), parts.Render(30); a != b {
 			t.Fatalf("whole %q, in chunks %q", a, b)
+		}
+		if a, b := show(whole.View(30)), show(parts.View(30)); a != b {
+			t.Fatalf("views: whole %s, in chunks %s", a, b)
+		}
+		if v := parts.View(30); strings.Join(v.Lines, "\n") != parts.Render(30) || len(v.Offsets) != len(v.Lines) {
+			t.Fatalf("a view %q, %d offsets; want Render's rows", v.Lines, len(v.Offsets))
 		}
 		parts.Finish()
 		want, _ := plain.Render(parts.Source(), 30)

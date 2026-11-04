@@ -29,6 +29,19 @@ type Printer struct {
 	asIs   bool // a table's rows printed as they came, by WithoutTableLayout
 	crlf   bool // lines end with CR LF, by WithCRLF
 	noDefs bool // a definition prints nothing, as Plain draws
+	fit    bool // a table is fitted to the width, as Plain draws (0009-PLAN D20)
+
+	highlighter Highlighter // WithHighlighter's
+	lim         limits      // WithHighlightLimits'
+	hl          *highlight  // how code is highlighted, or nil
+	fence       fenceState  // the fence the lines are in
+	at          int         // the source offset of partial's start
+	lineAt      int         // the source offset of the line being printed
+
+	view    *viewBuilder // Plain's view of what it prints, or nil
+	emitAt  int          // the source offset of the line an emit draws
+	heldAt  int          // the held paragraph line's
+	tableAt int          // the held table's first line's
 
 	clean   cleaned             // the sanitizers' output, read after each write
 	san     *safetext.Sanitizer // the rules', writing into base
@@ -59,9 +72,12 @@ var floor = safetext.Text()
 
 // NewPrinter is a Printer with nothing printed.
 func NewPrinter(o ...Option) *Printer {
-	p := &Printer{rules: safetext.Text(), defs: map[string]bool{}}
+	p := &Printer{rules: safetext.Text(), defs: map[string]bool{}, lim: defaultLimits()}
 	for _, opt := range o {
 		opt.apply(p)
+	}
+	if p.highlighter != nil {
+		p.hl = &highlight{h: p.highlighter, lim: p.lim}
 	}
 	p.open()
 	return p
@@ -90,6 +106,9 @@ func (p *Printer) Source() string { return p.source.String() }
 // 2, A9 item 2).
 func (p *Printer) At(width int) string {
 	q := &Printer{markup: p.markup, method: p.method, width: width, rules: p.rules, asIs: p.asIs, crlf: p.crlf, defs: map[string]bool{}}
+	if p.hl != nil {
+		q.hl = &highlight{h: p.hl.h, lim: p.hl.lim}
+	}
 	q.clean.b.WriteString(p.Source()) // cleaned already, by the rules and then the floor
 	q.end()
 	return q.drain()
@@ -126,12 +145,19 @@ func (p *Printer) Flush() string {
 func (p *Printer) end() {
 	p.take()
 	if p.partial != "" {
+		p.lineAt = p.at
 		p.line(p.partial, false)
+		p.at += len(p.partial)
 		p.partial = ""
 	}
 	p.endHeld()
 	p.endTable()
 	p.scan = Scanner{}
+	p.fence = fenceState{}
+	if v := p.view; v != nil {
+		v.closeCode(p.at)
+		v.closeIndented()
+	}
 }
 
 // take reads what the sanitizers wrote, and prints each line it
@@ -146,7 +172,9 @@ func (p *Printer) take() {
 		if i < 0 {
 			break
 		}
+		p.lineAt = p.at
 		p.line(s[:i], true)
+		p.at += i + 1
 		s = s[i+1:]
 	}
 	p.partial = s
@@ -161,6 +189,9 @@ func (p *Printer) drain() string {
 // emit writes one printed line, its rows and its end as WithCRLF says.
 // The cleaned text holds no CR, so no line end is written twice.
 func (p *Printer) emit(s string, nl bool) {
+	if p.view != nil {
+		p.view.emitted(s, p.emitAt)
+	}
 	if p.crlf {
 		s = strings.ReplaceAll(s, "\n", "\r\n")
 	}
@@ -183,22 +214,46 @@ func (p *Printer) line(l string, nl bool) {
 	if p.holding && b.Kind != BlockSetext && b.Kind != BlockTable {
 		p.endHeld()
 	}
+	p.emitAt = p.lineAt
+	if v := p.view; v != nil && b.Kind != BlockIndented && b.Kind != BlockBlank {
+		v.closeIndented()
+	}
 	switch b.Kind {
 	case BlockTableRow:
 		p.table, p.tableNL = append(p.table, l), nl
 	case BlockSetext:
 		p.holding = false
-		p.emit(p.markup.Heading.Apply(p.held), true)
+		p.emitAt = p.heldAt
+		p.emit(p.heading(p.held), true)
+		p.emitAt = p.lineAt
 		p.emit(p.markup.Heading.Apply(l), nl)
 	case BlockTable:
 		p.holding = false
-		p.table, p.tableNL = []string{p.held, l}, nl
+		p.table, p.tableNL, p.tableAt = []string{p.held, l}, nl, p.heldAt
 	case BlockFence:
+		p.openFence(l, fenceRun(l), p.lineAt)
+		if v := p.view; v != nil {
+			v.openCode(l, fenceRun(l), p.lineAt)
+		}
 		p.emit(p.fenceLine(l, fenceRun(l)), nl)
+	case BlockCode:
+		p.emit(p.code(l, nl), nl)
 	case BlockFenceEnd:
+		p.fence = fenceState{}
 		p.emit(p.fenceLine(l, ""), nl)
+		if v := p.view; v != nil {
+			v.closeCode(p.lineAt)
+		}
+	case BlockIndented:
+		if v := p.view; v != nil {
+			v.indented(p.lineAt, len(l)+b2i(nl))
+		}
+		p.emit(l, nl)
+		if v := p.view; v != nil {
+			v.indentR = v.rows()
+		}
 	case BlockHeading:
-		p.emit(p.markup.Heading.Apply(l), nl)
+		p.emit(p.heading(l), nl)
 	case BlockList, BlockQuote, BlockContinuation:
 		p.emit(p.prose(l), nl)
 	case BlockDefinition:
@@ -211,16 +266,25 @@ func (p *Printer) line(l string, nl bool) {
 			p.emit(p.prose(l), false) // the reply's last line: nothing can follow it
 			return
 		}
-		p.held, p.holding = l, true
-	default: // blank, code, indented code, a break, HTML
+		p.held, p.holding, p.heldAt = l, true, p.lineAt
+	default: // blank, a break, HTML
 		p.emit(l, nl)
 	}
+}
+
+// heading is a heading's line in the Heading style, its links in the view.
+func (p *Printer) heading(l string) string {
+	if p.view != nil {
+		p.view.links(p.method, l, p.emitAt, l, p.view.rows())
+	}
+	return p.markup.Heading.Apply(l)
 }
 
 // endHeld prints a held paragraph line: nothing came to make it more.
 func (p *Printer) endHeld() {
 	if p.holding {
 		p.holding = false
+		p.emitAt = p.heldAt
 		p.emit(p.prose(p.held), true)
 	}
 }
@@ -233,10 +297,28 @@ func (p *Printer) endTable() {
 	}
 	rows := p.table
 	if !p.asIs {
-		rows = layoutTable(p.method, rows)
+		width := 0 // a line-mode table is never wrapped (0023-MADR's Context)
+		if p.fit {
+			width = p.width
+		}
+		rows = FitTable(rows, TableOptions{Width: width, Method: p.method})
+	}
+	p.emitAt = p.tableAt
+	first := 0
+	if p.view != nil {
+		first = p.view.rows()
 	}
 	for i, row := range rows {
 		p.emit(inline(p.markup, row, p.defs), i < len(rows)-1 || p.tableNL) // the reply's last line keeps having no break
+	}
+	if v := p.view; v != nil {
+		t := ViewTable{Row: first, Rows: v.rows() - first}
+		for i, r := range p.table {
+			if i != 1 {
+				t.Cells = append(t.Cells, cells(r))
+			}
+		}
+		v.v.Tables = append(v.v.Tables, t)
 	}
 	p.table = nil
 }
@@ -253,7 +335,11 @@ func (p *Printer) prose(l string) string {
 	default:
 		styled = inline(p.markup, l, p.defs)
 	}
-	return wrapProse(p.method, p.width, styled)
+	out := wrapProse(p.method, p.width, styled)
+	if p.view != nil {
+		p.view.links(p.method, l, p.emitAt, out, p.view.rows())
+	}
+	return out
 }
 
 // fenceLine is a fence's opening line, its run dim and its language in

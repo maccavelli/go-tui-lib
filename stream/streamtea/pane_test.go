@@ -414,6 +414,42 @@ func TestTheme(t *testing.T) {
 	})
 }
 
+// TestRevision: the pane gives its Doc its theme's ID as the revision, so
+// a committed segment is drawn again under a new theme, not under the same
+// one, and under a literal theme at each draw
+// (docs/decisions/0009-PLAN-streaming-content-engine.md D19).
+func TestRevision(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		n := 0
+		counted := stream.RendererFunc(func(src string, _ int) (string, error) {
+			if strings.Contains(src, "first") {
+				n++
+			}
+			return src, nil
+		})
+		d := stream.NewDoc(counted)
+		d.Append("first\n\nsecond\n")
+		g := newProg(t, 20, 4, d, asciiTheme, keys(t))
+		before := n
+		g.w.SetTheme(asciiTheme) // the same theme, its ID the same
+		g.shown()
+		if n != before {
+			t.Fatalf("the same theme: the segment drawn %d times more; want none", n-before)
+		}
+		g.w.SetTheme(theme.New(colorprofile.ASCII, theme.Dark, glyph.ASCII()))
+		g.shown()
+		if n != before+1 {
+			t.Fatalf("a new theme: the segment drawn %d times more; want once", n-before)
+		}
+		g.w.SetTheme(theme.Theme{Glyphs: glyph.ASCII()})
+		g.p.View(20, 4)
+		g.p.View(20, 4)
+		if n != before+3 {
+			t.Fatalf("a literal theme, two draws: the segment drawn %d times more in all; want 3", n-before)
+		}
+	})
+}
+
 // TestMethod: rows are fitted with the workspace's width method, so when
 // the terminal reports grapheme clustering, an emoji with a skin tone,
 // four cells by wcwidth and two as a grapheme, is padded again.

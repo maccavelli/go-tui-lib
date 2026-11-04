@@ -1187,6 +1187,9 @@ Four parts, each passing its tests before the next.
   // in the Markdown form: a table wider than the width is a record each
   // row, where it ran past the width before. WithoutTableLayout keeps the
   // rows as they came.
+  // Corrected 2026-11-03 (D20): Plain alone fits its tables at its width;
+  // a Printer lays them out by FitTable with no width, as wide as their
+  // widest cells, as 0023-MADR decided.
 
   // Bounded holds live output, such as a tool's (A1 §4): all of it up to a
   // byte limit, then its first lines and its last, each line capped, the
@@ -1234,10 +1237,11 @@ Four parts, each passing its tests before the next.
     at each draw, and, under a theme of ID 0, to a new revision of its
     own each draw, so that a literal theme draws right at the cost of
     every cache, as A7 item 4 says.
-  * **`FitTable` changes the `Printer`'s and `Plain`'s tables** past their
+  * ~~**`FitTable` changes the `Printer`'s and `Plain`'s tables** past their
     width: from a row running past it to records. That is what A1 Q8,
     "so `Plain` can lay out tables", chose; it changes the line mode's
-    output, which a release note says.
+    output, which a release note says.~~ *Corrected 2026-11-03 (D20):*
+    `Plain`'s alone; the `Printer`'s are as 0023-MADR decided.
   * **`Bounded`'s floor is `StatusLine`, not `Text`:** A1 closes "an
     escape sequence cut off at the head", which `Text`, removing every
     sequence, would leave none of. Its default is still `Text`.
@@ -2893,3 +2897,187 @@ proposed (`b25f461`), pushed `main`, and said "pushed, proceed".
     `HighlighterFunc`, `Bounded` and `TableOptions`: clean.
 * **Step A1.4's API written, 2026-11-03,** a change to the records alone,
   for the owner's review and commit.
+
+*2026-11-03.* The owner committed the API (D19) and said "committed,
+proceed". Part 1, the dialect's tests and `WithMath`, passed before
+part 2.
+
+* **Deviation D20, 2026-11-03: a line-mode table is not wrapped.**
+  * **Found** building part 2, `FitTable`, with the `Printer` fitting its
+    tables at its width as D19 says: two tests of the tree failed.
+    `stream`'s `TestWrap`, "a table is laid out and not wrapped"
+    (`stream/printer_test.go:175`), one of gobble's wrapping cases; and
+    `transcript`'s `TestReprintGolden` at 60 columns, whose reply holds a
+    table "long enough to pass sixty columns on its own row"
+    (`transcript/testdata/reply.txt:16`), drawn now as records, with
+    `TestReprintBudget` at 55,478 allocations against its 49,696. Both
+    hold [0023-MADR-line-mode-components.md](0023-MADR-line-mode-components.md)'s Context: gobble wraps prose, and "fences, indented code,
+    table rows and headings" stay "unwrapped". D19 said the change
+    altered the line mode's output, and did not name the decision it
+    overturned.
+  * **Resolutions offered:** `Plain` alone fits its tables, since it
+    draws into a pane that clips a row, and the `Printer` keeps 0023's,
+    since a terminal wraps a long row in its scrollback (recommended);
+    both fit, 0023 amended, the two tests and the budget changed; or the
+    `Printer` fits under a new opt-in option.
+  * **Chosen by the owner,** 2026-11-03: "Plain fits; Printer as 0023
+    (Recommended)". The `Printer` lays its tables out by `FitTable` with
+    no width; `Plain`'s `Printer` passes its width. No test of the tree
+    changes. D19's text, 0009-MADR A1 §4's annotation and the defaults
+    row are annotated.
+
+**What changed,** in six parts, each passing its tests before the next:
+
+1. **The dialect and `WithMath`.** `holdback` holds an unclosed `\(` or
+   `$$` under `WithMath`, through `mathSpan`. The dialect needed no code:
+   `TestDialect` holds `~~x~~` struck and `~**10%**` and `~x~` not.
+2. **`FitTable` and `TableOptions`** (`stream/table.go`), built from
+   `layoutTable`, which they replace: a table that fits is drawn as
+   `layoutTable` drew it, byte for byte, so no golden of the tree moved;
+   past the width, its cells wrap, then key/value records, stacked
+   records, or its source rows as they came; a box from a
+   `glyph.Border`. `Plain` fits its tables at its width, and the `Printer`
+   does not (D20).
+3. **`Bounded`** (`stream/bounded.go`), **`Messages` and `MsgOmitted`**
+   (`stream/messages.go`); `stream.Option` gains `applyBounded`, and
+   `WithRules`, `WithMethod`, `WithMaxBytes`, `WithHeadLines`,
+   `WithTailLines`, `WithMaxLineBytes`, `WithGlyphs` and `WithCatalog`
+   apply to it.
+4. **`Highlighter`, `HighlighterFunc`, `WithHighlighter`,
+   `WithHighlightLimits` and `Doc.SetRevision`** (`stream/highlight.go`,
+   `stream/document.go`): the `Printer` highlights each fenced line as it
+   prints it; a `Doc` with `Plain` highlights through `Plain`'s `Printer`,
+   scanning each render input first for the blocks past a limit, and
+   keeps its tail's lines.
+5. **`RenderView`, `ViewLink`, `ViewCode`, `ViewTable`, `ViewRenderer`
+   and `Doc.View`** (`stream/view.go`): `Plain` is a `ViewRenderer`, its
+   `Printer` recording each row's source line, the links of each prose
+   line and heading, each code block and each table as it prints them;
+   the `Doc` keeps a segment's view per width, as its render, and takes
+   the tail's anew.
+6. **`DocPane`** gives its `Doc` its theme's ID as the revision at each
+   draw, before it records what it drew, and under a theme of ID 0 a new
+   revision each draw, from `1<<63` up, where no `theme.New` ID reaches.
+
+The agent's readings, where the API left the shape open:
+
+* **Highlighting** is of fenced code alone: indented code has no info
+  string, so no language. A `Highlighter` that returns a nil state is
+  given the block's every line so far with each next line, its cost
+  bounded by the line limit. A `Doc`'s tail keeps a fence's lines by its
+  opening line's offset in the document, so a cut moves no key; a fence a
+  cut commits is dropped from it.
+* **A `Printer`'s block past a limit is plain from the line that passes
+  it,** where D19 says "a block over any limit shows plain": a `Printer`
+  prints a line once, before the block's end is known. A `Doc`'s block is
+  plain whole, as D19 says, `overLimits` scanning its render input first.
+* **A link is reported on a prose line or a heading,** not in a table's
+  rows, whose cells `ViewTable` gives. A table's rows take its first
+  line's offset, since `FitTable`'s rows are not its source's one for
+  one. A reference link in a segment is reported once its definition is
+  committed, which is when the segment is rendered with it (D16).
+* **`Bounded` closes a head's SGR** by ending its last head line with
+  `CSI m` when any head line holds a sequence; a line is cut at a
+  character's start, so its cleaning makes no U+FFFD.
+* **`FitTable` pads a cell by at least nothing:** a cell wider than its
+  column, which correct widths never make, gives no negative
+  `strings.Repeat`, so that a wrong width is a wrong row and not a panic
+  (mutations A1.4.4 and A1.4.12 first panicked).
+
+**Tests:** `TestDocMath`, `TestDialect`; `TestFitTableFits`,
+`TestFitTableShrinks`, `TestFitTableFallbacks`, `TestFitTableWide`,
+`TestPlainFitsTables` and `TestFitTableGolden`, the box and the Markdown
+form across the matrix at 30 and 60 columns, the 8 goldens read before
+this record; `TestBoundedWithin`, `TestBoundedPast`, `TestBoundedLineCap`,
+`TestBoundedClean` and `TestBoundedCatalog`, `Messages()` through
+`msgcat.Check`; `TestHighlightGrowing`, `TestHighlightCaches`,
+`TestHighlightBudget`, `TestHighlightLimits` and `TestHighlightPrinter`;
+`TestViewIsRender`, `TestViewChunking`, `TestViewTables`,
+`TestViewWrappedLink`, `TestViewSplitFence` and `TestViewOtherRenderer`;
+`FuzzDoc` gains the view's chunking invariance and its rows being
+`Render`'s; in `streamtea`, `TestRevision`. All pass under `-race`, and
+every test of the tree's other packages as before, the line mode's
+goldens and allocation budgets among them.
+
+* Faults of the agent's, found by the tests and fixed: `FitTable`'s
+  source fallback rebuilt the rows from their cells, losing the
+  delimiter's colons; `Plain`'s view dropped its last line break, so its
+  rows did not join to `Render`'s after `Finish`; an indented block's end
+  left out its last line break. Test faults: `TestFitTableFits` wanted
+  the header left-aligned in a right-aligned column; the fallbacks'
+  first widths fitted the table's words; `TestHighlightBudget` and
+  `TestHighlightCaches` drew a second frame at the same version, which
+  `Render` gives back kept; `TestViewTables`' definition was the
+  document's last line, not yet committed.
+* **Fuzzing,** 5 minutes each: `FuzzDoc`, 19,259,376 executions, and
+  `FuzzPrinter`, 25,248,087: clean.
+* **The benchmark,** `BenchmarkDoc`, 200 KB in 20-byte chunks, no
+  highlighter: 1,125,834,112 bytes and 518,578 allocations an operation,
+  Step 5's 1.13 GB and 519,010; 0.17 to 0.21 s an operation in three runs
+  and three of one iteration each. Step 5 recorded 0.82 s, which the same
+  benchmark does not reproduce on the host now; the agent cannot say how
+  it was taken, and claims no speed-up.
+
+**Mutations,** `python3 -m tools.verify mutate`, on the final code:
+
+| Mutation | Its failure |
+| :--- | :--- |
+| A1.4.1 `RenderView` not cut back on a tail re-render | `TestViewWrappedLink`: "rows [\"Read [the whole\" … \"\" \"Read [the whole\" …]; want this frame's alone" |
+| A1.4.2 a single `~` striking | `TestDialect`: "\"~x~\\n\": \"\\x1b[2m~x~\\x1b[0m\\n\"; want \"~x~\\n\"" |
+| A1.4.3 the fence re-highlighted whole each line | `TestHighlightGrowing`: "\"line 27\" highlighted 23 times; want once" |
+| A1.4.4 `FitTable` padding by byte | `TestFitTableWide`: "rows of 14 and 16 cells" |
+| A1.4.5 `Bounded` counting rows instead of lines | `TestBoundedPast`: "5 lines of 200 bytes, one kept at each end: 9 omitted; want 3 lines" |
+| A1.4.6 the omitted line not from the catalogue | `TestBoundedCatalog`: "[\"line 1\" \"(3 lines not shown)\" \"line 5\"]; want the catalogue's line" |
+| A1.4.7 the math holdback ignored | `TestDocMath`: "an open \\(: \"the area \\\\(a^2\"; want \"the area \"" |
+| A1.4.8 a link's ID by its row | `TestViewTables`: "link [a link]: \"\", false; want \"https://e.x/t\" at its offset" |
+| A1.4.9 `SetRevision` keeping the segments | `TestHighlightCaches`: "after a new revision: 2 highlighted, version 4 after 3; want 4, raised" |
+| A1.4.10 the closed-fence cache never dropped | `TestHighlightBudget`: "past the budget, a second frame highlighted nothing" |
+| A1.4.11a a `Doc`'s whole-block limits ignored | `TestHighlightLimits`: "bytes, a Doc: … 1 highlighted; want the block plain" |
+| A1.4.11b a line's highlight limits ignored | `TestHighlightLimits`: "bytes, a Printer: … want the first line highlighted and the second plain" |
+| A1.4.12 `FitTable` breaking a word | `TestFitTableShrinks`: "a row of 70 cells at 60" |
+| A1.4.13 a fallback skipped | `TestFitTableFallbacks`: "at 7: [\"k: alpha\" …]; want [\"k\" \"  alpha\" …]" |
+| A1.4.14a `Bounded`'s floor `Text` | `TestBoundedClean`: "StatusLine keeps colour: [\"red \"]" |
+| A1.4.14b `Bounded` with no floor | `TestBoundedClean`: "the floor cuts a link StatusLine refuses" |
+| A1.4.15 a line's cap ignored | `TestBoundedLineCap`: "[\"abcdefghijkl\" …]; want the long lines cut at 8 bytes" |
+| A1.4.16 the pane giving no revision | `TestRevision`: "a new theme: the segment drawn 0 times more; want once" |
+| A1.4.17 a literal theme's revision reused | `TestRevision`: "a literal theme, two draws: the segment drawn 2 times more in all; want 3" |
+| A1.4.18 `Plain` not fitting its tables (D20) | `TestPlainFitsTables`: "Plain at 20: … want records" |
+| A1.4.19 a split fence's halves not joined | `TestViewSplitFence`: "code [{Info:sh Start:6 End:70 …} {Info:sh Start:70 …} …]; want one block" |
+
+`mutate: 21 killed, 0 survived, 0 errors`, each by its test's own
+assertion: no build failure and no panic among them. The step named six,
+D19 eight more; A1.4.7, A1.4.11b, A1.4.16 to A1.4.19 are the readings'
+and D20's. Three needed work: A1.4.1 first survived, since
+`TestViewWrappedLink` checked a part a row and a carried tail's parts
+fall on other rows; the test now holds the frame's rows to `Render`'s and
+the parts to consecutive rows. A1.4.13, first `if true`, did not compile,
+`pairs` then unused, so it counted for nothing; it is `pairs || true`.
+A1.4.4 and A1.4.12 first killed by a panic, a negative `strings.Repeat`;
+with the pad's clamp, by the tests' assertions.
+
+**Lint:** the pre-add check's first run found three findings in the
+agent's code, each fixed: `holdback`'s cognitive complexity, 62 and then
+51 against 50, its math and its code spans now `mathSpan` and
+`codeSpanEnd`; and `plain`'s `render` and `renderView`, differing from
+`Render` and `RenderView` by case alone (revive confusing-naming), now
+`drawWith` and `viewWith`. `make modernize` was clean, run before the
+gates this time.
+
+**The API,** `make apicheck`: "against v2.9.0, 0 incompatible
+change(s)": `stream.Option`'s third unexported method is compatible, as
+its second was; `stream` adds 22 names in this step, 60 since `v2.9.0`,
+D19's alone.
+
+**Gates,** with the step's files:
+
+| Host | `gates` |
+| :--- | :--- |
+| macOS | 22 passed, 0 failed, 0 skipped in 657 s |
+| `remote linux` | 21 passed, 0 failed, 1 skipped (`gofmt`) in 1066 s |
+| `remote windows` | 21 passed, 0 failed, 1 skipped (`gofmt`) in 2709 s, `script-test-check_ci_filters` among them (D18's flake did not recur) |
+
+* The pre-add check of the sixteen Go files, after its findings above,
+  `make modernize`, `internal/conformance`, the documents' checks and the
+  identifier scan, untracked files included: clean.
+* **Step A1.4 complete, 2026-11-03,** for the owner's commit. Step 8, the
+  examples, the guide and the root's release, is next.

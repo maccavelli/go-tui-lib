@@ -829,8 +829,10 @@ removes anything from it.
     source offset; the theme's revision reaches a `Doc` as a number,
     `Doc.SetRevision`, so that `stream` still imports no `theme`;
     `FitTable` takes `TableOptions`, its border a `glyph.Border` or the
-    Markdown form, and the `Printer` and `Plain` fit their tables with
-    it; `Bounded` keeps its head and tail in lines, its floor
+    Markdown form, and ~~the `Printer` and~~ `Plain` ~~fit their tables~~
+    fits its tables with it (*D20:* the `Printer`'s stay unwrapped, as
+    [0023-MADR-line-mode-components.md](0023-MADR-line-mode-components.md)
+    decided); `Bounded` keeps its head and tail in lines, its floor
     `safetext.StatusLine`, its omitted line `stream`'s first message,
     `MsgOmitted`.
 * **§6, `inputfilter` becomes a chain of stages.**
