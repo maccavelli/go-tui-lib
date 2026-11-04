@@ -1065,6 +1065,207 @@ Four parts, each passing its tests before the next.
   `~` striking; the fence re-highlighted whole each line; `FitTable`
   clipping by byte; `Bounded` counting rows instead of lines; the marker
   not from the catalogue.
+* *Written 2026-11-03 (D19), for the owner's review before any code:*
+  the step's API. Every type is `stream`'s, a core, which gains the
+  imports `glyph` (A1) and `msgcat`; `stream.Option` gains a third
+  unexported method, for `Bounded`, compatibly, as A7 item 6 found for
+  the second, and an option that means nothing to a `Printer`, a `Doc` or
+  a `Bounded` is documented as ignored by it.
+
+  ```go
+  // RenderView is a frame with its side-tables, for copying a code block,
+  // hit-testing a link and selecting text while a reply streams (A1 §4).
+  type RenderView struct {
+  	Lines   []string    // the frame's rows: Render's, split at its line breaks
+  	Offsets []int       // a row's source offset: the start of the source line it was
+  	                    // drawn from; of its segment, when the Renderer tells none; the
+  	                    // blank row between two segments, the next segment's
+  	Links   []ViewLink  // in row order
+  	Code    []ViewCode  // in source order
+  	Tables  []ViewTable // in source order
+  }
+
+  // ViewLink is a link's part on one row: a link wrapped over rows has a
+  // part a row, all with one ID.
+  type ViewLink struct {
+  	ID       int    // the source offset of the link's "[": the same in every frame,
+  	                // at every width and for any chunking
+  	URL      string // its destination, or its reference's, as the source has it
+  	Row      int
+  	From, To int    // its cells in the row, To excluded, under the Doc's method
+  }
+
+  // ViewCode is a code block: its info string and its body's source, for
+  // "copy code block", and the rows it was drawn on, its fences included.
+  type ViewCode struct {
+  	Info       string // the fence's info string; "" for indented code
+  	Start, End int    // its body's source bytes, the lines between its fences
+  	Row, Rows  int
+  }
+
+  // ViewTable is a table's cells as the source has them, its header first,
+  // for copying, and the rows it was drawn on.
+  type ViewTable struct {
+  	Cells     [][]string
+  	Row, Rows int
+  }
+
+  // ViewRenderer is a Renderer that tells its rows' lines and its
+  // side-tables, its offsets in src. Plain is one.
+  type ViewRenderer interface {
+  	Renderer
+  	RenderView(src string, width int) (RenderView, error)
+  }
+
+  // View is Render's frame with its side-tables. A segment's view is kept
+  // with its render; the tail's is taken anew each frame, so nothing of an
+  // earlier tail is carried; a code block a relaxed cut split is one
+  // ViewCode; after Finish, it is the Renderer's view of the whole source.
+  // With a Renderer that is not a ViewRenderer, a row's offset is its
+  // segment's, and there is no link, code block or table.
+  func (d *Doc) View(width int) RenderView
+
+  // Highlighter highlights code: lines, continuing from state, and the
+  // state after them, which a later call continues from, or nil when it
+  // cannot resume. out holds a line for each of lines, the same text
+  // styled; any other out is not used, and the lines show plain.
+  type Highlighter interface {
+  	Highlight(lang string, lines []string, state any) (out []string, next any)
+  }
+  type HighlighterFunc func(lang string, lines []string, state any) (out []string, next any)
+
+  // WithHighlighter highlights code blocks, lang the info string's first
+  // word: a Printer each code line as it prints it, from the state its
+  // last left; a Doc whose Renderer is Plain, nil or stream.Plain, its
+  // blocks, and a Doc with another Renderer ignores it. In a Doc:
+  //   - a committed segment's blocks are highlighted when it is rendered,
+  //     once a width, as the segment is;
+  //   - the tail's open fence resumes from the state after its last
+  //     complete line, so each line is highlighted once; under a nil state,
+  //     from its first line each frame;
+  //   - the tail's closed fences are kept by (info, body), up to twice the
+  //     byte limit, and all dropped when that overflows;
+  //   - a width change and a new revision drop both caches.
+  func WithHighlighter(h Highlighter) Option
+  // A block over any limit shows plain: 512 KiB, 10,000 lines, 4 KiB in a
+  // line, each kept by zero or less.
+  func WithHighlightLimits(maxBytes, maxLines, maxLineBytes int) Option
+
+  // SetRevision is the revision of what the Renderer and the Highlighter
+  // draw with, such as a theme.Theme's ID, which stream does not import; a
+  // different one drops every cache, the segments' and the frame's too.
+  func (d *Doc) SetRevision(rev uint64)
+
+  // WithMath makes a Doc's holdback hold an unclosed \( or $$ in the
+  // partial line too, as the other constructs, until it closes, the line
+  // completes or Finish; off by default. A Printer, which prints whole
+  // lines only, ignores it.
+  func WithMath() Option
+
+  // TableOptions is how FitTable lays a table out.
+  type TableOptions struct {
+  	Width  int           // cells; 0 or less: no limit, each column its widest cell
+  	Method ansi.Method
+  	Border *glyph.Border // nil: the Markdown form, pipes and a delimiter row, as
+  	                     // Plain draws; else a box of its glyphs, such as glyph.Set's
+  	                     // Light, whose ASCII twin glyph.ASCII() has
+  }
+
+  // FitTable lays out a closed table, rows its source lines: the header,
+  // the delimiter row and the body. Each column starts at its widest cell
+  // and shrinks no further than its longest word, the space left shared in
+  // proportion to what each still wants; a cell wraps at its spaces and no
+  // word is broken, so numbers and URLs stay whole; each row is padded by
+  // grapheme cluster under Method, so a wide glyph leaves no ghost cell.
+  // When the longest words do not fit, the rows are key/value records,
+  // "header: value", a blank line between records; when a pair does not
+  // fit one line, stacked records, the header on its line and the value
+  // under it indented two cells, wrapped; when a word is wider than Width,
+  // the source rows as they came.
+  func FitTable(rows []string, o TableOptions) []string
+  // A Printer and Plain lay their tables out by FitTable at their width,
+  // in the Markdown form: a table wider than the width is a record each
+  // row, where it ran past the width before. WithoutTableLayout keeps the
+  // rows as they came.
+
+  // Bounded holds live output, such as a tool's (A1 §4): all of it up to a
+  // byte limit, then its first lines and its last, each line capped, the
+  // lines between counted. The count is in lines, which no width changes.
+  // It is used on one goroutine.
+  type Bounded struct{ /* ... */ }
+  func NewBounded(o ...Option) *Bounded
+  func (b *Bounded) Write(p []byte) (int, error) // split into lines, each cleaned by its
+  	// rules, then StatusLine's, whose rules make one line
+  func (b *Bounded) Lines() []string // the head; the omitted line, when lines are left out;
+  	// the tail, the last line as far as it has come. A head line an SGR
+  	// left open is closed before the omitted line.
+  func (b *Bounded) Omitted() int    // the lines left out
+  func (b *Bounded) Render(width int) string // Lines wrapped at width cells, by its method
+  func WithMaxBytes(n int) Option     // 64 KiB: all is kept up to it
+  func WithHeadLines(n int) Option    // 20: the first lines kept past it
+  func WithTailLines(n int) Option    // 20: the last lines kept past it
+  func WithMaxLineBytes(n int) Option // 4 KiB: a longer line is cut, ending with the Ellipsis
+  func WithGlyphs(g glyph.Set) Option // Bounded's Ellipsis: glyph.Unicode() by default
+  func WithCatalog(c msgcat.Catalog) Option
+  	// each With… of a size: zero or less keeps the default
+  	// WithRules and WithMethod apply to a Bounded too: its rules
+  	// safetext.Text() by default, and never less than safetext.StatusLine(),
+  	// its floor, which keeps SGR, and OSC 8 links to http, https and mailto
+  	// targets, alone; so a program keeps a tool's colours with
+  	// WithRules(safetext.StatusLine())
+
+  // stream's first text a user is shown (0024-MADR D9).
+  const MsgOmitted msgcat.MessageID = "stream.omitted" // "(%d lines not shown)"
+  func Messages() msgcat.Table
+  ```
+
+  *The agent's readings, for the owner's review:*
+  * **The dialect needs no code:** the `Printer`, and so `Plain`, already
+    strike `~~` alone (`stream/inline.go:182-186`), so the step's tests of
+    it are tests only.
+  * **A `Renderer` reports through `ViewRenderer`,** an interface beside
+    `Renderer`, so that a renderer such as Step 7's glamour adapter, which
+    reports nothing, still works, as A1 says "A `Renderer` that cannot
+    report a table returns none, and `Doc` derives the line map itself".
+  * **A link's ID is its source offset,** which no tail render, width or
+    chunking changes; A1 asks only that the IDs continue.
+  * **The theme reaches the `Doc` as a number,** `SetRevision`, since A6
+    Q9 keeps `theme` out of `stream`. `DocPane` sets it to its theme's ID
+    at each draw, and, under a theme of ID 0, to a new revision of its
+    own each draw, so that a literal theme draws right at the cost of
+    every cache, as A7 item 4 says.
+  * **`FitTable` changes the `Printer`'s and `Plain`'s tables** past their
+    width: from a row running past it to records. That is what A1 Q8,
+    "so `Plain` can lay out tables", chose; it changes the line mode's
+    output, which a release note says.
+  * **`Bounded`'s floor is `StatusLine`, not `Text`:** A1 closes "an
+    escape sequence cut off at the head", which `Text`, removing every
+    sequence, would leave none of. Its default is still `Text`.
+  * **The numbers the agent chose, with no source:** `Bounded`'s 64 KiB,
+    20 and 20 lines and 4 KiB a line, and the closed fences' budget, twice
+    the byte limit. The 512 KiB, 10,000 lines and 4 KiB are A1's, codex's.
+  * **`DocPane` takes no catalogue:** it draws no `Bounded` and no text of
+    `stream`'s, so the step's "`DocPane` passes its catalogue on" has
+    nothing to pass. Should a pane draw a `Bounded` later, it takes one
+    then.
+* *(D19)* **Tests,** besides those above: `View`'s rows joined are
+  `Render`'s; its offsets and side-tables the same for any chunking,
+  after `Finish` too; a fence split by a relaxed cut one `ViewCode`;
+  `ViewTable`'s cells as the source has them; a Renderer that is not a
+  `ViewRenderer` giving segment offsets and no side-table; `SetRevision`
+  rendering every segment again; `WithHighlightLimits`; `FitTable` with a
+  box border and with none, each fallback at the width that brings it;
+  the `Printer`'s table past its width as records; `Bounded` under the
+  byte limit keeping all, over it head and tail with the omitted line, a
+  line past its cap cut with the Ellipsis, a line with no newline
+  bounded, `WithRules(safetext.StatusLine())` keeping colour and the
+  floor removing what `StatusLine` does, `WithCatalog`'s text; and
+  `Messages()` through `msgcat.Check`.
+* *(D19)* **Mutations,** besides those above: a link's ID by its row;
+  `SetRevision` keeping the segments; the closed-fence cache never
+  dropped; the highlight limits ignored; `FitTable` breaking a word; a
+  fallback skipped; `Bounded`'s floor `Text`, or none; a line's cap
+  ignored.
 
 ### Step 8: the examples, the guide, and the root's release
 
@@ -2662,3 +2863,33 @@ change(s)"; with compatible changes listed, `theme` adds
 * **Step 6 complete, 2026-11-03,** for the owner's commit. Step A1.4,
   `RenderView`, the dialect, `Highlighter`, `FitTable` and `Bounded`, is
   next.
+
+### Step A1.4: `RenderView`, the dialect, `Highlighter`, `FitTable` and `Bounded`
+
+*2026-11-03.* The owner committed Step 6 (`4413f94`) and 0022-MADR A1,
+proposed (`b25f461`), pushed `main`, and said "pushed, proceed".
+
+* **Deviation D19, 2026-11-03: the step's API.**
+  * **Found** reading the step against A1 before any code: the step gives
+    "The API, A1's, with A4's names", and A1 gives shapes, not
+    signatures. Six parts have none: how a `Renderer` reports
+    `RenderView`'s rows, links and code, when `Render` returns a string;
+    how a `Doc` learns the theme revision its `Highlighter`'s caches drop
+    on, when A6 Q9 keeps `theme` out of `stream`; the math holdback's
+    option; `Bounded`'s type and methods; `FitTable`'s signature and its
+    borders, against the pipes `layoutTable` draws; and `stream`'s
+    catalogue, and what "`DocPane` passes its catalogue on" passes it to.
+  * **Resolutions offered:** the whole API written into the records
+    first, as D13 did for Step A1.3 (recommended); the step in two, the
+    parts whose shape is plain first; or each choice asked at once, and
+    all built in one step.
+  * **Chosen by the owner,** 2026-11-03: "Write the whole API first
+    (Recommended)". The step's text now carries it, for the owner's review
+    and commit; no code is written until the owner approves it. 0009-MADR
+    A1 §4 is annotated, the glossary reserves the new names, and
+    `docs/guides/defaults.md` gains the defaults, `planned`.
+    `python3 -m tools.verify names` over `RenderView`, `ViewLink`,
+    `ViewCode`, `ViewTable`, `ViewRenderer`, `Highlighter`,
+    `HighlighterFunc`, `Bounded` and `TableOptions`: clean.
+* **Step A1.4's API written, 2026-11-03,** a change to the records alone,
+  for the owner's review and commit.

@@ -181,8 +181,9 @@ and D13) reserve these, which its PLAN builds: in `frame`, `DueMsg`, `Queue`,
 `ReplyMatcherFunc` and `ClipboardImageRequestMsg`; in `inputfilter/inputfiltertea`, `Filter` and
 `CoalescedWheelMsg`; in `stream`, `InterpretOptions`, `InterpretRow`,
 `Scanner`, `Block`, `BlockKind`, `Doc`, `Renderer`, `RendererFunc`,
-`Buffer`, `RenderView`, `Highlighter`, `HighlighterFunc`, `Bounded` and
-`Writer` (A8); in
+`Buffer`, `RenderView`, `Highlighter`, `HighlighterFunc`, `Bounded`,
+`ViewRenderer`, `ViewLink`, `ViewCode`, `ViewTable` and `TableOptions`
+(0009-PLAN D19) and `Writer` (A8); in
 `stream/streamtea`, `DocPane`; and `theme.Theme`'s method `ID`. A1's
 `safetext.Row` is not among them: it is `ask.Row`'s name, and
 `Interpret`'s row is `stream.InterpretRow` (0009-MADR A6 item 3, A7 Q13).

@@ -822,6 +822,17 @@ removes anything from it.
     omitted-bytes marker. Truncation counts wrapped rows and reports the
     omitted count in logical lines, so the count does not change with
     width.
+  * *Specified 2026-11-03, by
+    [0009-PLAN-streaming-content-engine.md](0009-PLAN-streaming-content-engine.md)
+    D19:* the PLAN's Step A1.4 gives the API: a `Renderer` reports its
+    side-tables as a `ViewRenderer`, `Plain` one; a link's ID is its
+    source offset; the theme's revision reaches a `Doc` as a number,
+    `Doc.SetRevision`, so that `stream` still imports no `theme`;
+    `FitTable` takes `TableOptions`, its border a `glyph.Border` or the
+    Markdown form, and the `Printer` and `Plain` fit their tables with
+    it; `Bounded` keeps its head and tail in lines, its floor
+    `safetext.StatusLine`, its omitted line `stream`'s first message,
+    `MsgOmitted`.
 * **§6, `inputfilter` becomes a chain of stages.**
   * **Fragment reassembly.** SGR mouse and focus reports split across reads
     are rejoined (report §8.5).
