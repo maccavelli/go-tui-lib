@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in-progress
 date: 2026-11-04
 associated-madr: "0025-MADR-charm-free-stream-allocations.md"
 ---
@@ -363,3 +363,12 @@ numbers are measured in the tree, before and after.
   its tests. After the tag, it stays (API convention 1); a fault in it is
   fixed forward in a patch release.
 * Nothing persists: no file format, no state outside the process.
+
+## Execution record
+
+### Step 1: records
+
+*2026-11-04.* The owner committed the MADR and this PLAN as proposed
+(`4e1a51f`) and said "accept the madr, approved to proceed". The MADR is
+`accepted`, with those words; this PLAN `in-progress`; `docs/README.md`'s
+two rows. Records only. **Step 1 complete, 2026-11-04.**

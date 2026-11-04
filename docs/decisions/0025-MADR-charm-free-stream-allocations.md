@@ -1,11 +1,14 @@
 ---
-status: proposed
+status: accepted
 date: 2026-11-04
 decision-makers: the repository owner
 consulted: "allocation profiles, escape analysis and scratch prototypes of stream, transcript and safetext at a8ff40f, measured by the agent"
 informed: gobble-cli and pi-go, the library's consumers
 ---
 # Draw a Doc's frame without copying its prefix, stream a Printer's chunks without copying the line again, and keep no sanitizer in a finished reply
+
+*Accepted 2026-11-04,* by the owner's "accept the madr, approved to
+proceed", after the records were committed as proposed (`4e1a51f`).
 
 ## Context and Problem Statement
 
