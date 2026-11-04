@@ -1,6 +1,7 @@
 package transcript_test
 
 import (
+	"fmt"
 	"os"
 	"slices"
 	"strings"
@@ -135,6 +136,98 @@ func TestHostReprint(t *testing.T) {
 		if ansi.WcWidth.StringWidth(l) > 40 {
 			t.Errorf("row %q is wider than 40", l)
 		}
+	}
+}
+
+// TestHostReprintMidParagraph: issue #15. A host streams a long paragraph
+// above a one-row region, and the terminal narrows from 60 columns to 40
+// while it streams. Once the resize settles, HandleTimeout with the host's
+// own idle gives the reprint at once, the reply's Printer still holding a
+// line; the host writes it with region.Print and streams on at the new
+// width. Once the reply ends, the screen holds every word once and in
+// order, no row wider than 40, the prompt below (0023-MADR A15).
+func TestHostReprintMidParagraph(t *testing.T) {
+	scr := inlinetest.NewScreen(60, 40, ansi.WcWidth)
+	region := inline.NewRegion(inline.WithoutCursorQuery())
+	tr := transcript.NewTranscript()
+	now := t0
+	write := func(s string) { _, _ = scr.Write([]byte(s)) }
+	prompt := []string{"> "}
+	show := func(s string) {
+		if s != "" {
+			write(region.Print(s))
+			write(region.Draw(prompt, 0, 2))
+		}
+	}
+	write(region.Resize(60, now))
+	tr.Resize(60, now)
+	write(region.Draw(prompt, 0, 2))
+	tr.AddText("> stream a long paragraph\n")
+	show("> stream a long paragraph\n")
+	p := stream.NewPrinter(stream.WithWidth(60))
+	tr.AddReply(p)
+
+	// Twelve source lines of one paragraph, each nine words and 62 cells,
+	// wider than either width.
+	var words, lines []string
+	for i := range 12 {
+		var l []string
+		for j := range 9 {
+			l = append(l, fmt.Sprintf("word%02d", i*9+j))
+		}
+		words = append(words, l...)
+		lines = append(lines, strings.Join(l, " ")+"\n")
+	}
+	feed := func(ls []string) {
+		for _, l := range ls {
+			show(p.Write(l[:20]))
+			show(p.Write(l[20:]))
+		}
+	}
+	feed(lines[:5])
+
+	now = now.Add(time.Second)
+	scr.Resize(40, inline.ReflowDown)
+	write(region.Resize(40, now))
+	tr.Resize(40, now)
+	p.SetWidth(40)
+	due, ok := tr.Timeout()
+	if !ok {
+		t.Fatal("no settle deadline after the resize")
+	}
+	if p.Idle() {
+		t.Fatal("the Printer is idle mid-paragraph")
+	}
+	out := tr.HandleTimeout(due, true)
+	if out == "" {
+		t.Fatal("no reprint at the settle's end with the host's output idle, the reply's line held")
+	}
+	write(region.Print(out))
+	feed(lines[5:])
+	show(p.Flush())
+
+	var rows []string
+	for _, l := range append(scr.Scrollback(), scr.Lines()...) {
+		if l = strings.TrimRight(l, " "); l != "" {
+			rows = append(rows, l)
+		}
+		if ansi.WcWidth.StringWidth(l) > 40 {
+			t.Errorf("row %q is wider than 40", l)
+		}
+	}
+	var shown []string
+	for _, r := range rows {
+		for w := range strings.FieldsSeq(r) {
+			if strings.HasPrefix(w, "word") {
+				shown = append(shown, w)
+			}
+		}
+	}
+	if !slices.Equal(shown, words) {
+		t.Fatalf("the words shown are\n%q\nwant each once, in order\n%q\nscreen:\n%s", shown, words, scr.Text())
+	}
+	if n := len(rows); n < 2 || rows[0] != "> stream a long paragraph" || rows[n-1] != ">" {
+		t.Fatalf("rows %q: want the submitted line first and the prompt last", rows)
 	}
 }
 

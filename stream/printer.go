@@ -103,19 +103,46 @@ func (p *Printer) Source() string { return p.source.String() }
 // Printer. While this one is Idle, At gives what it would have printed so
 // far had its width been width all along; a transcript draws a reply again
 // so on a resize (docs/decisions/0023-MADR-line-mode-components.md A8 item
-// 2, A9 item 2).
-func (p *Printer) At(width int) string {
+// 2, A9 item 2). A transcript's reprint draws a reply by Printed, which
+// leaves out what this Printer holds back, so that nothing it prints
+// after is drawn twice (A15).
+func (p *Printer) At(width int) string { return p.draw(p.Source(), width) }
+
+// Printed is the Source as far as this Printer has printed it, drawn
+// afresh at width as At draws the whole: the held paragraph line, a held
+// table and the partial line left out. It changes nothing in this Printer.
+// Printed, then what this Printer prints after it at the width SetWidth
+// gives, is the whole reply at that width, with no line twice and none
+// lost; while this Printer is Idle, Printed is At. A transcript draws a
+// kept reply so on a reprint, which then waits for no reply to be idle
+// (docs/decisions/0023-MADR-line-mode-components.md A15).
+func (p *Printer) Printed(width int) string {
+	end := p.at
+	switch {
+	case len(p.table) > 0:
+		end = p.tableAt
+	case p.holding:
+		end = p.heldAt
+	}
+	return p.draw(p.Source()[:end], width)
+}
+
+// draw is src, a part of the Source from its start, given to a new Printer
+// with this one's options at width, with no sanitizer, since it is cleaned
+// already, then ended as Flush ends a reply.
+func (p *Printer) draw(src string, width int) string {
 	q := &Printer{markup: p.markup, method: p.method, width: width, rules: p.rules, asIs: p.asIs, crlf: p.crlf, defs: map[string]bool{}}
 	if p.hl != nil {
 		q.hl = &highlight{h: p.hl.h, lim: p.hl.lim}
 	}
-	q.clean.b.WriteString(p.Source()) // cleaned already, by the rules and then the floor
+	q.clean.b.WriteString(src) // cleaned already, by the rules and then the floor
 	q.end()
 	return q.drain()
 }
 
 // Idle reports whether the Printer holds nothing back: what it printed
-// ends a line, and no line, table or part of one waits.
+// ends a line, and no line, table or part of one waits. A transcript's
+// reprint no longer needs it (Printed).
 func (p *Printer) Idle() bool {
 	return p.partial == "" && !p.holding && len(p.table) == 0 && p.clean.b.Len() == 0
 }

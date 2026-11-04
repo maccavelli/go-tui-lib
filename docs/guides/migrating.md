@@ -7,6 +7,53 @@ needs a major version, at a new module path
 ([AGENTS.md, API conventions](../../AGENTS.md#api-conventions), rule 1).
 Up to `v0.12.0`, a deprecated name was removed in the next minor release.
 
+## Migrating to `v2.11.0`
+
+`v2.11.0` is a minor release, for issue #15. It adds one method,
+`stream.Printer.Printed`, and changes how a `transcript.Transcript` draws
+a kept reply, below. Nothing is removed or retyped: `make apicheck`
+against `v2.10.0` reports 0 incompatible changes
+([0023-MADR-line-mode-components.md](../decisions/0023-MADR-line-mode-components.md)
+A15,
+[0023-PLAN-line-mode-components.md](../decisions/0023-PLAN-line-mode-components.md)
+Step 7f). A program on `v2.10.0` needs no change:
+
+```bash
+go get github.com/maccavelli/go-tui-lib/v2@v2.11.0
+```
+
+### Added
+
+- **`Printer.Printed(width int) string`:** the Source as far as the
+  Printer has printed it, drawn afresh at width, the held paragraph line,
+  a held table and the partial line left out. What the Printer prints
+  after it, at the width `SetWidth` gives, continues it, with no line
+  twice and none lost. While the Printer is `Idle`, `Printed` is `At`.
+
+### Changed
+
+- **A `Transcript` draws a kept reply by `Printed`,** not `At`. The
+  `idle` of `HandleTimeout` and `Reprint` is the host's own output alone,
+  at a line's start: a reprint no longer waits for a reply's Printer to
+  be idle, which through a long paragraph it never is. The line the
+  Printer holds follows the reprint when the Printer prints it, at the new
+  width.
+  - A host that passes the reply's `Idle()`, as the recipe did, gets the
+    reprints `v2.10.0` gives.
+  - A host that passed `true` while a reply held a line got that line in
+    the reprint and then again from the Printer; it now gets it once.
+
+### The recipe
+
+A host that writes whole lines, as a reply's Printer gives them, is at a
+line's start whenever it calls:
+
+```go
+if out := tr.HandleTimeout(now, true); out != "" {
+    write(region.Print(out))
+}
+```
+
 ## Migrating to `v2.10.0`
 
 `v2.10.0` is a minor release: the streaming content engine

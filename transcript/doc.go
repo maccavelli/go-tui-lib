@@ -6,15 +6,23 @@
 // A Transcript holds pieces in the order they were shown: text kept as it
 // was written, cleaned (AddText); a function of the width, drawn anew at
 // each width, such as a help listing or a log record (AddDrawn); and a
-// reply, a stream.Printer, drawn again from its source by Printer.At
-// (AddReply). It keeps at most WithMaxBytes bytes, 4 MiB by default; past
+// reply, a stream.Printer, drawn again from its source by Printer.Printed,
+// as far as it has printed it (AddReply). It keeps at most WithMaxBytes
+// bytes, 4 MiB by default; past
 // that, the oldest pieces go.
 //
 // The host gives it the width with Resize. The first Resize sets the width;
 // a later one with another width starts the settle, WithSettle after the
 // last resize, 150 ms by default, whose deadline Timeout gives. Once it has
 // passed, HandleTimeout gives the reprint when the host says its output is
-// idle: at a line's start, its Printer idle. A reprint still due waits for
+// idle: at a line's start. A reply's Printer need not be idle: the reprint
+// draws what it has printed, and a line it holds back, such as a
+// paragraph's last until the next comes, follows the reprint when the
+// Printer prints it, at the new width
+// (docs/decisions/0023-MADR-line-mode-components.md A15). Before v2.11.0
+// the reprint waited for every reply's Printer to be idle, and a host that
+// still passes the reply's Idle gets the same reprints as then. A reprint
+// still due waits for
 // the next HandleTimeout(now, true), so the host calls it whenever its
 // output becomes idle; it gives "" when nothing is due. Timeout gives no
 // deadline then, so a host never waits on one that has passed.

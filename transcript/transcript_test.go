@@ -174,20 +174,62 @@ func TestBound(t *testing.T) {
 	}
 }
 
-// TestReplyGrows: a reply added before it ends is drawn whole at the
-// reprint, and its source counts against the bound as it grows.
+// TestReplyGrows: a reply added before it ends is drawn at the reprint as
+// far as its Printer has printed it, the line it holds printed after, each
+// line once; and its source counts against the bound as it grows
+// (0023-MADR A15, 0023-PLAN D33).
 func TestReplyGrows(t *testing.T) {
 	tr := transcript.NewTranscript(transcript.WithMaxBytes(30))
 	tr.AddText("before\n")
 	p := stream.NewPrinter()
 	tr.AddReply(p)
 	p.Write("first line\n")
-	if got := body(t, reprint(t, tr, 80)); got != "before\nfirst line\n" {
-		t.Fatalf("%q", got)
+	if got := body(t, reprint(t, tr, 80)); got != "before\n" {
+		t.Fatalf("the reply's held line drawn: %q", got)
 	}
-	p.Write("a second line, longer\n")
-	if got := body(t, reprint(t, tr, 80)); got != notice+"first line\na second line, longer\n" {
+	if got := p.Write("a second line, longer\n"); got != "first line\n" {
+		t.Fatalf("after the reprint, the Printer printed %q; want its held line", got)
+	}
+	if got := body(t, reprint(t, tr, 80)); got != notice+"first line\n" {
 		t.Fatalf("the grown reply not counted against the bound: %q", got)
+	}
+	if got := p.Flush(); got != "a second line, longer\n" {
+		t.Fatalf("at the reply's end, the Printer printed %q; want its held line", got)
+	}
+}
+
+// TestReprintHeldLine: a kept reply is drawn as far as its Printer has
+// printed it. With a paragraph's line, a table or a partial line held, the
+// reprint leaves it out, for the Printer to print after; with the Printer
+// idle, the reprint draws the reply whole, by At, the bytes v2.10.0 gives
+// (0023-MADR A15).
+func TestReprintHeldLine(t *testing.T) {
+	for _, c := range []struct {
+		name, in, want string
+		idle           bool
+	}{
+		{"a paragraph's line held", "one two three four five\nsix seven\n", "one two three four\nfive\n", false},
+		{"a table held", "before\n\n| a | b |\n| - | - |\n| 1 | 2 |\n", "before\n\n", false},
+		{"a partial line", "done\n\npart", "done\n\n", false},
+		{"idle", "one two three four five\n\n", "one two three four\nfive\n\n", true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			tr := transcript.NewTranscript()
+			tr.AddText("x\n")
+			p := stream.NewPrinter(stream.WithWidth(20))
+			tr.AddReply(p)
+			p.Write(c.in)
+			if p.Idle() != c.idle {
+				t.Fatalf("Idle = %v; want %v", p.Idle(), c.idle)
+			}
+			got := body(t, reprint(t, tr, 20))
+			if got != "x\n"+c.want {
+				t.Fatalf("reprint %q; want %q", got, "x\n"+c.want)
+			}
+			if c.idle && got != "x\n"+p.At(20) {
+				t.Fatalf("idle, reprint %q; want At's %q", got, "x\n"+p.At(20))
+			}
+		})
 	}
 }
 

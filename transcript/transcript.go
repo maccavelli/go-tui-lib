@@ -78,11 +78,14 @@ func (t *Transcript) AddDrawn(f func(width int) string) {
 	}
 }
 
-// AddReply keeps p, a reply, drawn again from its cleaned source by p.At at
-// each reprint's width. Its size is its source's, as the reply grows.
+// AddReply keeps p, a reply, drawn again from its cleaned source by
+// p.Printed at each reprint's width: what p has printed, and not the line
+// or table it holds, which p prints after the reprint at the new width
+// (docs/decisions/0023-MADR-line-mode-components.md A15). Its size is its
+// source's, as the reply grows.
 //
 // From then on p is part of the Transcript's state: each Add reads every
-// kept reply's Source, and a reprint calls At. So every call on p, Write,
+// kept reply's Source, and a reprint calls Printed. So every call on p, Write,
 // Flush and SetWidth among them, is serialized with the Transcript's own
 // calls, on its goroutine or under the host's lock
 // (docs/decisions/0023-MADR-line-mode-components.md A14 item 7).
@@ -124,7 +127,7 @@ func (p *piece) bytes() int {
 func (p *piece) at(width int) string {
 	switch {
 	case p.reply != nil:
-		return p.reply.At(width)
+		return p.reply.Printed(width)
 	case p.drawn != nil:
 		return p.drawn(width)
 	}
@@ -158,10 +161,13 @@ func (t *Transcript) Timeout() (time.Time, bool) {
 }
 
 // HandleTimeout gives the reprint once the last resize has settled and the
-// host's output is idle, at a line's start with nothing held; otherwise "".
-// A reprint still due after the settle waits for the next call with idle
-// true, so the host calls it whenever its output becomes idle
-// (docs/decisions/0023-MADR-line-mode-components.md A8 item 4).
+// host's output is idle, at a line's start; otherwise "". idle is the
+// host's own output alone: a kept reply's Printer need not be idle, since
+// the reprint draws only what it has printed, and the line it holds
+// follows when it prints it (docs/decisions/0023-MADR-line-mode-components.md
+// A15). A reprint still due after the settle waits for the next call with
+// idle true, so the host calls it whenever its output becomes idle (A8
+// item 4).
 func (t *Transcript) HandleTimeout(now time.Time, idle bool) string {
 	if t.settling && !now.Before(t.due) {
 		t.settling, t.pending = false, true
@@ -177,10 +183,10 @@ func (t *Transcript) HandleTimeout(now time.Time, idle bool) string {
 // idle, the reprint now at the last Resize's width, the bytes HandleTimeout
 // would give, ending a settle in progress so that no second follows. Not
 // idle, it gives "" and ends the settle, and the reprint is due at the next
-// HandleTimeout with idle true: a reply's Printer still holding a line
-// would print it again after a reprint that drew it. Before the first
-// Resize it gives "" and changes nothing
-// (docs/decisions/0023-MADR-line-mode-components.md A14 item 6).
+// HandleTimeout with idle true. idle is the host's own output, at a line's
+// start, as HandleTimeout's is. Before the first Resize it gives "" and
+// changes nothing (docs/decisions/0023-MADR-line-mode-components.md A14
+// item 6, A15).
 func (t *Transcript) Reprint(idle bool) string {
 	if t.width == 0 {
 		return ""

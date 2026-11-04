@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -434,6 +435,84 @@ func TestAt(t *testing.T) {
 	}
 }
 
+// TestPrinted: for a reply in chunks of 1, 3, 7, 16 and 64 bytes, at every
+// point between Writes, Printed(40), then all the Printer prints after it
+// at 40, its Flush among it, is the whole reply printed at 40: styled,
+// highlighted, and with no table layout and CR LF; Printed is At whenever
+// the Printer is Idle; and Printed changes nothing in the Printer, which
+// prints after it what a twin given the same chunks prints without the
+// call (0023-MADR A15 item 5).
+func TestPrinted(t *testing.T) {
+	reply, err := os.ReadFile("testdata/reply.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	docs := []string{string(reply),
+		"Title\n===\n\npara one two three four five six seven eight nine ten\nmore of it\n\n| a | b |\n| - | - |\n| 1 | 2 |\nafter the table\n",
+		"- item one is long enough to wrap at forty cells or so\n  continued\n\n```go\nx := 1\ny := 2\n```\nend with no newline",
+		"[x]: http://e\n\nsee [x] and **bold**\nline two\nline three",
+	}
+	numbered := HighlighterFunc(func(_ string, lines []string, state any) ([]string, any) {
+		n, _ := state.(int)
+		out := make([]string, len(lines))
+		for i, l := range lines {
+			out[i] = fmt.Sprintf("\x1b[1m%d %s\x1b[m", n+i, l)
+		}
+		return out, n + len(lines)
+	})
+	points, idle := 0, 0
+	for _, o := range [][]Option{
+		{WithMarkup(DefaultMarkup())},
+		{WithMarkup(DefaultMarkup()), WithHighlighter(numbered)},
+		{WithoutTableLayout(), WithCRLF()},
+	} {
+		at := func(width int) *Printer { return NewPrinter(append(slices.Clip(o), WithWidth(width))...) }
+		for _, doc := range docs {
+			w := at(40)
+			want := w.Write(doc) + w.Flush()
+			for _, size := range []int{1, 3, 7, 16, 64} {
+				var chunks []string
+				for i := 0; i < len(doc); i += size {
+					chunks = append(chunks, doc[i:min(i+size, len(doc))])
+				}
+				for k := 0; k <= len(chunks); k++ {
+					p, twin := at(80), at(80)
+					for _, c := range chunks[:k] {
+						p.Write(c)
+						twin.Write(c)
+					}
+					got := p.Printed(40)
+					if p.Idle() {
+						idle++
+						if a := p.At(40); got != a {
+							t.Fatalf("%q, size %d, point %d, idle: Printed %q; At %q", doc[:min(len(doc), 20)], size, k, got, a)
+						}
+					}
+					p.SetWidth(40)
+					twin.SetWidth(40)
+					var rest, twinRest strings.Builder
+					for _, c := range chunks[k:] {
+						rest.WriteString(p.Write(c))
+						twinRest.WriteString(twin.Write(c))
+					}
+					rest.WriteString(p.Flush())
+					twinRest.WriteString(twin.Flush())
+					if rest.String() != twinRest.String() {
+						t.Fatalf("%q, size %d, point %d: after Printed the Printer printed\n%q\nand without it\n%q", doc[:min(len(doc), 20)], size, k, rest.String(), twinRest.String())
+					}
+					if got += rest.String(); got != want {
+						t.Fatalf("%q, size %d, point %d of %d: Printed and the rest\n%q\nwant\n%q", doc[:min(len(doc), 20)], size, k, len(chunks), got, want)
+					}
+					points++
+				}
+			}
+		}
+	}
+	if idle == 0 || idle == points {
+		t.Fatalf("%d points, %d of them idle; want some of each", points, idle)
+	}
+}
+
 // TestSource: Source is the cleaned source, across a Flush; Idle is true
 // only at a line's start with nothing held.
 func TestSource(t *testing.T) {
@@ -453,9 +532,11 @@ func TestSource(t *testing.T) {
 }
 
 // FuzzPrinter: for any reply, the Printer does not panic; a split in two at
-// any byte gives what the whole reply gives; DefaultMarkup's output less its
-// escapes is the zero Markup's; and, when every line is prose, each word on
-// a row but its first ends within the width or would open a block there.
+// any byte gives what the whole reply gives; Printed at the split, then
+// what the Printer prints after it at that width, gives it too (0023-MADR
+// A15); DefaultMarkup's output less its escapes is the zero Markup's; and,
+// when every line is prose, each word on a row but its first ends within
+// the width or would open a block there.
 func FuzzPrinter(f *testing.F) {
 	in, err := os.ReadFile("testdata/style.input.txt")
 	if err != nil {
@@ -478,6 +559,13 @@ func FuzzPrinter(f *testing.F) {
 		c := int(cut) % (len(s) + 1)
 		if got := print([]string{s[:c], s[c:]}, WithWidth(w)); got != plain {
 			t.Fatalf("split at %d: %q; whole: %q", c, got, plain)
+		}
+		q := NewPrinter(WithWidth(48 - w))
+		q.Write(s[:c])
+		got := q.Printed(w)
+		q.SetWidth(w)
+		if got += q.Write(s[c:]) + q.Flush(); got != plain {
+			t.Fatalf("Printed(%d) at %d, the Printer at %d till then, and the rest: %q; whole: %q", w, c, 48-w, got, plain)
 		}
 		if got := ansi.Strip(print([]string{s}, WithWidth(w), WithMarkup(DefaultMarkup()))); got != plain {
 			t.Fatalf("styled less its escapes: %q; plain: %q", got, plain)

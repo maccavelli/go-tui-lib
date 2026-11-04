@@ -2183,7 +2183,9 @@ facts".
 
 ### A15 (2026-11-04): a reprint while a reply holds a line (issue #15)
 
-*Status: proposed (2026-11-04),* for issue #15, filed for gobble-cli's
+*Status: accepted (2026-11-04),* the owner's "committed, proceed", after
+the records were committed (`56d2a6e`). Proposed the same day, for issue
+#15, filed for gobble-cli's
 `0035-PLAN-pin-current-sibling-releases-and-remove-gobble-copies.md` P18a
 (its deviation 19), from the owner's choice of the issue's option A on
 2026-11-03, "draft it after the release, option A", after `v2.10.0`'s
@@ -2256,7 +2258,13 @@ release. To be implemented by [0023-PLAN-line-mode-components.md](0023-PLAN-line
 9. **The release.** `Printed` is an addition, so the next minor, `v2.11.0`,
    or whichever the owner names; `make apicheck` stays at 0 incompatible
    changes. A reprint's bytes change only for a host that passes `idle`
-   true while a reply holds a line, whose reprint `v2.10.0` held back.
+   true while a reply holds a line, ~~whose reprint `v2.10.0` held
+   back~~. *Corrected 2026-11-04,* by
+   [0023-PLAN-line-mode-components.md](0023-PLAN-line-mode-components.md)
+   deviation D33: `v2.10.0` did not hold that reprint back. It drew the
+   held line, and the Printer printed the line again after it, the double
+   print of item 1. `TestReplyGrows` pinned those bytes; Step 7f gives it
+   this item's.
 
 ## More Information
 

@@ -742,7 +742,7 @@ exported name is added, `Transcript.Reprint`.
 
 ### Step 7f: a reprint while a reply holds a line (issue #15)
 
-*Added 2026-11-04, for 0023-MADR A15; proposed.* One exported name is
+*Added 2026-11-04, for 0023-MADR A15, and approved the same day:* One exported name is
 added, `stream.Printer.Printed`.
 
 * **Facts re-read** at the tree the step starts on, each a deviation if
@@ -776,7 +776,9 @@ added, `stream.Printer.Printed`.
   * The budgets hold: `TestReplyBudget`, 257 allocations
     (`stream/bench_test.go`), and `TestReprintBudget`, 49,696 allocations
     and 7,274,618 bytes (`transcript/bench_test.go`).
-  * Every existing test, golden and example passes unchanged.
+  * ~~Every existing test, golden and example passes unchanged.~~
+    *2026-11-04, D33:* every one but `TestReplyGrows`, whose wants become
+    A15's, its inputs kept.
   * `FuzzPrinter` and `transcript`'s fuzz target run 5 minutes each.
 * **Mutations,** each killing a named test:
   * `Printed` ignoring a held paragraph line: `TestPrinted`;
@@ -3523,3 +3525,134 @@ open for them, and the PLAN `in-progress`.
   and Windows; `make apicheck` reported 0 incompatible changes; the release
   smoke test passed from the proxy, its closure clean; the identifier scan
   found nothing.
+
+### Step 7f: a reprint while a reply holds a line (issue #15)
+
+*2026-11-04.* The owner committed 0023-MADR A15 and this step, as proposed
+(`56d2a6e`), and said "committed, proceed".
+
+**Facts re-read** at `56d2a6e`: nothing under `stream/`, `transcript/` or
+`docs/guides/line-mode.md` changed since `cc4c4a5`, where A15's prototype
+ran; `stream/printer.go` sets `at`, `heldAt` and `tableAt` as A15 item 2
+says; `transcript/transcript.go`'s `piece.at` draws a reply by `At`, and
+`HandleTimeout` and `Reprint` are as item 1 says.
+
+* **Deviation D33, 2026-11-04: `TestReplyGrows` pinned the double print.**
+  * **Found,** running `stream`'s and `transcript`'s tests with the code
+    in: `TestReplyGrows` (`transcript/transcript_test.go:179`), which
+    passes at `56d2a6e`, failed, `transcript_test.go:186: "before\n"`.
+    It writes `"first line\n"` to a kept reply and reprints with `idle`
+    true; the Printer holds that line, a paragraph's, until the next. `At`
+    drew it, and `Printed` leaves it out, as A15 decides: the test pinned
+    `v2.10.0`'s bytes for the case A15 changes, a held line drawn and then
+    printed again. This step said every existing test would pass
+    unchanged, and A15 item 9 that `v2.10.0` held that reprint back, which
+    it did not.
+  * **Resolutions offered:** keep the test's inputs and give it A15's
+    wants, the first reprint without the held line, the second the notice
+    and "first line", and the line Flush prints after it, so each line
+    shows once (recommended); or change its inputs so that no line is held,
+    its wants kept, the held line then covered by the new tests alone.
+  * **Chosen by the owner,** 2026-11-04: "New wants, same inputs". 0023-MADR
+    A15 item 9 corrected.
+
+**What changed:**
+
+* `stream/printer.go`: `Printed(width int) string`, as A15 item 3: its end
+  is `tableAt` while a table is held, `heldAt` while a paragraph line is,
+  and `at` otherwise. `At` and `Printed` share an unexported `draw`, which
+  is `At`'s former body over a part of the Source. `At`'s and `Idle`'s
+  documentation say a reprint uses `Printed`.
+* `transcript/transcript.go`: `piece.at` draws a reply by `Printed`;
+  `AddReply`'s, `HandleTimeout`'s and `Reprint`'s documentation, as A15
+  items 4 and 6.
+* `transcript/doc.go`: the recipe, `idle` the host's own output, and
+  hosts that pass the reply's `Idle` getting `v2.10.0`'s reprints.
+* `transcript/example_test.go`: the host's `idle` passes `true`, as it
+  writes whole lines; the example's output is unchanged.
+* `docs/guides/line-mode.md`: "Print the conversation again on a resize",
+  and the `host` excerpt with the example.
+* `docs/guides/defaults.md`: "When a reprint is made" says `idle` is the
+  host's own output; "How a kept reply is drawn" is `built`.
+* `docs/guides/migrating.md`: "Migrating to `v2.11.0`".
+* `README.md`: the current release `v2.11.0`, and a sentence in the
+  transcript's bullet. The current release read `v2.9.0` at `v2.10.0`'s
+  tag: 0009-PLAN Step 8 did not list it. This step corrects it.
+
+**Tests:**
+
+* `stream/printer_test.go`, `TestPrinted`: A15 item 5's property over
+  `testdata/reply.txt` and the three documents, in chunks of 1, 3, 7, 16
+  and 64 bytes, under three sets of options (`DefaultMarkup`; with a
+  `Highlighter` whose output numbers each line from its state; no table
+  layout and CR LF); `Printed` is `At` at every idle point, and the
+  Printer prints after `Printed` what a twin given the same chunks prints
+  without it. 0.75 s.
+* `FuzzPrinter`: `Printed` at the split, the Printer at `48 - w` until
+  then, then the rest at `w`, is the whole reply.
+* `transcript/transcript_test.go`: `TestReprintHeldLine`, a paragraph's
+  line, a table and a partial line left out, and an idle reply drawn as
+  `At` draws it; `TestReplyGrows`, as D33.
+* `transcript/host_test.go`, `TestHostReprintMidParagraph`: twelve lines of
+  one paragraph, the terminal narrowed after five, the reprint at once with
+  the Printer holding a line, and all 108 words shown once, in order, no
+  row wider than 40, the prompt last.
+* The budgets held: `TestReplyBudget` and `TestReprintBudget` pass.
+* `FuzzPrinter` ran 5 minutes, 12,360,321 runs, and `FuzzTranscript` 5
+  minutes, 6,644,316 runs, with no failure and no file added to the tree.
+  `FuzzTranscript`'s replies are flushed before they are kept, so it
+  reaches `Printed` only where it is `At`; the held cases are the tests'
+  above.
+
+**Mutations** (`python3 -m tools.verify mutate`, on scratch copies): 9
+killed, 0 survived, each by an assertion:
+
+* 7f.1, `Printed` ignoring a held paragraph line: `TestPrinted`,
+  `printer_test.go:504`, size 1, point 213 of 921, "Printed and the rest".
+* 7f.2, ignoring a held table: `TestPrinted`, the same line, point 673.
+* 7f.3, `Printed` clearing the held line's text: `TestPrinted`,
+  `printer_test.go:501`, "after Printed the Printer printed".
+* 7f.4, `Printed` drawing the partial line: `TestPrinted`, point 1.
+* 7f.5, as 7f.1, under `FuzzPrinter`'s seeds: the corpus entry
+  `cbf9b04895404c98`, committed with the Printer, at
+  `printer_test.go:568`, `Printed(8) at 7`, a table's first row drawn as
+  prose and then again in the table.
+* 7f.6, the Transcript drawing a reply by `At`:
+  `TestHostReprintMidParagraph`, `host_test.go:227`, "the words shown
+  are".
+* 7f.7, the same: `TestReprintHeldLine`, each held case failing at
+  `transcript_test.go:227`, the held line, table or partial line in the
+  reprint.
+* 7f.8, `At` at another width: `TestPrinted`, `printer_test.go:488`, at
+  the first idle point, "Printed … At".
+* 7f.9, as 7f.6: `TestReplyGrows`, `transcript_test.go:188`, "the reply's
+  held line drawn".
+
+**Gates:**
+
+* `python3 -m tools.verify gates` on macOS: 22 passed, 0 failed, 0 skipped
+  in 772 s; `release-check` clean over 514 files.
+* `remote linux`: 21 passed, 0 failed, 1 skipped (`gofmt`, which a remote
+  run is given no files for) in 1,283 s. `remote windows`: the same, in
+  2,761 s.
+* `make pre-add-check` on the seven Go files: clean. `make apicheck`
+  against `v2.10.0`: 0 incompatible changes; one addition,
+  `Printer.Printed`. `make markdownlint check-records docs-check
+  disclosure-check`: clean, the guides' 19 excerpts among it.
+* The identifier scan of the diff: clean.
+
+**The smoke test, rehearsed** (`smoke211.py local`, a scratch module
+outside the repository, the tree by a replace, `GOWORK` empty): `go mod
+tidy`, `go vet` and `go build` exit 0; `./mid`'s closure for Linux, macOS
+and Windows holds no Charm module but `x/ansi`; `./mid`, a resize settled
+mid-paragraph and reprinted at once, "smoke: PASS mid, the reprint
+mid-paragraph, each of 108 words once". It uses only names `v2.10.0` has,
+so its control, against `v2.10.0` from the proxy, builds, the requirement
+held at `v2.10.0` after `go mod tidy`, and fails as it must: "smoke: FAIL
+mid, 117 words shown, 108 once each wanted", the nine words of the held
+line shown twice.
+
+**Not done here:** the owner's commit; the disclosure guard; the owner's
+push, CI and Docs on it, the annotated tag `v2.11.0` and CI on it; the
+smoke test from the proxy, `smoke211.py proxy`; issue #15 told; and the
+close-out. This step stays open for them, and the PLAN `in-progress`.

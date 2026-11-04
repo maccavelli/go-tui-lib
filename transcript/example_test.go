@@ -63,11 +63,12 @@ func (h *host) resize(cols int, now time.Time) {
 	}
 }
 
-// idle reprints the conversation once a resize has settled, when the
-// reply holds nothing back, with the composer below it, as one update.
+// idle reprints the conversation once a resize has settled, with the
+// composer below it, as one update. The host writes whole lines through
+// the region, so its output is at a line's start whenever it calls, while
+// a reply streams too: a line the reply holds back follows the reprint.
 func (h *host) idle(now time.Time) {
-	idle := h.reply == nil || h.reply.Idle()
-	if out := h.tr.HandleTimeout(now, idle); out != "" {
+	if out := h.tr.HandleTimeout(now, true); out != "" {
 		h.write(h.region.Print(out))
 	}
 }

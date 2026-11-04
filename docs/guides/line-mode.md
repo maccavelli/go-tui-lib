@@ -409,11 +409,16 @@ new width:
   with another width starts the settle, `WithSettle`, 150 ms by default.
   `Timeout()` gives its deadline; add it to the loop's wake-up.
 - `HandleTimeout(now, idle)` gives the reprint once the settle has passed
-  and the host says its output is idle, at a line's start with nothing
-  held; until then it gives "". Call it at each idle point.
+  and the host says its own output is idle, at a line's start; until then
+  it gives "". Call it at each idle point. A reply need not have ended,
+  nor its Printer be idle: the reprint draws what the Printer has printed
+  (`Printer.Printed`), and the paragraph line it holds follows the reprint
+  when the next line comes, at the new width. Before `v2.11.0` the
+  reprint waited for the reply's `Idle()`; passing it still works, and
+  reprints as then.
 - `Reprint(idle)` gives the reprint on demand, for a redraw key or
   command. Not idle, it gives "" and the next idle `HandleTimeout` gives
-  it, since a reply's held line would otherwise print twice.
+  it.
 
 This is the host's side of it, on the loop's goroutine, as
 `ExampleTranscript` runs it on a test screen:
@@ -467,11 +472,12 @@ func (h *host) resize(cols int, now time.Time) {
     }
 }
 
-// idle reprints the conversation once a resize has settled, when the
-// reply holds nothing back, with the composer below it, as one update.
+// idle reprints the conversation once a resize has settled, with the
+// composer below it, as one update. The host writes whole lines through
+// the region, so its output is at a line's start whenever it calls, while
+// a reply streams too: a line the reply holds back follows the reprint.
 func (h *host) idle(now time.Time) {
-    idle := h.reply == nil || h.reply.Idle()
-    if out := h.tr.HandleTimeout(now, idle); out != "" {
+    if out := h.tr.HandleTimeout(now, true); out != "" {
         h.write(h.region.Print(out))
     }
 }

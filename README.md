@@ -18,7 +18,7 @@ pattern, used by every program that needs it.
 
 ## Status
 
-- **The current release is `v2.9.0`,** at the module path
+- **The current release is `v2.11.0`,** at the module path
   `github.com/maccavelli/go-tui-lib/v2`
   ([0020-MADR](docs/decisions/0020-MADR-charm-free-cores-glyphs-and-safetext.md)
   A4.1). `v2.0.0` follows `v1.13.0`, which a `v1` user keeps; `v1.13.0` follows
@@ -153,7 +153,9 @@ pattern, used by every program that needs it.
   `v2.6.1` makes the reprint and the printer faster, within gobble's
   allocation budgets, which the tests hold. Since `v2.9.0`, a reprint
   written with the region's `Print` and the region below it are one
-  synchronized update, and `Reprint` reprints on demand.
+  synchronized update, and `Reprint` reprints on demand. Since `v2.11.0`,
+  a reprint draws what a reply's Printer has printed, so it need not wait
+  for the reply's paragraph to end.
   [The line-mode guide](docs/guides/line-mode.md) shows the loop that
   drives every line-mode component.
 - **Streaming content, since `v2.10.0`.** `stream`'s `Doc` draws a
