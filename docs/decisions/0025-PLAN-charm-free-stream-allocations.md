@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-11-04
 associated-madr: "0025-MADR-charm-free-stream-allocations.md"
 ---
@@ -788,7 +788,44 @@ tidy`, requires `v2.11.0` still, and fails as it must:
 `parts/main.go:46:21: d.RenderParts undefined (type *stream.Doc has no
 field or method RenderParts)`.
 
-**Not done here:** the owner's commit; the disclosure guard; the owner's
+~~**Not done here:** the owner's commit; the disclosure guard; the owner's
 push, CI and Docs on it; the annotated tag `v2.12.0` and CI on it; the
 smoke test from the proxy, `smoke212.py proxy`; and the close-out. This
-step stays open for them, and the PLAN `in-progress`.
+step stays open for them, and the PLAN `in-progress`.~~ Done, below.
+
+**The release, `v2.12.0`:**
+
+* **The push.** The owner committed the step (`bbfd52f`). The disclosure
+  guard over the seven outgoing commits, `4e1a51f` to `bbfd52f`, exited 0
+  with nothing to report, and the identifier scan against `origin/main`
+  was clean; then the owner pushed `main`. CI run 41931958557 passed:
+  `modules`, `gates`, and `test` on macOS 15, Ubuntu 24.04 and Windows
+  2025. Docs run 41931958615 passed.
+* **The tag.** The owner tagged `bbfd52f` `v2.12.0`, annotated, and
+  pushed it. Its CI run, 41935275773, passed every job at its first
+  attempt.
+* **The smoke test from the proxy** (`smoke212.py proxy`, a scratch
+  module outside the repository, `GOWORK` empty): `go get
+  github.com/maccavelli/go-tui-lib/v2@v2.12.0`, `go mod tidy`, `go vet` and
+  `go build` exit 0, the requirement `v2.12.0`; `./parts`' closure for
+  Linux, macOS and Windows holds no Charm module but `x/ansi`; "smoke:
+  PASS parts, 1224 frames by RenderParts, the reply through a Printer and
+  a Writer".
+* **The control,** the same program against `v2.11.0` from the proxy,
+  after `go mod tidy` (D5), the requirement still `v2.11.0`: `go build`
+  exit 1, `parts/main.go:46:21: d.RenderParts undefined (type *stream.Doc
+  has no field or method RenderParts)`.
+* **Step 6 complete, 2026-11-04.**
+* **This PLAN is complete, 2026-11-04.** Its Verification holds: every
+  budget seen failing twice, the race ceilings among them; every mutation
+  of Steps 3 to 5 killed by an assertion, each failure quoted; the MADR's
+  table held in the tree (Step 6's measurements); `TestReplyBudget`,
+  `TestReprintBudget` and `safetext`'s `TestAllocations` passing at every
+  step; every existing test, golden and example unchanged, and
+  `ExampleDoc` checked again (D4); the fuzz targets 5 minutes each with no
+  failure; the gates on macOS, Linux and Windows at Steps 3, 4 and 5;
+  `make apicheck` 0 incompatible changes and one addition; the identifier
+  scans clean; CI green on the push and the tag; the smoke test passed
+  from the proxy and its control failed against `v2.11.0`. Five
+  deviations, D1 to D5, each the owner's choice, are recorded above; none
+  changed a decision of the MADR.
