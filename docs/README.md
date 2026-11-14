@@ -66,6 +66,8 @@ it was when they were written
 | 0024 | PLAN | [Close the terminal, text and convention gaps, and adopt the message catalogue](decisions/0024-PLAN-terminal-text-and-convention-opt-outs.md) | complete (`v2.7.0` and `v2.8.0`) |
 | 0025 | MADR | [Draw a Doc's frame without copying its prefix, stream a Printer's chunks without copying the line again, and keep no sanitizer in a finished reply](decisions/0025-MADR-charm-free-stream-allocations.md) | accepted |
 | 0025 | PLAN | [Implement a Doc's frame without the prefix copied, a Printer's chunks without the line copied again, and no sanitizer kept by a finished reply](decisions/0025-PLAN-charm-free-stream-allocations.md) | complete (`v2.12.0`) |
+| 0026 | MADR | [Give agent programs a tool card, an activity row, a diff view, a status row, a plan checklist and a thought display, as Charm-free cores shaped like ACP, with a feed pane and a status pane for the full screen](decisions/0026-MADR-agent-widgets.md) | accepted; Q1 to Q5 ruled |
+| 0026 | PLAN | [Implement the agent widgets: the diff view, tool card, activity row, note and feed in v2.13.0, and the status row, spinner, plan checklist and thought in v2.14.0](decisions/0026-PLAN-agent-widgets.md) | proposed (build after go-llmprovider-sdk `v1.31.0` and gobble-cli `v0.7.0`) |
 
 ## I want to…
 

@@ -40,6 +40,9 @@ built, as the next section lists. Reserved now, each checked with
 | :--- | :--- | :--- |
 | `stream` | `Scanner`, beside 0009's `Doc`, unexported until `Doc` is built on it | [0023-MADR](decisions/0023-MADR-line-mode-components.md) D7, A6 item 2 |
 | `workspace` | `FocusFallback`, `FocusFallbackFunc` | [0024-MADR](decisions/0024-MADR-opt-in-and-opt-out-coverage.md) A1 |
+| `diffview` | `Diff`, `Hunk`, `Line`, `Op`, `Stat`, `Colors`: a diff as lines, a hunk, one line, its operation, its added and removed counts, and its colours | [0026-MADR](decisions/0026-MADR-agent-widgets.md) D2, D5 |
+| `agentui` | `ToolKind`, `ToolState`, `Fold`, `ToolCard`, `ActivityRow`, `StatusRow`, `Spinner`, `Checklist`, `Step`, `StepState`, `Thought`, `Note`, `Tone`, `Element`, `Foldable`, `Feed`, `Look`, `Accents`: an agent's tool calls, their runs, its status row and its line-mode engine, a plan and its steps, a thought, a notice, and the feed that holds them, with how they are drawn | [0026-MADR](decisions/0026-MADR-agent-widgets.md) D1 to D4, D7 |
+| `agentui/agentuitea` | `FeedPane`, `StatusPane`, `StatusMsg`: the feed and the status row in a workspace, and the row's message | [0026-MADR](decisions/0026-MADR-agent-widgets.md) D3 |
 
 Each package's options are its `Option`, the deliberate name above.
 
