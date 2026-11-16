@@ -13,6 +13,17 @@ recommendation. This PLAN stays `proposed`. By the owner's ruling, building
 starts only after go-llmprovider-sdk `v1.31.0` and gobble-cli `v0.7.0`
 are released, and only once the owner approves this PLAN's execution.)*
 
+*(2026-11-15, by
+[0027-MADR-keep-docs-accurate-and-current.md](0027-MADR-keep-docs-accurate-and-current.md)
+D5: each step documents what it adds as it lands: a doc comment on
+every exported name it adds, by that record's D1; `diffview`,
+`agentui` and `agentui/agentuitea` in `docs/architecture.md` from the
+step that adds each; and a line under `CHANGELOG.md`'s `Unreleased`.
+Steps 9 and 14 also turn `Unreleased` into the release's entry. Step
+2, which rewrites `glyph/glyph.go`, also gives each exported name in
+that file the comment that record's D1 asks for, since 0027-PLAN's
+Phase D leaves the file to it.)*
+
 ## Goal
 
 `diffview` and `agentui` exist as Charm-free cores, and
