@@ -87,6 +87,13 @@ L18 to L21 verified. The Status column above is as it was written.)*
 | F | `docs/README.md`, `docs/reports/0014-REPORT-api-assessment-and-integration-research.md` (front matter only), `docs/architecture.md` (Tree) | the index current |
 | G | this PLAN, the MADR, `docs/README.md` | the close-out |
 
+*(2026-11-15, by the owner's ruling on QA1, "Phase D, as its own group":
+Phase D's row also takes the five package comments F18 to F22 name, in
+`internal/cells/cells.go`, `internal/termevent/termevent.go`,
+`fuzzy/doc.go`, `when/when.go` and `workspace/workspace.go`, as a package
+group of their own. Its scope is doc comments on exported names and these
+five package comments; the row above is as it was written.)*
+
 ### Out of scope
 
 * Any new gate, CI job or check script, and any change to an existing one
@@ -194,6 +201,20 @@ A phase with nothing to document says so, and why. 0026's build documents
    (`markdownlint-cli2 --version` prints `v0.23.2`) with the repository's
    configuration, ending `Summary: 0 error(s)`. A record is linted through
    a renamed copy, since the configuration's globs skip records.
+
+   *(2026-11-15, by the owner's ruling on QA3, "Compare against the base
+   copy", relayed by the coordinator: a record is linted as a renamed copy
+   of it as the phase starts it (the base, the committed file) and a
+   renamed copy of it as the phase leaves it, both with the repository's
+   own configuration and the `Makefile`'s pin, alike, and the phase adds no
+   issue: the counts by rule after are no higher than before, and no rule
+   appears that was not there. The summary is read as markdownlint-cli2
+   prints it, `Summary: N issues in M files`, not as `Summary: 0
+   error(s)`; the base's older issues stay, and are not this phase's to
+   fix. Each copy's name carries neither `MADR` nor `PLAN`, which the
+   configuration's globs skip, or the run lints no file. The non-record
+   Markdown is still linted as it is, and ends `Summary: 0 issues`. This
+   resolves deviation A-2; the text above is as it was written.)*
 8. **Identifiers.** `python3 -m tools.verify scan` over the phase's diff,
    clean, before the commit; nothing written carries a hostname, an
    account name or a real path.
@@ -359,6 +380,16 @@ settings key Phase A's inventory found undescribed.
 **Acceptance.** Every missing row is described where Phase A said; the
 inventory has no item without a place.
 
+*(2026-11-15, by the owner's ruling on QA2, "No; `Messages()` and doc
+comments cover them": the message IDs, each package's `Msg…` constants
+whose English defaults its `Messages()` returns, are not settings keys
+under MADR D1 and need no reference list. In Phase A's inventory (step 4)
+they are not an item, so the inventory's "no item without a place" holds
+for them without a row in Phase C: a program reaches them through each
+package's `Messages()` and `msgcat`, and their doc comments are Phase D's.
+No row, section or index entry is owed for them; the acceptance above is as
+it was written.)*
+
 ### Phase D: doc comments on exported names
 
 **Tier:** mainstream, medium effort (each comment written from the code).
@@ -366,6 +397,29 @@ inventory has no item without a place.
 **Files:** the non-test `.go` files outside `testdata` that the
 measurement names, in every module, except `glyph/glyph.go`, which 0026's
 Step 2 rewrites and comments (the order above).
+
+*(2026-11-15, by the owner's ruling on QA1, "Phase D, as its own group":
+the five package comments F18 to F22 are corrected in this phase, as a
+package group of their own, one commit under rule 1: `internal/cells/cells.go:2-6`,
+`internal/termevent/termevent.go:7-8`, `fuzzy/doc.go:21`,
+`when/when.go:29-30` and `workspace/workspace.go:16-18`, each by the fix its
+row gives. The group is a Go commit, so it runs the full CI, as the
+other groups do. Its files are named by those rows and are added to the
+"Files" above: the measurement of step 1 lists exported names without a
+comment, so it does not name a package comment that is present and
+wrong. Step 3 lists the group among the others before the first edit; step
+4's comment-only check, and step 5's per-group checks (`gofmt -l`, the
+comment-only diff, `make pre-add-check FILES="…"` and `make docs-check`),
+apply to it unchanged, each fact it writes checked against `go list` with
+`GOWORK=off` and the code (rule 4). The measurement's "0 names" does not
+test this group; its acceptance is that each of the five rows' lines
+reads as its fix, quoted in the execution record.)*
+
+*(2026-11-15, by the owner's ruling on QA2: the measurement's definition
+already counts the message IDs. Each `Msg…` constant is an exported
+top-level declaration, in a block comment or with its own, in a public
+package, so step 1 names one that has no comment and the definition above
+needs no change; no separate list of them is made.)*
 
 **The definition** is MADR D1's, from the owner's Q3 ruling: every
 exported top-level declaration and method its own doc comment, in every
@@ -428,6 +482,12 @@ field or interface method.
 **Acceptance.** The measurement reports 0 under the definition above
 outside `glyph/glyph.go`; every commit's diff is comments only; every
 group's checks passed.
+
+*(2026-11-15, by the owner's ruling on QA1, "Phase D, as its own group":
+the acceptance also holds for the package group of F18 to F22: each of the
+five lines reads as its row's fix, quoted, and that commit's diff is
+comments only with its checks passed. The text above is as it was
+written.)*
 
 ### Phase E: `CHANGELOG.md` and the release-notes sentence
 
@@ -534,6 +594,12 @@ missing; the documents' checks pass.
 | E | `CHANGELOG.md` (`Unreleased`, `v2.12.0`, one pointer), `AGENTS.md`'s sentence | mainstream, medium | changelog in D2's shape; AGENTS names it |
 | F | index currency | lightweight | every new doc and section reachable; statuses match |
 | G | close-out | mainstream, medium | every finding re-read; audits report nothing missing |
+
+*(2026-11-15, by the owner's ruling on QA1, "Phase D, as its own group":
+row D also covers the five package comments F18 to F22, as a package group
+of their own, with their lines quoted fixed as well as the measurement at 0
+outside `glyph/glyph.go`. Row B is unchanged: no package comment is in it.
+The rows above are as they were written.)*
 
 ## Verification
 
@@ -647,11 +713,26 @@ changelog's are Phase E's.)*
 | F39 | F18 to F22 | decision | — | they are package comments in Go files: Phase B's acceptance is Markdown only, and Phase D's scope is the doc comments its measurement names | see "Questions for the owner (Phase A)" | owner |
 | F40 | the message IDs | decision | — | each package's `Msg…` IDs are the keys of a program's catalogue; the guides point at each `Messages()` (`docs/guides/building-workspaces.md:307-308`, `docs/guides/commands.md:314-316`) and list none; step 4's list of settings keys does not name them | see "Questions for the owner (Phase A)" | owner |
 
+*(2026-11-15, the owner's rulings on QA1 and QA2, relayed by the
+coordinator. F18 to F22: the phase is D, as a package group of its own
+(QA1, "Phase D, as its own group"), not B, which the Phase column above
+gave as F39. F39: answered by that ruling; it is no longer a decision row.
+F40: answered by QA2, "No; `Messages()` and doc comments cover them": the
+message IDs are not settings keys under MADR D1, no Phase C row is owed,
+and their doc comments are Phase D's; it is no longer a decision row. The
+rows are as they were written.)*
+
 **Totals.** 40 rows: wrong 18 (F1 to F13, F15, F18 to F21), stale 6
 (F14, F16, F17, F22, F37, F38), missing 14 (F23 to F36), decision 2 (F39,
 F40), record 0. By phase: B 17 (F1 to F17), C 13 (F23 to F35), E 2 (F36,
 F37), F 1 (F38), and 7 for the owner first (F39, F40, and F18 to F22,
 whose phase F39 settles). Phase D's own count is its measurement's (L17).
+
+*(2026-11-15, after QA1 and QA2: of the 7 "for the owner first", F18 to
+F22 go to Phase D as a package group, which makes Phase D's 5 rows beside
+its measurement's own count; F39 and F40 are answered, with no row left
+for the owner. The 40 rows and the class counts are unchanged, and B 17, C
+13, E 2 and F 1 are unchanged. The totals above are as they were written.)*
 
 **Record rows.** None. The bodies of the unexecuted records (0009-PLAN
 Step 7, 0022-PLAN Phase 4, 0026) are outside Phase A's "Files read", and
@@ -675,6 +756,15 @@ Recommended: (a). Doing nothing leaves `go doc` saying that one package
 imports ultraviolet where three do, and that `fuzzy` and `when` import
 less than they do.
 
+*Answer, 2026-11-15, the owner's ruling, relayed by the coordinator:
+"Phase D, as its own group". That is option (a). It follows that the five
+package comments F18 to F22 are corrected in Phase D, as a package group of
+their own, under its comment-only check and its full CI; Phase D's scope is
+widened to them by the dated annotations under "In scope", Phase D's
+files, its acceptance and "Phases at a glance"; Phase B stays Markdown
+only; F18 to F22 and F39 are annotated in "Findings (Phase A)". No
+amendment of the MADR is needed (see the execution record).*
+
 **QA2 (F40). Are the message IDs settings keys under D1?**
 
 * **(a) No:** a program sets them through `msgcat`, each package's
@@ -687,6 +777,14 @@ less than they do.
 
 Recommended: (a). Doing nothing leaves Phase C's acceptance ("every item
 has a place") open to either reading.
+
+*Answer, 2026-11-15, the owner's ruling, relayed by the coordinator: "No;
+`Messages()` and doc comments cover them". That is option (a). It follows
+that the message IDs are not settings keys under MADR D1: Phase C owes no
+reference list for them, and a program reaches each through `msgcat` and
+that package's `Messages()`, with the doc comments Phase D's definition
+already asks of each `Msg…` constant. Phase C's acceptance and F40 are
+annotated.*
 
 **QA3 (deviation A-2). How does rule 7 lint a record?**
 
@@ -703,6 +801,12 @@ has a place") open to either reading.
 
 Recommended: (a). Doing nothing leaves rule 7 unmeetable by any phase
 that edits a record, and each would record this deviation again.
+
+*Answer, 2026-11-15, the owner's ruling, relayed by the coordinator:
+"Compare against the base copy". That is option (a). It follows that rule 7
+lints a record as a renamed copy before the phase and one after it, alike,
+and the phase adds no issue, the summary read as markdownlint-cli2 prints
+it; rule 7 is annotated, and deviation A-2 is resolved.*
 
 ## Execution record
 
@@ -897,6 +1001,10 @@ answered before Phases B to F run against it.
   issue (above). Not resolved here: it is QA3, and rule 7 stands as
   written until the owner rules.
 
+  *(2026-11-15, resolved: the owner ruled on QA3, "Compare against the
+  base copy", and rule 7 is annotated to say how a record is linted. The
+  entry above is as it was written. No file's scope changed.)*
+
 **No heavy run.** Phase A ran none: `make docs-check` runs one test of
 one package, which rule 9 allows on the session host.
 
@@ -919,3 +1027,49 @@ matter), `docs/decisions/0026-PLAN-agent-widgets.md` (the note),
 
 Staged, not committed; the coordinator commits and pushes after the
 disclosure guard; the plan pauses until the owner says to continue.
+
+### 2026-11-15: the owner's answers to QA1, QA2 and QA3
+
+**Provenance.** Written by a mainstream-tier model at medium effort, on
+the coordinator's brief, from the owner's three rulings, relayed by the
+coordinator. A records-only change: no phase ran. Base: `fc55005` (`main`,
+clean).
+
+**The answers,** each a label the owner chose from the options of
+"Questions for the owner (Phase A)". QA1 (F39): "Phase D, as its own
+group", option (a). QA2 (F40): "No; `Messages()` and doc comments cover
+them", option (a). QA3 (A-2): "Compare against the base copy", option (a).
+
+**Annotated, each by a dated note that leaves the text as written:** the
+answer under each of QA1, QA2 and QA3 in "Questions for the owner (Phase
+A)"; rule 7 (QA3); the "In scope" table, Phase D's row and Phase D's
+files, steps and acceptance (QA1, and QA2 for the measurement, which
+already counts the `Msg…` constants as exported declarations); Phase C's
+acceptance and inventory (QA2); "Phases at a glance" (QA1); the defects
+table's rows F18 to F22, F39 and F40, and the totals line, whose "7 for the
+owner first" becomes none (QA1, QA2); deviation A-2 (QA3, resolved);
+`docs/README.md`'s row for this PLAN.
+
+**The MADR needed no amendment.** The three answers change no decision and
+contradict no fact it asserts. D1 asks a doc comment on every exported
+name and a description of every package, command, flag, environment
+variable, settings key and make target: QA2 rules that the message IDs fall
+under the first (their constants' doc comments) and are not a settings key,
+which D1 does not define, so D1 is applied, not changed. QA1 places five
+package comments in a phase, which D1 and the MADR's "Neutral" consequence
+(Phase D adds comments to Go files and runs the full CI) already allow. QA3
+is a rule of this PLAN's, not a decision of the MADR. The MADR is
+untouched.
+
+**Verification.** Rule 7 as ruled, for each record edited: a renamed copy
+of it at `fc55005` (the base) and one as left, linted alike by
+markdownlint-cli2 `v0.23.2` with the repository's own configuration. Only
+this PLAN is edited among the records. Base: `Summary: 86 issues in 1
+file`, all 86 MD004 (the `*` list marker). After: the same, 86 MD004 and no
+other rule, so the edit adds no issue. `make check-records`, `make
+docs-check` and `make disclosure-check`: each exit 0 after the last edit.
+Every `path:line` the new notes cite is one of Phase A's rows, checked
+against the staged files, and no note sits inside a quotation.
+
+**No question is open.** The plan stays paused until the owner's word for
+the next phase.
