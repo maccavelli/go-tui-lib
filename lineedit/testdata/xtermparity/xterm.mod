@@ -3,7 +3,7 @@
 // module requires no golang.org/x/term (0023-MADR A5 item 1).
 module github.com/maccavelli/go-tui-lib/v2
 
-go 1.27.2
+go 1.27.4
 
 require golang.org/x/term v0.47.0
 
