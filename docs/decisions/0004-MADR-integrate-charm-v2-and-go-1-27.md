@@ -595,6 +595,16 @@ owner accepted that change (picked from options, 2026-10-04). §6 stands,
 and §Confirmation's rule holds for every other cell of every existing
 golden file.
 
+### A3 (2026-11-17): the floor is now Go 1.27.4
+
+*Status: accepted (2026-11-17).* The floor this record set (Go 1.27.1) was
+raised to 1.27.2 by
+[0016-MADR-go-1-27-2-for-go-2026-6604.md](0016-MADR-go-1-27-2-for-go-2026-6604.md)
+and is now `go 1.27.4`, by
+[0028-MADR-raise-floor-and-toolchain-to-go-1-27-4.md](0028-MADR-raise-floor-and-toolchain-to-go-1-27-4.md),
+which still needs Go 1.27 for the idioms this record adopted. The text
+above stays as written.
+
 ## More Information
 
 * [0003-REPORT-agent-tui-ecosystem-research.md](../reports/0003-REPORT-agent-tui-ecosystem-research.md):

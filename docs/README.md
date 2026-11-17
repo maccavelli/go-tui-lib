@@ -16,7 +16,7 @@ it was when they were written
 | 0002 | PLAN | [Implement multi-pane workspaces (`v0.1.0`)](decisions/0002-PLAN-multi-pane-workspace-layouts.md) | complete |
 | 0002 | PLAN | [Harden multi-pane workspaces (`v0.1.1`)](decisions/0002-PLAN-harden-workspace-v0-1-1.md) | complete |
 | 0003 | REPORT | [Agent TUI ecosystem research, an audit of `v0.1.0`, and a source pass over four agent TUIs](reports/0003-REPORT-agent-tui-ecosystem-research.md) | — |
-| 0004 | MADR | [Draw the workspace on an ultraviolet cell buffer, follow the terminal's width method and theme, and adopt Go 1.27 idioms in the public API](decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md) | accepted; A1, A2 accepted |
+| 0004 | MADR | [Draw the workspace on an ultraviolet cell buffer, follow the terminal's width method and theme, and adopt Go 1.27 idioms in the public API](decisions/0004-MADR-integrate-charm-v2-and-go-1-27.md) | accepted; A1, A2 accepted; A3 recorded |
 | 0004 | PLAN | [Implement direct cell drawing, terminal-following width and theme, and Go 1.27 accessors (`v0.2.0`)](decisions/0004-PLAN-integrate-charm-v2-and-go-1-27.md) | complete |
 | 0005 | MADR | [Detect terminal capabilities with one sentinel-terminated probe that observes Bubble Tea's own queries, and offer notifications, clipboard, links and prompt marks as commands built from the result](decisions/0005-MADR-terminal-capabilities-and-services.md) | accepted; A1–A5 accepted |
 | 0005 | PLAN | [Implement terminal capabilities and services (`termcap`, `termsvc`)](decisions/0005-PLAN-terminal-capabilities-and-services.md) | complete |
@@ -45,7 +45,7 @@ it was when they were written
 | 0014 | REPORT | [An API assessment of `v0.6.0`, and how Go CLIs and agent tools integrate a TUI](reports/0014-REPORT-api-assessment-and-integration-research.md) | — |
 | 0015 | MADR | [Make the pre-add check fail when gofmt itself fails, and skip a tracked file the work tree no longer has](decisions/0015-MADR-precheck-gofmt-errors.md) | accepted |
 | 0015 | PLAN | [Implement: the pre-add check fails when gofmt fails, and skips a tracked file the work tree no longer has](decisions/0015-PLAN-precheck-gofmt-errors.md) | complete |
-| 0016 | MADR | [Move the toolchain floor to Go 1.27.2, the release that fixes GO-2026-6604](decisions/0016-MADR-go-1-27-2-for-go-2026-6604.md) | accepted |
+| 0016 | MADR | [Move the toolchain floor to Go 1.27.2, the release that fixes GO-2026-6604](decisions/0016-MADR-go-1-27-2-for-go-2026-6604.md) | accepted; A1 recorded |
 | 0016 | PLAN | [Implement: the toolchain floor moves to Go 1.27.2](decisions/0016-PLAN-go-1-27-2-for-go-2026-6604.md) | complete |
 | 0017 | MADR | [Write the repository's scripts in Python, standard library only, and port the ten shell scripts](decisions/0017-MADR-python-repository-scripts.md) | accepted; built |
 | 0017 | PLAN | [Implement Python repository scripts: port the ten shell scripts, `go-fuzz` first with the case-6 fix](decisions/0017-PLAN-python-repository-scripts.md) | complete |
@@ -70,6 +70,8 @@ it was when they were written
 | 0026 | PLAN | [Implement the agent widgets: the diff view, tool card, activity row, note and feed in v2.13.0, and the status row, spinner, plan checklist and thought in v2.14.0](decisions/0026-PLAN-agent-widgets.md) | proposed (build after go-llmprovider-sdk `v1.31.0` and gobble-cli `v0.7.0`) |
 | 0027 | MADR | [Keep go-tui-lib's documents accurate, comprehensive and current: fix the gaps found at `v2.12.0`, give every exported name a doc comment and every feature a description, start a `CHANGELOG.md`, and hold the line with a docs step in every brief rather than a new check](decisions/0027-MADR-keep-docs-accurate-and-current.md) | accepted; R1 to R4 ruled; Q1 to Q5 and Q7 ruled; Q6 applied |
 | 0027 | PLAN | [Implement accurate, comprehensive and current documents: verify the survey, fix what is wrong, describe what is missing, comment every exported name, start `CHANGELOG.md`, and bring the index current](decisions/0027-PLAN-keep-docs-accurate-and-current.md) | in-progress (one phase at a time; Phase A done, QA1 to QA3 answered, awaiting the owner's word for the next) |
+| 0028 | MADR | [Raise the floor to `go 1.27.4`, with no `toolchain` line, because this module's code needs Go 1.27](decisions/0028-MADR-raise-floor-and-toolchain-to-go-1-27-4.md) | accepted |
+| 0028 | PLAN | [Implement the floor and toolchain at `go 1.27.4`](decisions/0028-PLAN-raise-floor-and-toolchain-to-go-1-27-4.md) | in-progress |
 
 ## I want to…
 
