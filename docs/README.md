@@ -71,7 +71,7 @@ it was when they were written
 | 0027 | MADR | [Keep go-tui-lib's documents accurate, comprehensive and current: fix the gaps found at `v2.12.0`, give every exported name a doc comment and every feature a description, start a `CHANGELOG.md`, and hold the line with a docs step in every brief rather than a new check](decisions/0027-MADR-keep-docs-accurate-and-current.md) | accepted; R1 to R4 ruled; Q1 to Q5 and Q7 ruled; Q6 applied |
 | 0027 | PLAN | [Implement accurate, comprehensive and current documents: verify the survey, fix what is wrong, describe what is missing, comment every exported name, start `CHANGELOG.md`, and bring the index current](decisions/0027-PLAN-keep-docs-accurate-and-current.md) | in-progress (one phase at a time; Phase A done, QA1 to QA3 answered, awaiting the owner's word for the next) |
 | 0028 | MADR | [Raise the floor to `go 1.27.4`, with no `toolchain` line, because this module's code needs Go 1.27](decisions/0028-MADR-raise-floor-and-toolchain-to-go-1-27-4.md) | accepted |
-| 0028 | PLAN | [Implement the floor and toolchain at `go 1.27.4`](decisions/0028-PLAN-raise-floor-and-toolchain-to-go-1-27-4.md) | in-progress |
+| 0028 | PLAN | [Implement the floor and toolchain at `go 1.27.4`](decisions/0028-PLAN-raise-floor-and-toolchain-to-go-1-27-4.md) | complete (`v2.12.1` tagged) |
 
 ## I want to…
 

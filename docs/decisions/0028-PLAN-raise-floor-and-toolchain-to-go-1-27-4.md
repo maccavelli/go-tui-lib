@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 date: 2026-11-17
 associated-madr: "0028-MADR-raise-floor-and-toolchain-to-go-1-27-4.md"
 ---
@@ -219,4 +219,54 @@ There is no `CHANGELOG.md` (0027-PLAN starts it); none is started here.
    does this release.
 
 Not done by the author of this amendment: the commit, the push, the tag,
-steps 2 to 6.
+steps 2 to 6. *(Annotated 2026-11-17: steps 1 to 6 are done, below.)*
+
+### The release, `v2.12.1` (2026-11-17)
+
+* **Step 1, the pre-tag commit:** `6ac8355` ("docs: record v2.12.1
+  release plan and migration notes"). Docs on it (run 44174185104)
+  passed, and only Docs ran, as a docs-only push.
+* **Steps 2 and 3, the push and the tag:** the coordinator ran the
+  disclosure guard over the outgoing tag (exit 0) and pushed the tag only,
+  on the owner's word, verbatim: "you may tag and push go-tui-lib v2.12.1
+  once its CI is green", relayed by the coordinator. The tag is annotated
+  and unsigned, tag object `05583ac942df089f4369842625cdca092f2b6199`,
+  message `v2.12.1`, on commit `6ac83559e3f1d366a903a23b69b22eaa5146a2af`
+  (`git ls-remote --tags origin v2.12.1` lists both).
+* **Step 4, CI on the tag,** run 44174480290: `gh run watch --exit-status`
+  exited 0, and the run's conclusion is `success`: `modules` (7 steps),
+  `gates` (17), `test (., macos-15)`, `test (., windows-2025)` and `test
+  (., ubuntu-24.04)` (12 each), each `success`; no job cancelled or empty.
+  Quoted from the log: `go-version-file: go.work`; "Successfully set up
+  Go version 1.27.4" in every job, with `go version go1.27.4
+  linux/amd64`, `darwin/arm64` and `windows/amd64`; the linters "0
+  issues." three times; `govulncheck` "No vulnerabilities found.";
+  `apicheck` "apicheck: .: against v2.12.0, 0 incompatible change(s)" and
+  "apicheck: clean". On a tag run the base is `v2.12.0`, the newest tag
+  that does not contain the tagged commit.
+* **Step 5, the smoke test from the proxy,** in a scratch module outside
+  any repository, a scratch `GOMODCACHE`, `go env GOWORK` empty: `go get
+  github.com/maccavelli/go-tui-lib/v2@v2.12.1`, a program importing
+  `workspace` and printing `workspace.New`'s type, `go mod tidy`, `go
+  vet`, `go build` and `go run`, each exit 0, the requirement `v2.12.1`,
+  the output "smoke: ok func(layout.Node, map[layout.PaneID]workspace.Pane,
+  ...workspace.Option) *workspace.Workspace". Two earlier runs differed
+  for reasons of the scratch program and its environment, not the
+  release: the first program compared a function with nil, which `go vet`
+  refused (exit 1); the second ran with `GOWORK=off`, where the guide asks
+  for it empty. Both were corrected and the test run again; the last run
+  is the result. `go list -m -json …@v2.12.1` gives `GoVersion` "1.27.4"
+  and the commit `6ac83559e3f1d366a903a23b69b22eaa5146a2af` (ref
+  `refs/tags/v2.12.1`, time 2026-11-17T20:54:05Z); `@latest` resolves to
+  `v2.12.1`. The proxy's `go.mod` for `v2.12.1` says `go 1.27.4`, and for
+  `v2.12.0` it says `go 1.27.2` (read, no longer inferred).
+* **Step 6, the close-out:** this PLAN is `complete`, and the index row
+  follows. The acceptance criteria, each met: the `go` lines and every
+  current statement agree (the agreement check above); the gates and
+  `govulncheck` under 1.27.4 exit 0 (the gates table above);
+  `release-check` passes and `make apicheck` shows 0 incompatible changes
+  against `v2.12.0`; CI on `e35e571` and on the tag is green on 1.27.4;
+  the tag exists and the proxy serves it with `go 1.27.4`; the smoke test
+  passes. The consumers' adoption of `v2.12.1` is theirs to record.
+* **Not done, and why:** no `CHANGELOG.md` entry (the file does not exist;
+  0027-PLAN starts it); the other repositories were not touched.

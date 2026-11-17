@@ -296,6 +296,19 @@ coordinator's to make and push, not this record's author's.
   pointers before the tag, in the commit that is tagged, as `v2.12.0`
   did.
 
+### A2 (2026-11-17): the release followed
+
+*Status: accepted (2026-11-17).* `v2.12.1` was tagged on `6ac8355` (an
+annotated, unsigned tag, object `05583ac942df089f4369842625cdca092f2b6199`)
+on the owner's word quoted in A1. CI on the tag passed on Go 1.27.4,
+`govulncheck` found nothing and `apicheck` reported 0 incompatible
+changes against `v2.12.0`. The proxy serves `v2.12.1` with `go 1.27.4`,
+where `v2.12.0` has `go 1.27.2`, and a consumer's smoke test from the proxy
+passed. The "Not verified" item on the release number is settled by the
+owner's word; the item on `setup-go` by A1's CI quotes. The execution
+record is in
+[0028-PLAN-raise-floor-and-toolchain-to-go-1-27-4.md](0028-PLAN-raise-floor-and-toolchain-to-go-1-27-4.md).
+
 ### Links
 
 * [GO-2026-6859](https://pkg.go.dev/vuln/GO-2026-6859).
