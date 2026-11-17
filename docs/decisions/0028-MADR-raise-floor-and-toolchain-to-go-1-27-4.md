@@ -258,6 +258,44 @@ form of the pin (no `toolchain` line, E3) and the amendments to 0004 and
   GO-2026-6859: only v1.9.0 was run.
 * The release number and date, which are the owner's.
 
+## Amendments
+
+### A1 (2026-11-17): the owner's word for the release, and the number `v2.12.1`
+
+*Status: accepted (2026-11-17).* The change of this record is committed
+and pushed (`735a3f7` the pair, `e35e571` the change). The owner's word
+for the release, relayed by the coordinator, verbatim: "you may tag and
+push go-tui-lib v2.12.1 once its CI is green". The tag is the
+coordinator's to make and push, not this record's author's.
+
+* **The number is a patch,** because no exported API changes. Evidence at
+  `e35e571`: `git diff --stat v2.12.0..HEAD` lists, among non-Markdown
+  files, only `go.mod`, `go.work`,
+  `lineedit/testdata/xtermparity/xterm.mod` and
+  `testdata/frameworks/go.mod.tmpl`, each a one-line `go` change; and
+  `make apicheck` prints "apicheck: .: against v2.12.0, 0 incompatible
+  change(s)" and "apicheck: clean". The six commits since `v2.12.0` are
+  all documents but `e35e571`: `855aa72`, `f093da6`, `fc55005`, `73d44fe`,
+  `735a3f7` (Markdown) and `e35e571` (the pins). A patch has precedent
+  here: `v2.6.1` and `v2.6.2`, each with a "Migrating to" section saying
+  nothing exported changes.
+* **CI on `e35e571` passed** (run 44167880653: `modules`, `gates` and the
+  three `test` entries, on Ubuntu 24.04, Windows 2025 and macOS 15), and
+  Docs passed on it. Its `setup-go` lines read `go-version-file: go.work`,
+  "Acquiring 1.27.4 from https://github.com/actions/go-versions/…",
+  "Successfully set up Go version 1.27.4" and `go version go1.27.4`. That
+  answers the second item of "Not verified": CI installs the `go` line's
+  1.27.4. The `gates` job printed "0 issues." for the linters and "No
+  vulnerabilities found." for `govulncheck`. The Docs run on `735a3f7` is
+  `cancelled`, as `docs.yml:22-24` says it would be: its `concurrency`
+  group `docs-${{ github.ref }}` has `cancel-in-progress: true`, and the
+  next push (`e35e571`, created 11 seconds later) superseded it.
+* **The release carries the pins and the documents,** not code: all six
+  commits above ship in the tag. The PLAN's release phase says what is
+  done and in what order. The release procedure moves the current-release
+  pointers before the tag, in the commit that is tagged, as `v2.12.0`
+  did.
+
 ### Links
 
 * [GO-2026-6859](https://pkg.go.dev/vuln/GO-2026-6859).

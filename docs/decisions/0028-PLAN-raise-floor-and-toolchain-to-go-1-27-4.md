@@ -163,3 +163,60 @@ change, and no Go code changed); every run under `GOTOOLCHAIN=go1.26.11`
 CI run (nothing is pushed); the tag and the release (the owner's word).
 Records edited after the markdownlint, `check-records` and disclosure runs
 above: this execution record; those three checks were re-run after it.
+
+## Amendment A1 (2026-11-17): the release phase, `v2.12.1`
+
+The owner's word, relayed by the coordinator, verbatim: "you may tag and
+push go-tui-lib v2.12.1 once its CI is green" (MADR A1). The change is
+committed and pushed (`735a3f7`, `e35e571`), and CI and Docs on `e35e571`
+passed. The steps are those of `docs/guides/releasing.md`, "Release the
+root alone", with 0025-PLAN Step 6's release (`v2.12.0`) and 0023-PLAN's
+`v2.6.1` and `v2.6.2` as the model for a patch. No nested module is
+touched: the module table in `AGENTS.md` lists `stream/glamourmd` as
+planned, and it has no directory.
+
+**Pointers.** Re-derived by `grep -rn 'v2\.12\.0'` at `e35e571`:
+
+| Where | Class | Action |
+| :--- | :--- | :--- |
+| `README.md:21` "The current release is `v2.12.0`" | current-release pointer | moves to `v2.12.1` |
+| `docs/guides/migrating.md:10-21` "Migrating to `v2.12.0`", with `go get …@v2.12.0` | history of that release | stays; a "Migrating to `v2.12.1`" section is added above it |
+| `docs/guides/streaming-content.md:47` "Since `v2.12.0`" | history (when `RenderParts` arrived) | stays |
+| `README.md:170` "Since `v2.12.0`, `Doc.RenderParts`" | history | stays |
+| `docs/README.md:68`, `:71`; records 0025, 0026, 0027 | records | stay (0026-PLAN's "`v2.12.0` is the latest tag" is the record's claim at its date; 0026-MADR names that a release in between changes the base) |
+
+There is no `CHANGELOG.md` (0027-PLAN starts it); none is started here.
+
+**Steps.**
+
+1. **The pre-tag commit** (Markdown only): `README.md:21` and the
+   "Migrating to `v2.12.1`" section (the floor is Go 1.27.4; GO-2026-6859
+   is reported under 1.27.3 and not 1.27.4; no API change; a program on
+   1.27.2 or 1.27.3 moves to 1.27.4). `make release-check`, `make
+   docs-check`, `make check-records`, `make disclosure-check`, `make
+   markdownlint` pass.
+2. **The disclosure guard** over the outgoing commit; the push. The push
+   changes only documents, so Docs runs and passes; the code proof is the
+   full CI run on `e35e571`, the last commit that changed anything else
+   (`docs/guides/releasing.md`, 0019-MADR).
+3. **The tag,** annotated, with the tag name as its message, on the
+   pre-tag commit Docs passed on: `git tag -a v2.12.1 -m "v2.12.1"
+   <commit>`, then `git push origin v2.12.1`. There is no tag-check script
+   in this repository and the tags are unsigned. Never moved or deleted.
+4. **CI on the tag** runs in full (a tag is never path-filtered,
+   `.github/workflows/ci.yml:14`) and passes. No workflow publishes
+   anything.
+5. **The consumer smoke test from the proxy:** a scratch module outside
+   the repository, `GOWORK` empty, `go get
+   github.com/maccavelli/go-tui-lib/v2@v2.12.1`, a program importing
+   `workspace` (a package with outside dependencies), `go mod tidy`, `go
+   vet`, `go build`, run; `go list -m -json …@v2.12.1` gives the tag's
+   commit, and the proxy's `go.mod` for it says `go 1.27.4` (the control:
+   `v2.12.0`'s says `go 1.27.2`).
+6. **The close-out:** this PLAN becomes `complete` with the tag, the CI
+   run and the smoke test recorded, and its index row follows. There is no
+   pin commit: `v2.12.0` moved its pointers in the tagged commit, and so
+   does this release.
+
+Not done by the author of this amendment: the commit, the push, the tag,
+steps 2 to 6.

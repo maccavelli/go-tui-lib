@@ -7,6 +7,31 @@ needs a major version, at a new module path
 ([AGENTS.md, API conventions](../../AGENTS.md#api-conventions), rule 1).
 Up to `v0.12.0`, a deprecated name was removed in the next minor release.
 
+## Migrating to `v2.12.1`
+
+`v2.12.1` is a patch: it raises the module's Go floor from 1.27.2 to
+1.27.4 and changes no code
+([0028-MADR-raise-floor-and-toolchain-to-go-1-27-4.md](../decisions/0028-MADR-raise-floor-and-toolchain-to-go-1-27-4.md),
+[0028-PLAN-raise-floor-and-toolchain-to-go-1-27-4.md](../decisions/0028-PLAN-raise-floor-and-toolchain-to-go-1-27-4.md)).
+Nothing exported changes: `make apicheck` against `v2.12.0` reports 0
+incompatible changes. Go 1.27.3 and earlier carry GO-2026-6859, in
+`net/http`, which `govulncheck` does not report under Go 1.27.4. A
+program that builds with Go 1.27.4 or later needs no change:
+
+```bash
+go get github.com/maccavelli/go-tui-lib/v2@v2.12.1
+```
+
+A program on Go 1.27.2 or 1.27.3 moves to Go 1.27.4 to build against
+`v2.12.1`, and its `go` line follows.
+
+### Changed
+
+- **The `go` line is 1.27.4** in `go.mod` and `go.work`, in the two files
+  that are built as modules of their own (the `lineedit` parity
+  generator's and the framework examples'), and in the documents that
+  state it.
+
 ## Migrating to `v2.12.0`
 
 `v2.12.0` is a minor release: fewer copies and less heap in `stream`'s
