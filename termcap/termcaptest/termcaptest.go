@@ -14,6 +14,7 @@
 package termcaptest
 
 import (
+	"errors"
 	"fmt"
 	"image/color"
 	"io"
@@ -264,7 +265,7 @@ func (t *Terminal) Run(tb testing.TB, model tea.Model) termcap.Caps {
 		tb.Fatalf("%s: the program exited before its CapsMsg: %v", t.profile.Name, err)
 	case <-time.After(timeout):
 		prog.Kill()
-		<-done
+		reapKilled(tb, t.profile.Name, done)
 		tb.Fatalf("%s: no CapsMsg within %v", t.profile.Name, timeout)
 	}
 	prog.Send(StopMsg{})
@@ -275,10 +276,21 @@ func (t *Terminal) Run(tb testing.TB, model tea.Model) termcap.Caps {
 		}
 	case <-time.After(timeout):
 		prog.Kill()
-		<-done
+		reapKilled(tb, t.profile.Name, done)
 		tb.Fatalf("%s: the program did not quit within %v of StopMsg", t.profile.Name, timeout)
 	}
 	return caps
+}
+
+// reapKilled waits for a killed program to finish. Run's error is then
+// tea.ErrProgramKilled, which is expected and ignored here, because the
+// caller fails tb with the timeout; any other error is a failure of the
+// program itself and is reported.
+func reapKilled(tb testing.TB, name string, done <-chan error) {
+	tb.Helper()
+	if err := <-done; err != nil && !errors.Is(err, tea.ErrProgramKilled) {
+		tb.Errorf("%s: the program, killed after the timeout, also failed: %v", name, err)
+	}
 }
 
 // Send writes seq to the program's input, as the terminal would, after

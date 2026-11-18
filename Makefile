@@ -66,7 +66,7 @@ LINT_GOOS := linux darwin windows
 lint: modernize ## Runs make modernize, then golangci-lint with fleet config for linux, darwin and windows, per module
 	@if [ ! -x "$(GOLANGCI_LINT)" ]; then \
 		echo "golangci-lint not found at $(GOLANGCI_LINT)"; \
-		echo "Install: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest"; \
+		echo "Install: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0"; \
 		exit 1; \
 	fi
 	@mods="$$($(MODULES_CMD))" || exit 1; status=0; root="$$(git rev-parse --show-toplevel)"; \

@@ -335,7 +335,7 @@ def main(argv):
     golangci = executable(golangci_path)
     if not golangci:
         err(f"go-precheck: golangci-lint not found at {golangci_path}.")
-        err("  install: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0")
+        err("  install: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0")
         c.fail(2)
     have_vuln = True
     if os.environ.get("GO_PRECHECK_SKIP_VULN", "0") == "1":

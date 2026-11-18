@@ -519,7 +519,7 @@ docs/
     - `go vet` for `freebsd/amd64`, `openbsd/amd64` and `linux/386`, per
       module;
     - `make vet`, `gofmt`, `make tidy-check`, and `make lint` (with
-      `make modernize`) with golangci-lint v2.14.0;
+      `make modernize`) with golangci-lint v2.15.0;
     - `make vuln` with govulncheck v1.8.0;
     - `apicheck`: the API diff gate's test, then `make apicheck`. The
       job's checkout fetches the whole history and its tags;

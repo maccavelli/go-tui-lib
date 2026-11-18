@@ -1,6 +1,7 @@
 package termcaptest
 
 import (
+	"errors"
 	"fmt"
 	"runtime"
 	"strings"
@@ -408,5 +409,30 @@ func TestSetRunTimeout(t *testing.T) {
 	}
 	if DefaultRunTimeout != 10*time.Second {
 		t.Errorf("DefaultRunTimeout = %v", DefaultRunTimeout)
+	}
+}
+
+// TestReapKilled: the error a killed program returns is expected and
+// ignored; any other error is reported
+// (docs/decisions/0029-MADR-move-golangci-lint-to-v2-15-0.md).
+func TestReapKilled(t *testing.T) {
+	boom := errors.New("boom")
+	for _, c := range []struct {
+		name string
+		err  error
+		want []string
+	}{
+		{"nil", nil, nil},
+		{"killed", tea.ErrProgramKilled, nil},
+		{"killed with a cause", fmt.Errorf("%w: %w", tea.ErrProgramKilled, boom), nil},
+		{"unexpected", boom, []string{"silent: the program, killed after the timeout, also failed: boom"}},
+	} {
+		done := make(chan error, 1)
+		done <- c.err
+		tb := &fatalTB{}
+		reapKilled(tb, "silent", done)
+		if len(tb.msgs) != len(c.want) || (len(c.want) > 0 && tb.msgs[0] != c.want[0]) {
+			t.Errorf("%s: reported %q, want %q", c.name, tb.msgs, c.want)
+		}
 	}
 }
