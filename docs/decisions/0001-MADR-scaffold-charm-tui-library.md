@@ -453,6 +453,10 @@ to go-core-lib. The email is not repeated in this record.
   `f200c51`, and the citations under More Information. GitHub redirects
   the old repository name to the new one.
 
+### A4 (2026-11-18): the golangci-lint pin is now v2.15.0
+
+* The pin this record chose, golangci-lint v2.14.0, is superseded for the version only by [0029-MADR-move-golangci-lint-to-v2-15-0.md](0029-MADR-move-golangci-lint-to-v2-15-0.md).
+
 ## More Information
 
 * go-core-lib `docs/decisions/0001-MADR-scaffold-shared-go-library.md`: the

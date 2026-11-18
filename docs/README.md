@@ -72,6 +72,8 @@ it was when they were written
 | 0027 | PLAN | [Implement accurate, comprehensive and current documents: verify the survey, fix what is wrong, describe what is missing, comment every exported name, start `CHANGELOG.md`, and bring the index current](decisions/0027-PLAN-keep-docs-accurate-and-current.md) | in-progress (one phase at a time; Phase A done, QA1 to QA3 answered, awaiting the owner's word for the next) |
 | 0028 | MADR | [Raise the floor to `go 1.27.4`, with no `toolchain` line, because this module's code needs Go 1.27](decisions/0028-MADR-raise-floor-and-toolchain-to-go-1-27-4.md) | accepted |
 | 0028 | PLAN | [Implement the floor and toolchain at `go 1.27.4`](decisions/0028-PLAN-raise-floor-and-toolchain-to-go-1-27-4.md) | complete (`v2.12.1` tagged) |
+| 0029 | MADR | [Move golangci-lint to v2.15.0, and fix the two errcheck findings in `termcaptest.Run`](decisions/0029-MADR-move-golangci-lint-to-v2-15-0.md) | accepted |
+| 0029 | PLAN | [Implement the golangci-lint v2.15.0 move](decisions/0029-PLAN-move-golangci-lint-to-v2-15-0.md) | in-progress |
 
 ## I want to…
 
